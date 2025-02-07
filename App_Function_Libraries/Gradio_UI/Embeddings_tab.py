@@ -3,7 +3,6 @@
 #
 # Imports
 import json
-import logging
 import os
 #
 # External Imports
@@ -19,7 +18,7 @@ from App_Function_Libraries.RAG.ChromaDB_Library import chroma_client, \
     store_in_chroma, situate_context
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, create_embeddings_batch
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process, chunk_for_embedding
-from App_Function_Libraries.Utils.Utils import load_and_log_configs
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, logging
 
 
 #

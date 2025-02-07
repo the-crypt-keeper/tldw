@@ -2,7 +2,6 @@
 # Description: This file contains the functions to allow for usage of different TTS providers.
 #
 # Imports
-import logging
 import os
 import tempfile
 #
@@ -11,7 +10,7 @@ import tempfile
 import requests
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_config_data, logging
 from App_Function_Libraries.TTS.TTS_Providers_Local import play_mp3, generate_audio_kokoro
 #
 #######################################################################################################################
@@ -595,7 +594,7 @@ def generate_audio_alltalk(input_text, voice=None, model=None, response_format=N
     Returns:
         str: Path to the generated audio file
     """
-
+    logging.debug("Generating audio using AllTalk API.")
     # Input validation
     try:
         if not input_text:
@@ -605,12 +604,24 @@ def generate_audio_alltalk(input_text, voice=None, model=None, response_format=N
     except Exception as e:
         logging.error(f"AllTalk: Error loading input text: {str(e)}")
         return f"AllTalk: Error loading input text: {str(e)}"
+    input_text = str(input_text)
+    logging.debug(f"AllTalk: Using input text: {input_text}")
+
+    # Handle Model
     try:
-        if input_text > 4096:
-            raise ValueError("Text input must be less than 4096 characters.")
+        if not model:
+            logging.info("AllTalk: Model not provided as parameter")
+            logging.info("AllTalk: Attempting to use model from config file")
+            model = loaded_config_data['alltalk_api']['default_alltalk_tts_model']
+            if not model:
+                logging.debug("Model must be provided")
+        if not model:
+            logging.debug("AllTalk: No model provided. Defaulting to 'placeholder'")
+            model = "placeholder"
     except Exception as e:
-        logging.error(f"AllTalk: Error loading input text(more than 4096 characters): {str(e)}")
-        return f"AllTalk: Error loading input text(more than 4096 characters): {str(e)}"
+        logging.error(f"AllTalk: Error loading model: {str(e)}")
+        return f"AllTalk: Error loading model: {str(e)}"
+    logging.debug(f"AllTalk: Using model: {model}")
 
     # Handle Voice
     try:
@@ -618,12 +629,15 @@ def generate_audio_alltalk(input_text, voice=None, model=None, response_format=N
             logging.info("AllTalk: Voice not provided as parameter")
             logging.info("AllTalk: Attempting to use voice from config file")
             voice = loaded_config_data['alltalk_api']['voice']
-
+            if voice not in ['alloy', 'echo', 'fable', 'nova', 'onyx', 'shimmer']:
+                raise ValueError("Voice must be one of: 'alloy', 'echo', 'fable', 'nova', 'onyx', 'shimmer'")
         if not voice:
-            raise ValueError("Voice is required. Default voice not found in config file and no voice selection was passed.")
+            logging.debug("AllTalk: No voice provided. Defaulting to 'alloy'")
+            voice = "alloy"
     except Exception as e:
         logging.error(f"AllTalk: Error loading voice: {str(e)}")
         return f"AllTalk: Error loading voice: {str(e)}"
+    logging.debug(f"AllTalk: Using voice: {voice}")
 
     # Handle Response Format
     try:
@@ -631,13 +645,18 @@ def generate_audio_alltalk(input_text, voice=None, model=None, response_format=N
             logging.info("AllTalk: Format not provided as parameter")
             logging.info("AllTalk: Attempting to use format from config file")
             response_format = loaded_config_data['alltalk_api']['default_alltalk_tts_output_format']
+            if response_format not in ['wav', 'mp3']:
+                logging.error("Response format must be 'wav' or 'mp3'")
+                return "Response format must be 'wav' or 'mp3'"
 
         if not response_format:
             logging.debug("AllTalk: No response format provided. Defaulting to 'wav'")
             response_format = "wav"
+
     except Exception as e:
         logging.error(f"AllTalk: Error setting format: {str(e)}")
         return f"AllTalk: Error setting format: {str(e)}"
+    logging.debug(f"AllTalk: Using response format: {response_format}")
 
     # Handle Speed
     try:
@@ -656,6 +675,7 @@ def generate_audio_alltalk(input_text, voice=None, model=None, response_format=N
     except Exception as e:
         logging.error(f"AllTalk: Error setting speed: {str(e)}")
         return f"AllTalk: Error setting speed: {str(e)}"
+    logging.debug(f"AllTalk: Using speed: {speed}")
 
     # API URL
     try:
@@ -665,6 +685,7 @@ def generate_audio_alltalk(input_text, voice=None, model=None, response_format=N
     except Exception as e:
         logging.error(f"AllTalk: Error loading API URL: {str(e)}")
         return f"AllTalk: Error loading API URL: {str(e)}"
+    logging.debug(f"AllTalk: Using API URL: {alltalk_api_url}")
 
     # Prepare request
     payload = {

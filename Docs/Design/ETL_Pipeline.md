@@ -7,7 +7,7 @@ https://towardsdatascience.com/etl-pipelines-in-python-best-practices-and-techni
 
 https://python.langchain.com/docs/integrations/document_loaders/source_code/
 https://python.langchain.com/docs/integrations/document_loaders/
-
+https://github.com/whyhow-ai/knowledge-table
 
 
 ## ETL Pipelines
@@ -56,7 +56,31 @@ https://arxiv.org/html/2410.21169
 
 ### Link Dump:
 https://github.com/shoryasethia/FinChat
+https://github.com/dgunning/edgartools
 
 
 
+ 	
+llm_trw 26 minutes ago | unvote | prev | next [–]
 
+This is using exactly the wrong tools at every stage of the OCR pipeline, and the cost is astronomical as a result.
+
+You don't use multimodal models to extract a wall of text from an image. They hallucinate constantly the second you get past perfect 100% high-fidelity images.
+
+You use an object detection model trained on documents to find the bounding boxes of each document section as _images_; each bounding box comes with a confidence score for free.
+
+You then feed each box of text to a regular OCR model, also gives you a confidence score along with each prediction it makes.
+
+You feed each image box into a multimodal model to describe what the image is about.
+
+For tables, use a specialist model that does nothing but extract tables—models like GridFormer that aren't hyped to hell and back.
+
+You then stitch everything together in an XML file because Markdown is for human consumption.
+
+You now have everything extracted with flat XML markup for each category the object detection model knows about, along with multiple types of probability metadata for each bounding box, each letter, and each table cell.
+
+You can now start feeding this data programmatically into an LLM to do _text_ processing, where you use the XML to control what parts of the document you send to the LLM.
+
+You then get chunking with location data and confidence scores of every part of the document to put as meta data into the RAG store.
+
+I've build a system that read 500k pages _per day_ using the above completely locally on a machine that cost $20k.

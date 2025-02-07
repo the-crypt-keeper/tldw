@@ -3,15 +3,18 @@
 import argparse
 import atexit
 import json
-import logging
 from logging.handlers import RotatingFileHandler
 import os
 import signal
 import sys
 import threading
 import time
-
+#
+# 3rd-Party Imports
 import nltk
+from loguru import logger
+
+from App_Function_Libraries.Metrics.logger_config import setup_logger
 
 #
 # Local Library Imports
@@ -28,23 +31,17 @@ from App_Function_Libraries.Local_File_Processing_Lib import read_paths_from_fil
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Utils.System_Checks_Lib import cuda_check, platform_check, check_ffmpeg
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, create_download_directory, \
-    extract_text_from_segments, cleanup_downloads
+    extract_text_from_segments, cleanup_downloads, logging
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
-#
-# 3rd-Party Module Imports
-#
-# OpenAI Tokenizer support
-#
-# Other Tokenizers
 #
 # Code responsible for launching GUI and leading to most functionality on line 838-862: launch UI launches the Gradio UI, which starts in the `Gradio_Related.py` file, where every tab it loads proceeds to load that page in a chain,
 # this means that the `Gradio_Related.py` file is the main file for the UI, and then calls out to all the other pieces, through the individual tabs.
 # So if you're trying to understand the codebase, start with `Gradio_Related.py` and then follow the chain of calls to understand how the UI is built/works on the backend as I've isolated/grouped most things together.
 #######################
-# Logging Setup
+# Stop Gradio Analytics
 #
-log_level = "DEBUG"
-logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
+#log_level = "DEBUG"
+#logging.basicConfig(level=getattr(logging, log_level), format='%(asctime)s - %(levelname)s - %(message)s')
 os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 #
 #############
@@ -57,9 +54,11 @@ share_public = False
 running_in_debug_mode = False
 
 # FIXME - add to config.txt
-log_file_path = os.getenv("tldw_LOG_FILE_PATH", "tldw_app_logs.json")
+log_file_path = os.getenv("tldw_LOG_FILE_PATH", "./Logs/tldw_app_logs.json")
 max_bytes = int(os.getenv("tldw_LOG_MAX_BYTES", 10 * 1024 * 1024))  # 10 MB
 backup_count = int(os.getenv("tldw_LOG_BACKUP_COUNT", 5))
+
+# logger.verbose("This is a VERBOSE message.")
 
 file_handler = RotatingFileHandler(
     log_file_path, maxBytes=max_bytes, backupCount=backup_count
@@ -685,9 +684,6 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Logging setup
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
     # Load Config
     loaded_config_data = load_and_log_configs()
 
@@ -737,7 +733,7 @@ Sample commands:
     parser.add_argument('-off', '--offset', type=int, default=0, help='Offset in seconds (default: 0)')
     parser.add_argument('-vad', '--vad_filter', action='store_true', help='Enable VAD filter')
     parser.add_argument('-log', '--log_level', type=str, default='INFO',
-                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
+                        choices=['TRACE', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], help='Log level (default: INFO)')
     parser.add_argument('-gui', '--user_interface', action='store_true', help="Launch the Gradio user interface")
     parser.add_argument('-demo', '--demo_mode', action='store_true', help='Enable demo mode')
     parser.add_argument('-prompt', '--custom_prompt', type=str,
@@ -794,27 +790,29 @@ Sample commands:
         server_port = None
 
     ########## Logging setup
-    logger = logging.getLogger()
-    logger.setLevel(getattr(logging, args.log_level))
+    # Convert the provided log level to uppercase
+    log_level = args.log_level.upper()
 
-    # Create console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, args.log_level))
-    console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(console_formatter)
+    # Remove the default Loguru handler so we can add our own sinks
+    logger.remove()
+    # '%(asctime)s - %(levelname)s - %(message)s' is mapped to Loguru’s {time} - {level} - {message}.
 
+    logger.add(
+        sys.stdout,
+        level=log_level,
+        format="{time:YYYY-MM-DD HH:mm:ss} - {level} - {message}",
+    )
     if args.log_file:
-        # Create file handler
-        file_handler = logging.FileHandler(args.log_file)
-        file_handler.setLevel(getattr(logging, args.log_level))
-        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(file_formatter)
-        logger.addHandler(file_handler)
+        # Add a file sink with the same level and format.
+        logger.add(
+            args.log_file,
+            level=log_level,
+            format="{time:YYYY-MM-DD HH:mm:ss} - {level} - {message}",
+        )
         logger.info(f"Log file created at: {args.log_file}")
-
     else:
-        logging.debug(f"Custom prompt defined, will use \n\nf{custom_prompt_input} \n\nas the prompt")
-        print(f"Custom Prompt has been defined. Custom prompt: \n\n {args.custom_prompt}")
+        logger.info(f"No Logfile declared. Using Standard logfile")
+        logger = setup_logger(args)
 
     # Check if the user wants to use the local LLM from the script
     local_llm = args.local_llm

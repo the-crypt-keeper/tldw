@@ -1,7 +1,6 @@
 # Audio_Generation_Playground.py
 # Description: Gradio UI for text-to-speech audio generation
 #
-import logging
 import os
 import time
 import gradio as gr
@@ -18,7 +17,7 @@ TTS_PROVIDERS = ["openai", "elevenlabs", "alltalk", "kokoro"]
 DEFAULT_VOICES = {
     "openai": ["alloy", "echo", "fable", "nova", "onyx", "shimmer"],
     "elevenlabs": ["21m00", "AZnzlk1XvdvUeBnXmlld"],
-    "alltalk": ["default"],
+    "alltalk": ["alloy", "echo", "fable", "nova", "onyx", "shimmer"],
     "kokoro": [ "af", "af_bella", "af_nicole", "af_sarah", "af_sky", "am_adam", "am_michael", "bf_emma",
                 "bf_isabella", "bm_george", "bm_lewis" ],
 }

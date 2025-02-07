@@ -2,19 +2,37 @@
 # Description: This file contains the functions to convert text-to-speech
 #
 # Imports
-
+import io
 import os
 from pydub import AudioSegment
 import re
 import tempfile
-from typing import List, Tuple, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 # External Imports
 #
 # Local Imports
+from App_Function_Libraries.TTS.TTS_Providers import generate_audio_openai, generate_audio_elevenlabs
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config, load_and_log_configs, logging
+
 #
 #######################################################################################################################
 #
 # Functions:
+
+# Type aliases
+AudioData = bytes
+ProviderFunction = Callable[[str, str, str], AudioData]
+
+# Provider functions
+# See TTS_Providers.py
+
+# Provider registry
+PROVIDERS: Dict[str, ProviderFunction] = {
+    "elevenlabs": generate_audio_elevenlabs,
+    "openai": generate_audio_openai,
+#    "edge": generate_audio_edge,
+}
+
 
 
 #######################################################
@@ -88,31 +106,6 @@ def test_all_tts_providers():
 #
 # Text-to-Speak Functions
 
-import logging
-from typing import Callable, Dict, Any, List, Tuple
-
-from App_Function_Libraries.TTS.TTS_Providers import generate_audio_openai, generate_audio_edge, \
-    generate_audio_elevenlabs, tts_providers
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Type aliases
-AudioData = bytes
-ProviderFunction = Callable[[str, str, str], AudioData]
-
-# Provider functions
-# See TTS_Providers.py
-
-# Provider registry
-PROVIDERS: Dict[str, ProviderFunction] = {
-    "elevenlabs": generate_audio_elevenlabs,
-    "openai": generate_audio_openai,
-    "edge": generate_audio_edge,
-}
-
-
 # Utility functions
 def clean_text(text: str) -> str:
     # Implement text cleaning logic
@@ -177,8 +170,6 @@ def tts_generate_audio_single_speaker(input_text, provider, voice, model):
         result = generate_audio_elevenlabs(input_text, voice, model)
     elif provider == "openai":
         result = generate_audio_openai(input_text, voice, model)
-    elif provider == "edge":
-        result = generate_audio_edge(input_text, voice, model)
     else:
         raise ValueError(f"No provider found / Unsupported provider: {provider}")
     # Save or process the result as needed
@@ -208,7 +199,7 @@ class TextToSpeech:
             api_key: Optional[str] = None,
             conversation_config: Optional[Dict[str, Any]] = None,
     ):
-        """
+        """from App_Function_Libraries.TTS.TTS_Providers import generate_audio_openai, generate_audio_elevenlabs
         Initialize the TextToSpeech class.
 
         Args:
@@ -217,9 +208,9 @@ class TextToSpeech:
                         api_key (Optional[str]): API key for the selected text-to-speech service.
                         conversation_config (Optional[Dict]): Configuration for conversation settings.
         """
-        self.config = load_config()
-        self.conversation_config = load_conversation_config(conversation_config)
-        self.tts_config = self.conversation_config.get("text_to_speech", {})
+        self.config = load_comprehensive_config()
+        self.conversation_config = load_and_log_configs()
+        self.tts_config = self.conversation_config.get("tts_settings", {})
 
         # Get API key from config if not provided
         if not api_key:
@@ -489,9 +480,6 @@ class TextToSpeech:
         except Exception as e:
             logger.error(f"Unexpected error during transcript validation: {str(e)}")
             raise ValueError(f"Invalid transcript format: {str(e)}")
-
-
-
-
-if __name__ == "__main__":
-    main(seed=42)
+#
+# End of TTS.py
+########################################################################################################################

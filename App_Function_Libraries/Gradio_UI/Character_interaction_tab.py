@@ -5,7 +5,6 @@
 import base64
 import io
 import uuid
-import logging
 import json
 from typing import List, Dict, Tuple, Union, Optional, Any
 #
@@ -18,7 +17,7 @@ from App_Function_Libraries.Chat.Chat_Functions import load_characters, save_cha
 from App_Function_Libraries.DB.DB_Manager import add_character_card, get_character_cards
 from App_Function_Libraries.Gradio_UI.Chat_ui import chat_wrapper
 from App_Function_Libraries.Gradio_UI.Writing_tab import generate_writing_feedback
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints, logging
 from App_Function_Libraries.Character_Chat.Character_Chat_Lib import load_character_card, parse_v2_card, parse_v1_card
 #
 ########################################################################################################################
@@ -69,7 +68,7 @@ def import_character_card(file):
             if isinstance(card_data, str):
                 logging.debug("Character card data is a string. Parsing as JSON.")
                 card_data = import_character_card_json(card_data)
-            # If the returned data is a dict and it contains the raw card keys,
+            # If the returned data is a dict, and it contains the raw card keys,
             # then process it to produce the final card format.
             elif isinstance(card_data, dict):
                 if card_data.get("spec") == "chara_card_v2":

@@ -3,7 +3,6 @@
 #
 # Imports
 import html
-import logging
 import sqlite3
 #
 # External Imports
@@ -13,14 +12,13 @@ import gradio as gr
 from App_Function_Libraries.DB.DB_Manager import search_and_display_items, get_all_document_versions, \
     fetch_item_details, get_latest_transcription, search_prompts, get_document_version
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown
+from App_Function_Libraries.Utils.Utils import logging
 #
 ###################################################################################################
 #
 # Functions:
 
-logger = logging.getLogger()
-
-
+# FIXME - Add logging to this file
 def update_detailed_view_with_versions(selected_item, item_mapping):
     if selected_item and item_mapping and selected_item in item_mapping:
         media_id = item_mapping[selected_item]

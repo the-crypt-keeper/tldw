@@ -14,7 +14,8 @@ from time import sleep
 import gradio as gr
 #
 # Local Imports
-from App_Function_Libraries.DB.DB_Manager import import_obsidian_note_to_db, logger
+from App_Function_Libraries.DB.DB_Manager import import_obsidian_note_to_db
+from App_Function_Libraries.Utils.Utils import logger
 #
 ###############################################################
 #

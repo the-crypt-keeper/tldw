@@ -15,7 +15,6 @@
 #########################################
 # Imports
 import json
-import logging
 import os
 import subprocess
 import tempfile
@@ -34,7 +33,7 @@ from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords, \
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.Summarization.Summarization_General_Lib import perform_summarization
 from App_Function_Libraries.Utils.Utils import downloaded_files, \
-    sanitize_filename, generate_unique_id, temp_files
+    sanitize_filename, generate_unique_id, temp_files, logging
 from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
 from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process

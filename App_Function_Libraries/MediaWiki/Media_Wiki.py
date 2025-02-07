@@ -4,12 +4,13 @@
 #
 # Imports
 import json
-import logging
 import os
 import re
+import sys
 import traceback
-from typing import List, Dict, Any, Iterator, Optional
+from typing import List, Dict, Any, Iterator, Optional, Union
 # 3rd-Party Imports
+from loguru import logger
 import mwparserfromhell
 import mwxml
 import yaml
@@ -17,6 +18,7 @@ import yaml
 # Local Imports
 from App_Function_Libraries.DB.DB_Manager import add_media_with_keywords
 from App_Function_Libraries.RAG.ChromaDB_Library import process_and_store_content
+from App_Function_Libraries.Utils.Utils import logging
 #
 #######################################################################################################################
 #
@@ -27,28 +29,18 @@ def load_mediawiki_import_config():
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-config = load_mediawiki_import_config()
+media_wiki_import_config = load_mediawiki_import_config()
 
-
-def setup_logger(name: str, level: int = logging.INFO, log_file: Optional[str] = None) -> logging.Logger:
-    """Set up and return a logger with the given name and level."""
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+def setup_media_wiki_logger(name: str, level: Union[int, str] = "INFO", log_file: Optional[str] = None) -> None:
+    """Set up the logger with the given name and level."""
+    logger.remove()  # Remove the default logger
+    logger.add(sys.stdout, format="{time} - {name} - {level} - {message}", level=level)
 
     if log_file:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    return logger
+        logger.add(log_file, format="{time} - {name} - {level} - {message}", level=level)
 
 # Usage
-logger = setup_logger('mediawiki_import', log_file='mediawiki_import.log')
+setup_media_wiki_logger('mediawiki_import', log_file='./Logs/mediawiki_import.log')
 
 # End of setup
 #######################################################################################################################
@@ -76,7 +68,7 @@ def parse_mediawiki_dump(file_path: str, namespaces: List[int] = None, skip_redi
                 "revision_id": revision.id,
                 "timestamp": revision.timestamp
             }
-        logger.debug(f"Yielded page: {page.title}")
+        logging.debug(f"Yielded page: {page.title}")
 
 
 def optimized_chunking(text: str, chunk_options: Dict[str, Any]) -> List[Dict[str, Any]]:

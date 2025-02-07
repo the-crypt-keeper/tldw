@@ -2,7 +2,6 @@
 # Description: Chat interface functions for Gradio
 #
 # Imports
-import logging
 import os
 import sqlite3
 import time
@@ -23,7 +22,7 @@ from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown, upda
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.TTS.TTS_Providers import generate_audio, play_mp3
 from App_Function_Libraries.Utils.Utils import default_api_endpoint, format_api_name, global_api_endpoints, \
-    loaded_config_data
+    loaded_config_data, logging
 
 
 #
@@ -130,8 +129,24 @@ def chat_wrapper(message, history, media_content, selected_parts, api_endpoint, 
         # Generate bot response
         logging.debug("chat_wrapper(): Generating bot response")
         bot_message = ""
-        response = chat(full_message, history, media_content, selected_parts, api_endpoint, api_key, custom_prompt,
-                        temperature, system_prompt, streaming, minp=None, maxp=None, model=None)
+        response = chat(full_message,
+                        history,
+                        media_content,
+                        selected_parts,
+                        api_endpoint,
+                        api_key,
+                        custom_prompt,
+                        temperature,
+                        system_message=system_prompt,
+                        streaming=streaming,
+                        minp=None,
+                        maxp=None,
+                        model=None,
+                        topp=None,
+                        topk=None,
+                        chatdict_entries=chatdict_entries,
+                        max_tokens=max_tokens,
+                        strategy=strategy)
 
         # Handle streaming and non-streaming responses
         if streaming:

@@ -70,10 +70,12 @@ https://github.com/Cloud-Code-AI/AkiraDocs
 https://ui.shadcn.com/docs
 https://www.typingmind.com/
 https://github.com/Vali-98/ChatterUI
+https://github.com/rio-labs/rio
 https://www.nngroup.com/videos/efficient-error-messages/
 https://uxdesign.cc/a-good-design-is-a-good-essay-197f4bd31c92
 https://github.com/Rugz007/liha
 https://astro.new/latest/
+https://github.com/AnswerDotAI/fasthtml
 https://github.com/lobehub/lobe-chat
 https://www.scoutos.com/
 https://github.com/FishiaT/yawullm
@@ -94,6 +96,7 @@ https://uiverse.io/elements
 https://uxdesign.cc/youre-trying-to-turn-an-oil-tanker-288ed30876e4
 https://uxdesign.cc/simple-recall-testing-for-b2b-ux-134e18330da9
 https://lovable.dev/
+https://news.ycombinator.com/item?id=42934190
 https://markwhen.com/
 https://kando.menu/
 https://deepseek-artifacts.vercel.app/

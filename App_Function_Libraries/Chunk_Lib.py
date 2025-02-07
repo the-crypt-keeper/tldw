@@ -8,7 +8,6 @@
 # Import necessary libraries
 import hashlib
 import json
-import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 import xml.etree.ElementTree as ET
@@ -24,7 +23,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 #
 # Import Local
-from App_Function_Libraries.Utils.Utils import load_and_log_configs
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, logging
 
 
 #
@@ -247,6 +246,10 @@ def chunk_text_by_words(text: str, max_words: int = 300, overlap: int = 0, langu
     logging.debug(f"Parameters: max_words={max_words}, overlap={overlap}, language={language}")
 
     try:
+        # Ensure that max_words and overlap are integers.
+        max_words = int(max_words)
+        overlap = int(overlap)
+
         if language is None:
             language = detect_language(text)
             logging.debug(f"Detected language: {language}")
@@ -1206,7 +1209,6 @@ def adaptive_chunking(text: str, base_size: int = 1000, min_size: int = 500, max
 #     'language': 'en'
 # }
 #chunks = improved_chunking_process(your_text, chunk_options)
-
 
 # Example of chunking a document with metadata
 # document_metadata = {

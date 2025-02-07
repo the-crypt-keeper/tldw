@@ -19,22 +19,20 @@
 ###############################
 # Import necessary libraries
 import json
-import logging
 import os
 import time
-from typing import Union
+from typing import Union, Any, Generator
 
-import requests
 # Import 3rd-party Libraries
-# Import Local
-from App_Function_Libraries.Utils.Utils import load_and_log_configs, extract_text_from_segments
+import requests
+#
+# Import Local Libraries
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, extract_text_from_segments, logging
+
 #
 #######################################################################################################################
 # Function Definitions
 #
-
-logger = logging.getLogger()
-
 
 summarizer_prompt = """
                     <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
@@ -455,14 +453,15 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_mess
 
 
 # https://github.com/oobabooga/text-generation-webui/wiki/12-%E2%80%90-OpenAI-API
-def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=None, temp=None, api_url="http://127.0.0.1:5000/v1/chat/completions", streaming=False):
+def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=None, temp=None, api_url=None, streaming=False):
     logging.debug("Oobabooga: Summarization process starting...")
     try:
         logging.debug("Oobabooga: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
+        ooba_api_key = None
+
         if loaded_config_data is None:
             logging.error("Failed to load configuration data")
-            ooba_api_key = None
         else:
             # Prioritize the API key passed as a parameter
             if api_key and api_key.strip():
@@ -470,134 +469,159 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=
                 logging.info("Oobabooga: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                ooba_api_key = loaded_config_data['api_keys'].get('ooba')
+                ooba_api_key = loaded_config_data['ooba_api']['api_key']
                 if ooba_api_key:
-                    logging.info("Anthropic: Using API key from config file")
+                    logging.info("Oobabooga: Using API key from config file")
                 else:
-                    logging.warning("Anthropic: No API key found in config file")
+                    logging.warning("Oobabooga: No API key found in config file")
 
-        logging.debug(f"Oobabooga: Using API Key: {ooba_api_key[:5]}...{ooba_api_key[-5:]}")
+        if not api_url:
+            api_url = loaded_config_data['ooba_api']['api_ip']
+            logging.debug(f"Oobabooga: Using API URL from config file: {api_url}")
 
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("Oobabooga: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
-        else:
-            logging.debug("Oobabooga: Using provided string data for summarization")
-            data = input_data
-
-        logging.debug(f"Oobabooga: Loaded data: {data}")
-        logging.debug(f"Oobabooga: Type of data: {type(data)}")
-
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("Oobabooga: Summary already exists in the loaded data")
-            return data['summary']
-
-        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError("Invalid input data format")
-
+        if not isinstance(api_url, str) or not api_url.startswith(('http://', 'https://')):
+            logging.error(f"Invalid API URL configured: {api_url}")
+            return "Oobabooga: Invalid API URL configured"
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
         }
-
-        if custom_prompt is None:
-            custom_prompt = f"{summarizer_prompt}\n\n\n\n{text}"
+        if ooba_api_key:
+            headers['Authorization'] = f'Bearer {ooba_api_key}'
+            logging.debug(f"Oobabooga: Using API Key: {ooba_api_key[:5]}...{ooba_api_key[-5:]}")
         else:
-            custom_prompt = f"{custom_prompt}\n\n\n\n{text}"
+            logging.debug("Oobabooga: No API key provided")
 
-        logging.debug("Ooba Summarize: Prompt being sent is {kobold_prompt}")
+        # Input data handling
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                try:
+                    data = json.loads(input_data)
+                    logging.debug("Oobabooga: Parsed JSON string input")
+                except json.JSONDecodeError as e:
+                    logging.error(f"Oobabooga: Error parsing JSON string: {str(e)}")
+                    return f"Oobabooga: Error parsing JSON input: {str(e)}"
+            elif os.path.isfile(input_data):
+                logging.debug("Oobabooga: Loading JSON data from file")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                data = input_data
+                logging.debug("Oobabooga: Using provided string data")
+        else:
+            data = input_data
 
-        ooba_prompt = f"{text}" + f"\n\n\n\n{custom_prompt}"
-        logging.debug("ooba: Prompt being sent is {ooba_prompt}")
+        logging.debug(f"Oobabooga: Processed data type: {type(data)}")
 
+        # Check for existing summary
+        if isinstance(data, dict) and 'summary' in data:
+            logging.debug("Oobabooga: Summary already exists")
+            return data['summary']
+
+        # Text extraction
+        if isinstance(data, dict):
+            if 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError("Oobabooga: Invalid input data format")
+
+        # Construct prompt
+        summarizer_prompt = "Please summarize the following text:"  # Define this if not already
+        if custom_prompt is None:
+            custom_prompt = summarizer_prompt
+        ooba_prompt = f"{text}\n\n\n\n{custom_prompt}"
+        logging.debug(f"Oobabooga: Prompt being sent is {ooba_prompt[:500]}...")
+
+        # System message handling
         if system_message is None:
             system_message = "You are a helpful AI assistant."
 
+        # Temperature handling
+        if temp is None:
+            # Check config
+            if 'temperature' in loaded_config_data['ooba_api']:
+                temp = loaded_config_data['ooba_api']['temperature']
+            else:
+                temp = 0.7
+
+        # Prepare API payload
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": ooba_prompt}
+        ]
         data = {
             "mode": "chat",
-            "character": "Example",
-            "messages": [{"role": "user", "content": ooba_prompt}],
-            "system_message": system_message,
-            "stream": streaming
+            "messages": messages,
+            "stream": streaming,
+            "temperature": temp,
         }
 
         if streaming:
-            logging.debug("Ooba Summarization: Streaming mode enabled")
+            logging.debug("Oobabooga: Streaming mode enabled")
+            response = requests.post(api_url, headers=headers, json=data, stream=True)
+            response.raise_for_status()
             try:
-                # Send the request with streaming enabled
-                response = requests.post(
-                    api_url, headers=headers, json=data, stream=True
-                )
-                logging.debug(
-                    "Ooba Summarization: API Response Status Code: %d",
-                    response.status_code,
-                )
-
-                if response.status_code == 200:
-                    # Process the streamed response
+                def stream_generator():
+                    collected_messages = ""
                     for line in response.iter_lines():
                         if line:
-                            decoded_line = line.decode('utf-8')
-                            logging.debug(
-                                "Ooba: Received streamed data: %s", decoded_line
-                            )
-                            # OpenAI API streams data prefixed with 'data: '
+                            decoded_line = line.decode('utf-8').strip()
                             if decoded_line.startswith('data: '):
-                                content = decoded_line[len('data: '):].strip()
+                                content = decoded_line[len('data: '):]
                                 if content == '[DONE]':
                                     break
                                 try:
                                     data_chunk = json.loads(content)
-                                    if 'choices' in data_chunk and len(data_chunk['choices']) > 0:
+                                    if 'choices' in data_chunk and data_chunk['choices']:
                                         delta = data_chunk['choices'][0].get('delta', {})
-                                        text = delta.get('content', '')
-                                        if text:
-                                            yield text
-                                    else:
-                                        logging.error(
-                                            "Ooba: Expected data not found in streamed response."
-                                        )
+                                        if 'content' in delta:
+                                            chunk = delta['content']
+                                            collected_messages += chunk
+                                            yield chunk
                                 except json.JSONDecodeError as e:
-                                    logging.error(
-                                        "Ooba: Error decoding streamed JSON: %s", str(e)
-                                    )
-                            else:
-                                logging.debug("Ooba: Ignoring line: %s", decoded_line)
-                else:
-                    logging.error(
-                        f"Ooba: API request failed with status code {response.status_code}: {response.text}"
-                    )
-                    yield f"Ooba: API request failed: {response.text}"
-            except Exception as e:
-                logging.error("Ooba: Error in processing: %s", str(e))
-                yield f"Ooba: Error occurred while processing summary with Ooba: {str(e)}"
+                                    logging.error(f"JSON decode error: {str(e)}")
+                                    continue
+
+                return stream_generator()
+            except requests.RequestException as e:
+                logging.error(f"Error streaming summary with Oobabooga: {e}")
+                return f"Error summarizing with Oobabooga: {str(e)}"
         else:
-            logging.debug("Ooba: Submitting request to API endpoint for summarization")
-            print("Ooba: Submitting request to API endpoint for summarization")
-            response = requests.post(api_url, headers=headers, json=data, verify=False)
-            logging.debug("Ooba: API Response Data: %s", response)
+            logging.debug("Oobabooga: Posting request")
+            response = requests.post(api_url, headers=headers, json=data)
 
             if response.status_code == 200:
                 response_data = response.json()
-                summary = response.json()['choices'][0]['message']['content']
-                logging.debug("Ooba: Summarization successful")
-                print("Summarization successful.")
-                return summary
+                logging.debug("Ooba API request successful")
+                logging.debug(response_data)
+                if 'choices' in response_data and response_data['choices']:
+                    logging.debug("Ooba API: Summarization successful")
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug(f"Ooba API: Summary (first 500 chars): {summary[:500]}...")
+                    return summary
+                else:
+                    error_msg = f"Ooba API request failed: {response.status_code} - {response.text}"
+                    logging.error(error_msg)
+                    return error_msg
             else:
-                logging.error(f"oobabooga: API request failed with status code {response.status_code}: {response.text}")
-                return f"Ooba: Summarization API request failed with status code {response.status_code}: {response.text}"
-
+                logging.error(f"Ooba API: Summarization failed with status code {response.status_code}")
+                logging.error(f"Ooba API: Error response: {response.text}")
+                return f"Ooba API: Failed to process summary. Status code: {response.status_code}"
+    except json.JSONDecodeError as e:
+        logging.error(f"Ooba API: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"Ooba API: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"Ooba API: Error making API request: {str(e)}", exc_info=True)
+        return f"Ooba API: Error making API request: {str(e)}"
     except Exception as e:
-        logging.error("ooba: Error in processing: %s", str(e))
-        return f"Ooba: Error occurred while processing summary with oobabooga: {str(e)}"
+        logging.error(f"Ooba API: Unexpected error: {str(e)}", exc_info=True)
+        return f"Ooba API: Unexpected error occurred: {str(e)}"
 
 
 def summarize_with_tabbyapi(
@@ -760,159 +784,166 @@ def summarize_with_tabbyapi(
             return f"TabbyAPI: Unexpected error in summarization process: {str(e)}"
 
 
-def summarize_with_vllm(
-        input_data: Union[str, dict, list],
-        custom_prompt_input: str,
-        api_key: str = None,
-        model: str = None,
-        system_prompt: str = None,
-        temp: float = 0.7,
-        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions",
-        streaming=False
-) -> Union[str]:
-    logging.debug("vLLM: Summarization process starting...")
+def summarize_with_vllm(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     try:
-        logging.debug("vLLM: Loading and validating configurations")
-        loaded_config_data = load_and_log_configs()
-        if loaded_config_data is None:
-            logging.error("Failed to load configuration data")
-            vllm_api_key = None
-        else:
-            # Prioritize the API key passed as a parameter
-            if api_key and api_key.strip():
-                vllm_api_key = api_key
-                logging.info("vLLM: Using API key provided as parameter")
-            else:
-                # If no parameter is provided, use the key from the config
-                vllm_api_key = loaded_config_data['api_keys'].get('vllm')
-                if vllm_api_key:
-                    logging.info("vLLM: Using API key from config file")
-                else:
-                    logging.warning("vLLM: No API key found in config file")
-            if vllm_api_url:
-                logging.debug(f"vLLM: Using API URL: {vllm_api_url}")
-            else:
-                if 'vllm' in loaded_config_data['api_urls']:
-                    vllm_api_url = loaded_config_data['local_api_ip']['vllm']
-                    logging.info(f"vLLM: Using API URL from config file: {vllm_api_url}")
-                else:
-                    logging.error("vLLM: API URL not found in config file")
+        # API key validation
+        if not api_key or api_key.strip() == "":
+            logging.info("vLLM Summarize: API key not provided as parameter")
+            logging.info("vLLM Summarize: Attempting to use API key from config file")
+            loaded_config_data = load_and_log_configs()
+            api_key = loaded_config_data.get('vllm_api', {}).get('api_key', "")
+            logging.debug(f"vLLM Summarize: Using API key from config file: {api_key[:5]}...{api_key[-5:]}")
 
-        logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:] if vllm_api_key else 'None'}")
-        # Process input data
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("vLLM: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
+        if not api_key or api_key.strip() == "":
+            logging.error("vLLM Summarize: API key not found or is empty")
+            logging.debug("vLLM Summarize: API Key Not Provided/Found in Config file or is empty")
+
+        logging.debug(f"vLLM Summarize: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        # Input data handling
+        logging.debug(f"vLLM Summarize: Raw input data type: {type(input_data)}")
+        logging.debug(f"vLLM Summarize: Raw input data (first 500 chars): {str(input_data)[:500]}...")
+
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                # It's likely a JSON string
+                logging.debug("vLLM Summarize: Parsing provided JSON string data for summarization")
+                try:
+                    data = json.loads(input_data)
+                except json.JSONDecodeError as e:
+                    logging.error(f"vLLM Summarize: Error parsing JSON string: {str(e)}")
+                    return f"vLLM Summarize: Error parsing JSON input: {str(e)}"
+            elif os.path.isfile(input_data):
+                logging.debug("vLLM Summarize: Loading JSON data from file for summarization")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                logging.debug("vLLM Summarize: Using provided string data for summarization")
+                data = input_data
         else:
-            logging.debug("vLLM: Using provided data for summarization")
             data = input_data
 
-        logging.debug(f"vLLM: Type of data: {type(data)}")
+        logging.debug(f"vLLM Summarize: Processed data type: {type(data)}")
+        logging.debug(f"vLLM Summarize: Processed data (first 500 chars): {str(data)[:500]}...")
 
-        # Extract text for summarization
-        if isinstance(data, dict) and 'summary' in data:
-            logging.debug("vLLM: Summary already exists in the loaded data")
-            return data['summary']
+        # Text extraction
+        if isinstance(data, dict):
+            if 'summary' in data:
+                logging.debug("vLLM Summarize: Summary already exists in the loaded data")
+                return data['summary']
+            elif 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)  # Convert dict to string if no specific format
         elif isinstance(data, list):
             text = extract_text_from_segments(data)
         elif isinstance(data, str):
             text = data
-        elif isinstance(data, dict):
-            text = json.dumps(data)
         else:
-            raise ValueError("Invalid input data format")
+            raise ValueError(f"vLLM Summarize: Invalid input data format: {type(data)}")
 
-        logging.debug(f"vLLM: Extracted text (showing first 500 chars): {text[:500]}...")
+        logging.debug(f"vLLM Summarize: Extracted text (first 500 chars): {text[:500]}...")
+        logging.debug(f"vLLM Summarize: Custom prompt: {custom_prompt_arg}")
 
-        if system_prompt is None:
-            system_prompt = "You are a helpful AI assistant."
+        config_settings = load_and_log_configs()
+        vllm_model = config_settings['vllm_api']['model']
+        logging.debug(f"vLLM Summarize: Using model: {vllm_model}")
 
-        if custom_prompt_input is None:
-            custom_prompt_input = f"{summarizer_prompt}\n\n\n\n{text}"
-        else:
-            custom_prompt_input = f"{custom_prompt_input}\n\n\n\n{text}"
-
-        model = model or loaded_config_data['models']['vllm']
-        if system_prompt is None:
-            system_prompt = "You are a helpful AI assistant."
-
-        # Prepare the API request
         headers = {
-            "Content-Type": "application/json"
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
         }
-        if vllm_api_key:
-            headers["Authorization"] = f"Bearer {vllm_api_key}"
 
-        payload = {
-            "model": model,
+        logging.debug(
+            f"vLLM API Key: {api_key[:5]}...{api_key[-5:] if api_key else None}")
+        logging.debug("vLLM Summarize: Preparing data + prompt for submittal")
+        user_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        if temp is None:
+            temp = load_and_log_configs()['vllm_api']['temperature']
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+        temp = float(temp)
+
+        # Set max tokens
+        max_tokens = load_and_log_configs()['vllm_api']['max_tokens']
+        max_tokens = int(max_tokens)
+        logging.debug(f"vLLM Summarize: Using max tokens: {max_tokens}")
+
+        # Prepare data payload
+        data = {
+            "model": vllm_model,
             "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"{custom_prompt_input}\n\n{text}"},
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_prompt}
             ],
+            "max_tokens": max_tokens,
             "temperature": temp,
-            "stream": streaming
+            "stream": streaming,
         }
 
-        logging.debug(f"vLLM: Sending request to {vllm_api_url}")
+        # Setup URL
+        url = load_and_log_configs()['vllm_api']['api_ip']
 
+        # Handle streaming
         if streaming:
-            # Send the request with streaming enabled
-            response = requests.post(vllm_api_url, headers=headers, json=payload, stream=True)
+            response = requests.post(
+                url,
+                headers=headers,
+                json=data,
+                stream=True
+            )
             response.raise_for_status()
-            # Process the streamed response
-            for line in response.iter_lines():
-                if line:
-                    decoded_line = line.decode('utf-8').strip()
-                    if decoded_line.startswith('data: '):
-                        data_line = decoded_line[len('data: '):]
-                        if data_line == '[DONE]':
+
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
+
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
                             break
                         try:
-                            data_json = json.loads(data_line)
-                            if 'choices' in data_json and len(data_json['choices']) > 0:
-                                delta = data_json['choices'][0].get('delta', {})
-                                content = delta.get('content', '')
-                                if content:
-                                    yield content
-                        except json.JSONDecodeError as e:
-                            logging.error(f"vLLM: Failed to parse JSON streamed data: {str(e)}")
-                    else:
-                        logging.debug(f"vLLM: Received non-data line: {decoded_line}")
-        else:
-            # Make the API call
-            logging.debug(f"vLLM: Sending request to {vllm_api_url}")
-            response = requests.post(vllm_api_url, headers=headers, json=payload)
-            # Check for successful response
-            response.raise_for_status()
-            # Extract and return the summary
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content']
-                logging.debug("vLLM: Summarization successful")
-                logging.debug(f"vLLM: Summary (first 500 chars): {summary[:500]}...")
-                return summary
-            else:
-                raise ValueError("Unexpected response format from vLLM API")
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"OpenAI: Error decoding JSON from line: {line}")
+                            continue
 
-    except requests.RequestException as e:
-        logging.error(f"vLLM: API request failed: {str(e)}")
-        if streaming:
-            yield f"Error: vLLM API request failed - {str(e)}"
+            return stream_generator()
+        # Handle non-streaming
         else:
-            return f"Error: vLLM API request failed - {str(e)}"
+            logging.debug("vLLM Summarization: Posting request")
+            response = requests.post(url, headers=headers, json=data)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("vLLM Summarization: Summarization successful")
+                    logging.debug(f"vLLM Summarization: Summary (first 500 chars): {summary[:500]}...")
+                    return summary
+                else:
+                    logging.warning("vLLM Summarization: Summary not found in the response data")
+                    return "vLLM Summarization: Summary not available"
+            else:
+                logging.error(f"vLLM Summarization: Summarization failed with status code {response.status_code}")
+                logging.error(f"vLLM Summarization: Error response: {response.text}")
+                return f"vLLM Summarization: Failed to process summary. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
-        logging.error(f"vLLM: Failed to parse API response: {str(e)}")
-        if streaming:
-            yield f"Error: Failed to parse vLLM API response - {str(e)}"
-        else:
-            return f"Error: Failed to parse vLLM API response - {str(e)}"
+        logging.error(f"vLLM Summarization: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"vLLM Summarization: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"vLLM Summarization: Error making API request: {str(e)}", exc_info=True)
+        return f"vLLM Summarization: Error making API request: {str(e)}"
     except Exception as e:
-        logging.error(f"vLLM: Unexpected error during summarization: {str(e)}")
-        if streaming:
-            yield f"Error: Unexpected error during vLLM summarization - {str(e)}"
-        else:
-            return f"Error: Unexpected error during vLLM summarization - {str(e)}"
+        logging.error(f"vLLM Summarization: Unexpected error: {str(e)}", exc_info=True)
+        return f"vLLM Summarization: Unexpected error occurred: {str(e)}"
 
 
 def summarize_with_ollama(
@@ -1178,7 +1209,7 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
             raise ValueError(f"Custom OpenAI API: Invalid input data format: {type(data)}")
 
         logging.debug(f"Custom OpenAI API: Extracted text (first 500 chars): {text[:500]}...")
-        logging.debug(f"v: Custom prompt: {custom_prompt_arg}")
+        logging.debug(f"Custom OpenAI API: Custom prompt: {custom_prompt_arg}")
 
         if input_data is None:
             input_data = f"{summarizer_prompt}\n\n\n\n{text}"

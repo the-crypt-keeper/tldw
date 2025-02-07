@@ -16,11 +16,11 @@
 #
 ####################
 # Import necessary libraries
+import inspect
 import json
-import logging
 import os
 import time
-from typing import Optional
+from typing import Optional, Any, Generator, Literal
 #
 import requests
 #
@@ -34,7 +34,7 @@ from App_Function_Libraries.Summarization.Local_Summarization_Lib import summari
     summarize_with_ollama, summarize_with_custom_openai
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Utils.Utils import (load_and_log_configs, sanitize_filename, clean_youtube_url,
-                                                create_download_directory, is_valid_url)
+                                                create_download_directory, is_valid_url, logging)
 from App_Function_Libraries.Video_DL_Ingestion_Lib import download_video, extract_video_info
 #
 #######################################################################################################################
@@ -52,7 +52,7 @@ def summarize(
     temp: Optional[float],
     system_message: Optional[str],
     streaming: Optional[bool] = False
-) -> str:
+):
     try:
         logging.debug(f"api_name type: {type(api_name)}, value: {api_name}")
         if api_name.lower() == "openai":
@@ -78,11 +78,12 @@ def summarize(
         elif api_name.lower() == "kobold":
             return summarize_with_kobold(input_data, api_key, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "ooba":
-            return summarize_with_oobabooga(input_data, api_key, custom_prompt_arg, temp, system_message, streaming)
+            return summarize_with_oobabooga(input_data, api_key, custom_prompt_arg, system_message,
+                                                                      temp=None, api_url=None, streaming=False)
         elif api_name.lower() == "tabbyapi":
             return summarize_with_tabbyapi(input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "vllm":
-            return summarize_with_vllm(input_data, custom_prompt_arg, None, system_message, streaming)
+            return summarize_with_vllm(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "local-llm":
             return summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "huggingface":
@@ -122,7 +123,6 @@ def extract_text_from_segments(segments):
 
 
 def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
-
     try:
         # API key validation
         if not api_key or api_key.strip() == "":
@@ -208,6 +208,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": openai_prompt}
             ],
+            # FIXME - Set a Max tokens value in config file for each API
             "max_tokens": 4096,
             "temperature": temp,
             "stream": streaming
@@ -1500,13 +1501,12 @@ def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, sys
 #
 # Gradio File Processing
 
-
 # Handle multiple videos as input
 def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_input, offset, api_name, api_key, vad_filter,
                        download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
                        keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
                        chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens,  chunk_by_semantic,
-                       semantic_chunk_size, semantic_chunk_overlap, recursive_summarization):
+                       semantic_chunk_size, semantic_chunk_overlap, recursive_summarization, full_text_with_metadata):
     global current_progress
     progress = []  # This must always be a list
     status = []  # This must always be a list
@@ -1564,7 +1564,8 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
                                                                                           chunk_by_semantic=chunk_by_semantic,
                                                                                           semantic_chunk_size=semantic_chunk_size,
                                                                                           semantic_chunk_overlap=semantic_chunk_overlap,
-                                                                                          recursive_summarization=recursive_summarization)
+                                                                                          recursive_summarization=recursive_summarization,
+                                                                                          full_text_with_metadata=full_text_with_metadata)
             # Update progress and transcription properly
 
             current_progress, current_status = update_progress(index, url, "Video processed and ingested into the database.")
@@ -1580,7 +1581,7 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
 
     success_message = "All videos have been transcribed, summarized, and ingested into the database successfully."
     return current_progress, success_message, None, None, None, None
-
+    #return current_progress, success_message, summary, json_file_path, summary_file_path, None
 
 def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False, overwrite=False):
     temp_files = []
@@ -1786,18 +1787,43 @@ def save_transcription_and_summary(transcription_text, summary_text, download_pa
         return None, None
 
 
+# FIXME
 def summarize_chunk(api_name, text, custom_prompt_input, api_key, temp=None, system_message=None):
     logging.debug("Entered 'summarize_chunk' function")
     if api_name in (None, "None", "none"):
         logging.warning("summarize_chunk: API name not provided for summarization")
         return "No summary available"
+
     try:
         result = summarize(text, custom_prompt_input, api_name, api_key, temp, system_message)
-        if result is None or result.startswith("Error:"):
-            logging.warning(f"Summarization with {api_name} failed: {result}")
+
+        # Handle streaming generator responses
+        if inspect.isgenerator(result):
+            logging.debug(f"Handling streaming response from {api_name}")
+            collected_chunks = []
+            for chunk in result:
+                # Check for error chunks first
+                if isinstance(chunk, str) and chunk.startswith("Error:"):
+                    logging.warning(f"Streaming error from {api_name}: {chunk}")
+                    return chunk
+                collected_chunks.append(chunk)
+            final_result = "".join(collected_chunks)
+            logging.info(f"Summarization with {api_name} streaming successful")
+            return final_result
+
+        # Handle regular string responses
+        elif isinstance(result, str):
+            if result.startswith("Error:"):
+                logging.warning(f"Summarization with {api_name} failed: {result}")
+                return None
+            logging.info(f"Summarization with {api_name} successful")
+            return result
+
+        # Handle unexpected response types
+        else:
+            logging.error(f"Unexpected response type from {api_name}: {type(result)}")
             return None
-        logging.info(f"Summarization with {api_name} successful")
-        return result
+
     except Exception as e:
         logging.error(f"Error in summarize_chunk with {api_name}: {str(e)}", exc_info=True)
         return None
@@ -1844,63 +1870,91 @@ def format_input_with_metadata(metadata, content):
     formatted_input += content
     return formatted_input
 
-def perform_summarization(api_name, input_data, custom_prompt_input, api_key, recursive_summarization=False, temp=None, system_message=None):
+
+def perform_summarization(api_name, input_data, custom_prompt_input, api_key,
+                          recursive_summarization=False, temp=None, system_message=None,
+                          chunked_summarization=False):
+    """
+    Perform summarization on the given input data using the specified API and optional chunking/recursive strategy.
+    This function ensures that if the underlying call produces a generator (e.g. from streaming),
+    we fully consume it here so that only a final string is returned.
+    """
     loaded_config_data = load_and_log_configs()
     logging.info("Starting summarization process...")
+
     if system_message is None:
-        system_message = """
-        You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
-**Bulleted Note Creation Guidelines**
-
-**Headings**:
-- Based on referenced topics, not categories like quotes or terms
-- Surrounded by **bold** formatting 
-- Not listed as bullet points
-- No space between headings and list items underneath
-
-**Emphasis**:
-- **Important terms** set in bold font
-- **Text ending in a colon**: also bolded
-
-**Review**:
-- Ensure adherence to specified format
-- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
+        system_message = (
+            "You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, "
+            "you should follow these guidelines: Use multiple headings based on the referenced topics, "
+            "not categories like quotes or terms. Headings should be surrounded by bold formatting and not be "
+            "listed as bullet points themselves. Leave no space between headings and their corresponding list items "
+            "underneath. Important terms within the content should be emphasized by setting them in bold font. "
+            "Any text that ends with a colon should also be bolded. Before submitting your response, review the "
+            "instructions, and make any corrections necessary to adhered to the specified format. Do not reference "
+            "these instructions within the notes.``` \nBased on the content between backticks create comprehensive "
+            "bulleted notes.\n"
+            "**Bulleted Note Creation Guidelines**\n\n"
+            "**Headings**:\n"
+            "- Based on referenced topics, not categories like quotes or terms\n"
+            "- Surrounded by **bold** formatting\n"
+            "- Not listed as bullet points\n"
+            "- No space between headings and list items underneath\n\n"
+            "**Emphasis**:\n"
+            "- **Important terms** set in bold font\n"
+            "- **Text ending in a colon**: also bolded\n\n"
+            "**Review**:\n"
+            "- Ensure adherence to specified format\n"
+            "- Do not reference these instructions in your response."
+        )
 
     try:
         logging.debug(f"Input data type: {type(input_data)}")
         logging.debug(f"Input data (first 500 chars): {str(input_data)[:500]}...")
 
-        # Extract metadata and content
+        # Extract metadata and content from the incoming data.
         metadata, content = extract_metadata_and_content(input_data)
-
         logging.debug(f"Extracted metadata: {metadata}")
         logging.debug(f"Extracted content (first 500 chars): {content[:500]}...")
 
-        # Prepare a structured input for summarization
+        # Prepare a combined "structured" input (e.g. with title/author + content).
         structured_input = format_input_with_metadata(metadata, content)
 
-        # Perform summarization on the structured input
+        # Decide whether to do chunked or recursive summarization vs. direct summarization.
         if recursive_summarization:
             chunk_options = {
-                'method': 'words',  # or 'sentences', 'paragraphs', 'tokens' based on your preference
-                'max_size': 1000,  # adjust as needed
-                'overlap': 100,  # adjust as needed
+                'method': 'words',     # Could also be 'sentences', 'paragraphs', or 'tokens'
+                'max_size': 1000,      # Adjust chunk size as needed
+                'overlap': 100,        # Overlap between chunks (in words/sentences/etc.)
                 'adaptive': False,
                 'multi_level': False,
                 'language': 'english'
             }
             chunks = improved_chunking_process(structured_input, chunk_options)
             logging.debug(f"Chunking process completed. Number of chunks: {len(chunks)}")
-            logging.debug("Now performing recursive summarization on each chunk...")
-            logging.debug("summary = recursive_summarize_chunks")
-            summary = recursive_summarize_chunks([chunk['text'] for chunk in chunks],
-                                                 lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key),
-                                                 custom_prompt_input, temp, system_message)
-        else:
-            logging.debug("summary = summarize_chunk")
-            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key, temp, system_message)
+            logging.debug("Performing recursive summarization on each chunk...")
 
-        # add some actual validation logic
+            summary = recursive_summarize_chunks(
+                [chunk['text'] for chunk in chunks],
+                lambda x: summarize_chunk(api_name, x, custom_prompt_input, api_key),
+                custom_prompt_input, temp, system_message
+            )
+
+        elif chunked_summarization:
+            logging.debug("Using summarize_chunk for chunked summarization.")
+            summary = summarize_chunk(api_name, structured_input, custom_prompt_input, api_key, temp, system_message)
+        else:
+            logging.debug("Using direct summarize (no chunking/recursive).")
+            summary = summarize(structured_input, custom_prompt_input, api_name, api_key, temp, system_message)
+
+        # If the summary is a generator, consume it here
+        if inspect.isgenerator(summary):
+            logging.debug(f"{api_name} returned a generator; consuming it now.")
+            collected = []
+            for token in summary:
+                collected.append(token)
+            summary = "".join(collected)
+
+        # Optional: if summary is valid, write to a file for debugging (only if input_data is a file path).
         if summary is not None:
             logging.info(f"Summary generated using {api_name} API")
             if isinstance(input_data, str) and os.path.exists(input_data):
@@ -1911,7 +1965,6 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
             logging.warning(f"Failed to generate summary using {api_name} API")
 
         logging.info("Summarization completed successfully.")
-
         return summary
 
     except requests.exceptions.ConnectionError:
@@ -1919,7 +1972,10 @@ def perform_summarization(api_name, input_data, custom_prompt_input, api_key, re
     except Exception as e:
         logging.error(f"Error summarizing with {api_name}: {str(e)}", exc_info=True)
         return f"An error occurred during summarization: {str(e)}"
+
+    # Fallback if something unexpected happens.
     return None
+
 
 def extract_text_from_input(input_data):
     if isinstance(input_data, str):
@@ -1955,7 +2011,6 @@ def extract_text_from_input(input_data):
     return '\n\n'.join(text_parts)
 
 
-
 def process_url(
         url,
         num_speakers,
@@ -1988,7 +2043,8 @@ def process_url(
         recursive_summarization=False,
         temp=None,
         system_message=None,
-        streaming=False,):
+        streaming=False,
+        full_text_with_metadata=None):
     # Handle the chunk summarization options
     set_chunk_txt_by_words = chunk_text_by_words
     set_max_txt_chunk_words = max_words
@@ -2015,7 +2071,7 @@ def process_url(
             return process_video_urls(urls, num_speakers, whisper_model, custom_prompt_input, offset, api_name, api_key, vad_filter,
                                       download_video_flag, download_audio, rolling_summarization, detail_level, question_box,
                                       keywords, chunk_text_by_words, max_words, chunk_text_by_sentences, max_sentences,
-                                      chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens, chunk_by_semantic, semantic_chunk_size, semantic_chunk_overlap, recursive_summarization)
+                                      chunk_text_by_paragraphs, max_paragraphs, chunk_text_by_tokens, max_tokens, chunk_by_semantic, semantic_chunk_size, semantic_chunk_overlap, recursive_summarization, full_text_with_metadata)
         else:
             urls = [url]
 
@@ -2035,19 +2091,23 @@ def process_url(
 
     # If URL/Local video file is provided
     try:
+        # Extract video info and create download directory.
         info_dict, title = extract_video_info(url)
         download_path = create_download_directory(title)
         current_whsiper_model = whisper_model
+
+        # Download the video and perform transcription.
         video_path = download_video(url, download_path, info_dict, download_video_flag, current_whsiper_model)
         global segments
         audio_file_path, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
 
+        # Set transcription_text based on whether diarization is enabled.
         if diarize:
             transcription_text = combine_transcription_and_diarization(audio_file_path)
         else:
+            # Note: transcription_text is a dictionary with keys 'audio_file' and 'transcription'
             audio_file, segments = perform_transcription(video_path, offset, whisper_model, vad_filter)
             transcription_text = {'audio_file': audio_file, 'transcription': segments}
-
 
         if audio_file_path is None or segments is None:
             logging.error("Process_URL: Transcription failed or segments not available.")
@@ -2055,11 +2115,9 @@ def process_url(
 
         logging.debug(f"Process_URL: Transcription audio_file: {audio_file_path}")
         logging.debug(f"Process_URL: Transcription segments: {segments}")
-
         logging.debug(f"Process_URL: Transcription text: {transcription_text}")
 
-        # FIXME - Implement chunking calls here
-        # Implement chunking calls here
+        # Handle chunking
         chunked_transcriptions = []
         if chunk_text_by_words:
             chunked_transcriptions = chunk_text_by_words(transcription_text['transcription'], max_words)
@@ -2072,7 +2130,19 @@ def process_url(
         elif chunk_by_semantic:
             chunked_transcriptions = semantic_chunking(transcription_text['transcription'], semantic_chunk_size, 'tokens')
 
-        # If we did chunking, we now have the chunked transcripts in 'chunked_transcriptions'
+        # Create a full text with metadata
+        if full_text_with_metadata is None:
+            # If transcription_text is a dictionary, extract the actual transcription text.
+            if isinstance(transcription_text, dict) and 'transcription' in transcription_text:
+                transcription_str = '\n'.join(segment.get('Text', '') for segment in transcription_text['transcription'])
+            elif isinstance(transcription_text, list):
+                transcription_str = '\n'.join(segment.get('Text', '') for segment in transcription_text)
+            else:
+                transcription_str = str(transcription_text)
+            # Concatenate the metadata and the extracted transcription text.
+            full_text_with_metadata = f"{json.dumps(info_dict, indent=2)}\n\n{transcription_str}"
+
+                # If we did chunking, we now have the chunked transcripts in 'chunked_transcriptions'
         elif rolling_summarization:
         # FIXME - rolling summarization
         #     text = extract_text_from_segments(segments)
@@ -2094,11 +2164,9 @@ def process_url(
             pass
         else:
             pass
-
         summarized_chunk_transcriptions = []
-
-        if chunk_text_by_words or chunk_text_by_sentences or chunk_text_by_paragraphs or chunk_text_by_tokens or chunk_by_semantic and api_name:
-            # Perform summarization based on chunks
+        if (chunk_text_by_words or chunk_text_by_sentences or chunk_text_by_paragraphs or
+            chunk_text_by_tokens or chunk_by_semantic) and api_name:
             for chunk in chunked_transcriptions:
                 summarized_chunks = []
                 if api_name == "anthropic":
@@ -2123,7 +2191,7 @@ def process_url(
                 elif api_name == "Kobold":
                     summary = summarize_with_kobold(chunk, None, custom_prompt_input, system_message, temp, streaming)
                 elif api_name == "Ooba":
-                    summary = summarize_with_oobabooga(chunk, None, custom_prompt_input, system_message, temp, streaming)
+                    summary = summarize_with_oobabooga(chunk, None, custom_prompt_input, system_message, temp, api_url=None, streaming=False)
                 elif api_name == "Tabbyapi":
                     summary = summarize_with_tabbyapi(chunk, custom_prompt_input, system_message, None, temp, streaming)
                 elif api_name == "VLLM":
@@ -2135,22 +2203,23 @@ def process_url(
                 #elif api_name == "custom_openai_api_2":
                     #summary = summarize_with_custom_openai_2(chunk, custom_prompt_input, api_key, temp=None,
                     #                                       system_message=None, streaming)
-
+                else:
+                    summary = None
                 summarized_chunk_transcriptions.append(summary)
 
-        # Combine chunked transcriptions into a single file
-        combined_transcription_text = '\n\n'.join(chunked_transcriptions)
-        combined_transcription_file_path = os.path.join(download_path, 'combined_transcription.txt')
-        with open(combined_transcription_file_path, 'w') as f:
-            f.write(combined_transcription_text)
+                # Combine chunked transcriptions and summaries.
+                combined_transcription_text = '\n\n'.join(chunked_transcriptions)
+                combined_transcription_file_path = os.path.join(download_path, 'combined_transcription.txt')
+                with open(combined_transcription_file_path, 'w') as f:
+                    f.write(combined_transcription_text)
 
-        # Combine summarized chunk transcriptions into a single file
-        combined_summary_text = '\n\n'.join(summarized_chunk_transcriptions)
-        combined_summary_file_path = os.path.join(download_path, 'combined_summary.txt')
-        with open(combined_summary_file_path, 'w') as f:
-            f.write(combined_summary_text)
+                # Combine summarized chunk transcriptions into a single file
+                combined_summary_text = '\n\n'.join(summarized_chunk_transcriptions)
+                combined_summary_file_path = os.path.join(download_path, 'combined_summary.txt')
+                with open(combined_summary_file_path, 'w') as f:
+                    f.write(combined_summary_text)
 
-        # Handle rolling summarization
+        # Determine how to get the final summary.
         if rolling_summarization:
             summary_text = rolling_summarize(
                 text=extract_text_from_segments(segments),
@@ -2160,19 +2229,19 @@ def process_url(
                 summarize_recursively=recursive_summarization
             )
         elif api_name:
-            summary_text = perform_summarization(api_name, segments_json_path, custom_prompt_input, api_key,
+            summary_text = perform_summarization(api_name, full_text_with_metadata, custom_prompt_input, api_key,
                                                  recursive_summarization, temp=None)
         else:
             summary_text = 'Summary not available'
 
-        # Check to see if chunking was performed, and if so, return that instead
-        if chunk_text_by_words or chunk_text_by_sentences or chunk_text_by_paragraphs or chunk_text_by_tokens or chunk_by_semantic:
-            # Combine chunked transcriptions into a single file
-            # FIXME - validate this works....
-            json_file_path, summary_file_path = save_transcription_and_summary(combined_transcription_file_path, combined_summary_file_path, download_path, info_dict)
+        # Save and register the transcription and summary.
+        if (chunk_text_by_words or chunk_text_by_sentences or chunk_text_by_paragraphs
+                or chunk_text_by_tokens or chunk_by_semantic):
+            json_file_path, summary_file_path = save_transcription_and_summary(combined_transcription_text, combined_summary_text, download_path, info_dict)
             add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
             return transcription_text, summary_text, json_file_path, summary_file_path, None, None
         else:
+            summary_text = combined_summary_text
             json_file_path, summary_file_path = save_transcription_and_summary(transcription_text, summary_text, download_path, info_dict)
             add_media_to_database(url, info_dict, segments, summary_text, keywords, custom_prompt_input, whisper_model)
             return transcription_text, summary_text, json_file_path, summary_file_path, None, None

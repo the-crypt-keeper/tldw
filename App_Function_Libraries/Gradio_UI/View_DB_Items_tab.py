@@ -3,8 +3,6 @@
 #
 # Imports
 import html
-import logging
-
 #
 # External Imports
 import gradio as gr
@@ -16,8 +14,7 @@ from App_Function_Libraries.DB.RAG_QA_Chat_DB import get_keywords_for_note, sear
     get_notes_by_keywords, get_keywords_for_conversation, get_db_connection, get_all_conversations, load_chat_history, \
     get_notes
 from App_Function_Libraries.DB.SQLite_DB import get_document_version, fetch_items_by_keyword, fetch_all_keywords
-
-
+from App_Function_Libraries.Utils.Utils import logging
 #
 ####################################################################################################
 #

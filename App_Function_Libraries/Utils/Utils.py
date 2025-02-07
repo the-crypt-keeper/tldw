@@ -30,34 +30,37 @@
 ####################
 #
 # Import necessary libraries
+import sys
 import zipfile
 
 import chardet
 import configparser
 import hashlib
 import json
-import logging
 import os
 import re
 import tempfile
 import time
 import uuid
 from datetime import timedelta, datetime
-from typing import Union, AnyStr, Tuple, List
+from typing import Union, AnyStr, Tuple, List, Protocol, cast
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 #
-# Non-Local Imports
+# 3rd-Party Imports
 import requests
 import unicodedata
 from tqdm import tqdm
+from loguru import logger
 #
 #######################################################################################################################
 #
 # Function Definitions
 
+logging = logger
+
 def extract_text_from_segments(segments, include_timestamps=True):
-    logging.debug(f"Segments received: {segments}")
-    logging.debug(f"Type of segments: {type(segments)}")
+    logger.trace(f"Segments received: {segments}")
+    logger.trace(f"Type of segments: {type(segments)}")
 
     def extract_text_recursive(data, include_timestamps):
         if isinstance(data, dict):
@@ -112,15 +115,15 @@ def cleanup_downloads():
 def load_comprehensive_config():
     # Get the directory of the current script (Utils.py)
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    logging.debug(f"Current directory: {current_dir}")
+    logging.trace(f"Current directory: {current_dir}")
 
     # Go up two levels to the project root directory (tldw)
     project_root = os.path.dirname(os.path.dirname(current_dir))
-    logging.debug(f"Project root directory: {project_root}")
+    logging.trace(f"Project root directory: {project_root}")
 
     # Construct the path to the config file
     config_path = os.path.join(project_root, 'Config_Files', 'config.txt')
-    logging.debug(f"Config file path: {config_path}")
+    logging.trace(f"Config file path: {config_path}")
 
     # Check if the config file exists
     if not os.path.exists(config_path):
@@ -132,7 +135,7 @@ def load_comprehensive_config():
     config.read(config_path)
 
     # Log the sections found in the config file
-    logging.debug("load_comprehensive_config(): Sections found in config: {config.sections()}")
+    logging.trace(f"load_comprehensive_config(): Sections found in config: {config.sections()}")
 
     return config
 
@@ -141,7 +144,7 @@ def get_project_root():
     """Get the absolute path to the project root directory."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(os.path.dirname(current_dir))
-    logging.debug(f"Project root: {project_root}")
+    logging.trace(f"Project root: {project_root}")
     return project_root
 
 
@@ -149,7 +152,7 @@ def get_database_dir():
     """Get the absolute path to the database directory."""
     db_dir = os.path.join(get_project_root(), 'Databases')
     os.makedirs(db_dir, exist_ok=True)
-    logging.debug(f"Database directory: {db_dir}")
+    logging.trace(f"Database directory: {db_dir}")
     return db_dir
 
 
@@ -161,19 +164,19 @@ def get_database_path(db_name: str) -> str:
     # Remove any directory traversal attempts
     safe_db_name = os.path.basename(db_name)
     path = os.path.join(get_database_dir(), safe_db_name)
-    logging.debug(f"Database path for {safe_db_name}: {path}")
+    logging.trace(f"Database path for {safe_db_name}: {path}")
     return path
 
 
 def get_project_relative_path(relative_path: Union[str, os.PathLike[AnyStr]]) -> str:
     """Convert a relative path to a path relative to the project root."""
     path = os.path.join(get_project_root(), str(relative_path))
-    logging.debug(f"Project relative path for {relative_path}: {path}")
+    logging.trace(f"Project relative path for {relative_path}: {path}")
     return path
 
 def get_chromadb_path():
     path = os.path.join(get_project_root(), 'Databases', 'chroma_db')
-    logging.debug(f"ChromaDB path: {path}")
+    logging.trace(f"ChromaDB path: {path}")
     return path
 
 def ensure_directory_exists(path):
@@ -327,6 +330,7 @@ def load_and_log_configs():
         vllm_top_p = config.get('Local-API', 'vllm_top_p', fallback='0.95')
         vllm_top_k = config.get('Local-API', 'vllm_top_k', fallback='100')
         vllm_min_p = config.get('Local-API', 'vllm_min_p', fallback='0.05')
+        vllm_max_tokens = config.get('Local-API', 'vllm_max_tokens', fallback='4096')
 
         ollama_api_url = config.get('Local-API', 'ollama_api_IP', fallback='http://127.0.0.1:11434/api/generate')
         ollama_api_key = config.get('Local-API', 'ollama_api_key', fallback=None)
@@ -341,8 +345,8 @@ def load_and_log_configs():
 
         custom_openai_api_key = config.get('API', 'custom_openai_api_key', fallback=None)
         custom_openai_api_url = config.get('API', 'custom_openai_url', fallback=None)
-        logging.debug(
-            f"Loaded Custom openai-like endpoint API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
+        #logging.debug(
+        #    f"Loaded Custom openai-like endpoint API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
         custom_openai_api_streaming = config.get('API', 'custom_openai_streaming', fallback='False')
         custom_openai_api_temperature = config.get('API', 'custom_openai_temperature', fallback='0.7')
 
@@ -362,14 +366,19 @@ def load_and_log_configs():
 
         # Retrieve output paths from the configuration file
         output_path = config.get('Paths', 'output_path', fallback='results')
-        logging.debug(f"Output path set to: {output_path}")
+        logging.trace(f"Output path set to: {output_path}")
 
         # Save video transcripts
         save_video_transcripts = config.get('Paths', 'save_video_transcripts', fallback='True')
 
+        # Retrieve logging settings from the configuration file
+        log_level = config.get('Logging', 'log_level', fallback='INFO')
+        log_file = config.get('Logging', 'log_file', fallback='./Logs/tldw_logs.json')
+        log_metrics_file = config.get('Logging', 'log_metrics_file', fallback='./Logs/tldw_metrics_logs.json')
+
         # Retrieve processing choice from the configuration file
         processing_choice = config.get('Processing', 'processing_choice', fallback='cpu')
-        logging.debug(f"Processing choice set to: {processing_choice}")
+        logging.trace(f"Processing choice set to: {processing_choice}")
 
         # Retrieve Chunking settings from the configuration file
         chunking_method = config.get('Chunking', 'chunking_method', fallback='words')
@@ -381,7 +390,7 @@ def load_and_log_configs():
 
         # Retrieve Embedding model settings from the configuration file
         embedding_model = config.get('Embeddings', 'embedding_model', fallback='')
-        logging.debug(f"Embedding model set to: {embedding_model}")
+        logging.trace(f"Embedding model set to: {embedding_model}")
         embedding_provider = config.get('Embeddings', 'embedding_provider', fallback='')
         embedding_model = config.get('Embeddings', 'embedding_model', fallback='')
         onnx_model_path = config.get('Embeddings', 'onnx_model_path', fallback="./App_Function_Libraries/onnx_models/text-embedding-3-small.onnx")
@@ -526,6 +535,7 @@ def load_and_log_configs():
         search_result_relevance_eval_prompt = config.get('Prompts', 'search_result_relevance_eval_prompt', fallback='')
         analyze_search_results_prompt = config.get('Prompts', 'analyze_search_results_prompt', fallback='')
 
+
         return {
             'anthropic_api': {
                 'api_key': anthropic_api_key,
@@ -648,14 +658,15 @@ def load_and_log_configs():
                 'min_p': tabby_min_p
             },
             'vllm_api': {
-                'api_url': vllm_api_url,
+                'api_ip': vllm_api_url,
                 'api_key': vllm_api_key,
                 'model': vllm_model,
                 'streaming': vllm_streaming,
                 'temperature': vllm_temperature,
                 'top_p': vllm_top_p,
                 'top_k': vllm_top_k,
-                'min_p': vllm_min_p
+                'min_p': vllm_min_p,
+                'max_tokens': vllm_max_tokens,
             },
             'ollama_api': {
                 'api_url': ollama_api_url,
@@ -666,7 +677,7 @@ def load_and_log_configs():
                 'top_p': ollama_top_p,
             },
             'aphrodite_api': {
-                'api_url': aphrodite_api_url,
+                'api_ip': aphrodite_api_url,
                 'api_key': aphrodite_api_key,
                 'model': aphrodite_model,
             },
@@ -716,6 +727,11 @@ def load_and_log_configs():
                 'embedding_api_key': embedding_api_key,
                 'chunk_size': chunk_size,
                 'chunk_overlap': overlap
+            },
+            'logging': {
+                'log_level': log_level,
+                'log_file': log_file,
+                'log_metrics_file': log_metrics_file
             },
             'auto-save': {
                 'save_character_chats': save_character_chats,
@@ -829,13 +845,12 @@ def load_and_log_configs():
                 'analyze_search_results_prompt': analyze_search_results_prompt,
             },
         }
-
     except Exception as e:
         logging.error(f"Error loading config: {str(e)}")
         return None
 
 
-global_api_endpoints = ["anthropic", "cohere", "google", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ooba", "kobold", "tabby", "vllm", "ollama", "aphrodite"]
+global_api_endpoints = ["anthropic", "cohere", "google", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ollama", "ooba", "kobold", "tabby", "vllm", "aphrodite"]
 
 global_search_engines = ["baidu", "bing", "brave", "duckduckgo", "google", "kagi", "searx", "tavily", "yandex"]
 

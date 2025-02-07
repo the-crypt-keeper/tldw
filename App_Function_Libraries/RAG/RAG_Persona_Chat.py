@@ -2,7 +2,6 @@
 # Description: Functions for RAG Persona Chat
 #
 # Imports
-import logging
 from typing import List, Dict, Any, Tuple
 #
 # External Imports
@@ -11,6 +10,9 @@ from typing import List, Dict, Any, Tuple
 from App_Function_Libraries.RAG.Embeddings_Create import create_embedding, embedding_provider, embedding_model, \
     embedding_api_url
 from App_Function_Libraries.RAG.ChromaDB_Library import chroma_client, store_in_chroma
+from App_Function_Libraries.Utils.Utils import logging
+
+
 #
 #######################################################################################################################
 #

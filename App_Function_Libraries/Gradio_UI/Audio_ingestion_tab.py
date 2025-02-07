@@ -2,7 +2,6 @@
 # Description: Gradio UI for ingesting audio files into the database
 #
 # Imports
-import logging
 #
 # External Imports
 import gradio as gr
@@ -13,7 +12,7 @@ from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models
 from App_Function_Libraries.Utils.Utils import cleanup_temp_files, default_api_endpoint, global_api_endpoints, \
-    format_api_name
+    format_api_name, logging
 # Import metrics logging
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 from App_Function_Libraries.Metrics.logger_config import logger

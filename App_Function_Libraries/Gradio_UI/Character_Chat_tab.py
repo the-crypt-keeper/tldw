@@ -9,7 +9,6 @@ import re
 import tempfile
 import uuid
 import json
-import logging
 import io
 import base64
 from typing import Dict, Any, Optional, List, Tuple
@@ -39,13 +38,13 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
 )
 from App_Function_Libraries.TTS.TTS_Providers import generate_audio
 from App_Function_Libraries.Utils.Utils import sanitize_user_input, format_api_name, global_api_endpoints, \
-    default_api_endpoint, load_and_log_configs
+    default_api_endpoint, load_and_log_configs, logging
 #
-############################################################################################################
+#######################################################################################################################
 #
 # Functions:
 
-#################################################################################
+########################################################
 #
 # Character card import functions:
 
@@ -134,7 +133,7 @@ def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
 
         # Attempt to load the JSON.
         card_data = json.loads(json_content)
-        logging.debug(f"Parsed JSON data keys: {list(card_data.keys())}")
+        logging.debug(f"Parsed JSON data keys(first 100 chars): {list(card_data.keys())[:100]}")
 
         # Check if it is a V2 card.
         if card_data.get('spec') == 'chara_card_v2':
@@ -149,7 +148,7 @@ def import_character_card_json(json_content: str) -> Optional[Dict[str, Any]]:
 
     except json.JSONDecodeError as e:
         logging.error(f"JSON decode error: {e}")
-        logging.error(f"Problematic JSON content (first 500 chars): {json_content[:500]}...")
+        logging.error(f"Problematic JSON content (first 100 chars): {json_content[:100]}...")
     except Exception as e:
         logging.error(f"Unexpected error parsing JSON: {e}")
     return None

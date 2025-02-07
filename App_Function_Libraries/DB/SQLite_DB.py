@@ -48,7 +48,6 @@ import configparser
 import csv
 import hashlib
 import html
-import logging
 import os
 import queue
 import re
@@ -60,13 +59,11 @@ import traceback
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
-from urllib.parse import quote
-
-from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 # Local Libraries
 from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_database_path, \
-    get_database_dir
+    get_database_dir, logger, logging
 from App_Function_Libraries.Chunk_Lib import chunk_options, chunk_text
+from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
 #
 # Third-Party Libraries
 import gradio as gr
@@ -81,9 +78,6 @@ def ensure_database_directory():
     os.makedirs(get_database_dir(), exist_ok=True)
 
 ensure_database_directory()
-
-# Set up logging
-logger = logging.getLogger(__name__)
 
 # FIXME - Setup properly and test/add documentation for its existence...
 # Construct the path to the config file
@@ -104,8 +98,8 @@ backup_path = get_project_relative_path(backup_path)
 db_path = sqlite_path
 backup_dir = backup_path
 
-print(f"Media Database path: {db_path}")
-print(f"Media Backup directory: {backup_dir}")
+logging.info(f"Media Database path: {db_path}")
+logging.info(f"Media Backup directory: {backup_dir}")
 #create_automated_backup(db_path, backup_dir)
 
 # FIXME - Setup properly and test/add documentation for its existence...
@@ -304,7 +298,8 @@ def create_tables(db) -> None:
             trash_date DATETIME,
             vector_embedding BLOB,
             chunking_status TEXT DEFAULT 'pending',
-            vector_processing INTEGER DEFAULT 0
+            vector_processing INTEGER DEFAULT 0,
+            content_hash TEXT UNIQUE
         )
         ''',
         '''
@@ -391,8 +386,8 @@ def create_tables(db) -> None:
         ''',
     ]
 
-    index_queries = [
-        # CREATE INDEX statements
+    basic_index_queries = [
+        # CREATE INDEX statements (excluding content_hash index)
         'CREATE INDEX IF NOT EXISTS idx_media_title ON Media(title)',
         'CREATE INDEX IF NOT EXISTS idx_media_type ON Media(type)',
         'CREATE INDEX IF NOT EXISTS idx_media_author ON Media(author)',
@@ -410,7 +405,7 @@ def create_tables(db) -> None:
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_url ON Media(url)',
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_media_keyword ON MediaKeywords(media_id, keyword_id)',
         'CREATE INDEX IF NOT EXISTS idx_document_versions_media_id ON DocumentVersions(media_id)',
-        'CREATE INDEX IF NOT EXISTS idx_document_versions_version_number ON DocumentVersions(version_number)',
+        'CREATE INDEX IF NOT EXISTS idx_document_versions_version_number ON DocumentVersions(version_number)'
     ]
 
     virtual_table_queries = [
@@ -419,9 +414,8 @@ def create_tables(db) -> None:
         'CREATE VIRTUAL TABLE IF NOT EXISTS keyword_fts USING fts5(keyword)'
     ]
 
-    all_queries = table_queries + index_queries + virtual_table_queries
-
-    for query in all_queries:
+    # Execute all table creation queries first
+    for query in table_queries:
         try:
             db.execute_query(query)
         except Exception as e:
@@ -429,10 +423,74 @@ def create_tables(db) -> None:
             logging.error(f"Error details: {str(e)}")
             raise
 
+    # Execute basic index queries
+    for query in basic_index_queries:
+        try:
+            db.execute_query(query)
+        except Exception as e:
+            logging.error(f"Error executing query: {query}")
+            logging.error(f"Error details: {str(e)}")
+            raise
+
+    # Execute virtual table queries
+    for query in virtual_table_queries:
+        try:
+            db.execute_query(query)
+        except Exception as e:
+            logging.error(f"Error executing query: {query}")
+            logging.error(f"Error details: {str(e)}")
+            raise
+
+    try:
+        db.execute_query('CREATE UNIQUE INDEX IF NOT EXISTS idx_media_content_hash ON Media(content_hash)')
+    except Exception as e:
+        logging.error("Error creating content_hash index")
+        logging.error(f"Error details: {str(e)}")
+        # Don't raise here as this might fail on first creation
+
     logging.info("All tables, indexes, and virtual tables created successfully.")
 
-create_tables(db)
+# ------------------------------------------------------------------------------------------
+# Safe schema update for existing DBs
+def update_database_schema():
+    """
+    Check for the content_hash column in Media; if missing, add it and create its index.
+    This prevents errors for DBs created before content_hash was added to the schema.
+    """
+    try:
+        logging.info("Checking if the 'content_hash' column exists in the Media table...")
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT COUNT(*) 
+                FROM pragma_table_info('Media') 
+                WHERE name = 'content_hash'
+            ''')
+            column_exists = cursor.fetchone()[0]
 
+            if not column_exists:
+                cursor.execute('ALTER TABLE Media ADD COLUMN content_hash TEXT')
+                logging.info("Added content_hash column to 'Media' table.")
+
+                cursor.execute('''
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_media_content_hash 
+                    ON Media(content_hash)
+                ''')
+                logging.info("Created 'content_hash' unique index.")
+
+            conn.commit()
+    except Exception as e:
+        logging.error(f"Schema update failed: {str(e)}")
+        logging.error(traceback.format_exc())
+        raise
+    finally:
+        db.close_connection()
+
+
+# ------------------------------------------------------------------------------------------
+# Create tables (if they don't exist), then update schema (if needed)
+create_tables(db)
+update_database_schema()
 #
 # End of DB Setup Functions
 #######################################################################################################################
@@ -1224,21 +1282,23 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
         with db.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Generate URL if not provided
-            if not url:
-                title = info_dict.get('title', 'Untitled')
-                url_hash = hashlib.md5(f"{title}{media_type}".encode()).hexdigest()
-                url = f"https://No-URL-Submitted.com/{media_type}/{quote(title)}-{url_hash}"
-
-            logging.debug(f"Checking for existing media with URL: {url}")
-
-            # Extract content from segments
+            # Extract content from segments first
             if isinstance(segments, list):
                 content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
             elif isinstance(segments, dict):
                 content = segments.get('text', '') or segments.get('content', '')
             else:
                 content = str(segments)
+
+            # Generate content hash
+            content_hash = hashlib.sha256(content.encode()).hexdigest()
+
+            # Generate URL if not provided
+            if not url:
+                title = info_dict.get('title', 'Untitled')
+                url = f"https://No-URL-Submitted.com/{media_type}/{content_hash}"
+
+            logging.debug(f"Checking for existing media with URL: {url}")
 
             # Process keywords
             if isinstance(keywords, str):
@@ -1248,8 +1308,8 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
             else:
                 keyword_list = ['default']
 
-            # Check if media already exists
-            cursor.execute('SELECT id FROM Media WHERE url = ?', (url,))
+            # Check if media already exists by URL or content_hash
+            cursor.execute('SELECT id FROM Media WHERE url = ? OR content_hash = ?', (url, content_hash))
             existing_media = cursor.fetchone()
 
             logging.debug(f"Existing media: {existing_media}")
@@ -1262,20 +1322,20 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
                     logging.debug("Updating existing media")
                     cursor.execute('''
                     UPDATE Media 
-                    SET content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?
+                    SET url = ?, content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?, content_hash = ?
                     WHERE id = ?
-                    ''', (content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
-                          info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', media_id))
+                    ''', (url, content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
+                          info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', content_hash, media_id))
                     action = "updated"
                 else:
                     logging.debug("Media exists but not updating (overwrite=False)")
                     action = "already exists (not updated)"
             else:
                 cursor.execute('''
-                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status, content_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
-                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model, 'pending'))
+                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model, 'pending', content_hash))
                 media_id = cursor.lastrowid
                 action = "added"
                 logging.debug(f"New media_id: {media_id}")
@@ -1387,22 +1447,42 @@ def update_media_content_with_version(media_id, info_dict, content_input, prompt
 
 
 # FIXME: This function is not complete and needs to be implemented
-def schedule_chunking(media_id: int, content: str, media_name: str, media_type: str = None): #, chunk_options: dict = None):
+def schedule_chunking(media_id: int, content: str, media_name: str, media_type: str = None, chunk_options: dict = None):
     try:
-        chunks = chunk_text(content, chunk_options['method'], chunk_options['max_size'], chunk_options['overlap'])
+        # Ensure chunk_options is provided; if not, use defaults.
+        if chunk_options is None:
+            chunk_options = {'method': 'words', 'max_size': 300, 'overlap': 0}
+
+        # Retrieve the values from chunk_options as provided.
+        method = chunk_options.get('method', 'words')
+        max_size = chunk_options.get('max_size', 300)  # preserve original type (could be str or int)
+        overlap = chunk_options.get('overlap', 0)        # preserve original type (could be str or int)
+
+        # Convert max_size and overlap to integers for arithmetic without modifying the original chunk_options
+        try:
+            max_size_int = int(max_size)
+            overlap_int = int(overlap)
+        except ValueError as e:
+            logging.error(f"Error converting chunk_options values to int: {e}")
+            raise
+
+        # Use the converted integers when calling the chunking function.
+        chunks = chunk_text(content, method, max_size_int, overlap_int)
+
         db = Database()
         with db.get_connection() as conn:
             cursor = conn.cursor()
             for i, chunk in enumerate(chunks):
+                # Calculate start and end indices for the chunk using the integer values
+                start_index = i * max_size_int
+                end_index = min((i + 1) * max_size_int, len(content))
                 cursor.execute('''
-                INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
-                VALUES (?, ?, ?, ?, ?)
-                ''', (media_id, chunk, i * chunk_options['max_size'],
-                      min((i + 1) * chunk_options['max_size'], len(content)),
-                      f"{media_id}_chunk_{i}"))
+                    INSERT INTO MediaChunks (media_id, chunk_text, start_index, end_index, chunk_id)
+                    VALUES (?, ?, ?, ?, ?)
+                    ''', (media_id, chunk, start_index, end_index, f"{media_id}_chunk_{i}"))
             conn.commit()
 
-        # Update chunking status
+        # Update chunking status in the Media table.
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE Media SET chunking_status = 'completed' WHERE id = ?", (media_id,))

@@ -3,7 +3,6 @@
 #
 # Imports
 import configparser
-import logging
 import os
 import re
 import sqlite3
@@ -17,7 +16,8 @@ from typing import List, Dict, Any, Tuple, Optional
 # (No external imports)
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_project_root
+from App_Function_Libraries.Utils.Utils import get_project_relative_path, get_project_root, logger, logging
+
 
 #
 ########################################################################################################################
@@ -35,10 +35,6 @@ def get_rag_qa_db_path():
         return rag_qa_db_path
     else:
         raise ValueError("Database path not found in config file")
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Database schema
 SCHEMA_SQL = '''

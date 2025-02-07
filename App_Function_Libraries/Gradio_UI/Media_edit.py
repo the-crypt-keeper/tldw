@@ -2,7 +2,6 @@
 # Functions for Gradio Media_Edit UI
 #
 # Imports
-import logging
 import uuid
 #
 # External Imports
@@ -14,6 +13,9 @@ from App_Function_Libraries.DB.DB_Manager import add_prompt, update_media_conten
 from App_Function_Libraries.DB.Prompts_DB import fetch_item_details_with_keywords
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_dropdown
 from App_Function_Libraries.DB.SQLite_DB import fetch_item_details
+from App_Function_Libraries.Utils.Utils import logging
+
+
 #
 #######################################################################################################################
 #

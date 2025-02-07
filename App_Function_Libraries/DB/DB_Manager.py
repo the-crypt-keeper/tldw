@@ -4,8 +4,6 @@
 # Imports
 import configparser
 import os
-import logging
-import time
 from typing import Tuple, List, Union, Dict
 #
 # 3rd-Party Libraries
@@ -81,18 +79,16 @@ from App_Function_Libraries.DB.Character_Chat_DB import (
 )
 #
 # Local Imports
-from App_Function_Libraries.Utils.Utils import load_comprehensive_config, get_database_path, get_project_relative_path
+from App_Function_Libraries.Utils.Utils import load_comprehensive_config, get_database_path, get_project_relative_path, \
+    logger, logging
+
 #
 # End of imports
 ############################################################################################################
 
-
 ############################################################################################################
 #
 # Database Config loading
-
-logger = logging.getLogger(__name__)
-
 config_path = get_project_relative_path('Config_Files/config.txt')
 config = configparser.ConfigParser()
 config.read(config_path)

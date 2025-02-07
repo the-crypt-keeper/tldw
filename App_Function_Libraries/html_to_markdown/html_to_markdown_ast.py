@@ -12,9 +12,6 @@ from s_types import (
 from conversion_options import ConversionOptions
 import logging
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 def escape_markdown_characters(text: str, is_inline_code: bool = False) -> str:
     if is_inline_code or not text.strip():
         return text
