@@ -15,7 +15,6 @@
 #     DB Config Loading
 #     File Handling Functions
 #
-#
 ####################
 # Function List
 #
