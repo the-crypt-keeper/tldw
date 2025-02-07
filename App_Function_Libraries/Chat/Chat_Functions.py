@@ -167,7 +167,7 @@ def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp
             )
 
         elif api_endpoint.lower() == "ooba":
-            response = chat_with_oobabooga(input_data, api_key, prompt, temp, system_message)
+            response = chat_with_oobabooga(input_data, api_key, prompt, system_message, None, streaming, temp, topp)
 
         elif api_endpoint.lower() == "tabbyapi":
             response = chat_with_tabbyapi(input_data, prompt, temp, system_message)

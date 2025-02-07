@@ -20,7 +20,7 @@ import inspect
 import json
 import os
 import time
-from typing import Optional
+from typing import Optional, Any, Generator, LiteralString
 #
 import requests
 #
@@ -52,7 +52,8 @@ def summarize(
     temp: Optional[float],
     system_message: Optional[str],
     streaming: Optional[bool] = False
-) -> str:
+) -> str | Generator[Any, Any, None] | LiteralString | None | Generator[str | Any, Any, None] | Generator[
+    str | Any, Any, str | None | Any] | Any:
     try:
         logging.debug(f"api_name type: {type(api_name)}, value: {api_name}")
         if api_name.lower() == "openai":
@@ -83,7 +84,7 @@ def summarize(
         elif api_name.lower() == "tabbyapi":
             return summarize_with_tabbyapi(input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "vllm":
-            return summarize_with_vllm(input_data, custom_prompt_arg, None, system_message, streaming)
+            return summarize_with_vllm(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "local-llm":
             return summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "huggingface":

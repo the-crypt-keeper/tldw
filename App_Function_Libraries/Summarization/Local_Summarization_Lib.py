@@ -21,7 +21,7 @@
 import json
 import os
 import time
-from typing import Union
+from typing import Union, Any, Generator
 
 # Import 3rd-party Libraries
 import requests
@@ -784,159 +784,166 @@ def summarize_with_tabbyapi(
             return f"TabbyAPI: Unexpected error in summarization process: {str(e)}"
 
 
-def summarize_with_vllm(
-        input_data: Union[str, dict, list],
-        custom_prompt_input: str,
-        api_key: str = None,
-        model: str = None,
-        system_prompt: str = None,
-        temp: float = 0.7,
-        vllm_api_url: str = "http://127.0.0.1:8000/v1/chat/completions",
-        streaming=False
-) -> Union[str]:
-    logging.debug("vLLM: Summarization process starting...")
+def summarize_with_vllm(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     try:
-        logging.debug("vLLM: Loading and validating configurations")
-        loaded_config_data = load_and_log_configs()
-        if loaded_config_data is None:
-            logging.error("Failed to load configuration data")
-            vllm_api_key = None
-        else:
-            # Prioritize the API key passed as a parameter
-            if api_key and api_key.strip():
-                vllm_api_key = api_key
-                logging.info("vLLM: Using API key provided as parameter")
-            else:
-                # If no parameter is provided, use the key from the config
-                vllm_api_key = loaded_config_data['api_keys'].get('vllm')
-                if vllm_api_key:
-                    logging.info("vLLM: Using API key from config file")
-                else:
-                    logging.warning("vLLM: No API key found in config file")
-            if vllm_api_url:
-                logging.debug(f"vLLM: Using API URL: {vllm_api_url}")
-            else:
-                if 'vllm' in loaded_config_data['api_urls']:
-                    vllm_api_url = loaded_config_data['local_api_ip']['vllm']
-                    logging.info(f"vLLM: Using API URL from config file: {vllm_api_url}")
-                else:
-                    logging.error("vLLM: API URL not found in config file")
+        # API key validation
+        if not api_key or api_key.strip() == "":
+            logging.info("vLLM Summarize: API key not provided as parameter")
+            logging.info("vLLM Summarize: Attempting to use API key from config file")
+            loaded_config_data = load_and_log_configs()
+            api_key = loaded_config_data.get('vllm_api', {}).get('api_key', "")
+            logging.debug(f"vLLM Summarize: Using API key from config file: {api_key[:5]}...{api_key[-5:]}")
 
-        logging.debug(f"vLLM: Using API Key: {vllm_api_key[:5]}...{vllm_api_key[-5:] if vllm_api_key else 'None'}")
-        # Process input data
-        if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("vLLM: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
+        if not api_key or api_key.strip() == "":
+            logging.error("vLLM Summarize: API key not found or is empty")
+            logging.debug("vLLM Summarize: API Key Not Provided/Found in Config file or is empty")
+
+        logging.debug(f"vLLM Summarize: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+
+        # Input data handling
+        logging.debug(f"vLLM Summarize: Raw input data type: {type(input_data)}")
+        logging.debug(f"vLLM Summarize: Raw input data (first 500 chars): {str(input_data)[:500]}...")
+
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                # It's likely a JSON string
+                logging.debug("vLLM Summarize: Parsing provided JSON string data for summarization")
+                try:
+                    data = json.loads(input_data)
+                except json.JSONDecodeError as e:
+                    logging.error(f"vLLM Summarize: Error parsing JSON string: {str(e)}")
+                    return f"vLLM Summarize: Error parsing JSON input: {str(e)}"
+            elif os.path.isfile(input_data):
+                logging.debug("vLLM Summarize: Loading JSON data from file for summarization")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                logging.debug("vLLM Summarize: Using provided string data for summarization")
+                data = input_data
         else:
-            logging.debug("vLLM: Using provided data for summarization")
             data = input_data
 
-        logging.debug(f"vLLM: Type of data: {type(data)}")
+        logging.debug(f"vLLM Summarize: Processed data type: {type(data)}")
+        logging.debug(f"vLLM Summarize: Processed data (first 500 chars): {str(data)[:500]}...")
 
-        # Extract text for summarization
-        if isinstance(data, dict) and 'summary' in data:
-            logging.debug("vLLM: Summary already exists in the loaded data")
-            return data['summary']
+        # Text extraction
+        if isinstance(data, dict):
+            if 'summary' in data:
+                logging.debug("vLLM Summarize: Summary already exists in the loaded data")
+                return data['summary']
+            elif 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)  # Convert dict to string if no specific format
         elif isinstance(data, list):
             text = extract_text_from_segments(data)
         elif isinstance(data, str):
             text = data
-        elif isinstance(data, dict):
-            text = json.dumps(data)
         else:
-            raise ValueError("Invalid input data format")
+            raise ValueError(f"vLLM Summarize: Invalid input data format: {type(data)}")
 
-        logging.debug(f"vLLM: Extracted text (showing first 500 chars): {text[:500]}...")
+        logging.debug(f"vLLM Summarize: Extracted text (first 500 chars): {text[:500]}...")
+        logging.debug(f"vLLM Summarize: Custom prompt: {custom_prompt_arg}")
 
-        if system_prompt is None:
-            system_prompt = "You are a helpful AI assistant."
+        config_settings = load_and_log_configs()
+        vllm_model = config_settings['vllm_api']['model']
+        logging.debug(f"vLLM Summarize: Using model: {vllm_model}")
 
-        if custom_prompt_input is None:
-            custom_prompt_input = f"{summarizer_prompt}\n\n\n\n{text}"
-        else:
-            custom_prompt_input = f"{custom_prompt_input}\n\n\n\n{text}"
-
-        model = model or loaded_config_data['models']['vllm']
-        if system_prompt is None:
-            system_prompt = "You are a helpful AI assistant."
-
-        # Prepare the API request
         headers = {
-            "Content-Type": "application/json"
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
         }
-        if vllm_api_key:
-            headers["Authorization"] = f"Bearer {vllm_api_key}"
 
-        payload = {
-            "model": model,
+        logging.debug(
+            f"vLLM API Key: {api_key[:5]}...{api_key[-5:] if api_key else None}")
+        logging.debug("vLLM Summarize: Preparing data + prompt for submittal")
+        user_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+        if temp is None:
+            temp = load_and_log_configs()['vllm_api']['temperature']
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+        temp = float(temp)
+
+        # Set max tokens
+        max_tokens = load_and_log_configs()['vllm_api']['max_tokens']
+        max_tokens = int(max_tokens)
+        logging.debug(f"vLLM Summarize: Using max tokens: {max_tokens}")
+
+        # Prepare data payload
+        data = {
+            "model": vllm_model,
             "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"{custom_prompt_input}\n\n{text}"},
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_prompt}
             ],
+            "max_tokens": max_tokens,
             "temperature": temp,
-            "stream": streaming
+            "stream": streaming,
         }
 
-        logging.debug(f"vLLM: Sending request to {vllm_api_url}")
+        # Setup URL
+        url = load_and_log_configs()['vllm_api']['api_ip']
 
+        # Handle streaming
         if streaming:
-            # Send the request with streaming enabled
-            response = requests.post(vllm_api_url, headers=headers, json=payload, stream=True)
+            response = requests.post(
+                url,
+                headers=headers,
+                json=data,
+                stream=True
+            )
             response.raise_for_status()
-            # Process the streamed response
-            for line in response.iter_lines():
-                if line:
-                    decoded_line = line.decode('utf-8').strip()
-                    if decoded_line.startswith('data: '):
-                        data_line = decoded_line[len('data: '):]
-                        if data_line == '[DONE]':
+
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
+
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
                             break
                         try:
-                            data_json = json.loads(data_line)
-                            if 'choices' in data_json and len(data_json['choices']) > 0:
-                                delta = data_json['choices'][0].get('delta', {})
-                                content = delta.get('content', '')
-                                if content:
-                                    yield content
-                        except json.JSONDecodeError as e:
-                            logging.error(f"vLLM: Failed to parse JSON streamed data: {str(e)}")
-                    else:
-                        logging.debug(f"vLLM: Received non-data line: {decoded_line}")
-        else:
-            # Make the API call
-            logging.debug(f"vLLM: Sending request to {vllm_api_url}")
-            response = requests.post(vllm_api_url, headers=headers, json=payload)
-            # Check for successful response
-            response.raise_for_status()
-            # Extract and return the summary
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                summary = response_data['choices'][0]['message']['content']
-                logging.debug("vLLM: Summarization successful")
-                logging.debug(f"vLLM: Summary (first 500 chars): {summary[:500]}...")
-                return summary
-            else:
-                raise ValueError("Unexpected response format from vLLM API")
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"OpenAI: Error decoding JSON from line: {line}")
+                            continue
 
-    except requests.RequestException as e:
-        logging.error(f"vLLM: API request failed: {str(e)}")
-        if streaming:
-            yield f"Error: vLLM API request failed - {str(e)}"
+            return stream_generator()
+        # Handle non-streaming
         else:
-            return f"Error: vLLM API request failed - {str(e)}"
+            logging.debug("vLLM Summarization: Posting request")
+            response = requests.post(url, headers=headers, json=data)
+
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    summary = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("vLLM Summarization: Summarization successful")
+                    logging.debug(f"vLLM Summarization: Summary (first 500 chars): {summary[:500]}...")
+                    return summary
+                else:
+                    logging.warning("vLLM Summarization: Summary not found in the response data")
+                    return "vLLM Summarization: Summary not available"
+            else:
+                logging.error(f"vLLM Summarization: Summarization failed with status code {response.status_code}")
+                logging.error(f"vLLM Summarization: Error response: {response.text}")
+                return f"vLLM Summarization: Failed to process summary. Status code: {response.status_code}"
     except json.JSONDecodeError as e:
-        logging.error(f"vLLM: Failed to parse API response: {str(e)}")
-        if streaming:
-            yield f"Error: Failed to parse vLLM API response - {str(e)}"
-        else:
-            return f"Error: Failed to parse vLLM API response - {str(e)}"
+        logging.error(f"vLLM Summarization: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"vLLM Summarization: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"vLLM Summarization: Error making API request: {str(e)}", exc_info=True)
+        return f"vLLM Summarization: Error making API request: {str(e)}"
     except Exception as e:
-        logging.error(f"vLLM: Unexpected error during summarization: {str(e)}")
-        if streaming:
-            yield f"Error: Unexpected error during vLLM summarization - {str(e)}"
-        else:
-            return f"Error: Unexpected error during vLLM summarization - {str(e)}"
+        logging.error(f"vLLM Summarization: Unexpected error: {str(e)}", exc_info=True)
+        return f"vLLM Summarization: Unexpected error occurred: {str(e)}"
 
 
 def summarize_with_ollama(
