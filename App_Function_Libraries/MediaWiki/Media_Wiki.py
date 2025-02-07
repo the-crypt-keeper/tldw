@@ -29,9 +29,9 @@ def load_mediawiki_import_config():
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-config = load_mediawiki_import_config()
+media_wiki_import_config = load_mediawiki_import_config()
 
-def setup_logger(name: str, level: Union[int, str] = "INFO", log_file: Optional[str] = None) -> None:
+def setup_media_wiki_logger(name: str, level: Union[int, str] = "INFO", log_file: Optional[str] = None) -> None:
     """Set up the logger with the given name and level."""
     logger.remove()  # Remove the default logger
     logger.add(sys.stdout, format="{time} - {name} - {level} - {message}", level=level)
@@ -40,7 +40,7 @@ def setup_logger(name: str, level: Union[int, str] = "INFO", log_file: Optional[
         logger.add(log_file, format="{time} - {name} - {level} - {message}", level=level)
 
 # Usage
-setup_logger('mediawiki_import', log_file='mediawiki_import.log')
+setup_media_wiki_logger('mediawiki_import', log_file='./Logs/mediawiki_import.log')
 
 # End of setup
 #######################################################################################################################
