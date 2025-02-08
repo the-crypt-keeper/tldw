@@ -42,6 +42,8 @@ https://machinelearningmastery.com/rag-hallucination-detection-techniques/
 https://huggingface.co/papers/2412.06745
 https://huggingface.co/dranger003/c4ai-command-r-v01-iMat.GGUF
 https://huggingface.co/allenai/Llama-3.1-Tulu-3-8B-DPO
+https://huggingface.co/papers/2502.00698
+https://huggingface.co/papers/2502.01534
 https://huggingface.co/allenai/Llama-3.1-Tulu-3-8B-SFT-no-safety-data
 https://huggingface.co/mradermacher/Llama-3.1-Tulu-3-8B-SFT-no-safety-data-GGUF
 https://arxiv.org/html/2412.02611v1
