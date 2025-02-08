@@ -231,7 +231,8 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
         if system_prompt is None:
             system_prompt = local_llm_system_message
 
-        max_tokens_llama = 4096
+
+        max_tokens_llama = int(loaded_config_data['llama_api']['max_tokens'])
 
         # Prepare headers
         headers = {
@@ -383,6 +384,8 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
         if not isinstance(temp, float):
             raise ValueError(f"Invalid type for 'temp': Expected a float, got {type(streaming).__name__}")
 
+        kobold_max_tokens = int(loaded_config_data['kobold_api']['max_tokens'])
+
         if isinstance(input_data, str) and os.path.isfile(input_data):
             logging.debug("Kobold.cpp: Loading json data for summarization")
             with open(input_data, 'r') as file:
@@ -422,7 +425,8 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
             "top_p": top_p,
             "top_k": top_k,
             #"rep_penalty": 1.0,
-            "stream": streaming
+            "stream": streaming,
+            "max_context_length": kobold_max_tokens,
         }
 
         logging.debug("kobold: Submitting request to API endpoint")
@@ -605,6 +609,8 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, system_prompt=None, 
             logging.error(f"Invalid API URL configured: {api_url}")
             return "Oobabooga: Invalid API URL configured"
 
+        ooba_max_tokens = int(loaded_config_data['ooba_api']['max_tokens'])
+
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
@@ -626,6 +632,7 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, system_prompt=None, 
             "stream": streaming,
             "top_p": top_p,
             "temperature": temp,
+            "max_tokens": ooba_max_tokens,
         }
 
         # If the user has set streaming to True:
@@ -785,7 +792,7 @@ def chat_with_tabbyapi(
         else:
             custom_prompt_input = f"{custom_prompt_input}\n\n{input_data}"
 
-        tabby_max_tokens = 4096
+        tabby_max_tokens = int(loaded_config_data['tabby_api']['max_tokens'])
 
         headers = {
             'Content-Type': 'application/json'
@@ -975,6 +982,8 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt, temp=None, system_me
         if system_message is None:
             system_message = aphrodite_system_message
 
+        aphrodite_max_tokens = int(loaded_config_data['aphrodite_api']['max_tokens'])
+
         data = {
             "model": aphrodite_model,
             "messages": [
@@ -986,7 +995,8 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt, temp=None, system_me
             "stream": streaming,
             "top_p": topp,
             "top_k": topk,
-            "min_p": minp
+            "min_p": minp,
+            "max_tokens": aphrodite_max_tokens,
         }
         if streaming:
             logging.debug("Aphrodite Chat: Posting request (streaming")
@@ -1148,6 +1158,8 @@ def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/
             system_message = "You are a helpful AI assistant."
         logging.debug(f"Ollama: Prompt being sent is: {ollama_prompt}")
 
+        ollama_max_tokens = int(loaded_config_data['ollama_api']['max_tokens'])
+
         data_payload = {
             "model": model,
             "messages": [
@@ -1162,7 +1174,8 @@ def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/
             ],
             "temperature": temp,
             "stream": streaming,
-            "top_p": top_p
+            "top_p": top_p,
+            "max_tokens": ollama_max_tokens,
         }
 
         if streaming:
@@ -1504,15 +1517,18 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
         if system_message is None:
             system_message = "You are a helpful AI assistant who does whatever the user requests."
         temp = float(temp)
+
+        custom_openai_max_tokens = int(loaded_config_data['custom_openai_api']['max_tokens'])
+
         data = {
             "model": openai_model,
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": openai_prompt}
             ],
-            "max_tokens": 4096,
+            "max_tokens": custom_openai_max_tokens,
             "temperature": temp,
-            "stream": streaming
+            "stream": streaming,
         }
 
         custom_openai_url = loaded_config_data['custom_openai_api']['api_ip']

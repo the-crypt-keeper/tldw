@@ -295,6 +295,7 @@ def load_and_log_configs():
         kobold_temperature = config.get('Local-API', 'kobold_temperature', fallback='0.7')
         kobold_top_p = config.get('Local-API', 'kobold_top_p', fallback='0.95')
         kobold_top_k = config.get('Local-API', 'kobold_top_k', fallback='100')
+        kobold_max_tokens = config.get('Local-API', 'kobold_max_tokens', fallback='4096')
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
@@ -303,6 +304,7 @@ def load_and_log_configs():
         llama_top_p = config.get('Local-API', 'llama_top_p', fallback='0.95')
         llama_min_p = config.get('Local-API', 'llama_min_p', fallback='0.05')
         llama_top_k = config.get('Local-API', 'llama_top_k', fallback='100')
+        llama_max_tokens = config.get('Local-API', 'llama_max_tokens', fallback='4096')
 
         ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
         ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
@@ -311,6 +313,7 @@ def load_and_log_configs():
         ooba_top_p = config.get('Local-API', 'ooba_top_p', fallback='0.95')
         ooba_min_p = config.get('Local-API', 'ooba_min_p', fallback='0.05')
         ooba_top_k = config.get('Local-API', 'ooba_top_k', fallback='100')
+        ooba_max_tokens = config.get('Local-API', 'ooba_max_tokens', fallback='4096')
 
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
@@ -320,6 +323,7 @@ def load_and_log_configs():
         tabby_top_p = config.get('Local-API', 'tabby_top_p', fallback='0.95')
         tabby_top_k = config.get('Local-API', 'tabby_top_k', fallback='100')
         tabby_min_p = config.get('Local-API', 'tabby_min_p', fallback='0.05')
+        tabby_max_tokens = config.get('Local-API', 'tabby_max_tokens', fallback='4096')
 
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
@@ -337,10 +341,12 @@ def load_and_log_configs():
         ollama_streaming = config.get('Local-API', 'ollama_streaming', fallback='False')
         ollama_temperature = config.get('Local-API', 'ollama_temperature', fallback='0.7')
         ollama_top_p = config.get('Local-API', 'ollama_top_p', fallback='0.95')
+        ollama_max_tokens = config.get('Local-API', 'ollama_max_tokens', fallback='4096')
 
         aphrodite_api_url = config.get('Local-API', 'aphrodite_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         aphrodite_api_key = config.get('Local-API', 'aphrodite_api_key', fallback='')
         aphrodite_model = config.get('Local-API', 'aphrodite_model', fallback='')
+        aphrodite_max_tokens = config.get('Local-API', 'aphrodite_max_tokens', fallback='4096')
 
         custom_openai_api_key = config.get('API', 'custom_openai_api_key', fallback=None)
         custom_openai_api_url = config.get('API', 'custom_openai_url', fallback=None)
@@ -348,6 +354,7 @@ def load_and_log_configs():
         #    f"Loaded Custom openai-like endpoint API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
         custom_openai_api_streaming = config.get('API', 'custom_openai_streaming', fallback='False')
         custom_openai_api_temperature = config.get('API', 'custom_openai_temperature', fallback='0.7')
+        custom_openai_api_max_tokens = config.get('API', 'custom_openai_max_tokens', fallback='4096')
 
         # Logging Checks for Local API IP loads
         # logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
@@ -542,7 +549,7 @@ def load_and_log_configs():
                 'streaming': anthropic_streaming,
                 'temperature': anthropic_temperature,
                 'top_p': anthropic_top_p,
-                'top_k': anthropic_top_k
+                'top_k': anthropic_top_k,
             },
             'cohere_api': {
                 'api_key': cohere_api_key,
@@ -626,7 +633,8 @@ def load_and_log_configs():
                 'temperature': llama_temperature,
                 'top_p': llama_top_p,
                 'min_p': llama_min_p,
-                'top_k': llama_top_k
+                'top_k': llama_top_k,
+                'max_tokens': llama_max_tokens
             },
             'ooba_api': {
                 'api_ip': ooba_api_IP,
@@ -635,7 +643,8 @@ def load_and_log_configs():
                 'temperature': ooba_temperature,
                 'top_p': ooba_top_p,
                 'min_p': ooba_min_p,
-                'top_k': ooba_top_k
+                'top_k': ooba_top_k,
+                'max_tokens': ooba_max_tokens
             },
             'kobold_api': {
                 'api_ip': kobold_api_ip,
@@ -644,7 +653,8 @@ def load_and_log_configs():
                 'streaming': kobold_streaming,
                 'temperature': kobold_temperature,
                 'top_p': kobold_top_p,
-                'top_k': kobold_top_k
+                'top_k': kobold_top_k,
+                'max_tokens': kobold_max_tokens
             },
             'tabby_api': {
                 'api_ip': tabby_api_IP,
@@ -654,7 +664,8 @@ def load_and_log_configs():
                 'temperature': tabby_temperature,
                 'top_p': tabby_top_p,
                 'top_k': tabby_top_k,
-                'min_p': tabby_min_p
+                'min_p': tabby_min_p,
+                'max_tokens': tabby_max_tokens
             },
             'vllm_api': {
                 'api_ip': vllm_api_url,
@@ -674,11 +685,13 @@ def load_and_log_configs():
                 'streaming': ollama_streaming,
                 'temperature': ollama_temperature,
                 'top_p': ollama_top_p,
+                'max_tokens': ollama_max_tokens
             },
             'aphrodite_api': {
                 'api_ip': aphrodite_api_url,
                 'api_key': aphrodite_api_key,
                 'model': aphrodite_model,
+                'max_tokens': aphrodite_max_tokens
             },
             'llm_api_settings': {
                 'default_api': default_api,

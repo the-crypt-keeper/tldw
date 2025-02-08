@@ -15,6 +15,7 @@ https://github.com/KartDriver/mira_converse?tab=readme-ov-file
 https://huggingface.co/kyutai
 https://github.com/kyutai-labs/hibiki
 https://metis-demo.github.io/#metis-tts
+https://github.com/RobViren/kokovoicelab
 
 
 
