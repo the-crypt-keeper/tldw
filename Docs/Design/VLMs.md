@@ -24,6 +24,9 @@ https://huggingface.co/Qwen/Qwen2-VL-72B
 https://huggingface.co/Qwen/Qwen2-VL-7B
 https://huggingface.co/Qwen/Qwen2-VL-2B
 https://github.com/Lokesh-Chimakurthi/vision-rag
+https://github.com/merveenoyan/smol-vision/blob/main/inference_gists/IBM_Granite_Vision.ipynb
+https://arxiv.org/abs/2502.04328
+https://huggingface.co/THUdyh/Ola-7b
 https://github.com/tjmlabs/ColiVara
 https://arxiv.org/abs/2501.07888
 https://arxiv.org/abs/2412.07112
