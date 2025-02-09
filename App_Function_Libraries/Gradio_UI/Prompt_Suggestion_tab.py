@@ -136,7 +136,7 @@ def create_prompt_suggestion_tab():
         )
 
 # Example chat function based on your API structure
-def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message=None):
+def chat_api_call(api_endpoint, api_key, input_data, prompt, temp, system_message=None, streaming=None, minp=None, maxp=None, model=None, topk=None, topp=None):
     # Here you will call your chat function as defined previously
     response = chat(message=input_data, history=[], media_content={}, selected_parts=[],
                     api_endpoint=api_endpoint, api_key=api_key, prompt=prompt, temperature=temp,

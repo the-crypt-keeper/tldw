@@ -72,7 +72,9 @@ Overall Assessment: [Your overall assessment of the summary's quality]
             streaming=False,
             minp=None,
             maxp=None,
-            model=None
+            model=None,
+            topk=None,
+            topp=None,
         )
     except Exception as e:
         return detailed_api_error(api_name, e)

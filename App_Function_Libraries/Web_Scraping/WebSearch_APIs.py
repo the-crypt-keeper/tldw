@@ -406,7 +406,12 @@ async def search_result_relevance(
                 prompt=eval_prompt,
                 temp=0.7,
                 system_message=None,
-                streaming=False
+                streaming=False,
+                minp=None,
+                maxp=None,
+                model=None,
+                topk=None,
+                topp=None,
             )
 
             # FIXME
@@ -679,7 +684,12 @@ def aggregate_results(
             prompt=analyze_search_results_prompt_2,
             temp=0.7,
             system_message=None,
-            streaming=False
+            streaming=False,
+            minp=None,
+            maxp=None,
+            model=None,
+            topk=None,
+            topp=None,
         )
         logging.debug(f"Returned response from LLM: {returned_response}")
         if returned_response:
