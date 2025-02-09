@@ -27,6 +27,9 @@ from App_Function_Libraries.Utils.Utils import *
 # Function Definitions
 #
 
+# Set global settings for retry/timeouts
+local_api_timeout = load_and_log_configs().get('local_llm', {}).get('timeout', 90)
+
 def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None, streaming=False, top_k=None, top_p=None, min_p=None):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -115,7 +118,7 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
         }
 
         logging.debug("Local LLM: Posting request")
-        response = requests.post('http://127.0.0.1:8080/v1/chat/completions', headers=headers, json=data)
+        response = requests.post('http://127.0.0.1:8080/v1/chat/completions', headers=headers, json=data, timeout=local_api_timeout)
 
         if response.status_code == 200:
             if streaming:
@@ -276,7 +279,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
         }
 
         logging.debug("llama.cpp: Submitting request to API endpoint")
-        response = requests.post(api_url, headers=headers, json=data, stream=streaming)
+        response = requests.post(api_url, headers=headers, json=data, stream=streaming, timeout=local_api_timeout)
         logging.debug("Llama.cpp: API Response Data: %s", response)
         if response.status_code == 200:
             if streaming:
@@ -442,7 +445,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                 # Get the Streaming API IP from the config
                 kobold_openai_api_IP = loaded_config_data['kobold_api']['api_streaming_ip']
                 response = requests.post(
-                    kobold_openai_api_IP, headers=headers, json=data, stream=True
+                    kobold_openai_api_IP, headers=headers, json=data, stream=True, timeout=local_api_timeout
                 )
                 logging.debug(
                     "Kobold Summarization: API Response Status Code: %d",
@@ -490,7 +493,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
         else:
             try:
                 response = requests.post(
-                    kobold_api_ip, headers=headers, json=data
+                    kobold_api_ip, headers=headers, json=data, timeout=local_api_timeout
                 )
                 logging.debug(
                     "Kobold Summarization: API Response Status Code: %d",
@@ -638,7 +641,7 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, system_prompt=None, 
         # If the user has set streaming to True:
         if streaming:
             logging.debug("Oobabooga chat: Streaming mode enabled")
-            response = requests.post(api_url, headers=headers, json=data, stream=True)
+            response = requests.post(api_url, headers=headers, json=data, stream=True, timeout=local_api_timeout)
             response.raise_for_status()
             try:
                 def stream_generator():
@@ -668,7 +671,7 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, system_prompt=None, 
                 return f"Error summarizing with Oobabooga: {str(e)}"
         else:
             logging.debug("Oobabooga Chat: Posting request (non-streaming)")
-            response = requests.post(api_url, headers=headers, json=data)
+            response = requests.post(api_url, headers=headers, json=data, timeout=local_api_timeout)
 
             if response.status_code == 200:
                 response_data = response.json()
@@ -824,7 +827,7 @@ def chat_with_tabbyapi(
         if streaming:
             logging.debug("TabbyAPI: Streaming mode enabled for chat request")
             try:
-                response = requests.post(tabby_api_ip, headers=headers, json=data2, stream=True)
+                response = requests.post(tabby_api_ip, headers=headers, json=data2, stream=True, timeout=local_api_timeout)
                 response.raise_for_status()
                 # Process the streamed response
                 for line in response.iter_lines():
@@ -853,7 +856,7 @@ def chat_with_tabbyapi(
                 yield f"TabbyAPI: Unexpected error in making chat request: {str(e)}"
         else:
             try:
-                response = requests.post(tabby_api_ip, headers=headers, json=data2)
+                response = requests.post(tabby_api_ip, headers=headers, json=data2, timeout=local_api_timeout)
                 response.raise_for_status()
                 response_json = response.json()
 
@@ -1004,7 +1007,8 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt, temp=None, system_me
                 'https://api.openai.com/v1/chat/completions',
                 headers=headers,
                 json=data,
-                stream=True
+                stream=True,
+                timeout=local_api_timeout
             )
             logging.debug(f"OpenAI: Response text: {response.text}")
             response.raise_for_status()
@@ -1033,7 +1037,7 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt, temp=None, system_me
             return stream_generator()
         else:
             logging.debug("Aphrodite Chat: Posting request (non-streaming")
-            response = requests.post(url, headers=headers, json=data)
+            response = requests.post(url, headers=headers, json=data, timeout=local_api_timeout)
             logging.debug(f"Full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
@@ -1186,7 +1190,7 @@ def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/
                 logging.debug("Ollama: Submitting streaming request to API endpoint")
                 print("Ollama: Submitting streaming request to API endpoint")
                 try:
-                    response = requests.post(api_url, headers=headers, json=data_payload, stream=True)
+                    response = requests.post(api_url, headers=headers, json=data_payload, stream=True, timeout=local_api_timeout)
                     response.raise_for_status()  # Raises HTTPError for bad responses
 
                     # Process the streamed response
@@ -1407,7 +1411,8 @@ def chat_with_vllm(
                 url=vllm_api_url,
                 headers=headers,
                 json=payload,
-                stream=True
+                stream=True,
+                timeout=local_api_timeout
             )
             response.raise_for_status()
 
@@ -1435,7 +1440,7 @@ def chat_with_vllm(
             return stream_generator()
         else:
             logging.debug("vLLM: Posting request (non-streaming")
-            response = requests.post(vllm_api_url, headers=headers, json=payload)
+            response = requests.post(vllm_api_url, headers=headers, json=payload, timeout=local_api_timeout)
             logging.debug(f"Full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
@@ -1538,7 +1543,8 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
                 custom_openai_url,
                 headers=headers,
                 json=data,
-                stream=True
+                stream=True,
+                timeout=local_api_timeout
             )
             response.raise_for_status()
             logging.debug(f"Custom OpenAI API: Response text: {response.text}")
@@ -1567,7 +1573,7 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
             return stream_generator()
         else:
             logging.debug("Custom OpenAI API: Posting request")
-            response = requests.post(custom_openai_url, headers=headers, json=data)
+            response = requests.post(custom_openai_url, headers=headers, json=data, timeout=local_api_timeout)
             logging.debug(f"Custom OpenAI API full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
