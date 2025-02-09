@@ -1148,8 +1148,7 @@ def summarize_with_ollama(
         return f"Ollama: Error occurred while processing summary with Ollama: {str(e)}"
 
 
-def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False,
-                                 custom_openai_api_url=None):
+def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
     loaded_config_data = load_and_log_configs()
     custom_openai_api_key = api_key
     try:
@@ -1157,7 +1156,7 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
         if not custom_openai_api_key:
             logging.info("Custom OpenAI API: API key not provided as parameter")
             logging.info("Custom OpenAI API: Attempting to use API key from config file")
-            custom_openai_api_key = loaded_config_data['api_keys']['custom_openai_api_key']
+            custom_openai_api_key = loaded_config_data['custom_openai_api']['api_key']
 
         if not custom_openai_api_key:
             logging.error("Custom OpenAI API: API key not found or is empty")
@@ -1216,35 +1215,52 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
         else:
             input_data = f"{input_data}\n\n\n\n{text}"
 
-        openai_model = loaded_config_data['models']['openai'] or "gpt-4o"
-        logging.debug(f"Custom OpenAI API: Using model: {openai_model}")
+        # Model Selection
+        custom_openai_model = loaded_config_data['custom_openai_api']['model']
+        logging.debug(f"Custom OpenAI API: Using model: {custom_openai_model}")
 
+        # Set max tokens
+        max_tokens = loaded_config_data['custom_openai_api']['max_tokens']
+        max_tokens = int(max_tokens)
+        logging.debug(f"Custom OpenAI API: Using max tokens: {max_tokens}")
+
+        # Set temperature
+        if temp is None:
+            temp = load_and_log_configs()['custom_openai_api']['temperature']
+        temp = float(temp)
+
+        # Set system message
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+
+        # Set Streaming
+        if streaming is None:
+            streaming = load_and_log_configs()['custom_openai_api']['streaming']
+
+        # Set API URL
+        custom_openai_api_url = loaded_config_data['custom_openai_api']['api_ip']
+        logging.debug(f"Custom OpenAI API: Using API URL: {custom_openai_api_url}")
+
+        logging.debug("Custom OpenAI API: Preparing data + prompt for submittal")
+        openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+
+        # Set headers
         headers = {
             'Authorization': f'Bearer {custom_openai_api_key}',
             'Content-Type': 'application/json'
         }
 
-        logging.debug(
-            f"OpenAI API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
-        logging.debug("Custom OpenAI API: Preparing data + prompt for submittal")
-        openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
-        if temp is None:
-            temp = 0.7
-        if system_message is None:
-            system_message = "You are a helpful AI assistant who does whatever the user requests."
-        temp = float(temp)
+        # Payload setup
         data = {
-            "model": openai_model,
+            "model": custom_openai_model,
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": openai_prompt}
             ],
-            "max_tokens": 4096,
+            "max_tokens": max_tokens,
             "temperature": temp,
-            "streaming": streaming
+            "stream": streaming
         }
-
-        custom_openai_url = loaded_config_data['Local_api_ip']['custom_openai_api_ip']
 
         if streaming:
             response = requests.post(
@@ -1279,7 +1295,7 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
             return stream_generator()
         else:
             logging.debug("Custom OpenAI API: Posting request")
-            response = requests.post(custom_openai_url, headers=headers, json=data)
+            response = requests.post(custom_openai_api_url, headers=headers, json=data)
             logging.debug(f"Custom OpenAI API full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
@@ -1305,6 +1321,181 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
     except Exception as e:
         logging.error(f"Custom OpenAI API: Unexpected error: {str(e)}", exc_info=True)
         return f"Custom OpenAI API: Unexpected error occurred: {str(e)}"
+
+
+def summarize_with_custom_openai_2(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
+    loaded_config_data = load_and_log_configs()
+    custom_openai_api_key = api_key
+    try:
+        # API key validation
+        if not custom_openai_api_key:
+            logging.info("Custom OpenAI API-2: API key not provided as parameter")
+            logging.info("Custom OpenAI API-2: Attempting to use API key from config file")
+            custom_openai_api_key = loaded_config_data['custom_openai_api_2']['api_key']
+
+        if not custom_openai_api_key:
+            logging.error("Custom OpenAI API-2: API key not found or is empty")
+            return "Custom OpenAI API-2: API Key Not Provided/Found in Config file or is empty"
+
+        logging.debug(f"Custom OpenAI API: Using API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:]}")
+
+        # Input data handling
+        logging.debug(f"Custom OpenAI API-2: Raw input data type: {type(input_data)}")
+        logging.debug(f"Custom OpenAI API-2: Raw input data (first 500 chars): {str(input_data)[:500]}...")
+
+        if isinstance(input_data, str):
+            if input_data.strip().startswith('{'):
+                # It's likely a JSON string
+                logging.debug("Custom OpenAI API-2: Parsing provided JSON string data for summarization")
+                try:
+                    data = json.loads(input_data)
+                except json.JSONDecodeError as e:
+                    logging.error(f"Custom OpenAI API-2: Error parsing JSON string: {str(e)}")
+                    data = input_data
+                    pass
+            elif os.path.isfile(input_data):
+                logging.debug("Custom OpenAI API-2: Loading JSON data from file for summarization")
+                with open(input_data, 'r') as file:
+                    data = json.load(file)
+            else:
+                logging.debug("Custom OpenAI API-2: Using provided string data for summarization")
+                data = input_data
+        else:
+            data = input_data
+
+        logging.debug(f"Custom OpenAI API-2: Processed data type: {type(data)}")
+        logging.debug(f"Custom OpenAI API-2: Processed data (first 500 chars): {str(data)[:500]}...")
+
+        # Text extraction
+        if isinstance(data, dict):
+            if 'summary' in data:
+                logging.debug("Custom OpenAI API-2: Summary already exists in the loaded data")
+                return data['summary']
+            elif 'segments' in data:
+                text = extract_text_from_segments(data['segments'])
+            else:
+                text = json.dumps(data)  # Convert dict to string if no specific format
+        elif isinstance(data, list):
+            text = extract_text_from_segments(data)
+        elif isinstance(data, str):
+            text = data
+        else:
+            raise ValueError(f"Custom OpenAI API-2: Invalid input data format: {type(data)}")
+
+        logging.debug(f"Custom OpenAI API-2: Extracted text (first 500 chars): {text[:500]}...")
+        logging.debug(f"Custom OpenAI API-2: Custom prompt: {custom_prompt_arg}")
+
+        if input_data is None:
+            input_data = f"{summarizer_prompt}\n\n\n\n{text}"
+        else:
+            input_data = f"{input_data}\n\n\n\n{text}"
+
+        # Model Selection
+        custom_openai_model = loaded_config_data['custom_openai_api_2']['model']
+        logging.debug(f"Custom OpenAI API-2: Using model: {custom_openai_model}")
+
+        # Set max tokens
+        max_tokens = loaded_config_data['custom_openai_api_2']['max_tokens']
+        max_tokens = int(max_tokens)
+        logging.debug(f"Custom OpenAI API: Using max tokens: {max_tokens}")
+
+        # Set temperature
+        if temp is None:
+            temp = load_and_log_configs()['custom_openai_api_2']['temperature']
+        temp = float(temp)
+
+        # Set system message
+        if system_message is None:
+            system_message = "You are a helpful AI assistant who does whatever the user requests."
+
+        # Set Streaming
+        if streaming is None:
+            streaming = load_and_log_configs()['custom_openai_api_2']['streaming']
+
+        # Set API URL
+        custom_openai_api_url = loaded_config_data['custom_openai_api_2']['api_ip']
+        logging.debug(f"Custom OpenAI API-2: Using API URL: {custom_openai_api_url}")
+
+        logging.debug("Custom OpenAI API-2: Preparing data + prompt for submittal")
+        openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
+
+        # Set headers
+        headers = {
+            'Authorization': f'Bearer {custom_openai_api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        # Payload setup
+        data = {
+            "model": custom_openai_model,
+            "messages": [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": openai_prompt}
+            ],
+            "max_tokens": max_tokens,
+            "temperature": temp,
+            "stream": streaming
+        }
+
+        if streaming:
+            response = requests.post(
+                custom_openai_api_url,
+                headers=headers,
+                json=data,
+                stream=True
+            )
+            response.raise_for_status()
+
+            def stream_generator():
+                collected_messages = ""
+                for line in response.iter_lines():
+                    line = line.decode("utf-8").strip()
+
+                    if line == "":
+                        continue
+
+                    if line.startswith("data: "):
+                        data_str = line[len("data: "):]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            data_json = json.loads(data_str)
+                            chunk = data_json["choices"][0]["delta"].get("content", "")
+                            collected_messages += chunk
+                            yield chunk
+                        except json.JSONDecodeError:
+                            logging.error(f"Custom OpenAI API-2: Error decoding JSON from line: {line}")
+                            continue
+                yield collected_messages
+            return stream_generator()
+        else:
+            logging.debug("Custom OpenAI API-2: Posting request")
+            response = requests.post(custom_openai_api_url, headers=headers, json=data)
+            logging.debug(f"Custom OpenAI API-2 full API response data: {response}")
+            if response.status_code == 200:
+                response_data = response.json()
+                logging.debug(response_data)
+                if 'choices' in response_data and len(response_data['choices']) > 0:
+                    chat_response = response_data['choices'][0]['message']['content'].strip()
+                    logging.debug("Custom OpenAI API-2: Chat Sent successfully")
+                    logging.debug(f"Custom OpenAI API-2: Chat response: {chat_response}")
+                    return chat_response
+                else:
+                    logging.warning("Custom OpenAI API-2: Chat response not found in the response data")
+                    return "Custom OpenAI API-2: Chat not available"
+            else:
+                logging.error(f"Custom OpenAI API-2: Chat request failed with status code {response.status_code}")
+                logging.error(f"Custom OpenAI API-2: Error response: {response.text}")
+                return f"OpenAI: Failed to process chat response. Status code: {response.status_code}"
+    except json.JSONDecodeError as e:
+        logging.error(f"Custom OpenAI API-2: Error decoding JSON: {str(e)}", exc_info=True)
+        return f"Custom OpenAI API-2: Error decoding JSON input: {str(e)}"
+    except requests.RequestException as e:
+        logging.error(f"Custom OpenAI API-2: Error making API request: {str(e)}", exc_info=True)
+        return f"Custom OpenAI API-2: Error making API request: {str(e)}"
+    except Exception as e:
+        logging.error(f"Custom OpenAI API-2: Unexpected error: {str(e)}", exc_info=True)
+        return f"Custom OpenAI API-2: Unexpected error occurred: {str(e)}"
 
 
 def save_summary_to_file(summary, file_path):

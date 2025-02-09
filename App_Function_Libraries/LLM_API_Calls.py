@@ -131,24 +131,31 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
 
         logging.debug(f"OpenAI: Using API Key: {openai_api_key[:5]}...{openai_api_key[-5:]}")
 
+        # Streaming mode
         if isinstance(streaming, str):
             streaming = streaming.lower() == "true"
         elif isinstance(streaming, int):
             streaming = bool(streaming)  # Convert integers (1/0) to boolean
         elif streaming is None:
-            streaming = loaded_config_data.get('openai_api', {}).get('streaming', False)
+            streaming = loaded_config_data['openai_api']['streaming']
+        if streaming:
             logging.debug("OpenAI: Streaming mode enabled")
         else:
             logging.debug("OpenAI: Streaming mode disabled")
         if not isinstance(streaming, bool):
             raise ValueError(f"Invalid type for 'streaming': Expected a boolean, got {type(streaming).__name__}")
 
+        # Set Top-P
         if maxp is None:
             maxp = loaded_config_data['openai_api']['top_p']
             maxp = float(maxp)
-        if model is None:
+
+        # Set model
+        openai_model = model
+        if openai_model is None:
             openai_model = loaded_config_data['openai_api']['model'] or "gpt-4o"
             logging.debug(f"OpenAI: Using model: {openai_model}")
+
 
         logging.debug(f"OpenAI: Custom prompt: {custom_prompt_arg}")
 
@@ -161,18 +168,28 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
             f"OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
         logging.debug("openai: Preparing data + prompt for submittal")
         openai_prompt = f"{input_data} \n\n\n\n{custom_prompt_arg}"
+
+        # Set Temperature
         if temp is None:
-            temp = 0.7
+            temp = loaded_config_data['openai_api']['temperature']
+            temp = float(temp)
+
+        # Set System message
         if system_message is None:
             system_message = "You are a helpful AI assistant who does whatever the user requests."
-        temp = float(temp)
+
+        # Set Max Tokens
+        max_tokens = loaded_config_data['openai_api']['max_tokens']
+        max_tokens = int(max_tokens)
+        logging.debug(f"OpenAI: Using max_tokens: {max_tokens}")
+
         data = {
             "model": openai_model,
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": openai_prompt}
             ],
-            "max_completion_tokens": 4096,
+            "max_completion_tokens": max_tokens,
             "temperature": temp,
             "stream": streaming,
             "top_p": maxp
@@ -330,6 +347,10 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
             top_p = 1.0
             logging.debug(f"Anthropic Chat: Using default maxp: {top_p}")
 
+        # Set max tokens
+        max_tokens = loaded_config_data['anthropic_api']['max_tokens']
+        max_tokens = int(max_tokens)
+
         headers = {
             'x-api-key': anthropic_api_key,
             'anthropic-version': '2023-06-01',
@@ -346,7 +367,7 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
         # FIXME - add topk only if it's not None
         data = {
             "model": anthropic_model,
-            "max_tokens": 4096,  # max possible tokens to return
+            "max_tokens": max_tokens,
             "messages": [user_message],
             "stop_sequences": ["\n\nHuman:"],
             "temperature": temp,
