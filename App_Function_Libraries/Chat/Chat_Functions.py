@@ -110,7 +110,14 @@ def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp
             )
 
         elif api_endpoint.lower() == "deepseek":
-            response = chat_with_deepseek(api_key, input_data, prompt, temp, system_message, streaming, topp)
+            response = chat_with_deepseek(api_key,
+                                          input_data,
+                                          prompt,
+                                          temp,
+                                          system_message,
+                                          streaming,
+                                          topp
+                                        )
 
         elif api_endpoint.lower() == "mistral":
             response = chat_with_mistral(api_key,
@@ -185,6 +192,9 @@ def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp
             response = chat_with_aphrodite(input_data, prompt, temp, system_message)
 
         elif api_endpoint.lower() == "custom-openai-api":
+            response = chat_with_custom_openai(api_key, input_data, prompt, temp, system_message)
+
+        elif api_endpoint.lower() == "custom-openai-api-2":
             response = chat_with_custom_openai(api_key, input_data, prompt, temp, system_message)
 
         else:
