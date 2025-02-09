@@ -27,9 +27,6 @@ from App_Function_Libraries.Utils.Utils import *
 # Function Definitions
 #
 
-# Set global settings for retry/timeouts
-local_api_timeout = load_and_log_configs().get('local_llm', {}).get('timeout', 90)
-
 def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None, streaming=False, top_k=None, top_p=None, min_p=None):
     try:
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -117,6 +114,7 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
             "min_p": min_p
         }
 
+        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
         logging.debug("Local LLM: Posting request")
         response = requests.post('http://127.0.0.1:8080/v1/chat/completions', headers=headers, json=data, timeout=local_api_timeout)
 
@@ -278,6 +276,8 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
 
         }
 
+        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
+
         logging.debug("llama.cpp: Submitting request to API endpoint")
         response = requests.post(api_url, headers=headers, json=data, stream=streaming, timeout=local_api_timeout)
         logging.debug("Llama.cpp: API Response Data: %s", response)
@@ -435,6 +435,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
         logging.debug("kobold: Submitting request to API endpoint")
         logging.info("kobold: Submitting request to API endpoint")
         kobold_api_ip = loaded_config_data['kobold_api']['api_ip']
+        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
 
         # FIXME - Kobold uses non-standard streaming bullshit
         streaming = False
@@ -638,6 +639,7 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, system_prompt=None, 
             "max_tokens": ooba_max_tokens,
         }
 
+        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
         # If the user has set streaming to True:
         if streaming:
             logging.debug("Oobabooga chat: Streaming mode enabled")
@@ -824,6 +826,7 @@ def chat_with_tabbyapi(
             "stream": streaming
         }
 
+        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
         if streaming:
             logging.debug("TabbyAPI: Streaming mode enabled for chat request")
             try:
@@ -1001,6 +1004,8 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt, temp=None, system_me
             "min_p": minp,
             "max_tokens": aphrodite_max_tokens,
         }
+        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
+
         if streaming:
             logging.debug("Aphrodite Chat: Posting request (streaming")
             response = requests.post(
@@ -1181,6 +1186,8 @@ def chat_with_ollama(input_data, custom_prompt, api_url="http://127.0.0.1:11434/
             "top_p": top_p,
             "max_tokens": ollama_max_tokens,
         }
+
+        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
 
         if streaming:
             # Add streaming support
@@ -1405,6 +1412,8 @@ def chat_with_vllm(
             vllm_api_url = loaded_config_data['vllm_api']['api_ip']
         logging.debug(f"vLLM: Sending request to {vllm_api_url}")
 
+        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
+
         if streaming:
             logging.debug("OpenAI: Posting request (streaming")
             response = requests.post(
@@ -1537,6 +1546,7 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
         }
 
         custom_openai_url = loaded_config_data['custom_openai_api']['api_ip']
+        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
 
         if streaming:
             response = requests.post(
@@ -1572,6 +1582,7 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
                 yield collected_messages
             return stream_generator()
         else:
+            local_api_timeout = loaded_config_data['local_llm']['api_timeout']
             logging.debug("Custom OpenAI API: Posting request")
             response = requests.post(custom_openai_url, headers=headers, json=data, timeout=local_api_timeout)
             logging.debug(f"Custom OpenAI API full API response data: {response}")
