@@ -31,7 +31,7 @@ from App_Function_Libraries.Chunk_Lib import semantic_chunking, rolling_summariz
 from App_Function_Libraries.Audio.Diarization_Lib import combine_transcription_and_diarization
 from App_Function_Libraries.Summarization.Local_Summarization_Lib import summarize_with_llama, summarize_with_kobold, \
     summarize_with_oobabooga, summarize_with_tabbyapi, summarize_with_vllm, summarize_with_local_llm, \
-    summarize_with_ollama, summarize_with_custom_openai
+    summarize_with_ollama, summarize_with_custom_openai, summarize_with_custom_openai_2
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Utils.Utils import (load_and_log_configs, sanitize_filename, clean_youtube_url,
                                                 create_download_directory, is_valid_url, logging)
@@ -88,9 +88,9 @@ def summarize(
             return summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "huggingface":
             return summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp, streaming)#system_message)
-        elif api_name.lower() == "custom-openai":
+        elif api_name.lower() == "custom-openai-api":
             return summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
-        elif api_name.lower() == "custom-openai_2":
+        elif api_name.lower() == "custom-openai-api-2":
             return summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp, system_message, streaming)
         elif api_name.lower() == "ollama":
             return summarize_with_ollama(input_data, custom_prompt_arg, None, api_key, temp, system_message, streaming)
@@ -2200,9 +2200,9 @@ def process_url(
                     summary = summarize_with_ollama(chunk, custom_prompt_input, api_key, temp, system_message, None, streaming)
                 elif api_name == "custom_openai_api":
                     summary = summarize_with_custom_openai(chunk, custom_prompt_input, api_key, temp=None, system_message=None, streaming=streaming)
-                #elif api_name == "custom_openai_api_2":
-                    #summary = summarize_with_custom_openai_2(chunk, custom_prompt_input, api_key, temp=None,
-                    #                                       system_message=None, streaming)
+                elif api_name == "custom_openai_api_2":
+                    summary = summarize_with_custom_openai_2(chunk, custom_prompt_input, api_key, temp=None,
+                                                           system_message=None, streaming=streaming)
                 else:
                     summary = None
                 summarized_chunk_transcriptions.append(summary)

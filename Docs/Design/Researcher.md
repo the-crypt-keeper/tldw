@@ -130,6 +130,7 @@ https://docs.gptr.dev/docs/gpt-researcher/multi_agents/langgraph
 https://pub.towardsai.net/learn-anything-with-ai-and-the-feynman-technique-00a33f6a02bc
 https://help.openalex.org/hc/en-us/articles/24396686889751-About-us
 https://www.ginkgonotes.com/
+https://github.com/LearningCircuit/local-deep-research
 https://github.com/assafelovic/gpt-researcher/tree/master/multi_agents
 https://www.reddit.com/r/Anki/comments/17u01ge/spaced_repetition_algorithm_a_threeday_journey/
 https://github.com/open-spaced-repetition/fsrs4anki/wiki/Spaced-Repetition-Algorithm:-A-Three%E2%80%90Day-Journey-from-Novice-to-Expert#day-3-the-latest-progress
@@ -152,6 +153,7 @@ https://github.com/bytedance/pasa
 https://huggingface.co/spaces/Felladrin/awesome-ai-web-search
 https://allenai.org/blog/ai2-scholarqa
 https://openreview.net/
+https://github.com/HarshJ23/Deeper-Seeker
 https://learning.google.com/experiments/learn-about/signup
 https://departmentofproduct.substack.com/p/how-to-use-perplexity-to-automate
 https://departmentofproduct.substack.com/p/deep-the-ux-of-search

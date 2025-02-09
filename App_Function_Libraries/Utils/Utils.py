@@ -15,7 +15,6 @@
 #     DB Config Loading
 #     File Handling Functions
 #
-#
 ####################
 # Function List
 #
@@ -231,52 +230,68 @@ def load_and_log_configs():
         # logging.debug(
         #     f"Loaded elevenlabs API Key: {elevenlabs_api_key[:5]}...{elevenlabs_api_key[-5:] if elevenlabs_api_key else None}")
 
-        # Models
-        anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-sonnet-20240229')
-        cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
-        groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
-        openai_model = config.get('API', 'openai_model', fallback='gpt-4-turbo')
-        huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
-        openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
-        deepseek_model = config.get('API', 'deepseek_model', fallback='deepseek-chat')
-        mistral_model = config.get('API', 'mistral_model', fallback='mistral-large-latest')
-        google_model = config.get('API', 'google_model', fallback='gemini-1.5-pro')
-
         # LLM API Settings - streaming / temperature / top_p / min_p
+        # Anthropic
+        anthropic_api_key = config.get('API', 'anthropic_api_key', fallback=None)
+        anthropic_model = config.get('API', 'anthropic_model', fallback='claude-3-5-sonnet-20240620')
         anthropic_streaming = config.get('API', 'anthropic_streaming', fallback='False')
         anthropic_temperature = config.get('API', 'anthropic_temperature', fallback='0.7')
         anthropic_top_p = config.get('API', 'anthropic_top_p', fallback='0.95')
         anthropic_top_k = config.get('API', 'anthropic_top_k', fallback='100')
+
+        # Cohere
         cohere_streaming = config.get('API', 'cohere_streaming', fallback='False')
         cohere_temperature = config.get('API', 'cohere_temperature', fallback='0.7')
         cohere_max_p = config.get('API', 'cohere_max_p', fallback='0.95')
         cohere_top_k = config.get('API', 'cohere_top_k', fallback='100')
+        cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
+
+        # Deepseek
+        deepseek_streaming = config.get('API', 'deepseek_streaming', fallback='False')
+        deepseek_temperature = config.get('API', 'deepseek_temperature', fallback='0.7')
+        deepseek_top_p = config.get('API', 'deepseek_top_p', fallback='0.95')
+        deepseek_min_p = config.get('API', 'deepseek_min_p', fallback='0.05')
+        deepseek_model = config.get('API', 'deepseek_model', fallback='deepseek-chat')
+
+        # Groq
+        groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
         groq_streaming = config.get('API', 'groq_streaming', fallback='False')
         groq_temperature = config.get('API', 'groq_temperature', fallback='0.7')
         groq_top_p = config.get('API', 'groq_top_p', fallback='0.95')
-        openai_streaming = config.get('API', 'openai_streaming', fallback='False')
-        openai_temperature = config.get('API', 'openai_temperature', fallback='0.7')
-        openai_top_p = config.get('API', 'openai_top_p', fallback='0.95')
+
+        # Google
+        google_model = config.get('API', 'google_model', fallback='gemini-1.5-pro')
+        google_streaming = config.get('API', 'google_streaming', fallback='False')
+        google_temperature = config.get('API', 'google_temperature', fallback='0.7')
+        google_top_p = config.get('API', 'google_top_p', fallback='0.95')
+        google_min_p = config.get('API', 'google_min_p', fallback='0.05')
+
+        # HuggingFace
+        huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
         huggingface_streaming = config.get('API', 'huggingface_streaming', fallback='False')
         huggingface_temperature = config.get('API', 'huggingface_temperature', fallback='0.7')
         huggingface_top_p = config.get('API', 'huggingface_top_p', fallback='0.95')
         huggingface_min_p = config.get('API', 'huggingface_min_p', fallback='0.05')
+
+        # Mistral
+        mistral_model = config.get('API', 'mistral_model', fallback='mistral-large-latest')
+        mistral_streaming = config.get('API', 'mistral_streaming', fallback='False')
+        mistral_temperature = config.get('API', 'mistral_temperature', fallback='0.7')
+        mistral_top_p = config.get('API', 'mistral_top_p', fallback='0.95')
+
+        # OpenAI
+        openai_model = config.get('API', 'openai_model', fallback='gpt-4o')
+        openai_streaming = config.get('API', 'openai_streaming', fallback='False')
+        openai_temperature = config.get('API', 'openai_temperature', fallback='0.7')
+        openai_top_p = config.get('API', 'openai_top_p', fallback='0.95')
+
+        # OpenRouter
+        openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
         openrouter_streaming = config.get('API', 'openrouter_streaming', fallback='False')
         openrouter_temperature = config.get('API', 'openrouter_temperature', fallback='0.7')
         openrouter_top_p = config.get('API', 'openrouter_top_p', fallback='0.95')
         openrouter_min_p = config.get('API', 'openrouter_min_p', fallback='0.05')
         openrouter_top_k = config.get('API', 'openrouter_top_k', fallback='100')
-        deepseek_streaming = config.get('API', 'deepseek_streaming', fallback='False')
-        deepseek_temperature = config.get('API', 'deepseek_temperature', fallback='0.7')
-        deepseek_top_p = config.get('API', 'deepseek_top_p', fallback='0.95')
-        deepseek_min_p = config.get('API', 'deepseek_min_p', fallback='0.05')
-        mistral_streaming = config.get('API', 'mistral_streaming', fallback='False')
-        mistral_temperature = config.get('API', 'mistral_temperature', fallback='0.7')
-        mistral_top_p = config.get('API', 'mistral_top_p', fallback='0.95')
-        google_streaming = config.get('API', 'google_streaming', fallback='False')
-        google_temperature = config.get('API', 'google_temperature', fallback='0.7')
-        google_top_p = config.get('API', 'google_top_p', fallback='0.95')
-        google_min_p = config.get('API', 'google_min_p', fallback='0.05')
 
         # Logging Checks for model loads
         # logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
@@ -296,6 +311,7 @@ def load_and_log_configs():
         kobold_temperature = config.get('Local-API', 'kobold_temperature', fallback='0.7')
         kobold_top_p = config.get('Local-API', 'kobold_top_p', fallback='0.95')
         kobold_top_k = config.get('Local-API', 'kobold_top_k', fallback='100')
+        kobold_max_tokens = config.get('Local-API', 'kobold_max_tokens', fallback='4096')
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
@@ -304,6 +320,7 @@ def load_and_log_configs():
         llama_top_p = config.get('Local-API', 'llama_top_p', fallback='0.95')
         llama_min_p = config.get('Local-API', 'llama_min_p', fallback='0.05')
         llama_top_k = config.get('Local-API', 'llama_top_k', fallback='100')
+        llama_max_tokens = config.get('Local-API', 'llama_max_tokens', fallback='4096')
 
         ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
         ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
@@ -312,6 +329,7 @@ def load_and_log_configs():
         ooba_top_p = config.get('Local-API', 'ooba_top_p', fallback='0.95')
         ooba_min_p = config.get('Local-API', 'ooba_min_p', fallback='0.05')
         ooba_top_k = config.get('Local-API', 'ooba_top_k', fallback='100')
+        ooba_max_tokens = config.get('Local-API', 'ooba_max_tokens', fallback='4096')
 
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
@@ -321,6 +339,7 @@ def load_and_log_configs():
         tabby_top_p = config.get('Local-API', 'tabby_top_p', fallback='0.95')
         tabby_top_k = config.get('Local-API', 'tabby_top_k', fallback='100')
         tabby_min_p = config.get('Local-API', 'tabby_min_p', fallback='0.05')
+        tabby_max_tokens = config.get('Local-API', 'tabby_max_tokens', fallback='4096')
 
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
@@ -338,17 +357,31 @@ def load_and_log_configs():
         ollama_streaming = config.get('Local-API', 'ollama_streaming', fallback='False')
         ollama_temperature = config.get('Local-API', 'ollama_temperature', fallback='0.7')
         ollama_top_p = config.get('Local-API', 'ollama_top_p', fallback='0.95')
+        ollama_max_tokens = config.get('Local-API', 'ollama_max_tokens', fallback='4096')
 
         aphrodite_api_url = config.get('Local-API', 'aphrodite_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         aphrodite_api_key = config.get('Local-API', 'aphrodite_api_key', fallback='')
         aphrodite_model = config.get('Local-API', 'aphrodite_model', fallback='')
+        aphrodite_max_tokens = config.get('Local-API', 'aphrodite_max_tokens', fallback='4096')
 
         custom_openai_api_key = config.get('API', 'custom_openai_api_key', fallback=None)
-        custom_openai_api_url = config.get('API', 'custom_openai_url', fallback=None)
-        #logging.debug(
-        #    f"Loaded Custom openai-like endpoint API Key: {custom_openai_api_key[:5]}...{custom_openai_api_key[-5:] if custom_openai_api_key else None}")
-        custom_openai_api_streaming = config.get('API', 'custom_openai_streaming', fallback='False')
-        custom_openai_api_temperature = config.get('API', 'custom_openai_temperature', fallback='0.7')
+        custom_openai_api_ip = config.get('API', 'custom_openai_api_ip', fallback=None)
+        custom_openai_api_model = config.get('API', 'custom_openai_api_model', fallback=None)
+        custom_openai_api_streaming = config.get('API', 'custom_openai_api_streaming', fallback='False')
+        custom_openai_api_temperature = config.get('API', 'custom_openai_api_temperature', fallback='0.7')
+        custom_openai_api_top_p = config.get('API', 'custom_openai_api_top_p', fallback='0.95')
+        custom_openai_api_min_p = config.get('API', 'custom_openai_api_top_k', fallback='100')
+        custom_openai_api_max_tokens = config.get('API', 'custom_openai_api_max_tokens', fallback='4096')
+
+        # 2nd Custom OpenAI API
+        custom_openai2_api_key = config.get('API', 'custom_openai2_api_key', fallback=None)
+        custom_openai2_api_ip = config.get('API', 'custom_openai2_api_ip', fallback=None)
+        custom_openai2_api_model = config.get('API', 'custom_openai2_api_model', fallback=None)
+        custom_openai2_api_streaming = config.get('API', 'custom_openai2_api_streaming', fallback='False')
+        custom_openai2_api_temperature = config.get('API', 'custom_openai2_api_temperature', fallback='0.7')
+        custom_openai2_api_top_p = config.get('API', 'custom_openai_api2_top_p', fallback='0.95')
+        custom_openai2_api_min_p = config.get('API', 'custom_openai_api2_top_k', fallback='100')
+        custom_openai2_api_max_tokens = config.get('API', 'custom_openai2_api_max_tokens', fallback='4096')
 
         # Logging Checks for Local API IP loads
         # logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
@@ -543,7 +576,7 @@ def load_and_log_configs():
                 'streaming': anthropic_streaming,
                 'temperature': anthropic_temperature,
                 'top_p': anthropic_top_p,
-                'top_k': anthropic_top_k
+                'top_k': anthropic_top_k,
             },
             'cohere_api': {
                 'api_key': cohere_api_key,
@@ -614,12 +647,6 @@ def load_and_log_configs():
                 'default_alltalk_tts_speed': default_alltalk_tts_speed,
                 'default_alltalk_tts_output_format': default_alltalk_tts_output_format,
             },
-            'custom_openai_api': {
-                'api_key': custom_openai_api_key,
-                'api_url': custom_openai_api_url,
-                'streaming': custom_openai_api_streaming,
-                'temperature': custom_openai_api_temperature,
-            },
             'llama_api': {
                 'api_ip': llama_api_IP,
                 'api_key': llama_api_key,
@@ -627,7 +654,8 @@ def load_and_log_configs():
                 'temperature': llama_temperature,
                 'top_p': llama_top_p,
                 'min_p': llama_min_p,
-                'top_k': llama_top_k
+                'top_k': llama_top_k,
+                'max_tokens': llama_max_tokens
             },
             'ooba_api': {
                 'api_ip': ooba_api_IP,
@@ -636,7 +664,8 @@ def load_and_log_configs():
                 'temperature': ooba_temperature,
                 'top_p': ooba_top_p,
                 'min_p': ooba_min_p,
-                'top_k': ooba_top_k
+                'top_k': ooba_top_k,
+                'max_tokens': ooba_max_tokens
             },
             'kobold_api': {
                 'api_ip': kobold_api_ip,
@@ -645,7 +674,8 @@ def load_and_log_configs():
                 'streaming': kobold_streaming,
                 'temperature': kobold_temperature,
                 'top_p': kobold_top_p,
-                'top_k': kobold_top_k
+                'top_k': kobold_top_k,
+                'max_tokens': kobold_max_tokens
             },
             'tabby_api': {
                 'api_ip': tabby_api_IP,
@@ -655,7 +685,8 @@ def load_and_log_configs():
                 'temperature': tabby_temperature,
                 'top_p': tabby_top_p,
                 'top_k': tabby_top_k,
-                'min_p': tabby_min_p
+                'min_p': tabby_min_p,
+                'max_tokens': tabby_max_tokens
             },
             'vllm_api': {
                 'api_ip': vllm_api_url,
@@ -675,11 +706,33 @@ def load_and_log_configs():
                 'streaming': ollama_streaming,
                 'temperature': ollama_temperature,
                 'top_p': ollama_top_p,
+                'max_tokens': ollama_max_tokens
             },
             'aphrodite_api': {
                 'api_ip': aphrodite_api_url,
                 'api_key': aphrodite_api_key,
                 'model': aphrodite_model,
+                'max_tokens': aphrodite_max_tokens
+            },
+            'custom_openai_api': {
+                'api_ip': custom_openai_api_ip,
+                'api_key': custom_openai_api_key,
+                'streaming': custom_openai_api_streaming,
+                'model': custom_openai_api_model,
+                'temperature': custom_openai_api_temperature,
+                'max_tokens': custom_openai_api_max_tokens,
+                'top_p': custom_openai_api_top_p,
+                'min_p': custom_openai_api_min_p,
+            },
+            'custom_openai_api_2': {
+                'api_ip': custom_openai2_api_ip,
+                'api_key': custom_openai2_api_key,
+                'streaming': custom_openai2_api_streaming,
+                'model': custom_openai2_api_model,
+                'temperature': custom_openai2_api_temperature,
+                'max_tokens': custom_openai2_api_max_tokens,
+                'top_p': custom_openai2_api_top_p,
+                'min_p': custom_openai2_api_min_p,
             },
             'llm_api_settings': {
                 'default_api': default_api,
@@ -850,7 +903,7 @@ def load_and_log_configs():
         return None
 
 
-global_api_endpoints = ["anthropic", "cohere", "google", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "llama", "ollama", "ooba", "kobold", "tabby", "vllm", "aphrodite"]
+global_api_endpoints = ["anthropic", "cohere", "google", "groq", "openai", "huggingface", "openrouter", "deepseek", "mistral", "custom_openai_api", "custom_openai_api_2", "llama", "ollama", "ooba", "kobold", "tabby", "vllm", "aphrodite"]
 
 global_search_engines = ["baidu", "bing", "brave", "duckduckgo", "google", "kagi", "searx", "tavily", "yandex"]
 
@@ -879,6 +932,7 @@ def format_api_name(api):
         "deepseek": "DeepSeek",
         "mistral": "Mistral",
         "custom_openai_api": "Custom-OpenAI-API",
+        "custom_openai_api_2": "Custom-OpenAI-API-2",
         "llama": "Llama.cpp",
         "ooba": "Ooba",
         "kobold": "Kobold",
