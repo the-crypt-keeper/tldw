@@ -232,7 +232,6 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
         if system_prompt is None:
             system_prompt = local_llm_system_message
 
-
         max_tokens_llama = int(loaded_config_data['llama_api']['max_tokens'])
 
         # Prepare headers

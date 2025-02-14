@@ -170,7 +170,7 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
                 logging.info("Llama.cpp: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                llama_api_key = loaded_config_data['api_keys'].get('llama')
+                llama_api_key = loaded_config_data['llama_api']['api_key']
                 if llama_api_key:
                     logging.info("Llama.cpp: Using API key from config file")
                 else:
@@ -221,14 +221,48 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
         else:
             llama_prompt = f"{custom_prompt}\n\n{text}"
 
+        logging.debug(f"Llama Summarize: Prompt being sent is {llama_prompt[:500]}...")
+
+        # Temperature handling
+        if temp is None:
+            # Check config
+            if 'temperature' in loaded_config_data['llama_api']:
+                temp = loaded_config_data['llama_api']['temperature']
+                temp = float(temp)
+            else:
+                temp = 0.7
+        logging.debug(f"Llama: Using temperature: {temp}")
+
+        # Check API URL
+        if not isinstance(api_url, str) or not api_url.startswith(('http://', 'https://')):
+            logging.error(f"Llama: Invalid API URL configured: {api_url}")
+            return "Llama: Invalid API URL configured"
+
+        logging.debug(f"Llama: Using API URL: {api_url}")
+
+        # Check for max tokens
+        if 'max_tokens' in loaded_config_data['llama_api']:
+            max_tokens = loaded_config_data['llama_api']['max_tokens']
+            max_tokens = int(max_tokens)
+        else:
+            max_tokens = 4096
+        logging.debug(f"Llama: Using max tokens: {max_tokens}")
+
+        # Check for streaming
+        if not isinstance(streaming, bool):
+            if 'streaming' in loaded_config_data['llama_api']:
+                streaming = loaded_config_data['llama_api']['streaming']
+                streaming = bool(streaming)
+        logging.debug(f"Llama: Streaming mode: {streaming}")
+
         # Prepare data payload
         data = {
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": llama_prompt}
             ],
-            "max_tokens": 4096,
-            "temperature": temp or 0.7,
+            "max_tokens": max_tokens,
+            "temperature": temp,
             "stream": streaming
         }
 
