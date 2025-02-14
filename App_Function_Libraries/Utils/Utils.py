@@ -321,6 +321,7 @@ def load_and_log_configs():
         llama_min_p = config.get('Local-API', 'llama_min_p', fallback='0.05')
         llama_top_k = config.get('Local-API', 'llama_top_k', fallback='100')
         llama_max_tokens = config.get('Local-API', 'llama_max_tokens', fallback='4096')
+        llama_api_timeout = config.get('Local-API', 'llama_api_timeout', fallback='90')
 
         ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
         ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
@@ -655,7 +656,8 @@ def load_and_log_configs():
                 'top_p': llama_top_p,
                 'min_p': llama_min_p,
                 'top_k': llama_top_k,
-                'max_tokens': llama_max_tokens
+                'max_tokens': llama_max_tokens,
+                'api_timeout': llama_api_timeout,
             },
             'ooba_api': {
                 'api_ip': ooba_api_IP,

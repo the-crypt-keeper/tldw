@@ -276,9 +276,10 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
 
         }
 
-        local_api_timeout = loaded_config_data['local_llm']['api_timeout']
+        local_api_timeout = loaded_config_data['llama_api']['api_timeout']
+        local_api_timeout = int(local_api_timeout)
+        logging.debug(f"llama.cpp: Submitting request to API endpoint with a timeout of {local_api_timeout} seconds")
 
-        logging.debug("llama.cpp: Submitting request to API endpoint")
         response = requests.post(api_url, headers=headers, json=data, stream=streaming, timeout=local_api_timeout)
         logging.debug(f"Llama.cpp: API Response Data: {response}")
         if response.status_code == 200:
