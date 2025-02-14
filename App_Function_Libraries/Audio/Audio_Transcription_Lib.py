@@ -453,12 +453,12 @@ def speech_to_text(
         file_ending = file_path.suffix
 
         # Construct output filenames in the same directory as the input file
-        santitized_whisper_model_name = sanitize_filename(whisper_model)
-        out_file = file_path.with_name(f"{file_path.stem}-whisper_model-{santitized_whisper_model_name}.segments.json")
-        prettified_out_file = file_path.with_name(f"{file_path.stem}-whisper_model-{santitized_whisper_model_name}.segments_pretty.json")
+        sanitized_whisper_model_name = sanitize_filename(whisper_model)
+        out_file = file_path.with_name(f"{file_path.stem}-whisper_model-{sanitized_whisper_model_name}.segments.json")
+        prettified_out_file = file_path.with_name(f"{file_path.stem}-whisper_model-{sanitized_whisper_model_name}.segments_pretty.json")
 
         if out_file.exists():
-            logging.info("speech-to-text: Segments file already exists: %s", out_file)
+            logging.info(f"speech-to-text: Segments file already exists: {out_file}")
             with out_file.open() as f:
                 segments = json.load(f)
             return segments
@@ -484,7 +484,7 @@ def speech_to_text(
                 "Time_End": end_str,
                 "Text": segment_chunk.text
             }
-            logging.debug("Segment: %s", chunk)
+            logging.debug(f"Segment: {chunk}")
             segments.append(chunk)
             logging.info(f"{start_str} - {end_str} | {segment_chunk.text}")  # Use HH:MM:SS in logs
 
@@ -500,7 +500,7 @@ def speech_to_text(
             raise RuntimeError("No transcription produced. The audio file may be invalid or empty.")
 
         transcription_time = time.time() - time_start
-        logging.info("speech-to-text: Transcription completed in %.2f seconds", transcription_time)
+        logging.info(f"speech-to-text: Transcription completed in {transcription_time} seconds")
         log_histogram(
             "speech_to_text_duration",
             transcription_time,
@@ -515,7 +515,7 @@ def speech_to_text(
             logging.info("speech-to-text: Saving segments to JSON file")
             output_data = {'segments': segments}
 
-            logging.info("speech-to-text: Saving JSON to %s", out_file)
+            logging.info(f"speech-to-text: Saving JSON to {out_file}",)
             with out_file.open('w', encoding='utf-8') as f:
                 json.dump(output_data, f)
 
@@ -523,7 +523,7 @@ def speech_to_text(
             del output_data
             gc.collect()
 
-            logging.info("speech-to-text: Saving prettified JSON to %s", prettified_out_file)
+            logging.info(f"speech-to-text: Saving prettified JSON to {prettified_out_file}")
             with prettified_out_file.open('w', encoding='utf-8') as f:
                 json.dump({'segments': segments}, f, indent=2)
 
@@ -532,7 +532,7 @@ def speech_to_text(
         return segments
 
     except Exception as e:
-        logging.error("speech-to-text: Error transcribing audio: %s", str(e), exc_info=True)
+        logging.error(f"speech-to-text: Error transcribing audio: {e}")
         log_counter(
             "speech_to_text_error",
             labels={"file_path": str(file_path), "model": whisper_model, "error": str(e)}
