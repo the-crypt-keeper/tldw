@@ -648,7 +648,7 @@ def load_and_log_configs():
                 'top_p': openai_top_p,
             },
             'elevenlabs_api': {
-                'api_key': elevenlabs_api_key
+                'api_key': elevenlabs_api_key,
             },
             'alltalk_api': {
                 'api_ip': alltalk_api_ip,
