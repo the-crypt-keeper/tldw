@@ -156,7 +156,7 @@ def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message
         return f"Local LLM: Error occurred while processing summary: {str(e)}"
 
 
-def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, system_message=None, api_url="http://127.0.0.1:8080/completion", streaming=False):
+def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, system_message=None, streaming=False):
     try:
         logging.debug("Llama.cpp: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -175,6 +175,10 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
                     logging.info("Llama.cpp: Using API key from config file")
                 else:
                     logging.warning("Llama.cpp: No API key found in config file")
+
+        logging.info("llama.cpp: Attempting to use API URL from config file")
+        api_url = loaded_config_data['llama_api']['api_ip']
+        logging.debug(f"Llama: Using API URL: {api_url}")
 
         # Load transcript
         logging.debug("Llama.cpp: Loading JSON data")
@@ -232,13 +236,6 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
             else:
                 temp = 0.7
         logging.debug(f"Llama: Using temperature: {temp}")
-
-        # Check API URL
-        if not isinstance(api_url, str) or not api_url.startswith(('http://', 'https://')):
-            logging.error(f"Llama: Invalid API URL configured: {api_url}")
-            return "Llama: Invalid API URL configured"
-
-        logging.debug(f"Llama: Using API URL: {api_url}")
 
         # Check for max tokens
         if 'max_tokens' in loaded_config_data['llama_api']:
@@ -309,7 +306,7 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
             return f"Llama: API request failed: {response.text}"
 
     except Exception as e:
-        logging.error("Llama: Error in processing: %s", str(e))
+        logging.error(f"Llama: Error in processing: {str(e)}")
         return f"Llama: Error occurred while processing summary with Llama: {str(e)}"
 
 
