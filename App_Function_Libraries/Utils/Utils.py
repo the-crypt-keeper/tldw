@@ -753,7 +753,7 @@ def load_and_log_configs():
                 'max_tokens': custom_openai2_api_max_tokens,
                 'top_p': custom_openai2_api_top_p,
                 'min_p': custom_openai2_api_min_p,
-                'api_timeout': custom_openai_api_2_timeout,
+                'api_timeout': custom_openai2_api_timeout,
             },
             'llm_api_settings': {
                 'default_api': default_api,
