@@ -176,6 +176,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
 
         logging.debug(f"llama.cpp: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
+
         if api_url is None:
             logging.info("llama.cpp: API URL not provided as parameter")
             logging.info("llama.cpp: Attempting to use API URL from config file")
