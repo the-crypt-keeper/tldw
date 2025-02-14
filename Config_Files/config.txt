@@ -137,6 +137,7 @@ custom_openai_api_temperature = 0.7
 custom_openai_api_top_p = 0.9
 custom_openai_api_min_p = 0.05
 custom_openai_api_max_tokens = 4096
+custom_openai_api_timeout = 90
 #
 custom_openai2_api_key = <custom_openai_api_key>
 custom_openai2_api_ip = <api_ip_here>
@@ -146,6 +147,7 @@ custom_openai2_api_temperature = 0.7
 custom_openai2_api_top_p = 0.9
 custom_openai2_api_min_p = 0.05
 custom_openai2_api_max_tokens = 4096
+custom_openai2_api_timeout = 90
 #
 default_api = openai
 
@@ -160,6 +162,7 @@ kobold_top_p = 0.9
 kobold_min_p = 0.05
 kobold_top_k = 100
 kobold_max_tokens = 4096
+kobold_api_timeout = 90
 #
 llama_api_IP = http://127.0.0.1:8080/completion
 llama_api_key =
@@ -169,6 +172,7 @@ llama_top_p = 0.9
 llama_min_p = 0.05
 llama_top_k = 100
 llama_max_tokens = 4096
+llama_api_timeout = 90
 #
 ooba_api_key =
 ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
@@ -178,6 +182,7 @@ ooba_top_p = 0.9
 ooba_min_p = 0.05
 ooba_top_k = 100
 ooba_max_tokens = 4096
+ooba_api_timeout = 90
 #
 tabby_api_IP = http://127.0.0.1:5000/v1/chat/completions
 tabby_api_key =
@@ -185,6 +190,7 @@ tabby_streaming = False
 tabby_temperature = 0.7
 tabby_top_k = 100
 tabby_max_tokens = 4096
+tabby_api_timeout = 90
 #
 vllm_api_IP = http://127.0.0.1:8000/v1/chat/completions
 vllm_model =
@@ -195,6 +201,7 @@ vllm_top_p = 0.9
 vllm_min_p = 0.05
 vllm_top_k = 100
 vllm_max_tokens = 4096
+vllm_api_timeout = 90
 #
 ollama_api_IP = http://127.0.0.1:11434/v1/chat/completions
 ollama_api_key =
@@ -203,6 +210,7 @@ ollama_streaming = False
 ollama_temperature = 0.7
 ollama_top_p = 0.9
 ollama_max_tokens = 4096
+ollama_api_timeout = 90
 #
 aphrodite_api_IP = http://127.0.0.1:8080/completion
 aphrodite_api_key =
@@ -212,6 +220,7 @@ aphrodite_top_p = 0.9
 aphrodite_min_p = 0.05
 aphrodite_model =
 aprhodite_max_tokens = 4096
+aphrodite_api_timeout = 90
 #
 max_tokens = 4096
 local_api_timeout = 90
