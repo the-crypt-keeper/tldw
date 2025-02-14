@@ -156,7 +156,7 @@ def summarize_with_local_llm(input_data, custom_prompt_arg, temp, system_message
         return f"Local LLM: Error occurred while processing summary: {str(e)}"
 
 
-def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, system_message=None, api_url="http://127.0.0.1:8080/completion", streaming=False):
+def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, system_message=None, streaming=False):
     try:
         logging.debug("Llama.cpp: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -170,11 +170,15 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
                 logging.info("Llama.cpp: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                llama_api_key = loaded_config_data['api_keys'].get('llama')
+                llama_api_key = loaded_config_data['llama_api']['api_key']
                 if llama_api_key:
                     logging.info("Llama.cpp: Using API key from config file")
                 else:
                     logging.warning("Llama.cpp: No API key found in config file")
+
+        logging.info("llama.cpp: Attempting to use API URL from config file")
+        api_url = loaded_config_data['llama_api']['api_ip']
+        logging.debug(f"Llama: Using API URL: {api_url}")
 
         # Load transcript
         logging.debug("Llama.cpp: Loading JSON data")
@@ -221,14 +225,41 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
         else:
             llama_prompt = f"{custom_prompt}\n\n{text}"
 
+        logging.debug(f"Llama Summarize: Prompt being sent is {llama_prompt[:500]}...")
+
+        # Temperature handling
+        if temp is None:
+            # Check config
+            if 'temperature' in loaded_config_data['llama_api']:
+                temp = loaded_config_data['llama_api']['temperature']
+                temp = float(temp)
+            else:
+                temp = 0.7
+        logging.debug(f"Llama: Using temperature: {temp}")
+
+        # Check for max tokens
+        if 'max_tokens' in loaded_config_data['llama_api']:
+            max_tokens = loaded_config_data['llama_api']['max_tokens']
+            max_tokens = int(max_tokens)
+        else:
+            max_tokens = 4096
+        logging.debug(f"Llama: Using max tokens: {max_tokens}")
+
+        # Check for streaming
+        if not isinstance(streaming, bool):
+            if 'streaming' in loaded_config_data['llama_api']:
+                streaming = loaded_config_data['llama_api']['streaming']
+                streaming = bool(streaming)
+        logging.debug(f"Llama: Streaming mode: {streaming}")
+
         # Prepare data payload
         data = {
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": llama_prompt}
             ],
-            "max_tokens": 4096,
-            "temperature": temp or 0.7,
+            "max_tokens": max_tokens,
+            "temperature": temp,
             "stream": streaming
         }
 
@@ -275,7 +306,7 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
             return f"Llama: API request failed: {response.text}"
 
     except Exception as e:
-        logging.error("Llama: Error in processing: %s", str(e))
+        logging.error(f"Llama: Error in processing: {str(e)}")
         return f"Llama: Error occurred while processing summary with Llama: {str(e)}"
 
 

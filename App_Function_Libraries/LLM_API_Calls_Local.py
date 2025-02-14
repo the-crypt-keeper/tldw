@@ -176,6 +176,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
 
         logging.debug(f"llama.cpp: Using API Key: {api_key[:5]}...{api_key[-5:]}")
 
+
         if api_url is None:
             logging.info("llama.cpp: API URL not provided as parameter")
             logging.info("llama.cpp: Attempting to use API URL from config file")
@@ -232,7 +233,6 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
         if system_prompt is None:
             system_prompt = local_llm_system_message
 
-
         max_tokens_llama = int(loaded_config_data['llama_api']['max_tokens'])
 
         # Prepare headers
@@ -243,8 +243,8 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
         if len(api_key) > 5:
             headers['Authorization'] = f'Bearer {api_key}'
 
-        logging.debug("Llama.cpp: System prompt being used is: %s", system_prompt)
-        logging.debug("Llama.cpp: User prompt being used is: %s", custom_prompt)
+        logging.debug(f"Llama.cpp: System prompt being used is: {system_prompt}")
+        logging.debug(f"Llama.cpp: User prompt being used is: {custom_prompt}")
 
         llama_prompt = f"{custom_prompt} \n\n\n\n{input_data}"
         logging.debug(f"llama: Prompt being sent is {llama_prompt}")
@@ -280,7 +280,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
 
         logging.debug("llama.cpp: Submitting request to API endpoint")
         response = requests.post(api_url, headers=headers, json=data, stream=streaming, timeout=local_api_timeout)
-        logging.debug("Llama.cpp: API Response Data: %s", response)
+        logging.debug(f"Llama.cpp: API Response Data: {response}")
         if response.status_code == 200:
             if streaming:
                 logging.debug("llama.cpp: Processing streaming response")
@@ -320,7 +320,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
                     return f"Llama: API Chat request failed: {response.text}"
 
     except Exception as e:
-        logging.error("Llama: Error in processing: %s", str(e))
+        logging.error(f"Llama: Error in processing: {e}")
         return f"Llama: Error occurred while processing summary with llama: {str(e)}"
 
 
