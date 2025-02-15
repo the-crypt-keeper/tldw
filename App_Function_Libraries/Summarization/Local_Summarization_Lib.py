@@ -989,232 +989,239 @@ def summarize_with_ollama(
     retry_delay=20,
     streaming=False,
     top_p=None
-    ):
+):
+    """
+    Summarizes text via the Ollama API, returning:
+      - a generator (if streaming=True)
+      - a single string (if streaming=False)
+    Follows the same style as chat_with_llama / chat_with_ollama.
+    """
+    # 1) Load config
     try:
         logging.debug("Ollama: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
-        if loaded_config_data is None:
-            logging.error("Failed to load configuration data")
-            ollama_api_key = None
+        if not loaded_config_data:
+            logging.error("summarize_with_ollama: Could not load config data.")
+            return "Ollama: No config data found."
+
+        ollama_config = loaded_config_data.get("ollama_api", {})
+    except Exception as e:
+        logging.error(f"summarize_with_ollama: Error loading config: {e}")
+        return f"Ollama: Error loading config: {str(e)}"
+
+    # 2) Determine API Key
+    try:
+        if not api_key or not api_key.strip():
+            # Use config if parameter not given
+            api_key = ollama_config.get("api_key", "")
+            if not api_key:
+                logging.warning("Ollama: No API key found in config or param.")
         else:
-            # Prioritize the API key passed as a parameter
-            if api_key and api_key.strip():
-                ollama_api_key = api_key
-                logging.info("Ollama: Using API key provided as parameter")
-            else:
-                # If no parameter is provided, use the key from the config
-                ollama_api_key = loaded_config_data['ollama_api']['api_key']
-                if ollama_api_key:
-                    logging.info("Ollama: Using API key from config file")
-                else:
-                    logging.warning("Ollama: No API key found in config file")
+            logging.info("Ollama: Using API key provided as parameter.")
 
-        # Set model from parameter or config
-        if model is None:
-            model = loaded_config_data['ollama_api']['model']
-            logging.info(f"Ollama: Using model from config file: {model}")
-            if model is None:
-                logging.error("Ollama: Model not found in config file")
-                return "Ollama: Model not found in config file"
+        # 3) Determine API URL
+        if not api_url or not api_url.strip():
+            api_url = ollama_config.get("api_url", "")
+        if not api_url:
+            logging.error("Ollama: API URL not found or is empty.")
+            return "Ollama: API URL not found in config or parameter."
 
-        # Set api_url from parameter or config
-        if api_url is None:
-            api_url = loaded_config_data['ollama_api']['api_url']
-            if api_url is None:
-                logging.error("Ollama: API URL not found in config file")
-                return "Ollama: API URL not found in config file"
+        # 4) Determine Model
+        if not model:
+            model = ollama_config.get("model", None)
+        if not model:
+            logging.error("Ollama: Model not provided or found in config.")
+            return "Ollama: Model not found in config or parameter."
 
-        # Set temperature from parameter or config
+        # 5) Determine Temperature
         if temp is None:
-            temp = loaded_config_data['ollama_api']['temperature']
+            temp = ollama_config.get("temperature", 0.7)
+        if isinstance(temp, str):
             temp = float(temp)
-            logging.info(f"Ollama: Using temperature from config file: {temp}")
-            if temp is None:
-                logging.error("Ollama: Temperature not found in config file")
-                return "Ollama: Temperature not found in config file"
+        temp = float(temp)
+        logging.info(f"Ollama: Temp is {temp}")
 
-        # Set streaming from parameter or config
-        if streaming is None:
-            streaming = loaded_config_data['ollama_api']['streaming']
-            logging.info(f"Ollama: Using streaming from config file: {streaming}")
-            if streaming is None:
-                logging.warning("Ollama: Streaming not found in config file")
-                streaming = False
-
-        if isinstance(top_p, float):
+        # 6) Determine top_p
+        if top_p is None:
+            top_p = ollama_config.get("top_p", 0.95)
+        if isinstance(top_p, str):
             top_p = float(top_p)
-            logging.debug(f"Ollama: Using top_p: {top_p}")
-        elif top_p is None:
-            top_p = load_and_log_configs().get('ollama_api', {}).get('top_p', 0.95)
-            logging.debug(f"Ollama: Using top_p from config: {top_p}")
-            top_p = float(top_p)
+        top_p = float(top_p)
 
+        # 7) Determine streaming
+        if isinstance(streaming, str):
+            streaming = streaming.lower() == "true"
+        elif isinstance(streaming, int):
+            streaming = bool(streaming)
+        elif streaming is None:
+            streaming = ollama_config.get('streaming', False)
+        if not isinstance(streaming, bool):
+            raise ValueError(f"Invalid type for 'streaming': expected bool, got {type(streaming).__name__}")
+        logging.debug(f"Ollama: streaming = {streaming}")
 
-        # Load transcript
-        logging.debug("Ollama: Loading JSON data")
+        # 8) Determine system_message
+        if not system_message:
+            system_message = "You are a helpful AI assistant."
+
+        # 9) Parse/prepare input_data
+        logging.debug("Ollama: Attempting to parse the input data for summarization.")
+        text_content = None
         if isinstance(input_data, str) and os.path.isfile(input_data):
-            logging.debug("Ollama: Loading json data for summarization")
-            with open(input_data, 'r') as file:
-                data = json.load(file)
+            # Load from file
+            logging.debug(f"Ollama: Loading from file: {input_data}")
+            with open(input_data, 'r') as f:
+                file_data = json.load(f)
+            # If we have a dict with 'summary', short-circuit
+            if isinstance(file_data, dict) and 'summary' in file_data:
+                logging.debug("Ollama: Found existing 'summary' in file data.")
+                return file_data['summary']
+            elif isinstance(file_data, list):
+                # Possibly a list of segments
+                text_content = extract_text_from_segments(file_data)
+            elif isinstance(file_data, str):
+                text_content = file_data
+            else:
+                raise ValueError("Ollama: Invalid JSON file content format.")
         else:
-            logging.debug("Ollama: Using provided string data for summarization")
-            data = input_data
+            # Input data is not a file path, treat as raw text or list
+            if isinstance(input_data, dict) and 'summary' in input_data:
+                logging.debug("Ollama: 'summary' already present in input_data dict.")
+                return input_data['summary']
+            elif isinstance(input_data, list):
+                text_content = extract_text_from_segments(input_data)
+            elif isinstance(input_data, str):
+                text_content = input_data
+            else:
+                raise ValueError("Ollama: Invalid input_data format; must be str or list/dict with summary.")
 
-        logging.debug(f"Ollama: Loaded data: {data}")
-        logging.debug(f"Ollama: Type of data: {type(data)}")
+        if not text_content:
+            logging.error("Ollama: No valid text content found to summarize.")
+            return "Ollama: Could not extract text for summarization."
 
-        if isinstance(data, dict) and 'summary' in data:
-            # If the loaded data is a dictionary and already contains a summary, return it
-            logging.debug("Ollama: Summary already exists in the loaded data")
-            return data['summary']
+        # 10) Build final prompt
+        ollama_prompt = f"{custom_prompt}\n\n{text_content}"
+        logging.debug(f"Ollama: Summarization prompt:\n{ollama_prompt}")
 
-        # If the loaded data is a list of segment dictionaries or a string, proceed with summarization
-        if isinstance(data, list):
-            segments = data
-            text = extract_text_from_segments(segments)
-        elif isinstance(data, str):
-            text = data
-        else:
-            raise ValueError("Ollama: Invalid input data format")
-
+        # 11) Prepare request
+        max_tokens = int(ollama_config.get("max_tokens", 500))
         headers = {
             'accept': 'application/json',
             'content-type': 'application/json',
         }
-        if ollama_api_key and len(ollama_api_key) > 2:
-            headers['Authorization'] = f'Bearer {ollama_api_key}'
+        # Optionally set Authorization
+        if api_key and len(api_key) > 3:
+            headers['Authorization'] = f'Bearer {api_key}'
         else:
-            logging.debug("Ollama: No API key provided")
-            headers['Authorization'] = f'Bearer ollama_placeholder_key'
-
-        ollama_prompt = f"{custom_prompt}\n\n{text}"
-        if system_message is None:
-            system_message = "You are a helpful AI assistant."
-        logging.debug(f"Ollama: Prompt being sent is: {ollama_prompt}")
-
-        ollama_max_tokens = int(loaded_config_data['ollama_api']['max_tokens'])
+            logging.debug("Ollama: No valid API key to set in headers.")
 
         data_payload = {
             "model": model,
             "messages": [
-                {
-                    "role": "system",
-                    "content": system_message
-                },
-                {
-                    "role": "user",
-                    "content": ollama_prompt
-                }
+                {"role": "system", "content": system_message},
+                {"role": "user",   "content": ollama_prompt}
             ],
             "temperature": temp,
             "stream": streaming,
             "top_p": top_p,
-            "max_tokens": ollama_max_tokens,
+            "max_tokens": max_tokens
         }
 
-        local_api_timeout = loaded_config_data['ollama_api']['api_timeout']
-        local_api_timeout = int(local_api_timeout)
+        local_api_timeout = int(ollama_config.get("api_timeout", 600))
 
+        # 12) Attempt request with retries
+        for attempt in range(1, max_retries + 1):
+            try:
+                logging.debug(f"Ollama Summarize: Attempt {attempt}/{max_retries}")
+                response = requests.post(
+                    api_url,
+                    headers=headers,
+                    json=data_payload,
+                    stream=streaming,
+                    timeout=local_api_timeout
+                )
+                response.raise_for_status()  # Raise HTTPError if not 2xx
+            except requests.exceptions.Timeout:
+                logging.error("Ollama: Request timed out.")
+                if attempt < max_retries:
+                    logging.info(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    continue
+                return "Ollama: Request timed out."
+            except requests.exceptions.HTTPError as http_err:
+                logging.error(f"Ollama: HTTP error occurred: {http_err}")
+                if attempt < max_retries:
+                    time.sleep(retry_delay)
+                    continue
+                return f"Ollama: HTTP error: {http_err}"
+            except requests.exceptions.RequestException as req_err:
+                logging.error(f"Ollama: Request exception: {req_err}")
+                if attempt < max_retries:
+                    time.sleep(retry_delay)
+                    continue
+                return f"Ollama: Request exception: {req_err}"
+            except Exception as e:
+                logging.error(f"Ollama: Unexpected error: {str(e)}")
+                if attempt < max_retries:
+                    time.sleep(retry_delay)
+                    continue
+                return f"Ollama: Unexpected error: {str(e)}"
+            # If we got a valid response, break out of the retry loop
+            break
+
+        # 13) Handle streaming or non-streaming
         if streaming:
-            # Add streaming support
-            data_payload['stream'] = True
-
-            for attempt in range(1, max_retries + 1):
-                logging.debug("Ollama: Submitting streaming request to API endpoint")
-                print("Ollama: Submitting streaming request to API endpoint")
-                try:
-                    response = requests.post(api_url, headers=headers, json=data_payload, stream=True, timeout=local_api_timeout)
-                    response.raise_for_status()  # Raises HTTPError for bad responses
-
-                    # Process the streamed response
-                    for line in response.iter_lines():
-                        if line:
-                            decoded_line = line.decode('utf-8')
-                            logging.debug(f"Ollama: Received line: {decoded_line}")
-                            try:
-                                json_data = json.loads(decoded_line)
-                                if 'response' in json_data:
-                                    text_chunk = json_data['response']
-                                    yield text_chunk
-                                if json_data.get('done', False):
-                                    logging.debug("Ollama: Streaming complete.")
-                                    break
-                            except json.JSONDecodeError:
-                                logging.error("Ollama: Failed to decode JSON from streamed line.")
-                    return  # Exit after streaming is complete
-                except requests.exceptions.Timeout:
-                    logging.error("Ollama: Request timed out.")
-                    yield "Ollama: Request timed out."
-                except requests.exceptions.HTTPError as http_err:
-                    logging.error(f"Ollama: HTTP error occurred: {http_err}")
-                    yield f"Ollama: HTTP error occurred: {http_err}"
-                except requests.exceptions.RequestException as req_err:
-                    logging.error(f"Ollama: Request exception: {req_err}")
-                    yield f"Ollama: Request exception: {req_err}"
-                except Exception as e:
-                    logging.error(f"Ollama: An unexpected error occurred: {str(e)}")
-                    yield f"Ollama: An unexpected error occurred: {str(e)}"
-                break  # Break out of retry loop after successful streaming
+            # Return a generator that yields partial text chunks
+            logging.debug("Ollama: Processing streaming response.")
+            def stream_generator():
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    decoded_line = line.decode('utf-8').strip()
+                    try:
+                        # Some Ollama builds prefix with "data: ...".
+                        # If that's the case, parse accordingly:
+                        if decoded_line.startswith("data:"):
+                            decoded_line = decoded_line[len("data:"):].strip()
+                            if decoded_line == "[DONE]":
+                                break
+                        json_chunk = json.loads(decoded_line)
+                        if "response" in json_chunk:
+                            yield json_chunk["response"]
+                        if json_chunk.get("done"):
+                            break
+                    except json.JSONDecodeError:
+                        logging.error(f"Ollama: JSON decode error on line: {decoded_line}")
+                        continue
+            return stream_generator()
         else:
-            logging.info("Ollama: Posting non-streaming summarization request")
-            for attempt in range(1, max_retries + 1):
-                logging.info("Ollama: Submitting request to API endpoint")
-                try:
-                    response = requests.post(api_url, headers=headers, json=data_payload, timeout=local_api_timeout)
-                    response.raise_for_status()  # Raises HTTPError for bad responses
-                    response_data = response.json()
-                except requests.exceptions.Timeout:
-                    logging.error("Ollama: Request timed out.")
-                    return "Ollama: Request timed out."
-                except requests.exceptions.HTTPError as http_err:
-                    logging.error(f"Ollama: HTTP error occurred: {http_err}")
-                    return f"Ollama: HTTP error occurred: {http_err}"
-                except requests.exceptions.RequestException as req_err:
-                    logging.error(f"Ollama: Request exception: {req_err}")
-                    return f"Ollama: Request exception: {req_err}"
-                except json.JSONDecodeError:
-                    logging.error("Ollama: Failed to decode JSON response")
-                    return "Ollama: Failed to decode JSON response."
-                except Exception as e:
-                    logging.error(f"Ollama: An unexpected error occurred: {str(e)}")
-                    return f"Ollama: An unexpected error occurred: {str(e)}"
+            # Non-streaming => parse entire JSON once and return the text
+            try:
+                response_data = response.json()
+            except json.JSONDecodeError:
+                logging.error("Ollama: Failed to parse JSON response.")
+                return "Ollama: JSON parse error from summarization API."
 
-                logging.debug(f"API Response Data: {response_data}")
+            logging.debug(f"Ollama: Full JSON response: {response_data}")
+            # Attempt to retrieve final summary
+            summary = None
+            if 'response' in response_data and response_data['response']:
+                summary = response_data['response'].strip()
+            elif 'choices' in response_data and len(response_data['choices']) > 0:
+                choice = response_data['choices'][0]
+                content = choice.get('message', {}).get('content', "").strip()
+                if content:
+                    summary = content
 
-                if response.status_code == 200:
-                    # Inspect available keys
-                    available_keys = list(response_data.keys())
-                    logging.debug(f"Ollama: Available keys in response: {available_keys}")
-
-                    # Attempt to retrieve 'response'
-                    summary = None
-                    if 'response' in response_data and response_data['response']:
-                        summary = response_data['response'].strip()
-                    elif 'choices' in response_data and len(response_data['choices']) > 0:
-                        choice = response_data['choices'][0]
-                        if 'message' in choice and 'content' in choice['message']:
-                            summary = choice['message']['content'].strip()
-
-                    if summary:
-                        logging.debug("Ollama: Chat request successful")
-                        print("\n\nChat request successful.")
-                        return summary
-                    elif response_data.get('done_reason') == 'load':
-                        logging.warning(f"Ollama: Model is loading. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
-                        time.sleep(retry_delay)
-                    else:
-                        logging.error("Ollama: API response does not contain 'response' or 'choices'.")
-                        return "Ollama: API response does not contain 'response' or 'choices'."
-                else:
-                    logging.error(f"Ollama: API request failed with status code {response.status_code}: {response.text}")
-                    return f"Ollama: API request failed: {response.text}"
-
-            logging.error("Ollama: Maximum retry attempts reached. Model is still loading.")
-            return "Ollama: Maximum retry attempts reached. Model is still loading."
+            if summary:
+                logging.debug("Ollama: Summarization request successful.")
+                return summary
+            else:
+                logging.error("Ollama: 'response' or 'choices' not found in JSON.")
+                return "Ollama: Summarization API response missing text."
 
     except Exception as e:
-        logging.error(f"\n\nOllama: Error in processing: {str(e)}")
-        return f"Ollama: Error occurred while processing summary with Ollama: {str(e)}"
+        logging.error(f"Ollama Summarize: Exception: {str(e)}")
+        return f"Ollama: Error occurred while summarizing: {str(e)}"
 
 
 def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, system_message=None, streaming=False):
