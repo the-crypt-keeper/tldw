@@ -85,7 +85,7 @@ def create_video_transcription_tab():
                     next_page_button = gr.Button("Next Page", visible=False)
                 with gr.Row():
                     system_prompt_input = gr.Textbox(label="System Prompt",
-                                                     value="""<s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhere to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                                                     value="""<s>You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhere to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
 **Bulleted Note Creation Guidelines**
 
 **Headings**:
@@ -100,7 +100,7 @@ def create_video_transcription_tab():
 
 **Review**:
 - Ensure adherence to specified format
-- Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+- Do not reference these instructions in your response.</s> {{ .Prompt }}
 """,
                                                      lines=3,
                                                      visible=False,
@@ -382,7 +382,7 @@ def create_video_transcription_tab():
                                     custom_prompt = custom_prompt
                                 else:
                                     custom_prompt = ("""
-                                    <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                                    <s>You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
                                         **Bulleted Note Creation Guidelines**
 
                                         **Headings**:
@@ -397,7 +397,7 @@ def create_video_transcription_tab():
 
                                         **Review**:
                                         - Ensure adherence to specified format
-                                        - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                                        - Do not reference these instructions in your response.</s> {{ .Prompt }}
                                     """)
 
                                 logging.debug("Gradio_Related.py: process_url_with_metadata being called")

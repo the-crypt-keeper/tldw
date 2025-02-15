@@ -648,7 +648,7 @@ def load_and_log_configs():
                 'top_p': openai_top_p,
             },
             'elevenlabs_api': {
-                'api_key': elevenlabs_api_key
+                'api_key': elevenlabs_api_key,
             },
             'alltalk_api': {
                 'api_ip': alltalk_api_ip,
@@ -1162,6 +1162,7 @@ def safe_read_file(file_path):
 
     try:
         with open(file_path, 'rb') as file:
+            logging.debug(f"Reading file in binary mode: {file_path}")
             raw_data = file.read()
     except FileNotFoundError:
         logging.error(f"File not found: {file_path}")
@@ -1184,7 +1185,7 @@ def safe_read_file(file_path):
         try:
             decoded_content = raw_data.decode(encoding)
             # Check if the content is mostly printable
-            if sum(c.isprintable() for c in decoded_content) / len(decoded_content) > 0.95:
+            if sum(c.isprintable() for c in decoded_content) / len(decoded_content) > 0.90:
                 logging.info(f"Successfully decoded file with encoding: {encoding}")
                 return decoded_content
         except UnicodeDecodeError:
