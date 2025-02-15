@@ -1002,25 +1002,43 @@ def summarize_with_ollama(
                 logging.info("Ollama: Using API key provided as parameter")
             else:
                 # If no parameter is provided, use the key from the config
-                ollama_api_key = loaded_config_data['api_keys'].get('ollama')
+                ollama_api_key = loaded_config_data['ollama_api']['api_key']
                 if ollama_api_key:
                     logging.info("Ollama: Using API key from config file")
                 else:
                     logging.warning("Ollama: No API key found in config file")
 
-            # Set model from parameter or config
+        # Set model from parameter or config
+        if model is None:
+            model = loaded_config_data['ollama_api']['model']
+            logging.info(f"Ollama: Using model from config file: {model}")
             if model is None:
-                model = loaded_config_data['models'].get('ollama')
-                if model is None:
-                    logging.error("Ollama: Model not found in config file")
-                    return "Ollama: Model not found in config file"
+                logging.error("Ollama: Model not found in config file")
+                return "Ollama: Model not found in config file"
 
-            # Set api_url from parameter or config
+        # Set api_url from parameter or config
+        if api_url is None:
+            api_url = loaded_config_data['ollama_api']['api_url']
             if api_url is None:
-                api_url = loaded_config_data['local_api_ip'].get('ollama')
-                if api_url is None:
-                    logging.error("Ollama: API URL not found in config file")
-                    return "Ollama: API URL not found in config file"
+                logging.error("Ollama: API URL not found in config file")
+                return "Ollama: API URL not found in config file"
+
+        # Set temperature from parameter or config
+        if temp is None:
+            temp = loaded_config_data['ollama_api']['temperature']
+            temp = float(temp)
+            logging.info(f"Ollama: Using temperature from config file: {temp}")
+            if temp is None:
+                logging.error("Ollama: Temperature not found in config file")
+                return "Ollama: Temperature not found in config file"
+
+        # Set streaming from parameter or config
+        if streaming is None:
+            streaming = loaded_config_data['ollama_api']['streaming']
+            logging.info(f"Ollama: Using streaming from config file: {streaming}")
+            if streaming is None:
+                logging.warning("Ollama: Streaming not found in config file")
+                streaming = False
 
         # Load transcript
         logging.debug("Ollama: Loading JSON data")
@@ -1053,8 +1071,11 @@ def summarize_with_ollama(
             'accept': 'application/json',
             'content-type': 'application/json',
         }
-        if ollama_api_key and len(ollama_api_key) > 5:
+        if ollama_api_key and len(ollama_api_key) > 2:
             headers['Authorization'] = f'Bearer {ollama_api_key}'
+        else:
+            logging.debug("Ollama: No API key provided")
+            headers['Authorization'] = f'Bearer ollama_placeholder_key'
 
         ollama_prompt = f"{custom_prompt}\n\n{text}"
         if system_message is None:
@@ -1073,7 +1094,7 @@ def summarize_with_ollama(
                     "content": ollama_prompt
                 }
             ],
-            'temperature': temp,
+            #'temperature': temp,
             'stream': streaming
         }
 
@@ -1175,7 +1196,7 @@ def summarize_with_ollama(
             return "Ollama: Maximum retry attempts reached. Model is still loading."
 
     except Exception as e:
-        logging.error("\n\nOllama: Error in processing: %s", str(e))
+        logging.error(f"\n\nOllama: Error in processing: {str(e)}")
         return f"Ollama: Error occurred while processing summary with Ollama: {str(e)}"
 
 
