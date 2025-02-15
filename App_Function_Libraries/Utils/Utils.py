@@ -1182,6 +1182,7 @@ def safe_read_file(file_path):
         logging.info(f"Detected encoding: {detected['encoding']}")
 
     for encoding in encodings:
+        logging.info(f"Trying encoding: {encoding}")
         try:
             decoded_content = raw_data.decode(encoding)
             # Check if the content is mostly printable
