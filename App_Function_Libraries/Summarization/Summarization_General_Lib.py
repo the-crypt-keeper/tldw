@@ -1528,7 +1528,7 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
 
     **Review**:
     - Ensure adherence to specified format
-    - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]"""
+    - Do not reference these instructions in your response.</s> {{ .Prompt }} """
 
     def update_progress(index, url, message):
         progress.append(f"Processing {index + 1}/{len(url_list)}: {url}")  # Append to list

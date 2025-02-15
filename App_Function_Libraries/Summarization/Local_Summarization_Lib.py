@@ -35,7 +35,7 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs, extract_tex
 #
 
 summarizer_prompt = """
-                    <s>You are a bulleted notes specialist. [INST]```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.[/INST]
+                    <s>You are a bulleted notes specialist. ```When creating comprehensive bulleted notes, you should follow these guidelines: Use multiple headings based on the referenced topics, not categories like quotes or terms. Headings should be surrounded by bold formatting and not be listed as bullet points themselves. Leave no space between headings and their corresponding list items underneath. Important terms within the content should be emphasized by setting them in bold font. Any text that ends with a colon should also be bolded. Before submitting your response, review the instructions, and make any corrections necessary to adhered to the specified format. Do not reference these instructions within the notes.``` \nBased on the content between backticks create comprehensive bulleted notes.
                         **Bulleted Note Creation Guidelines**
 
                         **Headings**:
@@ -50,7 +50,7 @@ summarizer_prompt = """
 
                         **Review**:
                         - Ensure adherence to specified format
-                        - Do not reference these instructions in your response.</s>[INST] {{ .Prompt }} [/INST]
+                        - Do not reference these instructions in your response.</s> {{ .Prompt }}
                     """
 
 
@@ -980,15 +980,16 @@ def summarize_with_vllm(api_key, input_data, custom_prompt_arg, temp=None, syste
 def summarize_with_ollama(
     input_data,
     custom_prompt,
-    api_url="http://127.0.0.1:11434/v1/chat/completions",
+    api_url=None,
     api_key=None,
     temp=None,
     system_message=None,
     model=None,
     max_retries=5,
     retry_delay=20,
-    streaming=False
-):
+    streaming=False,
+    top_p=None
+    ):
     try:
         logging.debug("Ollama: Loading and validating configurations")
         loaded_config_data = load_and_log_configs()
@@ -1040,6 +1041,15 @@ def summarize_with_ollama(
                 logging.warning("Ollama: Streaming not found in config file")
                 streaming = False
 
+        if isinstance(top_p, float):
+            top_p = float(top_p)
+            logging.debug(f"Ollama: Using top_p: {top_p}")
+        elif top_p is None:
+            top_p = load_and_log_configs().get('ollama_api', {}).get('top_p', 0.95)
+            logging.debug(f"Ollama: Using top_p from config: {top_p}")
+            top_p = float(top_p)
+
+
         # Load transcript
         logging.debug("Ollama: Loading JSON data")
         if isinstance(input_data, str) and os.path.isfile(input_data):
@@ -1082,9 +1092,7 @@ def summarize_with_ollama(
             system_message = "You are a helpful AI assistant."
         logging.debug(f"Ollama: Prompt being sent is: {ollama_prompt}")
 
-        # Load timeout value
-        timeout = loaded_config_data['ollama_api']['api_timeout']
-        timeout = int(timeout)
+        ollama_max_tokens = int(loaded_config_data['ollama_api']['max_tokens'])
 
         data_payload = {
             "model": model,
@@ -1098,9 +1106,14 @@ def summarize_with_ollama(
                     "content": ollama_prompt
                 }
             ],
-            #'temperature': temp,
-            'stream': streaming
+            "temperature": temp,
+            "stream": streaming,
+            "top_p": top_p,
+            "max_tokens": ollama_max_tokens,
         }
+
+        local_api_timeout = loaded_config_data['ollama_api']['api_timeout']
+        local_api_timeout = int(local_api_timeout)
 
         if streaming:
             # Add streaming support
@@ -1110,7 +1123,7 @@ def summarize_with_ollama(
                 logging.debug("Ollama: Submitting streaming request to API endpoint")
                 print("Ollama: Submitting streaming request to API endpoint")
                 try:
-                    response = requests.post(api_url, headers=headers, json=data_payload, stream=True)
+                    response = requests.post(api_url, headers=headers, json=data_payload, stream=True, timeout=local_api_timeout)
                     response.raise_for_status()  # Raises HTTPError for bad responses
 
                     # Process the streamed response
@@ -1143,11 +1156,11 @@ def summarize_with_ollama(
                     yield f"Ollama: An unexpected error occurred: {str(e)}"
                 break  # Break out of retry loop after successful streaming
         else:
+            logging.info("Ollama: Posting non-streaming summarization request")
             for attempt in range(1, max_retries + 1):
-                logging.debug("Ollama: Submitting request to API endpoint")
-                print("Ollama: Submitting request to API endpoint")
+                logging.info("Ollama: Submitting request to API endpoint")
                 try:
-                    response = requests.post(api_url, headers=headers, json=data_payload, timeout=timeout)
+                    response = requests.post(api_url, headers=headers, json=data_payload, timeout=local_api_timeout)
                     response.raise_for_status()  # Raises HTTPError for bad responses
                     response_data = response.json()
                 except requests.exceptions.Timeout:

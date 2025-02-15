@@ -45,7 +45,6 @@ def approximate_token_count(history):
         return 0
 
 
-# FIXME - add model parameter
 def chat_api_call(api_endpoint, api_key=None, input_data=None, prompt=None, temp=None, system_message=None, streaming=None, minp=None, maxp=None, model=None, topk=None, topp=None):
     logging.info(f"Debug - Chat API Call - API Endpoint: {api_endpoint}")
     log_counter("chat_api_call_attempt", labels={"api_endpoint": api_endpoint})
