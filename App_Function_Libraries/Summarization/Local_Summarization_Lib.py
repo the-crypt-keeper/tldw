@@ -1082,6 +1082,10 @@ def summarize_with_ollama(
             system_message = "You are a helpful AI assistant."
         logging.debug(f"Ollama: Prompt being sent is: {ollama_prompt}")
 
+        # Load timeout value
+        timeout = loaded_config_data['ollama_api']['api_timeout']
+        timeout = int(timeout)
+
         data_payload = {
             "model": model,
             "messages": [
@@ -1143,7 +1147,7 @@ def summarize_with_ollama(
                 logging.debug("Ollama: Submitting request to API endpoint")
                 print("Ollama: Submitting request to API endpoint")
                 try:
-                    response = requests.post(api_url, headers=headers, json=data_payload, timeout=30)
+                    response = requests.post(api_url, headers=headers, json=data_payload, timeout=timeout)
                     response.raise_for_status()  # Raises HTTPError for bad responses
                     response_data = response.json()
                 except requests.exceptions.Timeout:
