@@ -1127,6 +1127,7 @@ def summarize_with_ollama(
         }
 
         local_api_timeout = int(ollama_config.get("api_timeout", 600))
+        logging.debug(f"Ollama: Using local API timeout: {local_api_timeout} seconds")
 
         # 12) Attempt request with retries
         for attempt in range(1, max_retries + 1):
