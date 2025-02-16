@@ -66,6 +66,9 @@ https://github.com/woshixiaobai2019/mirau-chat-ui
 https://uxdesign.cc/the-importance-of-hover-states-c9312d7fd516
 https://trends.uxdesign.cc/
 https://bolters.io/
+https://github.com/abhishekkrthakur/aiaio
+https://www.phind.com/blog/phind-2-model-creation
+
 https://github.com/Cloud-Code-AI/AkiraDocs
 https://ui.shadcn.com/docs
 https://www.typingmind.com/
