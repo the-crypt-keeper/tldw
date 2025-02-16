@@ -22,6 +22,7 @@ https://github.com/deepseek-ai/DeepSeek-VL2
 https://huggingface.co/Qwen/QVQ-72B-Preview
 https://huggingface.co/Qwen/Qwen2-VL-72B
 https://huggingface.co/Qwen/Qwen2-VL-7B
+https://huggingface.co/OpenGVLab/InternVideo2_5_Chat_8B
 https://huggingface.co/Qwen/Qwen2-VL-2B
 https://github.com/Lokesh-Chimakurthi/vision-rag
 https://github.com/merveenoyan/smol-vision/blob/main/inference_gists/IBM_Granite_Vision.ipynb
