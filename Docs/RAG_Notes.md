@@ -18,6 +18,8 @@ https://arxiv.org/abs/2501.15228
 https://research.google/blog/speculative-rag-enhancing-retrieval-augmented-generation-through-drafting/
 https://arxiv.org/abs/2502.01142
 https://arxiv.org/abs/2401.15884
+https://huggingface.co/papers/2502.00306
+https://pub.towardsai.net/multimodal-rag-unveiled-a-deep-dive-into-cutting-edge-advancements-0eeb514c3ac4
 https://arxiv.org/abs/2501.14342
 	https://arxiv.org/abs/2410.13765
 	https://arxiv.org/pdf/2409.15699v1

@@ -14,7 +14,8 @@ https://huggingface.co/google/gemma-7b-aps-it
 https://docs.anthropic.com/en/docs/build-with-claude/citations
 https://mattyyeung.github.io/deterministic-quoting
 https://github.com/tangzhy/RealCritic
-
+https://huggingface.co/papers/2502.09604
+https://github.com/voidism/SelfCite
 https://liveideabench.com/
 
 RAG
