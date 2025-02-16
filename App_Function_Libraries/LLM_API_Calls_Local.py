@@ -1167,8 +1167,9 @@ def chat_with_ollama(input_data, custom_prompt, api_url=None, api_key=None,
             headers['Authorization'] = f'Bearer {api_key}'
 
         # Timeout from config or fallback
-        local_api_timeout = int(loaded_config_data['ollama_api'].get('api_timeout', 60))
-
+        local_api_timeout = int(loaded_config_data['ollama_api']['api_timeout'])
+        if local_api_timeout is None:
+            local_api_timeout = 900
         # ----------------------------------------------------------------
         # 5. Perform the request with optional retries
         # ----------------------------------------------------------------
