@@ -1170,6 +1170,7 @@ def chat_with_ollama(input_data, custom_prompt, api_url=None, api_key=None,
         local_api_timeout = int(loaded_config_data['ollama_api']['api_timeout'])
         if local_api_timeout is None:
             local_api_timeout = 900
+            logging.debug(f"Ollama: Using default timeout: {local_api_timeout} seconds")
         # ----------------------------------------------------------------
         # 5. Perform the request with optional retries
         # ----------------------------------------------------------------
