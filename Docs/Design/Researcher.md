@@ -144,7 +144,10 @@ https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_resear
 https://github.com/0xeb/TheBigPromptLibrary/blob/main/SystemPrompts/Perplexity.ai/20241024-Perplexity-Desktop-App.md
 https://github.com/rashadphz/farfalle
 https://huggingface.co/blog/open-deep-research
+https://danielkliewer.com/2025/02/05/open-deep-research
 https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_research_prompt.md
+https://research.google/blog/accelerating-scientific-breakthroughs-with-an-ai-co-scientist/
+https://github.com/CJones-Optics/ChiCurate
 https://www.emergentmind.com/
 https://github.com/neuml/paperai
 https://github.com/neuml/paperetl
