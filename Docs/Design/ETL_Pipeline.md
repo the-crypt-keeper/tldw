@@ -57,7 +57,8 @@ https://arxiv.org/html/2410.21169
 ### Link Dump:
 https://github.com/shoryasethia/FinChat
 https://github.com/dgunning/edgartools
-
+Confluence
+  https://openwebui.com/t/romainneup/confluence_search
 
 
  	

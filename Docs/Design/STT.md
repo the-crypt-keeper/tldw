@@ -67,3 +67,8 @@ STT
         https://github.com/usefulsensors/moonshine
         https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
         https://huggingface.co/onnx-community/moonshine-base-ONNX
+    https://github.com/FreedomIntelligence/Soundwave
+        https://arxiv.org/abs/2502.12900
+https://github.com/psdwizzard/MeetingBuddy
+
+

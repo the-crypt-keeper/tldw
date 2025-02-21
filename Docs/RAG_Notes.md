@@ -13,7 +13,10 @@ https://arxiv.org/pdf/2412.17149
 	https://arxiv.org/abs/2410.21012
 https://arxiv.org/abs/2410.03608
 https://huggingface.co/papers/2502.09411
-
+https://github.com/opendatalab/OHR-Bench
+https://zerobench.github.io/
+https://huggingface.co/papers/2502.08826
+https://github.com/topoteretes/cognee?utm_source=newsletter.danielmiessler.com&utm_medium=newsletter&utm_campaign=unsupervised-learning-no-469-standard-edition
 https://research.google/blog/chain-of-agents-large-language-models-collaborating-on-long-context-tasks/
 https://arxiv.org/abs/2501.15228
 	https://arxiv.org/abs/2410.20088

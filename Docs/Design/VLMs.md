@@ -40,9 +40,13 @@ https://huggingface.co/collections/nvidia/eagle-2-6764ba887fa1ef387f7df067
 https://github.com/baichuan-inc/Baichuan-Omni-1.5
 https://huggingface.co/ibm-granite/granite-vision-3.1-2b-preview
 https://github.com/bytedance/UI-TARS
+https://arxiv.org/abs/2502.13923
+https://huggingface.co/blog/smolvlm2
+https://github.com/QwenLM/Qwen2.5-VL/blob/main/cookbooks/video_understanding.ipynb
 https://github.com/ggerganov/llama.cpp/pull/11289
 https://mmvu-benchmark.github.io/
 https://github.com/DAMO-NLP-SG/VideoLLaMA3
+https://github.com/DCDmllm/HealthGPT
 https://huggingface.co/collections/OpenGVLab/internvl-25-673e1019b66e2218f68d7c1c
 https://huggingface.co/Infinigence/Megrez-3B-Omni
 https://arxiv.org/abs/2501.07888
