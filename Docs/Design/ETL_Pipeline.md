@@ -8,7 +8,7 @@ https://towardsdatascience.com/etl-pipelines-in-python-best-practices-and-techni
 https://python.langchain.com/docs/integrations/document_loaders/source_code/
 https://python.langchain.com/docs/integrations/document_loaders/
 https://github.com/whyhow-ai/knowledge-table
-
+https://olmocr.allenai.org/papers/olmocr.pdf
 
 ## ETL Pipelines
 
