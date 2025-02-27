@@ -79,6 +79,7 @@ https://uxdesign.cc/a-good-design-is-a-good-essay-197f4bd31c92
 https://github.com/Rugz007/liha
 https://astro.new/latest/
 https://github.com/AnswerDotAI/fasthtml
+https://medium.com/sadasant/god-mode-ux-why-your-next-interface-will-look-more-like-starcraft-than-slack-12498eb274d4
 https://github.com/lobehub/lobe-chat
 https://www.scoutos.com/
 https://github.com/FishiaT/yawullm

@@ -22,7 +22,9 @@ https://arxiv.org/abs/2501.15228
 	https://arxiv.org/abs/2410.20088
 https://research.google/blog/speculative-rag-enhancing-retrieval-augmented-generation-through-drafting/
 https://arxiv.org/abs/2502.01142
+https://medium.com/towards-data-science/how-to-create-a-rag-evaluation-dataset-from-documents-140daa3cbe71
 https://arxiv.org/abs/2401.15884
+https://github.com/integral-business-intelligence/chroma-auditor?tab=readme-ov-file
 https://huggingface.co/papers/2502.00306
 https://pub.towardsai.net/multimodal-rag-unveiled-a-deep-dive-into-cutting-edge-advancements-0eeb514c3ac4
 https://arxiv.org/abs/2501.14342
@@ -91,6 +93,7 @@ GraphRAG
 	https://towardsdatascience.com/how-to-implement-graph-rag-using-knowledge-graphs-and-vector-databases-60bb69a22759
 	https://towardsdatascience.com/how-to-implement-graph-rag-using-knowledge-graphs-and-vector-databases-60bb69a22759
 	https://towardsdatascience.com/text-to-knowledge-graph-made-easy-with-graph-maker-f3f890c0dbe8
+	https://www.arxiv.org/abs/2502.13339
 	https://towardsdatascience.com/building-a-knowledge-graph-from-scratch-using-llms-f6f677a17f07
 	https://iopscience.iop.org/article/10.1088/2632-2153/ad7228/pdf
 	https://medium.com/thoughts-on-machine-learning/building-dynamic-knowledge-graphs-using-open-source-llms-06a870e1bc4f
