@@ -691,7 +691,7 @@ def add_media_to_database(url, info_dict, segments, summary, keywords, custom_pr
 
 # Function to add media with keywords
 def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author,
-                           ingestion_date, overwrite=False, db=None):
+                           ingestion_date, overwrite=False, db=None, chunk_options=None):
     log_counter("add_media_with_keywords_attempt")
     start_time = time.time()
     logging.debug(f"Entering add_media_with_keywords: URL={url}, Title={title}")
@@ -833,9 +833,9 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
 
             conn.commit()
 
-            # Schedule chunking if media was added or updated
+            # Add loading of chunking options from Config file
             if action in ["updated", "added"]:
-                schedule_chunking(media_id, content, title)
+                schedule_chunking(media_id, content, title, chunk_options)
 
             duration = time.time() - start_time
             log_histogram("add_media_with_keywords_duration", duration)

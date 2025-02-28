@@ -132,7 +132,7 @@ https://github.com/dzhng/deep-research
 https://github.com/eRuaro/open-gemini-deep-research
 https://help.openalex.org/hc/en-us/articles/24396686889751-About-us
 https://www.ginkgonotes.com/
-https://github.com/jina-ai/node-DeepResearch
+https://github.com/jina-ai/node-DeepResearch[v1-f.py](../../../Sky/v1-f.py)
 https://github.com/LearningCircuit/local-deep-research
 https://www.reddit.com/r/Anki/comments/17u01ge/spaced_repetition_algorithm_a_threeday_journey/
 https://github.com/open-spaced-repetition/fsrs4anki/wiki/Spaced-Repetition-Algorithm:-A-Three%E2%80%90Day-Journey-from-Novice-to-Expert#day-3-the-latest-progress
@@ -150,6 +150,7 @@ https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_resear
 https://research.google/blog/accelerating-scientific-breakthroughs-with-an-ai-co-scientist/
 https://github.com/CJones-Optics/ChiCurate
 https://www.emergentmind.com/
+https://milvus.io/blog/introduce-deepsearcher-a-local-open-source-deep-research.md
 https://github.com/neuml/paperai
 https://github.com/neuml/paperetl
 https://github.com/ai-christianson/RA.Aid
