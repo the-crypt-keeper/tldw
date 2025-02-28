@@ -15,6 +15,7 @@ https://github.com/breezedeus/Pix2Text
 https://huggingface.co/HuggingFaceTB/SmolVLM-Instruct
 https://huggingface.co/tencent/HunyuanVideo
 https://huggingface.co/OpenGVLab/InternVL2_5-38B
+https://huggingface.co/microsoft/Phi-4-multimodal-instruct
 https://ivy-lvlm.github.io/Video-MA2MBA/
 https://internvl.github.io/blog/2024-12-20-InternVL-2.5-MPO/
 https://huggingface.co/allenai/Molmo-7B-D-0924
