@@ -13,7 +13,7 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Audio.Audio_Files import process_audio_files
 from App_Function_Libraries.Audio.Audio_Transcription_Lib import get_system_audio_devices, parse_device_id, \
-    record_audio_to_disk, PartialTranscriptionThread, stop_recording_short
+    record_audio_to_disk, PartialTranscriptionThread, stop_recording_short, test_device_availability
 from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models
@@ -61,11 +61,15 @@ def create_audio_processing_tab():
 
         # Device, consent, partial interval, live/final model dropdowns
         audio_devices = get_system_audio_devices()
+
         system_audio_device = gr.Dropdown(
             choices=[f"{d['id']}: {d['name']}" for d in audio_devices],
             label="Select Output Device to Record",
             visible=False
         )
+
+        test_device_button = gr.Button("Test Selected Device")
+
         consent_checkbox = gr.Checkbox(
             label="✅ I have obtained all necessary consents to record this audio",
             value=False,
@@ -93,6 +97,23 @@ def create_audio_processing_tab():
         record_button = gr.Button("Start Recording", visible=False)
         partial_txt = gr.Textbox(label="Partial Transcript (Live)", lines=3, interactive=False, visible=False)
         final_txt = gr.Textbox(label="Final Transcript (Stopped)", lines=3, interactive=False, visible=False)
+
+        def on_test_device_click(device_str):
+            device_id = parse_device_id(device_str)
+            if device_id is None:
+                return "Please select a device first"
+
+            if test_device_availability(device_id):
+                return "✅ Device is available and working"
+            else:
+                return "❌ Device is not available or in use by another application"
+
+        test_device_button.click(
+            fn=on_test_device_click,
+            inputs=[system_audio_device],
+            outputs=[partial_txt]  # Showing result in the partial text box
+        )
+
         transcribe_now_button = gr.Button("Transcribe Recorded Audio Now", visible=False)
 
         ###############################################################################

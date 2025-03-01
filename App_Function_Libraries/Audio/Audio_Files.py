@@ -146,7 +146,6 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
             audio_files = []
         audio_files.extend(recorded_files)
 
-
     def format_transcription_with_timestamps(segments):
         if keep_timestamps:
             formatted_segments = []
@@ -154,9 +153,20 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
                 start = segment.get('Time_Start', 0)
                 end = segment.get('Time_End', 0)
                 text = segment.get('Text', '').strip()
-                start_time = time.strftime('%H:%M:%S', time.gmtime(start))
-                end_time = time.strftime('%H:%M:%S', time.gmtime(end))
-                formatted_segments.append(f"[{start_time}-{end_time}] {text}")
+
+                # Check if start and end are already formatted strings
+                if isinstance(start, str) and ':' in start:
+                    # Already in HH:MM:SS format, use directly
+                    formatted_segments.append(f"[{start}-{end}] {text}")
+                else:
+                    # Numeric seconds, convert to time format
+                    try:
+                        start_time1 = time.strftime('%H:%M:%S', time.gmtime(float(start)))
+                        end_time = time.strftime('%H:%M:%S', time.gmtime(float(end)))
+                        formatted_segments.append(f"[{start_time1}-{end_time}] {text}")
+                    except (ValueError, TypeError):
+                        # Fallback if conversion fails
+                        formatted_segments.append(f"[{start}-{end}] {text}")
 
             # Join the segments with a newline to ensure proper formatting
             return "\n".join(formatted_segments)
@@ -414,7 +424,7 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
         return update_progress(f"Processing failed: {str(e)}"), "No transcriptions available", "No summaries available"
 
 
-def format_transcription_with_timestamps(segments, keep_timestamps):
+def format_transcription_with_timestamps(segments, keep_timestamps=True):
     """
     Formats the transcription segments with or without timestamps.
 
@@ -432,9 +442,24 @@ def format_transcription_with_timestamps(segments, keep_timestamps):
             end = segment.get('Time_End', 0)
             text = segment.get('Text', '').strip()
 
+            # Check if start and end are already formatted strings
+            if isinstance(start, str) and ':' in start:
+                # Already in HH:MM:SS format, use directly
+                formatted_segments.append(f"[{start}-{end}] {text}")
+            else:
+                # Numeric seconds, convert to time format
+                try:
+                    start_time = time.strftime('%H:%M:%S', time.gmtime(float(start)))
+                    end_time = time.strftime('%H:%M:%S', time.gmtime(float(end)))
+                    formatted_segments.append(f"[{start_time}-{end_time}] {text}")
+                except (ValueError, TypeError):
+                    # Fallback if conversion fails
+                    formatted_segments.append(f"[{start}-{end}] {text}")
+            # Join the segments with a newline to ensure proper formatting
             formatted_segments.append(f"[{start:.2f}-{end:.2f}] {text}")
         return "\n".join(formatted_segments)
     else:
+        # Join the text without timestamps
         return "\n".join([segment.get('Text', '').strip() for segment in segments])
 
 

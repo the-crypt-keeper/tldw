@@ -146,7 +146,7 @@ class PartialTranscriptionThread(threading.Thread):
                     # If your STT supports stereo, skip this step.
                     if self.channels == 2:
                         audio_np = audio_np.reshape((-1, 2))
-                        audio_np = audio_np.mean(axis=1)  # simple stereo -> mono
+                        audio_np = np.mean(audio_np, axis=1)  # simple stereo -> mono
 
                     # FIXME - Add support for multiple languages/whisper models
                     partial_text = transcribe_audio(
@@ -180,40 +180,78 @@ def record_audio_to_disk(device_id, output_file_path, stop_event, audio_queue):
     RATE = 44100
 
     try:
+        # Validate device ID
+        device_count = p.get_device_count()
+        if device_id is None or device_id < 0 or device_id >= device_count:
+            err_msg = f"Invalid device ID: {device_id}. Valid range is 0-{device_count - 1}"
+            logging.error(err_msg)
+            raise ValueError(err_msg)
+
+        # Check device capabilities
+        device_info = p.get_device_info_by_index(device_id)
+        logging.info(f"Using device: {device_info['name']}")
+
+        if device_info['maxInputChannels'] < 1:
+            err_msg = f"Device {device_id} ({device_info['name']}) doesn't support audio input"
+            logging.error(err_msg)
+            raise ValueError(err_msg)
+
+        # Adjust channels to device capability
+        actual_channels = min(CHANNELS, int(device_info['maxInputChannels']))
+        if actual_channels != CHANNELS:
+            logging.info(f"Adjusted channels from {CHANNELS} to {actual_channels} for device limitations")
+
+        # Open audio stream
         stream = p.open(
             format=FORMAT,
-            channels=CHANNELS,
+            channels=actual_channels,
             rate=RATE,
             input=True,
             input_device_index=device_id,
             frames_per_buffer=CHUNK
         )
+
+        # Open the WAV for writing
+        wf = wave.open(output_file_path, 'wb')
+        wf.setnchannels(actual_channels)
+        wf.setsampwidth(2)  # 16-bit
+        wf.setframerate(RATE)
+
+        while not stop_event.is_set():
+            try:
+                data = stream.read(CHUNK, exception_on_overflow=False)
+                # write to disk
+                wf.writeframes(data)
+                # also push to queue for partial
+                audio_queue.put(data)
+            except Exception as e:
+                logging.error(f"Recording error: {e}")
+                break
+
     except Exception as e:
-        logging.error(f"Error opening device {device_id}: {e}")
+        # Enhanced error messages for common issues
+        if "9999" in str(e):
+            logging.error(f"Device {device_id} is likely in use by another application")
+        elif "Invalid sample rate" in str(e):
+            logging.error(f"Device {device_id} doesn't support {RATE}Hz sample rate")
+        else:
+            logging.error(f"Error with device {device_id}: {e}")
         raise
 
-    # Open the WAV for writing
-    wf = wave.open(output_file_path, 'wb')
-    wf.setnchannels(CHANNELS)
-    wf.setsampwidth(2)  # 16-bit
-    wf.setframerate(RATE)
-
-    while not stop_event.is_set():
-        try:
-            data = stream.read(CHUNK, exception_on_overflow=False)
-            # write to disk
-            wf.writeframes(data)
-            # also push to queue for partial
-            audio_queue.put(data)
-        except Exception as e:
-            logging.error(f"Recording error: {e}")
-            break
-
-    # Cleanup
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
-    wf.close()
+    finally:
+        # Ensure proper cleanup even if errors occur
+        if 'stream' in locals():
+            try:
+                stream.stop_stream()
+                stream.close()
+            except:
+                pass
+        if 'wf' in locals():
+            try:
+                wf.close()
+            except:
+                pass
+        p.terminate()
 
 
 def stop_recording_short(record_state):
@@ -809,6 +847,37 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 #
 # Audio Recording Functions
 
+def test_device_availability(device_id):
+    """Test if a device is actually available for recording."""
+    if device_id is None:
+        return False
+
+    p = pyaudio.PyAudio()
+    try:
+        # Try to get device info
+        device_info = p.get_device_info_by_index(device_id)
+        if not device_info or device_info['maxInputChannels'] < 1:
+            return False
+
+        # Try to open stream briefly
+        stream = p.open(
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=44100,
+            input=True,
+            input_device_index=device_id,
+            frames_per_buffer=1024,
+            start=False
+        )
+        stream.close()
+        return True
+    except Exception as e:
+        logging.debug(f"Device {device_id} not available: {e}")
+        return False
+    finally:
+        p.terminate()
+
+
 @timeit
 def record_audio(duration, sample_rate=16000, chunk_size=1024):
     log_counter("record_audio_attempt", labels={"duration": duration})
@@ -896,39 +965,50 @@ def save_audio_temp(audio_data, sample_rate=16000):
 # Non-Filtering version
 def get_system_audio_devices() -> List[Dict]:
     """
-    Return only devices that are typically capable of capturing system audio
-    (i.e., 'loopback' or 'stereo mix' on Windows, 'monitor' on Linux/PulseAudio,
-    'blackhole' or 'soundflower' on macOS, etc.).
+    Return available audio devices for system audio recording with better
+    identification of loopback capabilities.
     """
     # Keywords commonly found in device names that can capture system output
     loopback_keywords = [
-        "loopback",      # WASAPI loopback
-        "stereo mix",    # Realtek driver
-        "monitor",       # PulseAudio monitor on Linux
-        "blackhole",     # macOS loopback driver
-        "soundflower"    # older macOS loopback driver
+        "loopback",  # WASAPI loopback
+        "stereo mix",  # Realtek driver
+        "monitor",  # PulseAudio monitor on Linux
+        "blackhole",  # macOS loopback driver
+        "soundflower",  # older macOS loopback driver
+        "what u hear",  # Sound Blaster
+        "output",  # Generic term that might indicate system output
+        "mix"  # Common in stereo mix devices
     ]
 
     devices = []
-    host_apis = sd.query_hostapis()
-    all_devs = sd.query_devices()
+    try:
+        host_apis = sd.query_hostapis()
+        all_devs = sd.query_devices()
 
-    for device_index, device in enumerate(all_devs):
-        name_lower = device["name"].lower()
-        api_name = host_apis[device["hostapi"]]["name"]
+        for device_index, device in enumerate(all_devs):
+            # Only include input devices
+            if device["max_input_channels"] > 0:
+                name_lower = device["name"].lower()
+                api_name = host_apis[device["hostapi"]]["name"]
 
-        # Check if the device name contains any known loopback keyword
-        # (In many drivers, these devices show up as "input" channels,
-        #  because you're "recording" the system output.)
-        if any(keyword in name_lower for keyword in loopback_keywords):
-            devices.append({
-                "id": device_index,
-                "name": f"{device['name']} ({api_name})",
-                "hostapi": device["hostapi"],
-                "max_input_channels": device["max_input_channels"],
-                "max_output_channels": device["max_output_channels"],
-                "rate": device["default_samplerate"]
-            })
+                # Check if it might be a loopback device
+                is_likely_loopback = any(keyword in name_lower for keyword in loopback_keywords)
+
+                devices.append({
+                    "id": device_index,
+                    "name": f"{device['name']} ({api_name})" +
+                            (" [SYSTEM AUDIO]" if is_likely_loopback else ""),
+                    "hostapi": device["hostapi"],
+                    "max_input_channels": device["max_input_channels"],
+                    "max_output_channels": device["max_output_channels"],
+                    "rate": device["default_samplerate"],
+                    "is_loopback": is_likely_loopback
+                })
+
+        # Sort to put potential loopback devices first
+        devices.sort(key=lambda x: (not x.get("is_loopback"), x["name"]))
+    except Exception as e:
+        logging.error(f"Error enumerating audio devices: {e}")
 
     return devices
 # Filtering version
