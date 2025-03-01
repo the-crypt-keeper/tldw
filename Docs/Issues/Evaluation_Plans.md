@@ -36,6 +36,8 @@ https://github.com/lechmazur/generalization
 https://docs.ragas.io/en/stable/getstarted/rag_eval/
 https://github.com/plurch/ir_evaluation
 https://github.com/OpenBMB/UltraEval-Audio
+https://huggingface.co/papers/2502.06329
+https://arxiv.org/abs/2502.05167
 https://alibaba-nlp.github.io/WebWalker/
 https://arxiv.org/abs/2501.03491
 https://machinelearningmastery.com/rag-hallucination-detection-techniques
