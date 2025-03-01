@@ -75,6 +75,185 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 # 4. Adjust CPU threads properly
 # 5. Use quantized models - compute_type="int8"
 
+#####################################
+# Memory-Saving Indefinite Recording
+#####################################
+
+class PartialTranscriptionThread(threading.Thread):
+    def __init__(
+        self,
+        audio_queue: queue.Queue,
+        stop_event: threading.Event,
+        partial_text_state: dict,
+        lock: threading.Lock,
+        live_model: str,          # model for partial
+        sample_rate=44100,
+        channels=2,
+        partial_update_interval=2.0,   # how often we attempt a partial transcription
+        partial_chunk_seconds=5,
+    ):
+        super().__init__(daemon=True)
+        self.audio_queue = audio_queue
+        self.stop_event = stop_event
+        self.partial_text_state = partial_text_state
+        self.lock = lock
+        self.live_model = live_model
+
+        self.sample_rate = sample_rate
+        self.channels = channels
+        self.partial_update_interval = partial_update_interval
+        self.partial_chunk_seconds = partial_chunk_seconds
+
+        # Rolling buffer for partial
+        self.audio_buffer = b""
+        # We only keep last X seconds in memory for partial
+        self.max_partial_bytes = int(self.partial_chunk_seconds * self.sample_rate * self.channels * 2)
+
+        self.last_ts = time.time()
+
+        # Keep track of any exceptions
+        self.exception_encountered = None
+
+    def run(self):
+        while not self.stop_event.is_set():
+            now = time.time()
+            if now - self.last_ts < self.partial_update_interval:
+                time.sleep(0.1)
+                continue
+
+            # Gather new chunks from the queue
+            new_data = []
+            while not self.audio_queue.empty():
+                chunk = self.audio_queue.get_nowait()
+                new_data.append(chunk)
+
+            if new_data:
+                combined_new_data = b"".join(new_data)
+                # Append to rolling buffer
+                self.audio_buffer += combined_new_data
+
+                # Enforce maximum partial buffer size
+                if len(self.audio_buffer) > self.max_partial_bytes:
+                    self.audio_buffer = self.audio_buffer[-self.max_partial_bytes:]
+
+            # If rolling buffer is large enough, do partial transcription
+            if len(self.audio_buffer) > (self.sample_rate * self.channels * 2):  # ~1s
+                try:
+                    # Convert from 16-bit PCM to float32
+                    audio_np = np.frombuffer(self.audio_buffer, dtype=np.int16).astype(np.float32) / 32768.0
+
+                    # If channels=2, you may want to downmix to mono:
+                    # If your STT supports stereo, skip this step.
+                    if self.channels == 2:
+                        audio_np = audio_np.reshape((-1, 2))
+                        audio_np = audio_np.mean(axis=1)  # simple stereo -> mono
+
+                    partial_text = transcribe_audio(
+                        audio_np,
+                        transcription_method="faster-whisper",  # or your logic
+                        sample_rate=self.sample_rate,
+                        whisper_model=self.live_model
+                    )
+
+                    with self.lock:
+                        self.partial_text_state["text"] = partial_text
+                except Exception as e:
+                    self.exception_encountered = e
+                    logging.error(f"Partial transcription error: {e}")
+
+            self.last_ts = time.time()
+
+
+def record_audio_to_disk(device_id, output_file_path, stop_event, audio_queue):
+    """
+    Thread function that:
+    - Opens PyAudio with (44.1kHz, 2ch).
+    - Reads data in a loop, writes directly to disk, and also puts chunk into `audio_queue`.
+    - We store minimal data in RAM since each chunk is appended to file.
+    """
+    p = pyaudio.PyAudio()
+    CHUNK = 1024
+    FORMAT = pyaudio.paInt16
+    CHANNELS = 2
+    RATE = 44100
+
+    try:
+        stream = p.open(
+            format=FORMAT,
+            channels=CHANNELS,
+            rate=RATE,
+            input=True,
+            input_device_index=device_id,
+            frames_per_buffer=CHUNK
+        )
+    except Exception as e:
+        logging.error(f"Error opening device {device_id}: {e}")
+        raise
+
+    # Open the WAV for writing
+    wf = wave.open(output_file_path, 'wb')
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(2)  # 16-bit
+    wf.setframerate(RATE)
+
+    while not stop_event.is_set():
+        try:
+            data = stream.read(CHUNK, exception_on_overflow=False)
+            # write to disk
+            wf.writeframes(data)
+            # also push to queue for partial
+            audio_queue.put(data)
+        except Exception as e:
+            logging.error(f"Recording error: {e}")
+            break
+
+    # Cleanup
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+    wf.close()
+
+
+def stop_recording(record_state):
+    """
+    - Signals the threads to stop
+    - Joins them with a timeout
+    - If partial thread had an exception, returns that
+    """
+    if not record_state:
+        return None, "[No active recording to stop]", None
+
+    stop_event = record_state["stop_event"]
+    rec_thread = record_state["record_thread"]
+    partial_thread = record_state["partial_thread"]
+    output_file_path = record_state["wav_path"]
+
+    stop_event.set()
+    rec_thread.join(timeout=5)
+    if rec_thread.is_alive():
+        logging.warning("record_thread didn't stop in time.")
+
+    partial_thread.join(timeout=5)
+    if partial_thread.is_alive():
+        logging.warning("partial_thread didn't stop in time.")
+
+    if partial_thread.exception_encountered:
+        return None, f"[Partial transcription error: {partial_thread.exception_encountered}]", output_file_path
+
+    return partial_thread.partial_text_state["text"], "", output_file_path
+
+
+def parse_device_id(selected_device_text: str):
+    if not selected_device_text:
+        return None
+    try:
+        parts = selected_device_text.split(":", 1)
+        return int(parts[0].strip())
+    except Exception as e:
+        logging.error(f"Could not parse device from '{selected_device_text}': {e}")
+        return None
+
+
 
 ##########################################################
 # Transcription Sink Function
