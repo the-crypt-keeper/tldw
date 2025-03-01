@@ -8,6 +8,7 @@ import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Audio.Audio_Files import process_audio_files
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import get_system_audio_devices
 from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models
@@ -23,6 +24,7 @@ from App_Function_Libraries.Metrics.logger_config import logger
 def create_audio_processing_tab():
     with gr.TabItem("Audio File Transcription + Summarization", visible=True):
         gr.Markdown("# Transcribe & Summarize Audio Files from URLs or Local Files!")
+
         # Get and validate default value
         try:
             default_value = None
@@ -38,13 +40,57 @@ def create_audio_processing_tab():
         with gr.Row():
             with gr.Column():
                 audio_url_input = gr.Textbox(label="Audio File URL(s)", placeholder="Enter the URL(s) of the audio file(s), one per line")
-                # Updated to support multiple files
                 audio_file_input = gr.File(
                     label="Upload Audio Files (Supported formats: MP3, WAV, M4A, FLAC, AAC, ALAC, OGG, OPUS)",
                     file_types=["audio", ".mp3", ".wav", ".m4a", ".flac", ".aac", ".alac", ".ogg", ".opus"],
                     file_count="multiple"
                 )
                 custom_title_input = gr.Textbox(label="Custom Title Prefix", placeholder="Enter a prefix for the audio files (individual files will be numbered)")
+
+                # New System Audio Recording Section
+                with gr.Accordion("🔴 Live System Audio Recording", open=False):
+                    record_system_audio = gr.Checkbox(
+                        label="Record System Audio Output",
+                        value=False,
+                        info="WARNING: Ensure you have legal consent to record audio"
+                    )
+                    recording_duration = gr.Slider(
+                        minimum=10,
+                        maximum=3600,
+                        value=300,
+                        step=10,
+                        label="Recording Duration (seconds)",
+                        visible=False
+                    )
+                    audio_devices = get_system_audio_devices()
+                    system_audio_device = gr.Dropdown(
+                        choices=[f"{d['id']}: {d['name']}" for d in audio_devices],
+                        label="Select Output Device to Record",
+                        visible=bool(audio_devices)
+                    )
+                    consent_checkbox = gr.Checkbox(
+                        label="✅ I have obtained all necessary consents to record this audio",
+                        value=False,
+                        visible=False
+                    )
+
+                    # Show/hide elements based on recording checkbox
+                    record_system_audio.change(
+                        fn=lambda x: (
+                            gr.update(visible=x),  # duration slider
+                            gr.update(visible=x),  # device dropdown
+                            gr.update(visible=x),  # consent checkbox
+                            gr.update(visible=not x)  # file upload
+                        ),
+                        inputs=[record_system_audio],
+                        outputs=[
+                            recording_duration,
+                            system_audio_device,
+                            consent_checkbox,
+                            audio_file_input
+                        ]
+                    )
+
                 use_cookies_input = gr.Checkbox(label="Use cookies for authenticated download", value=False)
                 cookies_input = gr.Textbox(
                     label="Audio Download Cookies",
@@ -203,7 +249,7 @@ def create_audio_processing_tab():
                     inputs=[preset_prompt],
                     outputs=[custom_prompt_input, system_prompt_input]
                 )
-                # Refactored API selection dropdown
+
                 api_name_input = gr.Dropdown(
                     choices=["None"] + [format_api_name(api) for api in global_api_endpoints],
                     value=default_value,
@@ -230,7 +276,7 @@ def create_audio_processing_tab():
                     outputs=[chunking_options_box]
                 )
 
-                process_audio_button = gr.Button("Process Audio File(s)")
+                process_audio_button = gr.Button("Process Audio File(s)", variant="primary")
 
             with gr.Column():
                 audio_progress_output = gr.Textbox(label="Progress", lines=10)
@@ -244,7 +290,8 @@ def create_audio_processing_tab():
             inputs=[audio_url_input, audio_file_input, whisper_model_input, api_name_input, api_key_input,
                     use_cookies_input, cookies_input, keep_original_input, custom_keywords_input, custom_prompt_input,
                     chunk_method, max_chunk_size, chunk_overlap, use_adaptive_chunking, use_multi_level_chunking,
-                    chunk_language, diarize_input, keep_timestamps_input, custom_title_input],
+                    chunk_language, diarize_input, keep_timestamps_input, custom_title_input,
+                    record_system_audio, recording_duration, system_audio_device, consent_checkbox],
             outputs=[audio_progress_output, audio_transcription_output, audio_summary_output]
         )
 

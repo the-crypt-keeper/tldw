@@ -92,3 +92,7 @@ keyring~=25.4.1
 pycryptodomex~=3.20.0
 lxml
 jsonlines~=3.1.0
+# System audio recording
+# pip install sounddevice numpy wave
+# brew install blackhole-2ch  # For virtual device
+# sudo apt-get install pavucontrol

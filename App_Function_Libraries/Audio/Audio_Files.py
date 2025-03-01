@@ -108,8 +108,18 @@ def download_audio_file(url, current_whisper_model="", use_cookies=False, cookie
 def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_key, use_cookies, cookies, keep_original,
                         custom_keywords, custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap,
                         use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize,
-                        keep_timestamps, custom_title):
+                        keep_timestamps, custom_title, record_system_audio, recording_duration,
+                        system_audio_device, consent):
 
+    # Add validation at the start of the function
+    if record_system_audio:
+        if not consent:
+            raise ValueError("You must confirm you have consent to record audio")
+        if not system_audio_device:
+            raise ValueError("Please select an audio output device to record from")
+
+    # Add recording logic before processing files
+    recorded_files = []
     start_time = time.time()  # Start time for processing
     processed_count = 0
     failed_count = 0
@@ -117,6 +127,26 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
     all_transcriptions = []
     all_summaries = []
     temp_files = []  # Keep track of temporary files
+
+    if record_system_audio:
+        try:
+            # Extract device ID from the selected device string
+            device_id = int(system_audio_device.split(":")[0])
+            recorded_file = record_system_audio(
+                duration=recording_duration,
+                device_id=device_id
+            )
+            recorded_files.append(recorded_file)
+            temp_files.append(recorded_file)
+        except Exception as e:
+            return print(f"Recording failed: {str(e)}"), "", ""
+
+    # Process recorded files along with others
+    if recorded_files:
+        if not isinstance(audio_files, list):
+            audio_files = []
+        audio_files.extend(recorded_files)
+
 
     def format_transcription_with_timestamps(segments):
         if keep_timestamps:
@@ -140,13 +170,21 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
         return "\n".join(progress)
 
     def cleanup_files():
-        for file in temp_files:
-            try:
-                if os.path.exists(file):
-                    os.remove(file)
-                    update_progress(f"Temporary file {file} removed.")
-            except Exception as e:
-                update_progress(f"Failed to remove temporary file {file}: {str(e)}")
+        if not keep_original:
+            for file in temp_files:
+                try:
+                    if os.path.exists(file):
+                        os.remove(file)
+                        update_progress(f"Temporary file {file} removed.")
+                except Exception as e:
+                    update_progress(f"Failed to remove temporary file {file}: {str(e)}")
+            # Also clean recorded files
+            for file in recorded_files:
+                try:
+                    if os.path.exists(file):
+                        os.remove(file)
+                except:
+                    pass
 
     def reencode_mp3(mp3_file_path):
         try:

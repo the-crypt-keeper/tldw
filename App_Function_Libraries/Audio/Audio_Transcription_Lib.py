@@ -35,6 +35,8 @@ import numpy as np
 import torch
 from scipy.io import wavfile
 from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
+import sounddevice as sd
+import wave
 #
 # Import Local
 from App_Function_Libraries.Utils.Utils import sanitize_filename, load_and_log_configs, logging
@@ -707,6 +709,109 @@ def save_audio_temp(audio_data, sample_rate=16000):
         logging.error(f"Error saving temp audio: {str(e)}")
         log_counter("save_audio_temp_error")
         return None
+
+
+# Non-Filtering version
+def get_system_audio_devices() -> List[Dict]:
+    """
+    Return only devices that are typically capable of capturing system audio
+    (i.e., 'loopback' or 'stereo mix' on Windows, 'monitor' on Linux/PulseAudio,
+    'blackhole' or 'soundflower' on macOS, etc.).
+    """
+    # Keywords commonly found in device names that can capture system output
+    loopback_keywords = [
+        "loopback",      # WASAPI loopback
+        "stereo mix",    # Realtek driver
+        "monitor",       # PulseAudio monitor on Linux
+        "blackhole",     # macOS loopback driver
+        "soundflower"    # older macOS loopback driver
+    ]
+
+    devices = []
+    host_apis = sd.query_hostapis()
+    all_devs = sd.query_devices()
+
+    for device_index, device in enumerate(all_devs):
+        name_lower = device["name"].lower()
+        api_name = host_apis[device["hostapi"]]["name"]
+
+        # Check if the device name contains any known loopback keyword
+        # (In many drivers, these devices show up as "input" channels,
+        #  because you're "recording" the system output.)
+        if any(keyword in name_lower for keyword in loopback_keywords):
+            devices.append({
+                "id": device_index,
+                "name": f"{device['name']} ({api_name})",
+                "hostapi": device["hostapi"],
+                "max_input_channels": device["max_input_channels"],
+                "max_output_channels": device["max_output_channels"],
+                "rate": device["default_samplerate"]
+            })
+
+    return devices
+# Filtering version
+# def get_system_audio_devices() -> List[Dict]:
+#     """Get list of available system audio devices with their capabilities"""
+#     devices = []
+#     host_apis = sd.query_hostapis()
+#
+#     for device_index, device in enumerate(sd.query_devices()):
+#         if device['max_input_channels'] > 0:
+#             # Windows loopback devices show up as inputs
+#             api_name = host_apis[device['hostapi']]['name']
+#             devices.append({
+#                 'id': device_index,
+#                 'name': f"{device['name']} ({api_name})",
+#                 'is_loopback': 'loopback' in device['name'].lower(),
+#                 'hostapi': device['hostapi'],
+#                 'max_channels': device['max_input_channels'],
+#                 'rate': device['default_samplerate']
+#             })
+#
+#     # Sort devices with loopback first
+#     return sorted(devices, key=lambda x: not x['is_loopback'])
+
+
+def record_system_audio(duration: float, device_id: int, sample_rate: int = 44100,
+                        channels: int = 2, subtype: str = 'PCM_16') -> str:
+    """
+    Record system audio output to a temporary WAV file
+    Returns path to recorded file
+    """
+    temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+
+    try:
+        # Configure recording settings based on device capabilities
+        device_info = sd.query_devices(device_id)
+        actual_sample_rate = int(device_info['default_samplerate'] if device_info['default_samplerate'] > 0
+                                 else sample_rate)
+
+        logging.info(f"Starting system audio recording (Duration: {duration}s, "
+                     f"Device: {device_info['name']}, SR: {actual_sample_rate})")
+
+        audio_data = sd.rec(
+            int(duration * actual_sample_rate),
+            samplerate=actual_sample_rate,
+            channels=min(channels, device_info['max_input_channels']),
+            device=device_id,
+            dtype=np.int16,
+            blocking=True
+        )
+
+        # Save to WAV file
+        with wave.open(temp_file.name, 'wb') as wav_file:
+            wav_file.setnchannels(min(channels, device_info['max_input_channels']))
+            wav_file.setsampwidth(2)  # 16-bit PCM
+            wav_file.setframerate(actual_sample_rate)
+            wav_file.writeframes(audio_data.tobytes())
+
+        logging.info(f"Recording saved to {temp_file.name}")
+        return temp_file.name
+
+    except Exception as e:
+        temp_file.close()
+        os.unlink(temp_file.name)
+        raise RuntimeError(f"Recording failed: {str(e)}")
 
 #
 # End of Audio Recording Functions

@@ -144,7 +144,7 @@ https://github.com/ai-christianson/RA.Aid
 https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_research_prompt.md
 https://github.com/0xeb/TheBigPromptLibrary/blob/main/SystemPrompts/Perplexity.ai/20241024-Perplexity-Desktop-App.md
 https://github.com/rashadphz/farfalle
-https://huggingface.co/blog/open-deep-research
+https://huggingface.co/blog/open-deep-re[v3-f-single.py](../../../Sky/v3-f-single.py)search
 https://danielkliewer.com/2025/02/05/open-deep-research
 https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_research_prompt.md
 https://research.google/blog/accelerating-scientific-breakthroughs-with-an-ai-co-scientist/
