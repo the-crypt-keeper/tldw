@@ -23,7 +23,7 @@ from App_Function_Libraries.Metrics.logger_config import logger
 
 def create_audio_processing_tab():
     with gr.TabItem("Audio File Transcription + Summarization", visible=True):
-        gr.Markdown("# Transcribe & Summarize Audio Files from URLs or Local Files!")
+        gr.Markdown("## Transcribe Audio from URLs, Uploads, or System Audio (44.1 kHz, 2ch)")
 
         # Get and validate default value
         try:
