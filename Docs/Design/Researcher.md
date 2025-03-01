@@ -150,6 +150,7 @@ https://github.com/cbuccella/perplexity_research_prompt/blob/main/general_resear
 https://research.google/blog/accelerating-scientific-breakthroughs-with-an-ai-co-scientist/
 https://github.com/CJones-Optics/ChiCurate
 https://www.emergentmind.com/
+https://github.com/goodreasonai/nichey
 https://milvus.io/blog/introduce-deepsearcher-a-local-open-source-deep-research.md
 https://github.com/neuml/paperai
 https://github.com/neuml/paperetl
