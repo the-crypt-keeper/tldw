@@ -55,6 +55,7 @@ rouge_score~=0.1.2
 sacrebleu~=2.4.2
 scikit_learn
 sentence_transformers
+sounddevice # For Handling system audio recording
 SQLAlchemy~=2.0.34
 streamlit
 tenacity~=8.5.0
