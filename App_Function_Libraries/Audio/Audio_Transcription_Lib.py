@@ -148,11 +148,13 @@ class PartialTranscriptionThread(threading.Thread):
                         audio_np = audio_np.reshape((-1, 2))
                         audio_np = audio_np.mean(axis=1)  # simple stereo -> mono
 
+                    # FIXME - Add support for multiple languages/whisper models
                     partial_text = transcribe_audio(
                         audio_np,
-                        transcription_method="faster-whisper",  # or your logic
                         sample_rate=self.sample_rate,
-                        whisper_model=self.live_model
+                        whisper_model=self.live_model,
+                        speaker_lang="en",
+                        transcription_provider="faster-whisper"
                     )
 
                     with self.lock:
@@ -214,7 +216,7 @@ def record_audio_to_disk(device_id, output_file_path, stop_event, audio_queue):
     wf.close()
 
 
-def stop_recording(record_state):
+def stop_recording_short(record_state):
     """
     - Signals the threads to stop
     - Joins them with a timeout
@@ -418,7 +420,8 @@ class LiveAudioStreamer:
                         final_audio = np.concatenate(audio_buffer, axis=0).flatten()
                         audio_buffer.clear()
                         # Transcribe the finalized audio
-                        user_text = transcribe_audio(final_audio, sample_rate=self.sample_rate)
+                        # FIXME - Add support for multiple languages/whisper models
+                        user_text = transcribe_audio(final_audio, sample_rate=self.sample_rate, whisper_model="distil-large-v3", speaker_lang="en", transcription_provider="faster-whisper")
 
                         # Then do something with user_text (e.g. add to chatbot)
                         self.handle_transcribed_text(user_text)
@@ -835,7 +838,7 @@ def record_audio(duration, sample_rate=16000, chunk_size=1024):
 
 
 @timeit
-def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
+def stop_recording_infinite(p, stream, audio_queue, stop_recording_event, audio_thread):
     log_counter("stop_recording_attempt")
     start_time = time.time()
     stop_recording_event.set()
