@@ -173,6 +173,8 @@ https://github.com/SakanaAI/AI-Scientist
 https://agentlaboratory.github.io/
 https://gangiswag.github.io/infogent/
 https://arxiv.org/abs/2501.03916
+https://arxiv.org/abs/2502.19413
+https://arxiv.org/abs/2502.18864
 https://github.com/dendrite-systems/dendrite-python-sdk
 https://github.com/rashadphz/farfalle/blob/main/src/backend/agent_search.py
 https://github.com/rashadphz/farfalle/blob/main/src/backend/prompts.py

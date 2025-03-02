@@ -25,6 +25,9 @@ from typing import Union, Any, Generator
 
 # Import 3rd-party Libraries
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
+
 #
 # Import Local Libraries
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, extract_text_from_segments, logging
@@ -263,8 +266,28 @@ def summarize_with_llama(input_data, custom_prompt, api_key=None, temp=None, sys
             "stream": streaming
         }
 
+        # Create a session
+        session = requests.Session()
+
+        # Load config values
+        retry_count = loaded_config_data['llama_api']['api_retries']
+        retry_delay = loaded_config_data['llama_api']['api_retry_delay']
+
+        # Configure the retry strategy
+        retry_strategy = Retry(
+            total=retry_count,  # Total number of retries
+            backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+            status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+        )
+
+        # Create the adapter
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+
+        # Mount adapters for both HTTP and HTTPS
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
         logging.debug("Llama: Submitting request to API endpoint")
-        response = requests.post(api_url, headers=headers, json=data, stream=streaming)
+        response = session.post(api_url, headers=headers, json=data, stream=streaming)
 
         if response.status_code == 200:
             if streaming:
@@ -392,8 +415,28 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_mess
         if streaming:
             logging.debug("Kobold Summarization: Streaming mode enabled")
             try:
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['kobold_api']['api_retries']
+                retry_delay = loaded_config_data['kobold_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
                 # Send the request with streaming enabled
-                response = requests.post(
+                response = session.post(
                     kobold_openai_api_IP, headers=headers, json=data_payload, stream=True
                 )
                 logging.debug(
@@ -441,7 +484,27 @@ def summarize_with_kobold(input_data, api_key, custom_prompt_input,  system_mess
                 yield f"Kobold: Error occurred while processing summary with Kobold: {str(e)}"
         else:
             try:
-                response = requests.post(
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['kobold_api']['api_retries']
+                retry_delay = loaded_config_data['kobold_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                response = session.post(
                     kobold_api_ip, headers=headers, json=data_payload
                 )
                 logging.debug(
@@ -595,7 +658,27 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=
 
         if streaming:
             logging.debug("Oobabooga: Streaming mode enabled")
-            response = requests.post(api_url, headers=headers, json=data, stream=True)
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['ooba_api']['api_retries']
+            retry_delay = loaded_config_data['ooba_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(api_url, headers=headers, json=data, stream=True)
             response.raise_for_status()
             try:
                 def stream_generator():
@@ -624,8 +707,28 @@ def summarize_with_oobabooga(input_data, api_key, custom_prompt, system_message=
                 logging.error(f"Error streaming summary with Oobabooga: {e}")
                 return f"Error summarizing with Oobabooga: {str(e)}"
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['ooba_api']['api_retries']
+            retry_delay = loaded_config_data['ooba_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Oobabooga: Posting request")
-            response = requests.post(api_url, headers=headers, json=data)
+            response = session.post(api_url, headers=headers, json=data)
 
             if response.status_code == 200:
                 response_data = response.json()
@@ -755,7 +858,27 @@ def summarize_with_tabbyapi(
         if streaming:
             logging.debug("TabbyAPI: Streaming mode enabled")
             try:
-                response = requests.post(tabby_api_ip, headers=headers, json=data2, stream=True)
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['tabby_api']['api_retries']
+                retry_delay = loaded_config_data['tabby_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                response = session.post(tabby_api_ip, headers=headers, json=data2, stream=True)
                 response.raise_for_status()
                 # Process the streamed response
                 for line in response.iter_lines():
@@ -784,7 +907,27 @@ def summarize_with_tabbyapi(
                 yield f"Unexpected error in summarization process: {str(e)}"
         else:
             try:
-                response = requests.post(tabby_api_ip, headers=headers, json=data2)
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['tabby_api']['api_retries']
+                retry_delay = loaded_config_data['tabby_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                response = session.post(tabby_api_ip, headers=headers, json=data2)
                 response.raise_for_status()
                 response_json = response.json()
 
@@ -917,7 +1060,27 @@ def summarize_with_vllm(api_key, input_data, custom_prompt_arg, temp=None, syste
 
         # Handle streaming
         if streaming:
-            response = requests.post(
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['vllm_api']['api_retries']
+            retry_delay = loaded_config_data['vllm_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(
                 url,
                 headers=headers,
                 json=data,
@@ -949,8 +1112,28 @@ def summarize_with_vllm(api_key, input_data, custom_prompt_arg, temp=None, syste
             return stream_generator()
         # Handle non-streaming
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['vllm_api']['api_retries']
+            retry_delay = loaded_config_data['vllm_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("vLLM Summarization: Posting request")
-            response = requests.post(url, headers=headers, json=data)
+            response = session.post(url, headers=headers, json=data)
 
             if response.status_code == 200:
                 response_data = response.json()
@@ -1130,44 +1313,49 @@ def summarize_with_ollama(
         logging.info(f"Ollama: Using local API timeout: {local_api_timeout} seconds")
 
         # 12) Attempt request with retries
-        for attempt in range(1, max_retries + 1):
-            try:
-                logging.debug(f"Ollama Summarize: Attempt {attempt}/{max_retries}")
-                response = requests.post(
-                    api_url,
-                    headers=headers,
-                    json=data_payload,
-                    stream=streaming,
-                    timeout=local_api_timeout
-                )
-                response.raise_for_status()  # Raise HTTPError if not 2xx
-            except requests.exceptions.Timeout:
-                logging.error("Ollama: Request timed out.")
-                if attempt < max_retries:
-                    logging.info(f"Retrying in {retry_delay} seconds...")
-                    time.sleep(retry_delay)
-                    continue
-                return "Ollama: Request timed out."
-            except requests.exceptions.HTTPError as http_err:
-                logging.error(f"Ollama: HTTP error occurred: {http_err}")
-                if attempt < max_retries:
-                    time.sleep(retry_delay)
-                    continue
-                return f"Ollama: HTTP error: {http_err}"
-            except requests.exceptions.RequestException as req_err:
-                logging.error(f"Ollama: Request exception: {req_err}")
-                if attempt < max_retries:
-                    time.sleep(retry_delay)
-                    continue
-                return f"Ollama: Request exception: {req_err}"
-            except Exception as e:
-                logging.error(f"Ollama: Unexpected error: {str(e)}")
-                if attempt < max_retries:
-                    time.sleep(retry_delay)
-                    continue
-                return f"Ollama: Unexpected error: {str(e)}"
-            # If we got a valid response, break out of the retry loop
-            break
+
+        try:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['ollama_api']['api_retries']
+            retry_delay = loaded_config_data['ollama_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            logging.debug(f"Ollama Summarize request being sent")
+            response = session.post(
+                api_url,
+                headers=headers,
+                json=data_payload,
+                stream=streaming,
+                timeout=local_api_timeout
+            )
+            response.raise_for_status()  # Raise HTTPError if not 2xx
+        except requests.exceptions.Timeout:
+            logging.error("Ollama: Request timed out.")
+            return "Ollama: Request timed out."
+        except requests.exceptions.HTTPError as http_err:
+            logging.error(f"Ollama: HTTP error occurred: {http_err}")
+            return f"Ollama: HTTP error: {http_err}"
+        except requests.exceptions.RequestException as req_err:
+            logging.error(f"Ollama: Request exception: {req_err}")
+            return f"Ollama: Request exception: {req_err}"
+        except Exception as e:
+            logging.error(f"Ollama: Unexpected error: {str(e)}")
+            return f"Ollama: Unexpected error: {str(e)}"
 
         # 13) Handle streaming or non-streaming
         if streaming:
@@ -1197,7 +1385,27 @@ def summarize_with_ollama(
         else:
             # Non-streaming => parse entire JSON once and return the text
             try:
-                response_data = response.json()
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['ollama_api']['api_retries']
+                retry_delay = loaded_config_data['ollama_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                response_data = session.json()
             except json.JSONDecodeError:
                 logging.error("Ollama: Failed to parse JSON response.")
                 return "Ollama: JSON parse error from summarization API."
@@ -1340,7 +1548,27 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
         }
 
         if streaming:
-            response = requests.post(
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['custom_openai_api']['api_retries']
+            retry_delay = loaded_config_data['custom_openai_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(
                 custom_openai_api_url,
                 headers=headers,
                 json=data,
@@ -1371,8 +1599,28 @@ def summarize_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=No
                 yield collected_messages
             return stream_generator()
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['custom_openai_api']['api_retries']
+            retry_delay = loaded_config_data['custom_openai_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Custom OpenAI API: Posting request")
-            response = requests.post(custom_openai_api_url, headers=headers, json=data)
+            response = session.post(custom_openai_api_url, headers=headers, json=data)
             logging.debug(f"Custom OpenAI API full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
@@ -1515,7 +1763,27 @@ def summarize_with_custom_openai_2(api_key, input_data, custom_prompt_arg, temp=
         }
 
         if streaming:
-            response = requests.post(
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['custom_openai_api_2']['api_retries']
+            retry_delay = loaded_config_data['custom_openai_api_2']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(
                 custom_openai_api_url,
                 headers=headers,
                 json=data,
@@ -1546,8 +1814,28 @@ def summarize_with_custom_openai_2(api_key, input_data, custom_prompt_arg, temp=
                 yield collected_messages
             return stream_generator()
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['custom_openai_api_2']['api_retries']
+            retry_delay = loaded_config_data['custom_openai_api_2']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Custom OpenAI API-2: Posting request")
-            response = requests.post(custom_openai_api_url, headers=headers, json=data)
+            response = session.post(custom_openai_api_url, headers=headers, json=data)
             logging.debug(f"Custom OpenAI API-2 full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
