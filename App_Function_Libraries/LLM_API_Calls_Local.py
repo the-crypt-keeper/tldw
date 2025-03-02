@@ -160,7 +160,7 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
             print("Local LLM: Failed to process Chat response:", response.text)
             return f"Local LLM: Failed to process Chat response, status code {response.status_code}"
     except Exception as e:
-        logging.debug("Local LLM: Error in processing: %s", str(e))
+        logging.debug(f"Local LLM: Error in processing: {str(e)}")
         print("Error occurred while processing Chat request with Local LLM:", str(e))
         return f"Local LLM: Error occurred while processing Chat response: {str(e)}"
 
@@ -331,7 +331,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
                 return stream_generator()
             else:
                 response_data = response.json()
-                logging.debug("API Response Data: %s", response_data)
+                logging.debug(f"API Response Data: {response_data}")
 
                 if response.status_code == 200:
                     # if 'X' in response_data:
@@ -504,7 +504,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                         if line:
                             decoded_line = line.decode('utf-8')
                             logging.debug(
-                                "Kobold: Received streamed data: %s", decoded_line
+                                "fKobold: Received streamed data: {decoded_line}"
                             )
                             # OpenAI API streams data prefixed with 'data: '
                             if decoded_line.startswith('data: '):
@@ -524,17 +524,17 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                                         )
                                 except json.JSONDecodeError as e:
                                     logging.error(
-                                        "Kobold: Error decoding streamed JSON: %s", str(e)
+                                        f"Kobold: Error decoding streamed JSON: {str(e)}"
                                     )
                             else:
-                                logging.debug("Kobold: Ignoring line: %s", decoded_line)
+                                logging.debug(f"Kobold: Ignoring line: {decoded_line}")
                 else:
                     logging.error(
                         f"Kobold: API request failed with status code {response.status_code}: {response.text}"
                     )
                     yield f"Kobold: API request failed: {response.text}"
             except Exception as e:
-                logging.error("Kobold: Error in processing: %s", str(e))
+                logging.error(f"Kobold: Error in processing: {str(e)}")
                 yield f"Kobold: Error occurred while processing summary with Kobold: {str(e)}"
         else:
             try:
@@ -572,7 +572,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                 if response.status_code == 200:
                     try:
                         response_data = response.json()
-                        logging.debug("Kobold: API Response Data: %s", response_data)
+                        logging.debug(f"Kobold: API Response Data: {response_data}")
 
                         # Debugging: Print the parsed response data
                         logging.debug(f"Parsed Response Data: {response_data}")
@@ -592,7 +592,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                             return "Expected data not found in API response."
                     except ValueError as e:
                         logging.error(
-                            "Kobold: Error parsing JSON response: %s", str(e)
+                            f"Kobold: Error parsing JSON response: {str(e)}"
                         )
                         yield f"Error parsing JSON response: {str(e)}"
                         return
@@ -603,11 +603,11 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                     yield f"Kobold: API request failed: {response.text}"
                     return
             except Exception as e:
-                logging.error("kobold: Error in processing: %s", str(e))
+                logging.error(f"kobold: Error in processing: {str(e)}")
                 yield f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
                 return
     except Exception as e:
-        logging.error("kobold: Error in processing: %s", str(e))
+        logging.error(f"kobold: Error in processing: {str(e)}")
         return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
 
 

@@ -932,7 +932,7 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
             )
 
             response_data = response.json()
-            logging.debug("API Response Data: %s", response_data)
+            logging.debug(f"API Response Data: {response_data}")
 
             if response.status_code == 200:
                 if 'choices' in response_data and len(response_data['choices']) > 0:
@@ -1051,7 +1051,7 @@ def chat_with_openrouter(api_key=None, input_data=None, custom_prompt_arg=None, 
         logging.debug(f"openrouter: User Prompt being sent is {openrouter_prompt}")
 
     except Exception as e:
-        logging.error("OpenRouter: Error in processing: %s", str(e))
+        logging.error(f"OpenRouter: Error in processing: {str(e)}")
         return f"OpenRouter: Error occurred while processing config file with OpenRouter: {str(e)}"
 
     if streaming:
@@ -1180,7 +1180,7 @@ def chat_with_openrouter(api_key=None, input_data=None, custom_prompt_arg=None, 
             logging.debug(f"Raw API Response Content: {response.text}")
 
             response_data = response.json()
-            logging.debug("Full API Response Data: %s", response_data)
+            logging.debug(f"Full API Response Data: {response_data}")
 
             if response.status_code == 200:
                 if 'choices' in response_data and len(response_data['choices']) > 0:
@@ -1195,7 +1195,7 @@ def chat_with_openrouter(api_key=None, input_data=None, custom_prompt_arg=None, 
                 logging.error(f"openrouter:  API request failed with status code {response.status_code}: {response.text}")
                 return f"openrouter: API request failed: {response.text}"
         except Exception as e:
-            logging.error("openrouter: Error in processing: %s", str(e))
+            logging.error(f"openrouter: Error in processing: {str(e)}")
             return f"openrouter: Error occurred while processing chat request with openrouter: {str(e)}"
 
 

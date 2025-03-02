@@ -658,7 +658,7 @@ def main(input_path, api_name=None, api_key=None,
             logging.error(f"Error processing {path}: {str(e)}")
             continue
 
-    logging.debug("Total time taken: %s seconds", time.monotonic() - start_time)
+    logging.debug(f"Total time taken: {time.monotonic() - start_time} seconds")
     logging.info("MAIN: returing transcription_text.")
     return transcription_text
 

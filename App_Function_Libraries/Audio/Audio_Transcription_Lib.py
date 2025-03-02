@@ -624,6 +624,7 @@ def unload_whisper_model():
 
 
 def get_whisper_model(model_name, device, ):
+    #FIXME - remove call to huggingface if whisper model exists on device
     global whisper_model_instance
     if whisper_model_instance is None:
         logging.info(f"Initializing new WhisperModel with size {model_name} on device {device}")
@@ -668,7 +669,7 @@ def speech_to_text(
 
     # Convert the string to a Path object and ensure it's resolved (absolute path)
     file_path = Path(audio_file_path).resolve()
-    logging.info("speech-to-text: Audio file path: %s", file_path)
+    logging.info("speech-to-text: Audio file path: {file_path}")
 
     try:
         # Get file extension and base name
@@ -690,7 +691,7 @@ def speech_to_text(
         options = dict(language=selected_source_lang, beam_size=10, best_of=10, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
         # use function and config at top of file
-        logging.debug("speech-to-text: Using whisper model: %s", whisper_model)
+        logging.debug(f"speech-to-text: Using whisper model: {whisper_model}", )
 
         whisper_model_instance = get_whisper_model(whisper_model, processing_choice)
         segments_raw, info = whisper_model_instance.transcribe(str(file_path), **transcribe_options)
@@ -813,10 +814,10 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
                     result = subprocess.run(command, stdin=null_file, text=True, capture_output=True)
                 if result.returncode == 0:
                     logging.info("FFmpeg executed successfully")
-                    logging.debug("FFmpeg output: %s", result.stdout)
+                    logging.debug(f"FFmpeg output: {result.stdout}")
                 else:
                     logging.error("Error in running FFmpeg")
-                    logging.error("FFmpeg stderr: %s", result.stderr)
+                    logging.error(f"FFmpeg stderr: {result.stderr}")
                     raise RuntimeError(f"FFmpeg error: {result.stderr}")
             except Exception as e:
                 logging.error("Error occurred - ffmpeg doesn't like windows")
@@ -825,10 +826,10 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
             os.system(f'ffmpeg -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
         else:
             raise RuntimeError("Unsupported operating system")
-        logging.info("Conversion to WAV completed: %s", out_path)
+        logging.info(f"Conversion to WAV completed: {out_path}")
         log_counter("convert_to_wav_success", labels={"file_path": video_file_path})
     except Exception as e:
-        logging.error("speech-to-text: Error transcribing audio: %s", str(e))
+        logging.error(f"speech-to-text: Error transcribing audio: {str(e)}")
         log_counter("convert_to_wav_error", labels={"file_path": video_file_path, "error": str(e)})
         return {"error": str(e)}
 
