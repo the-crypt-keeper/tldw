@@ -536,11 +536,13 @@ def stop_live_chat_fn():
     """
     global global_live_chat
     if global_live_chat is not None:
+        # This is valid because it becomes the object at runtime
         global_live_chat.stop()
         global_live_chat = None
     return "Live speech2speech Chat Stopped."
 
 
+# FIXME - Add support for changing transcription provider, whisper model and speaker language
 def record_and_transcribe(duration=5, sample_rate=16000, chunk_size=1024,
                           transcription_provider="faster-whisper", whisper_model="distil-large-v3", speaker_lang="en"):
     """
@@ -582,6 +584,128 @@ def record_and_transcribe(duration=5, sample_rate=16000, chunk_size=1024,
         transcribed_text = f"[Transcription error: {str(e)}]"
     print("Transcribed Text:", transcribed_text)
     return transcribed_text
+
+
+class DictationManager:
+    def __init__(self, sample_rate=16000, chunk_size=1024):
+        self.sample_rate = sample_rate
+        self.chunk_size = chunk_size
+        self.audio_queue = queue.Queue()
+        self.stop_event = threading.Event()
+        self.is_recording = False
+        self.recording_thread = None
+        self.pa = None  # Will initialize PyAudio when needed
+
+    def start_recording(self):
+        """Start recording audio for dictation"""
+        if self.is_recording:
+            return "Already recording. Press 'Stop Dictation' first."
+
+        # Initialize PyAudio if needed
+        if not self.pa:
+            self.pa = pyaudio.PyAudio()
+
+        # Reset state
+        self.stop_event.clear()
+        self.is_recording = True
+
+        # Start recording thread
+        self.recording_thread = threading.Thread(target=self._record_audio_thread, daemon=True)
+        self.recording_thread.start()
+
+        return "🔴 Recording active. Press 'Stop Dictation' when finished."
+
+    def stop_recording_and_transcribe(self):
+        """Stop recording and transcribe the collected audio"""
+        if not self.is_recording:
+            return "No active recording", ""
+
+        # Signal the recording thread to stop
+        self.stop_event.set()
+        self.is_recording = False
+
+        # Wait for recording thread to finish
+        if self.recording_thread and self.recording_thread.is_alive():
+            self.recording_thread.join(timeout=5)
+
+        # Process collected audio from queue
+        frames = []
+        try:
+            while not self.audio_queue.empty():
+                frames.append(self.audio_queue.get_nowait())
+        except queue.Empty:
+            pass
+
+        if not frames:
+            return "No audio recorded", ""
+
+        # Process the recorded audio
+        raw_data = b"".join(frames)
+        audio_np = np.frombuffer(raw_data, dtype=np.int16).astype(np.float32) / 32768.0
+
+        try:
+            transcribed_text = transcribe_audio(
+                audio_np,
+                transcription_provider="faster-whisper",
+                sample_rate=self.sample_rate,
+                whisper_model="distil-large-v3",
+                speaker_lang="en"
+            )
+
+            return "Transcription complete", transcribed_text
+        except Exception as e:
+            error_msg = f"Transcription error: {str(e)}"
+            print(error_msg)
+            return error_msg, ""
+
+    def _record_audio_thread(self):
+        """Thread function that records audio chunks"""
+        stream = None
+        try:
+            stream = self.pa.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=self.sample_rate,
+                input=True,
+                frames_per_buffer=self.chunk_size
+            )
+
+            print("Dictation recording started")
+            # Empty the queue first
+            while not self.audio_queue.empty():
+                self.audio_queue.get_nowait()
+
+            # Start recording
+            while not self.stop_event.is_set():
+                try:
+                    data = stream.read(self.chunk_size, exception_on_overflow=False)
+                    self.audio_queue.put(data)
+                except Exception as e:
+                    print(f"Error reading audio: {e}")
+                    break
+
+        except Exception as e:
+            print(f"Error setting up audio: {e}")
+        finally:
+            if stream:
+                try:
+                    stream.stop_stream()
+                    stream.close()
+                except:
+                    pass
+            print("Dictation recording stopped")
+
+    def cleanup(self):
+        """Clean up resources"""
+        if self.is_recording:
+            self.stop_event.set()
+            self.is_recording = False
+
+        if self.pa:
+            self.pa.terminate()
+            self.pa = None
+
+dictation_manager = DictationManager()
 
 #
 # End of Live Chat Functions
@@ -762,9 +886,14 @@ def create_chat_interface():
                     # --- Message Input and Transcribe Button ---
                     # When the transcribe button is clicked, record and transcribe audio, then populate the message
                     # textbox with the transcribed text.
-                    transcribe_btn = gr.Button("Dictate (Transcribe)")
+                    dictate_status = gr.Textbox(
+                        label="Dictation Status",
+                        value="Ready to record",
+                        interactive=False
+                    )
+                    start_dictation_btn = gr.Button("Start Dictation")
+                    stop_dictation_btn = gr.Button("Stop Dictation")
                     submit = gr.Button("Submit")
-                    transcribe_btn.click(fn=record_and_transcribe, inputs=[], outputs=[msg])
                 with gr.Row():
                     speak_button = gr.Button("Speak Response")
                     tts_status = gr.Textbox(label="TTS Status", interactive=False)
@@ -781,6 +910,19 @@ def create_chat_interface():
                 with gr.Row():
                     save_chat_history_as_file = gr.Button("Save Chat History as File")
                     download_file = gr.File(label="Download Chat History")
+
+        # Connect the dictation buttons to their functions
+        start_dictation_btn.click(
+            fn=dictation_manager.start_recording,
+            inputs=[],
+            outputs=[dictate_status]
+        )
+
+        stop_dictation_btn.click(
+            fn=dictation_manager.stop_recording_and_transcribe,
+            inputs=[],
+            outputs=[dictate_status, msg]
+        )
 
         gr.HTML(confirm_clear_chat_js)
         # Restore original functionality
