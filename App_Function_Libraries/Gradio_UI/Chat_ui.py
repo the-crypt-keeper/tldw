@@ -3,12 +3,19 @@
 #
 # Imports
 import os
+import queue
 import sqlite3
+import threading
 import time
+import wave
 from datetime import datetime
 #
 # External Imports
 import gradio as gr
+import numpy as np
+import pyaudio
+
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import transcribe_audio
 #
 # Local Imports
 from App_Function_Libraries.Chat.Chat_Functions import approximate_token_count, chat, save_chat_history, \
@@ -310,6 +317,281 @@ def update_dropdown_multiple(query, search_type, keywords=""):
         return gr.update(choices=[]), {}
 
 
+##################################################################
+#
+# Live Chat Functions
+
+# FIXME - Setup defaults / loading config values
+class LiveChat:
+    def __init__(self, sample_rate=16000, chunk_size=1024, silence_threshold=0.01, silence_duration=2.5):
+        """
+        :param sample_rate: Sampling rate for recording (Hz)
+        :param chunk_size: Number of frames per audio chunk
+        :param silence_threshold: Amplitude threshold below which audio is considered "silent"
+        :param silence_duration: Duration (in seconds) of continuous silence needed to trigger a response
+        """
+        self.sample_rate = sample_rate
+        self.chunk_size = chunk_size
+        self.silence_threshold = silence_threshold
+        self.silence_duration = silence_duration
+
+        self.audio_queue = queue.Queue()
+        self.stop_event = threading.Event()
+        self.silence_start_time = None
+        self.audio_buffer = []  # Stores raw audio chunks until finalized
+
+        self.recording_thread = None
+        self.processing_thread = None
+
+        self.pa = pyaudio.PyAudio()
+
+    def start(self):
+        self.stop_event.clear()
+        # Start the audio recording thread
+        self.recording_thread = threading.Thread(target=self.record_audio, daemon=True)
+        self.recording_thread.start()
+        # Start the processing thread (to detect silence and trigger processing)
+        self.processing_thread = threading.Thread(target=self.process_audio, daemon=True)
+        self.processing_thread.start()
+
+    def stop(self):
+        self.stop_event.set()
+        if self.recording_thread is not None:
+            self.recording_thread.join()
+        if self.processing_thread is not None:
+            self.processing_thread.join()
+        self.pa.terminate()
+
+    def record_audio(self):
+        stream = self.pa.open(
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=self.sample_rate,
+            input=True,
+            frames_per_buffer=self.chunk_size
+        )
+        while not self.stop_event.is_set():
+            try:
+                data = stream.read(self.chunk_size, exception_on_overflow=False)
+                self.audio_queue.put(data)
+            except Exception as e:
+                print(f"Error recording audio: {e}")
+        stream.stop_stream()
+        stream.close()
+
+    def process_audio(self):
+        while not self.stop_event.is_set():
+            try:
+                # Wait briefly for a new chunk
+                chunk = self.audio_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            # Append chunk to our rolling buffer
+            self.audio_buffer.append(chunk)
+
+            # Compute the average amplitude of this chunk
+            audio_data = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
+            amplitude = np.abs(audio_data).mean()
+
+            if amplitude < self.silence_threshold:
+                # If silence detected, start (or continue) the silence timer
+                if self.silence_start_time is None:
+                    self.silence_start_time = time.time()
+                else:
+                    elapsed = time.time() - self.silence_start_time
+                    if elapsed >= self.silence_duration:
+                        print("Silence detected. Finalizing user input...")
+                        self.finalize_and_process_buffer()
+                        self.silence_start_time = None
+            else:
+                # Reset silence timer if speech is detected
+                self.silence_start_time = None
+
+    def finalize_and_process_buffer(self):
+        if not self.audio_buffer:
+            return
+
+        # Combine all recorded chunks into one raw audio byte string
+        raw_audio = b"".join(self.audio_buffer)
+        # Clear the buffer so recording can resume fresh
+        self.audio_buffer = []
+
+        # Convert raw audio from int16 to normalized float32 array
+        audio_np = np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32) / 32768.0
+
+        # --- Step 1: Transcribe the finalized audio ---
+        try:
+            user_text = transcribe_audio(
+                audio_np,
+                transcription_provider="faster-whisper",
+                sample_rate=self.sample_rate,
+                whisper_model="distil-large-v3",
+                speaker_lang="en"
+            )
+        except Exception as e:
+            user_text = f"[Transcription error: {str(e)}]"
+        print("User said:", user_text)
+
+        if not user_text.strip():
+            print("No speech detected.")
+            return
+
+        # --- Step 2: Get a chat response from the LLM ---
+        try:
+            # Initialize parameters required by chat_wrapper
+            history = []
+            media_content = {}
+            selected_parts = []
+            api_endpoint = "None"  # Default endpoint
+            api_key = None
+            custom_prompt = None
+            conversation_id = None
+            save_conversation = False
+            temperature = 0.7
+            system_prompt = "You are a helpful AI assistant"
+            streaming = False  # No streaming in LiveChat
+
+            # Call chat_wrapper and get the response
+            responses = list(chat_wrapper(
+                user_text, history, media_content, selected_parts,
+                api_endpoint, api_key, custom_prompt, conversation_id,
+                save_conversation, temperature, system_prompt, streaming
+            ))
+
+            if responses:
+                chat_response, _, _ = responses[0]  # Get the first (and likely only) response
+            else:
+                chat_response = "[No response generated]"
+        except Exception as e:
+            chat_response = f"[Chat error: {str(e)}]"
+        print("LLM response:", chat_response)
+
+        # --- Step 3: Generate TTS for the chat response ---
+        try:
+            tts_audio_file = generate_audio(
+                api_key=None,  # Use your configured key or None if not needed
+                text=chat_response,
+                provider="openai",  # or another provider like "elevenlabs"
+                voice="alloy",      # choose a voice from your configuration
+                model=None,
+                voice2=None,
+                output_file=None,   # Let the function generate a temporary filename
+                response_format="mp3",
+                streaming=False,
+                speed=1.0
+            )
+        except Exception as e:
+            print(f"TTS generation error: {str(e)}")
+            return
+
+        if tts_audio_file and os.path.exists(tts_audio_file):
+            print("Playing TTS audio...")
+            self.play_audio(tts_audio_file)
+        else:
+            print("TTS audio file was not generated.")
+
+    def play_audio(self, file_path):
+        # A simple audio playback using PyAudio and wave
+        wf = wave.open(file_path, 'rb')
+        stream = self.pa.open(
+            format=self.pa.get_format_from_width(wf.getsampwidth()),
+            channels=wf.getnchannels(),
+            rate=wf.getframerate(),
+            output=True
+        )
+        data = wf.readframes(self.chunk_size)
+        while data:
+            stream.write(data)
+            data = wf.readframes(self.chunk_size)
+        stream.stop_stream()
+        stream.close()
+        wf.close()
+
+
+# Global variable to store the live chat instance
+global_live_chat = None
+
+def start_live_chat_fn():
+    """
+    Creates and starts a LiveChat instance if one isn't running,
+    and returns a status string.
+    """
+    global global_live_chat
+    if global_live_chat is None:
+        # Instantiate the LiveChat class with desired parameters
+        # (Make sure LiveChat is imported or defined in your code)
+        global_live_chat = LiveChat(
+            sample_rate=16000,
+            chunk_size=1024,
+            silence_threshold=0.01,
+            silence_duration=2.5
+        )
+        global_live_chat.start()
+    return "Live speech2speech Chat Started."
+
+def stop_live_chat_fn():
+    """
+    Stops the LiveChat instance if it exists and resets the global variable.
+    """
+    global global_live_chat
+    if global_live_chat is not None:
+        global_live_chat.stop()
+        global_live_chat = None
+    return "Live speech2speech Chat Stopped."
+
+
+def record_and_transcribe(duration=5, sample_rate=16000, chunk_size=1024,
+                          transcription_provider="faster-whisper", whisper_model="distil-large-v3", speaker_lang="en"):
+    """
+    Records audio from the microphone for a fixed duration,
+    transcribes it, and returns the resulting text.
+    """
+    p = pyaudio.PyAudio()
+    stream = p.open(format=pyaudio.paInt16,
+                    channels=1,
+                    rate=sample_rate,
+                    input=True,
+                    frames_per_buffer=chunk_size)
+    frames = []
+    print("Recording for {} seconds...".format(duration))
+    # Record for the specified duration
+    for _ in range(0, int(sample_rate / chunk_size * duration)):
+        try:
+            data = stream.read(chunk_size, exception_on_overflow=False)
+        except Exception as e:
+            print(f"Recording error: {e}")
+            break
+        frames.append(data)
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+
+    raw_data = b"".join(frames)
+    # Convert to float32 (normalize by 32768 for int16)
+    audio_np = np.frombuffer(raw_data, dtype=np.int16).astype(np.float32) / 32768.0
+    try:
+        transcribed_text = transcribe_audio(
+            audio_np,
+            transcription_provider=transcription_provider,
+            sample_rate=sample_rate,
+            whisper_model=whisper_model,
+            speaker_lang=speaker_lang
+        )
+    except Exception as e:
+        transcribed_text = f"[Transcription error: {str(e)}]"
+    print("Transcribed Text:", transcribed_text)
+    return transcribed_text
+
+#
+# End of Live Chat Functions
+##################################################################
+
+
+##################################################################
+#
+# Chat Interfaces
+
 def create_chat_interface():
     try:
         default_value = None
@@ -368,7 +650,24 @@ def create_chat_interface():
         media_content = gr.State({})
         selected_parts = gr.State([])
         conversation_id = gr.State(None)
+        # --- Live Chat Controls ---
+        with gr.Row():
+            start_live_chat_btn = gr.Button("Start speech2speech Chat")
+            stop_live_chat_btn = gr.Button("Stop speech2speech Chat")
+            live_chat_status = gr.Textbox(label="Live Chat Status", value="Inactive", interactive=False)
 
+        # Wire the live chat control buttons to their functions
+        start_live_chat_btn.click(
+            fn=start_live_chat_fn,
+            inputs=[],
+            outputs=[live_chat_status]
+        )
+        stop_live_chat_btn.click(
+            fn=stop_live_chat_fn,
+            inputs=[],
+            outputs=[live_chat_status]
+        )
+        # --- End Live Chat Controls ---
         with gr.Row():
             with gr.Column(scale=1):
                 # Refactored API selection dropdown
@@ -459,7 +758,13 @@ def create_chat_interface():
                 chatbot = gr.Chatbot(height=800, elem_classes="chatbot-container")
                 streaming = gr.Checkbox(label="Streaming", value=False, visible=True)
                 msg = gr.Textbox(label="Enter your message")
-                submit = gr.Button("Submit")
+                with gr.Row():
+                    # --- Message Input and Transcribe Button ---
+                    # When the transcribe button is clicked, record and transcribe audio, then populate the message
+                    # textbox with the transcribed text.
+                    transcribe_btn = gr.Button("Dictate (Transcribe)")
+                    submit = gr.Button("Submit")
+                    transcribe_btn.click(fn=record_and_transcribe, inputs=[], outputs=[msg])
                 with gr.Row():
                     speak_button = gr.Button("Speak Response")
                     tts_status = gr.Textbox(label="TTS Status", interactive=False)
@@ -1609,6 +1914,7 @@ def create_chat_interface_four():
             outputs=[preset_prompt, page_display, current_page_state]
         )
 
+        # FIXME
         def chat_wrapper_single(message, chat_history, api_endpoint, api_key, temperature, user_prompt):
             logging.debug(f"Chat Wrapper Single - Message: {message}, Chat History: {chat_history}")
 
@@ -1655,11 +1961,7 @@ def create_chat_interface_four():
                 False,  # save_conversation
                 temperature,  # temperature
                 system_prompt="",  # system_prompt
-                max_tokens=None,
-                top_p=None,
-                frequency_penalty=None,
-                presence_penalty=None,
-                stop_sequence=None
+                max_tokens=4096,
             )
 
             if "API request failed" not in new_msg:
