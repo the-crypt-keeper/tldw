@@ -17,7 +17,7 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs
 # Functions:
 
 loaded_config_data = load_and_log_configs()
-log_metrics_file = loaded_config_data['logging']['log_metrics_file']
+log_metrics_file = loaded_config_data['logging']['log_metrics_file'] or './Logs/tldw_metrics_logs.json'
 
 def retention_function(files):
     """

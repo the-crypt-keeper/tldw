@@ -27,6 +27,8 @@ from typing import List
 #
 # Import 3rd-Party Libraries
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 #
 # Import Local libraries
 from App_Function_Libraries.Utils.Utils import load_and_log_configs, logging
@@ -229,7 +231,29 @@ def chat_with_openai(api_key, input_data, custom_prompt_arg, temp, system_messag
             return stream_generator()
         else:
             logging.debug("OpenAI: Posting request (non-streaming")
-            response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data)
+
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['openai_api']['api_retries']
+            retry_delay = loaded_config_data['openai_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data,
+                                     timeout=30)
             logging.debug(f"Full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
@@ -382,8 +406,28 @@ def chat_with_anthropic(api_key, input_data, model, custom_prompt_arg, max_retri
 
         for attempt in range(max_retries):
             try:
-                logging.debug("Anthropic: Posting request to API")
-                response = requests.post(
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['anthropic_api']['api_retries']
+                retry_delay = loaded_config_data['anthropic_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+
+                response = session.post(
                     'https://api.anthropic.com/v1/messages',
                     headers=headers,
                     json=data
@@ -566,7 +610,27 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
 
         if streaming:
             logging.debug("Cohere: Submitting streaming request to API endpoint")
-            response = requests.post(
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['cohere_api']['api_retries']
+            retry_delay = loaded_config_data['cohere_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(
                 'https://api.cohere.com/v2/chat',
                 headers=headers,
                 json=data,
@@ -608,6 +672,26 @@ def chat_with_cohere(api_key, input_data, model=None, custom_prompt_arg=None, sy
             return stream_generator()
         else:
             try:
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['cohere_api']['api_retries']
+                retry_delay = loaded_config_data['cohere_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
                 response = requests.post('https://api.cohere.com/v2/chat', headers=headers, json=data)
                 logging.debug(f"Cohere Chat: Raw API response: {response.text}")
             except requests.RequestException as e:
@@ -768,7 +852,27 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
         logging.debug("groq: Submitting request to API endpoint")
         print("groq: Submitting request to API endpoint")
         if streaming:
-            response = requests.post(
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['groq_api']['api_retries']
+            retry_delay = loaded_config_data['groq_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(
                 'https://api.groq.com/openai/v1/chat/completions',
                 headers=headers,
                 json=data,
@@ -801,7 +905,27 @@ def chat_with_groq(api_key, input_data, custom_prompt_arg, temp=None, system_mes
 
             return stream_generator()
         else:
-            response = requests.post(
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['groq_api']['api_retries']
+            retry_delay = loaded_config_data['groq_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(
                 'https://api.groq.com/openai/v1/chat/completions',
                 headers=headers,
                 json=data
@@ -935,8 +1059,28 @@ def chat_with_openrouter(api_key=None, input_data=None, custom_prompt_arg=None, 
             logging.debug("OpenRouter: Submitting streaming request to API endpoint")
             print("OpenRouter: Submitting streaming request to API endpoint")
 
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['openrouter_api']['api_retries']
+            retry_delay = loaded_config_data['openrouter_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             # Make streaming request
-            response = requests.post(
+            response = session.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {api_key}",
@@ -993,8 +1137,28 @@ def chat_with_openrouter(api_key=None, input_data=None, custom_prompt_arg=None, 
             return error_msg
     else:
         try:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['openrouter_api']['api_retries']
+            retry_delay = loaded_config_data['openrouter_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.info("OpenRouter: Submitting request to API endpoint")
-            response = requests.post(
+            response = session.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {api_key}",
@@ -1088,7 +1252,27 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
 
         logging.debug("HuggingFace Chat: Submitting request...")
         if streaming:
-            response = requests.post(API_URL, headers=headers, json=data, stream=True)
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['huggingface_api']['api_retries']
+            retry_delay = loaded_config_data['huggingface_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(API_URL, headers=headers, json=data, stream=True)
             response.raise_for_status()
 
             def stream_generator():
@@ -1118,7 +1302,27 @@ def chat_with_huggingface(api_key, input_data, custom_prompt_arg, system_prompt=
 
             return stream_generator()
         else:
-            response = requests.post(API_URL, headers=headers, json=data)
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['huggingface_api']['api_retries']
+            retry_delay = loaded_config_data['huggingface_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(API_URL, headers=headers, json=data)
             logging.debug(f"Full API response data: {response.text}")
 
             if response.status_code == 200:
@@ -1283,79 +1487,112 @@ def chat_with_deepseek(api_key, input_data, custom_prompt_arg, temp=0.1, system_
         }
 
         logging.debug("DeepSeek: Posting request to API")
-        for attempt in range(1, max_retries + 1):
-            try:
-                if streaming:
-                    logging.debug("DeepSeek: Posting streaming request")
-                    response = requests.post(
-                        'https://api.deepseek.com/chat/completions',
-                        headers=headers,
-                        json=payload,
-                        stream=True
-                    )
-                    response.raise_for_status()
 
-                    def stream_generator():
-                        collected_text = ""
-                        for line in response.iter_lines():
-                            if line:
-                                decoded_line = line.decode('utf-8').strip()
-                                if decoded_line == '':
+        try:
+            if streaming:
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['deepseek_api']['api_retries']
+                retry_delay = loaded_config_data['deepseek_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                logging.debug("DeepSeek: Posting streaming request")
+                response = session.post(
+                    'https://api.deepseek.com/chat/completions',
+                    headers=headers,
+                    json=payload,
+                    stream=True
+                )
+                response.raise_for_status()
+
+                def stream_generator():
+                    collected_text = ""
+                    for line in response.iter_lines():
+                        if line:
+                            decoded_line = line.decode('utf-8').strip()
+                            if decoded_line == '':
+                                continue
+                            if decoded_line.startswith('data: '):
+                                data_str = decoded_line[len('data: '):]
+                                if data_str == '[DONE]':
+                                    break
+                                try:
+                                    data_json = json.loads(data_str)
+                                    delta_content = data_json['choices'][0]['delta'].get('content', '')
+                                    collected_text += delta_content
+                                    yield delta_content
+                                except json.JSONDecodeError:
+                                    logging.error(f"DeepSeek: Error decoding JSON from line: {decoded_line}")
                                     continue
-                                if decoded_line.startswith('data: '):
-                                    data_str = decoded_line[len('data: '):]
-                                    if data_str == '[DONE]':
-                                        break
-                                    try:
-                                        data_json = json.loads(data_str)
-                                        delta_content = data_json['choices'][0]['delta'].get('content', '')
-                                        collected_text += delta_content
-                                        yield delta_content
-                                    except json.JSONDecodeError:
-                                        logging.error(f"DeepSeek: Error decoding JSON from line: {decoded_line}")
-                                        continue
-                                    except KeyError as e:
-                                        logging.error(f"DeepSeek: Key error: {str(e)} in line: {decoded_line}")
-                                        continue
-                        yield collected_text
+                                except KeyError as e:
+                                    logging.error(f"DeepSeek: Key error: {str(e)} in line: {decoded_line}")
+                                    continue
+                    yield collected_text
 
-                    return stream_generator()
-                else:
-                    response = requests.post('https://api.deepseek.com/chat/completions', headers=headers, json=payload, timeout=30)
-                    logging.debug(f"DeepSeek: Full API response: {response.status_code} - {response.text}")
-
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        logging.debug(f"DeepSeek: Response JSON: {json.dumps(response_data, indent=2)}")
-
-                        # Adjust parsing based on actual API response structure
-                        if 'choices' in response_data:
-                            if len(response_data['choices']) > 0:
-                                summary = response_data['choices'][0]['message']['content'].strip()
-                                logging.debug("DeepSeek: Chat request successful")
-                                return summary
-                            else:
-                                logging.error("DeepSeek: 'choices' key is empty in response")
-                        else:
-                            logging.error("DeepSeek: 'choices' key missing in response")
-                        return "DeepSeek: Unexpected response format from API."
-                    elif 500 <= response.status_code < 600:
-                        logging.error(f"DeepSeek: Server error (status code {response.status_code}). Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
-                    else:
-                        logging.error(f"DeepSeek: Request failed with status code {response.status_code}. Response: {response.text}")
-                        return f"DeepSeek: Failed to process chat request. Status code: {response.status_code}"
-
-            except requests.Timeout:
-                logging.error(f"DeepSeek: Request timed out. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
-            except requests.RequestException as e:
-                logging.error(f"DeepSeek: Request exception occurred: {str(e)}. Attempt {attempt} of {max_retries}. Retrying in {retry_delay} seconds...")
-
-            if attempt < max_retries:
-                time.sleep(retry_delay)
+                return stream_generator()
             else:
-                logging.error("DeepSeek: Max retries reached. Failed to get a successful response.")
-                return "DeepSeek: Failed to get a successful response from API after multiple attempts."
+                # Create a session
+                session = requests.Session()
 
+                # Load config values
+                retry_count = loaded_config_data['deepseek_api']['api_retries']
+                retry_delay = loaded_config_data['deepseek_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                response = session.post('https://api.deepseek.com/chat/completions', headers=headers, json=payload, timeout=30)
+                logging.debug(f"DeepSeek: Full API response: {response.status_code} - {response.text}")
+
+                if response.status_code == 200:
+                    response_data = response.json()
+                    logging.debug(f"DeepSeek: Response JSON: {json.dumps(response_data, indent=2)}")
+
+                    # Adjust parsing based on actual API response structure
+                    if 'choices' in response_data:
+                        if len(response_data['choices']) > 0:
+                            summary = response_data['choices'][0]['message']['content'].strip()
+                            logging.debug("DeepSeek: Chat request successful")
+                            return summary
+                        else:
+                            logging.error("DeepSeek: 'choices' key is empty in response")
+                    else:
+                        logging.error("DeepSeek: 'choices' key missing in response")
+                    return "DeepSeek: Unexpected response format from API."
+                elif 500 <= response.status_code < 600:
+                    logging.error(f"DeepSeek: Server error (status code {response.status_code})")
+                else:
+                    logging.error(f"DeepSeek: Request failed with status code {response.status_code}. Response: {response.text}")
+                    return f"DeepSeek: Failed to process chat request. Status code: {response.status_code}"
+
+        except requests.Timeout:
+            logging.error(f"DeepSeek: Request timed out.")
+        except requests.RequestException as e:
+            logging.error(f"DeepSeek: Request exception occurred: {str(e)}.")
     except Exception as e:
         logging.error(f"DeepSeek: Unexpected error in processing: {str(e)}", exc_info=True)
         return f"DeepSeek: Error occurred while processing chat request: {str(e)}"
@@ -1467,8 +1704,28 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
         }
 
         if streaming:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['mistral_api']['api_retries']
+            retry_delay = loaded_config_data['mistral_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Mistral: Posting streaming request")
-            response = requests.post(
+            response = session.post(
                 'https://api.mistral.ai/v1/chat/completions',
                 headers=headers,
                 json=data,
@@ -1510,8 +1767,28 @@ def chat_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, system_
                 # yield collected_text
             return stream_generator()
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['mistral_api']['api_retries']
+            retry_delay = loaded_config_data['mistral_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Mistral: Posting non-streaming request")
-            response = requests.post(
+            response = session.post(
                 'https://api.mistral.ai/v1/chat/completions',
                 headers=headers,
                 json=data
@@ -1669,8 +1946,28 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
         }
 
         if streaming:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['google_api']['api_retries']
+            retry_delay = loaded_config_data['google_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Google: Posting streaming request")
-            response = requests.post(
+            response = session.post(
                 "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
                 headers=headers,
                 json=data,
@@ -1700,8 +1997,28 @@ def chat_with_google(api_key, input_data, custom_prompt_arg, temp=None, system_m
                                 continue
             return stream_generator()
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['google_api']['api_retries']
+            retry_delay = loaded_config_data['google_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Google: Posting request")
-            response = requests.post('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', headers=headers, json=data)
+            response = session.post('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', headers=headers, json=data)
             logging.debug(f"Full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
