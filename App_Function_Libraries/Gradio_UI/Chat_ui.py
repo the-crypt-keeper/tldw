@@ -426,7 +426,7 @@ class LiveChat:
                 audio_np,
                 transcription_provider="faster-whisper",
                 sample_rate=self.sample_rate,
-                whisper_model="distil-large-v3",
+                whisper_model="deepdml/faster-whisper-large-v3-turbo-ct2",
                 speaker_lang="en"
             )
         except Exception as e:
@@ -544,7 +544,7 @@ def stop_live_chat_fn():
 
 # FIXME - Add support for changing transcription provider, whisper model and speaker language
 def record_and_transcribe(duration=5, sample_rate=16000, chunk_size=1024,
-                          transcription_provider="faster-whisper", whisper_model="distil-large-v3", speaker_lang="en"):
+                          transcription_provider="faster-whisper", whisper_model="deepdml/faster-whisper-large-v3-turbo-ct2", speaker_lang="en"):
     """
     Records audio from the microphone for a fixed duration,
     transcribes it, and returns the resulting text.
@@ -648,7 +648,7 @@ class DictationManager:
                 audio_np,
                 transcription_provider="faster-whisper",
                 sample_rate=self.sample_rate,
-                whisper_model="distil-large-v3",
+                whisper_model="deepdml/faster-whisper-large-v3-turbo-ct2",
                 speaker_lang="en"
             )
 
