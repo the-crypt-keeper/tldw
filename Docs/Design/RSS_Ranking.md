@@ -20,6 +20,7 @@ https://arxiv.org/abs/2412.18082
 https://arxiv.org/abs/2502.13131
 https://blog.badsectorlabs.com/files/blogs.txt
 https://arxiv.org/abs/2412.08604
+https://blog.continua.ai/p/making-sense-of-the-digital-deluge
 https://arxiv.org/abs/2411.18814
 https://github.com/fabriziosalmi/UglyFeed
 https://gwern.net/doc/ai/tabular/2009-koren.pdf

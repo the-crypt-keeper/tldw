@@ -893,7 +893,8 @@ def create_chat_interface():
                     )
                     start_dictation_btn = gr.Button("Start Dictation")
                     stop_dictation_btn = gr.Button("Stop Dictation")
-                    submit = gr.Button("Submit")
+
+                submit = gr.Button("Submit")
                 with gr.Row():
                     speak_button = gr.Button("Speak Response")
                     tts_status = gr.Textbox(label="TTS Status", interactive=False)
