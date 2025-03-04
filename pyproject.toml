@@ -85,6 +85,10 @@ web_research = [
   "playwright",
   "trafilatura"
 ]
+audio_recording_windows = [
+  'PyAudioWPatch',
+  "placeholder',"
+]
 STT_All = [
   "placeholder",
   "blah"

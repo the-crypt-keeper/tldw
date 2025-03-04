@@ -20,6 +20,7 @@ https://github.com/prakharsr/audiobook-creator
 https://github.com/smy20011/MorningRadio
 https://github.com/aedocw/epub2tts
 https://github.com/plusuncold/autiobooks
-
+https://claudio.uk/posts/audiblez-v4.html
+https://github.com/dbamman/litbank
 
 

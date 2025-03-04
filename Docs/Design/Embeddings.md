@@ -12,7 +12,7 @@ https://huggingface.co/BAAI/bge-m3
 https://medium.com/@sarayavalasaravikiran/optimizing-rag-with-embedding-tuning-2508af2ec049
 https://huggingface.co/iamgroot42/rover_nexus
 https://shawhin.medium.com/fine-tuning-text-embeddings-f913b882b11c
-
+https://maartengr.github.io/BERTopic/index.html
 
 
 

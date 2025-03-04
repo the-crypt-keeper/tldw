@@ -24,6 +24,13 @@ https://research.google/blog/speculative-rag-enhancing-retrieval-augmented-gener
 https://arxiv.org/abs/2502.01142
 https://medium.com/towards-data-science/how-to-create-a-rag-evaluation-dataset-from-documents-140daa3cbe71
 https://arxiv.org/abs/2401.15884
+
+https://github.com/Lokesh-Chimakurthi/vision-rag
+
+https://github.com/tjmlabs/ColiVara
+
+https://huggingface.co/vidore/colqwen2-v0.1
+https://colivara.com/
 https://github.com/integral-business-intelligence/chroma-auditor?tab=readme-ov-file
 https://huggingface.co/papers/2502.00306
 https://pub.towardsai.net/multimodal-rag-unveiled-a-deep-dive-into-cutting-edge-advancements-0eeb514c3ac4
@@ -48,6 +55,10 @@ https://hub.athina.ai/p/34eedbf5-4db2-4c88-84a4-7a192fd5b0ed/
 https://cobusgreyling.medium.com/four-levels-of-rag-research-from-microsoft-fdc54388f0ff
 https://arxiv.org/html/2412.00239v1
 https://arxiv.org/abs/2412.02830
+https://arxiv.org/abs/2502.20964
+https://softwaredoug.com/blog/2025/02/08/elasticsearch-hybrid-search
+https://arxiv.org/abs/2502.20995
+https://lascari.ai/writing/2025/02/10/image-gen-tagging/
 https://arxiv.org/pdf/2410.04790v1
 https://arxiv.org/html/2412.02035v1
 https://towardsdatascience.com/dragin-dynamic-retrieval-augmented-generation-based-on-the-information-needs-of-large-language-dbdb9aabc1ef
