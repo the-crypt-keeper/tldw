@@ -37,7 +37,10 @@ def mock_db():
             content TEXT,
             author TEXT,
             ingestion_date TEXT,
-            transcription_model TEXT
+            transcription_model TEXT,
+            chunking_status TEXT DEFAULT 'pending',
+            vector_processing INTEGER DEFAULT 0,
+            content_hash TEXT UNIQUE
         )
     ''')
     cursor.execute('''
@@ -77,6 +80,9 @@ def mock_db():
         )
     ''')
     cursor.execute('''
+        CREATE UNIQUE INDEX idx_media_content_hash ON Media(content_hash)
+    ''')
+    cursor.execute('''
         CREATE VIRTUAL TABLE media_fts USING fts5(title, content)
     ''')
     cursor.execute('''
@@ -90,11 +96,16 @@ def mock_db():
     conn.close()
 
 
+# @pytest.fixture
+# def mock_get_connection(mock_db):
+#     with patch('App_Function_Libraries.DB.SQLite_DB.db.get_connection') as mock:
+#         mock.return_value = mock_db
+#         yield mock
 @pytest.fixture
 def mock_get_connection(mock_db):
-    with patch('App_Function_Libraries.DB.SQLite_DB.db.get_connection') as mock:
-        mock.return_value = mock_db
-        yield mock
+    with patch('App_Function_Libraries.DB.SQLite_DB.Database.get_connection') as mock_method:
+        mock_method.return_value = mock_db
+        yield mock_method
 
 
 # Modify this test to handle both success and failure cases
@@ -115,7 +126,8 @@ def test_add_media_with_keywords_success(mock_get_connection):
     assert isinstance(result, tuple) or isinstance(result, str)
     if isinstance(result, tuple):
         assert isinstance(result[0], int)  # media_id
-        assert "added/updated successfully" in result[1]
+        # Check for the correct success message substring
+        assert "added with URL" in result[1]
     else:
         assert "Error" in result
 
@@ -152,7 +164,8 @@ def test_ingest_article_to_db_success(mock_get_connection):
     assert isinstance(result, tuple) or isinstance(result, str)
     if isinstance(result, tuple):
         assert isinstance(result[0], int)  # media_id
-        assert "added/updated successfully" in result[1]
+        # Check for the correct success message substring
+        assert "added with URL" in result[1]
     else:
         assert "Error" not in result
 
@@ -242,6 +255,7 @@ def test_export_keywords_to_csv(mock_get_connection):
 
 # Tests for fetch_keywords_for_media
 def test_fetch_keywords_for_media(mock_get_connection):
+    # Ensure overwrite=True to add keywords even if media exists
     media_id, _ = add_media_with_keywords(
         url="http://example.com",
         title="Test Article",
@@ -252,7 +266,8 @@ def test_fetch_keywords_for_media(mock_get_connection):
         summary="Test summary",
         transcription_model=None,
         author="Test Author",
-        ingestion_date="2023-06-01"
+        ingestion_date="2023-06-01",
+        overwrite=True  # Add overwrite parameter if available in the function
     )
     keywords = fetch_keywords_for_media(media_id)
     assert "test" in keywords

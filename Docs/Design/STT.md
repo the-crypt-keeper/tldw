@@ -6,6 +6,13 @@ Switch to mobiusLabs model: https://github.com/SYSTRAN/faster-whisper/issues/103
 https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo
 https://huggingface.co/spaces/hf-audio/open_asr_leaderboard
 
+Benchmark
+    https://github.com/dnhkng/GLaDOS/blob/main/src/glados/ASR/asr.py
+    https://github.com/SYSTRAN/faster-whisper/blob/master/tests/test_transcribe.py
+
+
+API
+    https://github.com/heimoshuiyu/whisper-fastapi
 
 
 Review potential use of quantized STT Models:
@@ -67,3 +74,8 @@ STT
         https://github.com/usefulsensors/moonshine
         https://github.com/huggingface/transformers.js-examples/tree/main/moonshine-web
         https://huggingface.co/onnx-community/moonshine-base-ONNX
+    https://github.com/FreedomIntelligence/Soundwave
+        https://arxiv.org/abs/2502.12900
+https://github.com/psdwizzard/MeetingBuddy
+
+

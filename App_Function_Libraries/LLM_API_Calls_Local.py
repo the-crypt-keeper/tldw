@@ -6,6 +6,9 @@
 ####
 from typing import Union, Any, Generator
 
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
+
 ####################
 # Function List
 # FIXME - UPDATE
@@ -157,7 +160,7 @@ def chat_with_local_llm(input_data, custom_prompt_arg, temp, system_message=None
             print("Local LLM: Failed to process Chat response:", response.text)
             return f"Local LLM: Failed to process Chat response, status code {response.status_code}"
     except Exception as e:
-        logging.debug("Local LLM: Error in processing: %s", str(e))
+        logging.debug(f"Local LLM: Error in processing: {str(e)}")
         print("Error occurred while processing Chat request with Local LLM:", str(e))
         return f"Local LLM: Error occurred while processing Chat response: {str(e)}"
 
@@ -280,7 +283,28 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
         local_api_timeout = int(local_api_timeout)
         logging.debug(f"llama.cpp: Submitting request to API endpoint with a timeout of {local_api_timeout} seconds")
 
-        response = requests.post(api_url, headers=headers, json=data, stream=streaming, timeout=local_api_timeout)
+        # Create a session
+        session = requests.Session()
+
+        # Load config values
+        retry_count = loaded_config_data['llama_api']['api_retries']
+        retry_delay = loaded_config_data['llama_api']['api_retry_delay']
+
+        # Configure the retry strategy
+        retry_strategy = Retry(
+            total=retry_count,  # Total number of retries
+            backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+            status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+        )
+
+        # Create the adapter
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+
+        # Mount adapters for both HTTP and HTTPS
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+
+        response = session.post(api_url, headers=headers, json=data, stream=streaming, timeout=local_api_timeout)
         logging.debug(f"Llama.cpp: API Response Data: {response}")
         if response.status_code == 200:
             if streaming:
@@ -307,7 +331,7 @@ def chat_with_llama(input_data, custom_prompt, temp, api_url=None, api_key=None,
                 return stream_generator()
             else:
                 response_data = response.json()
-                logging.debug("API Response Data: %s", response_data)
+                logging.debug(f"API Response Data: {response_data}")
 
                 if response.status_code == 200:
                     # if 'X' in response_data:
@@ -446,7 +470,27 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                 # Send the request with streaming enabled
                 # Get the Streaming API IP from the config
                 kobold_openai_api_IP = loaded_config_data['kobold_api']['api_streaming_ip']
-                response = requests.post(
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['kobold_api']['api_retries']
+                retry_delay = loaded_config_data['kobold_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                response = session.post(
                     kobold_openai_api_IP, headers=headers, json=data, stream=True, timeout=local_api_timeout
                 )
                 logging.debug(
@@ -460,7 +504,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                         if line:
                             decoded_line = line.decode('utf-8')
                             logging.debug(
-                                "Kobold: Received streamed data: %s", decoded_line
+                                "fKobold: Received streamed data: {decoded_line}"
                             )
                             # OpenAI API streams data prefixed with 'data: '
                             if decoded_line.startswith('data: '):
@@ -480,21 +524,41 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                                         )
                                 except json.JSONDecodeError as e:
                                     logging.error(
-                                        "Kobold: Error decoding streamed JSON: %s", str(e)
+                                        f"Kobold: Error decoding streamed JSON: {str(e)}"
                                     )
                             else:
-                                logging.debug("Kobold: Ignoring line: %s", decoded_line)
+                                logging.debug(f"Kobold: Ignoring line: {decoded_line}")
                 else:
                     logging.error(
                         f"Kobold: API request failed with status code {response.status_code}: {response.text}"
                     )
                     yield f"Kobold: API request failed: {response.text}"
             except Exception as e:
-                logging.error("Kobold: Error in processing: %s", str(e))
+                logging.error(f"Kobold: Error in processing: {str(e)}")
                 yield f"Kobold: Error occurred while processing summary with Kobold: {str(e)}"
         else:
             try:
-                response = requests.post(
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['kobold_api']['api_retries']
+                retry_delay = loaded_config_data['kobold_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                response = session.post(
                     kobold_api_ip, headers=headers, json=data, timeout=local_api_timeout
                 )
                 logging.debug(
@@ -508,7 +572,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                 if response.status_code == 200:
                     try:
                         response_data = response.json()
-                        logging.debug("Kobold: API Response Data: %s", response_data)
+                        logging.debug(f"Kobold: API Response Data: {response_data}")
 
                         # Debugging: Print the parsed response data
                         logging.debug(f"Parsed Response Data: {response_data}")
@@ -528,7 +592,7 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                             return "Expected data not found in API response."
                     except ValueError as e:
                         logging.error(
-                            "Kobold: Error parsing JSON response: %s", str(e)
+                            f"Kobold: Error parsing JSON response: {str(e)}"
                         )
                         yield f"Error parsing JSON response: {str(e)}"
                         return
@@ -539,11 +603,11 @@ def chat_with_kobold(input_data, api_key, custom_prompt_input, temp=None, system
                     yield f"Kobold: API request failed: {response.text}"
                     return
             except Exception as e:
-                logging.error("kobold: Error in processing: %s", str(e))
+                logging.error(f"kobold: Error in processing: {str(e)}")
                 yield f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
                 return
     except Exception as e:
-        logging.error("kobold: Error in processing: %s", str(e))
+        logging.error(f"kobold: Error in processing: {str(e)}")
         return f"kobold: Error occurred while processing chat response with kobold: {str(e)}"
 
 
@@ -644,7 +708,27 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, system_prompt=None, 
         # If the user has set streaming to True:
         if streaming:
             logging.debug("Oobabooga chat: Streaming mode enabled")
-            response = requests.post(api_url, headers=headers, json=data, stream=True, timeout=local_api_timeout)
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['ooba_api']['api_retries']
+            retry_delay = loaded_config_data['ooba_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(api_url, headers=headers, json=data, stream=True, timeout=local_api_timeout)
             response.raise_for_status()
             try:
                 def stream_generator():
@@ -673,8 +757,28 @@ def chat_with_oobabooga(input_data, api_key, custom_prompt, system_prompt=None, 
                 logging.error(f"Error streaming summary with Oobabooga: {e}")
                 return f"Error summarizing with Oobabooga: {str(e)}"
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['ooba_api']['api_retries']
+            retry_delay = loaded_config_data['ooba_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Oobabooga Chat: Posting request (non-streaming)")
-            response = requests.post(api_url, headers=headers, json=data, timeout=local_api_timeout)
+            response = session.post(api_url, headers=headers, json=data, timeout=local_api_timeout)
 
             if response.status_code == 200:
                 response_data = response.json()
@@ -831,7 +935,27 @@ def chat_with_tabbyapi(
         if streaming:
             logging.debug("TabbyAPI: Streaming mode enabled for chat request")
             try:
-                response = requests.post(tabby_api_ip, headers=headers, json=data2, stream=True, timeout=local_api_timeout)
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['tabby_api']['api_retries']
+                retry_delay = loaded_config_data['tabby_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                response = session.post(tabby_api_ip, headers=headers, json=data2, stream=True, timeout=local_api_timeout)
                 response.raise_for_status()
                 # Process the streamed response
                 for line in response.iter_lines():
@@ -860,7 +984,27 @@ def chat_with_tabbyapi(
                 yield f"TabbyAPI: Unexpected error in making chat request: {str(e)}"
         else:
             try:
-                response = requests.post(tabby_api_ip, headers=headers, json=data2, timeout=local_api_timeout)
+                # Create a session
+                session = requests.Session()
+
+                # Load config values
+                retry_count = loaded_config_data['tabby_api']['api_retries']
+                retry_delay = loaded_config_data['tabby_api']['api_retry_delay']
+
+                # Configure the retry strategy
+                retry_strategy = Retry(
+                    total=retry_count,  # Total number of retries
+                    backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                    status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+                )
+
+                # Create the adapter
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+
+                # Mount adapters for both HTTP and HTTPS
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+                response = session.post(tabby_api_ip, headers=headers, json=data2, timeout=local_api_timeout)
                 response.raise_for_status()
                 response_json = response.json()
 
@@ -1008,8 +1152,28 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt, temp=None, system_me
         local_api_timeout = loaded_config_data['local_llm']['api_timeout']
 
         if streaming:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['aphrodite_api']['api_retries']
+            retry_delay = loaded_config_data['aphrodite_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Aphrodite Chat: Posting request (streaming")
-            response = requests.post(
+            response = session.post(
                 'https://api.openai.com/v1/chat/completions',
                 headers=headers,
                 json=data,
@@ -1042,8 +1206,28 @@ def chat_with_aphrodite(api_key, input_data, custom_prompt, temp=None, system_me
 
             return stream_generator()
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['aphrodite_api']['api_retries']
+            retry_delay = loaded_config_data['aphrodite_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Aphrodite Chat: Posting request (non-streaming")
-            response = requests.post(url, headers=headers, json=data, timeout=local_api_timeout)
+            response = session.post(url, headers=headers, json=data, timeout=local_api_timeout)
             logging.debug(f"Full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
@@ -1174,32 +1358,42 @@ def chat_with_ollama(input_data, custom_prompt, api_url=None, api_key=None,
         # ----------------------------------------------------------------
         # 5. Perform the request with optional retries
         # ----------------------------------------------------------------
-        for attempt in range(1, max_retries + 1):
-            try:
-                logging.debug(f"Ollama: Sending POST to {api_url}, attempt {attempt}/{max_retries}")
-                response = requests.post(
-                    api_url,
-                    headers=headers,
-                    json=data_payload,
-                    stream=streaming,
-                    timeout=local_api_timeout
-                )
-                response.raise_for_status()  # Raise on 4xx/5xx
+        try:
+            # Create a session
+            session = requests.Session()
 
-            except requests.exceptions.Timeout:
-                logging.error(f"Ollama: Request timed out (attempt {attempt}).")
-                if attempt < max_retries:
-                    time.sleep(retry_delay)
-                    continue
-                return "Ollama: Request timed out."
-            except requests.exceptions.RequestException as req_err:
-                logging.error(f"Ollama: HTTP error (attempt {attempt}): {req_err}")
-                if attempt < max_retries:
-                    time.sleep(retry_delay)
-                    continue
-                return f"Ollama: HTTP error: {str(req_err)}"
-            # If we got here, we have a valid 200 response. Break out of retry loop.
-            break
+            # Load config values
+            retry_count = loaded_config_data['ollama_api']['api_retries']
+            retry_delay = loaded_config_data['ollama_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            logging.debug(f"Ollama: Sending POST to {api_url}")
+            response = requests.post(
+                api_url,
+                headers=headers,
+                json=data_payload,
+                stream=streaming,
+                timeout=local_api_timeout
+            )
+            response.raise_for_status()  # Raise on 4xx/5xx
+
+        except requests.exceptions.Timeout:
+            logging.error(f"Ollama: Request timed out.")
+        except requests.exceptions.RequestException as req_err:
+            logging.error(f"Ollama: HTTP error: {req_err}")
+            return f"Ollama: HTTP error: {str(req_err)}"
 
         # ----------------------------------------------------------------
         # 6. Handle streaming vs. non-streaming
@@ -1395,8 +1589,28 @@ def chat_with_vllm(
         local_api_timeout = loaded_config_data['local_llm']['api_timeout']
 
         if streaming:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['vllm_api']['api_retries']
+            retry_delay = loaded_config_data['vllm_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("OpenAI: Posting request (streaming")
-            response = requests.post(
+            response = session.post(
                 url=vllm_api_url,
                 headers=headers,
                 json=payload,
@@ -1428,8 +1642,28 @@ def chat_with_vllm(
 
             return stream_generator()
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['vllm_api']['api_retries']
+            retry_delay = loaded_config_data['vllm_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("vLLM: Posting request (non-streaming")
-            response = requests.post(vllm_api_url, headers=headers, json=payload, timeout=local_api_timeout)
+            response = session.post(vllm_api_url, headers=headers, json=payload, timeout=local_api_timeout)
             logging.debug(f"Full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
@@ -1555,7 +1789,27 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
         # FIXME: Implement API Retry value
 
         if streaming:
-            response = requests.post(
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['custom_openai_api']['api_retries']
+            retry_delay = loaded_config_data['custom_openai_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(
                 custom_openai_api_url,
                 headers=headers,
                 json=data,
@@ -1588,9 +1842,28 @@ def chat_with_custom_openai(api_key, input_data, custom_prompt_arg, temp=None, s
                 yield collected_messages
             return stream_generator()
         else:
-            local_api_timeout = loaded_config_data['local_llm']['api_timeout']
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['custom_openai_api']['api_retries']
+            retry_delay = loaded_config_data['custom_openai_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Custom OpenAI API: Posting request")
-            response = requests.post(custom_openai_api_url, headers=headers, json=data, timeout=local_api_timeout)
+            response = session.post(custom_openai_api_url, headers=headers, json=data, timeout=local_api_timeout)
             logging.debug(f"Custom OpenAI API full API response data: {response}")
             if response.status_code == 200:
                 response_data = response.json()
@@ -1712,7 +1985,27 @@ def chat_with_custom_openai_2(api_key, input_data, custom_prompt_arg, temp=None,
         }
 
         if streaming:
-            response = requests.post(
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['custom_openai_2_api']['api_retries']
+            retry_delay = loaded_config_data['custom_openai_2_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+            response = session.post(
                 custom_openai_api_url,
                 headers=headers,
                 json=data,
@@ -1743,6 +2036,26 @@ def chat_with_custom_openai_2(api_key, input_data, custom_prompt_arg, temp=None,
                 yield collected_messages
             return stream_generator()
         else:
+            # Create a session
+            session = requests.Session()
+
+            # Load config values
+            retry_count = loaded_config_data['custom_openai_2_api']['api_retries']
+            retry_delay = loaded_config_data['custom_openai_2_api']['api_retry_delay']
+
+            # Configure the retry strategy
+            retry_strategy = Retry(
+                total=retry_count,  # Total number of retries
+                backoff_factor=retry_delay,  # A delay factor (exponential backoff)
+                status_forcelist=[429, 502, 503, 504],  # Status codes to retry on
+            )
+
+            # Create the adapter
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+
+            # Mount adapters for both HTTP and HTTPS
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
             logging.debug("Custom OpenAI API-2: Posting request")
             response = requests.post(custom_openai_api_url, headers=headers, json=data)
             logging.debug(f"Custom OpenAI API-2 full API response data: {response}")

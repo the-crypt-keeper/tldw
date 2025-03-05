@@ -44,7 +44,6 @@ from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 
 MAX_FILE_SIZE = 500 * 1024 * 1024
 
-
 def download_audio_file(url, current_whisper_model="", use_cookies=False, cookies=None):
     try:
         # Check if media already exists in the database and compare whisper models
@@ -108,8 +107,18 @@ def download_audio_file(url, current_whisper_model="", use_cookies=False, cookie
 def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_key, use_cookies, cookies, keep_original,
                         custom_keywords, custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap,
                         use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize,
-                        keep_timestamps, custom_title):
+                        keep_timestamps, custom_title, record_system_audio, recording_duration,
+                        system_audio_device, consent):
 
+    # Add validation at the start of the function
+    if record_system_audio:
+        if not consent:
+            raise ValueError("You must confirm you have consent to record audio")
+        if not system_audio_device:
+            raise ValueError("Please select an audio output device to record from")
+
+    # Add recording logic before processing files
+    recorded_files = []
     start_time = time.time()  # Start time for processing
     processed_count = 0
     failed_count = 0
@@ -118,6 +127,25 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
     all_summaries = []
     temp_files = []  # Keep track of temporary files
 
+    if record_system_audio:
+        try:
+            # Extract device ID from the selected device string
+            device_id = int(system_audio_device.split(":")[0])
+            recorded_file = record_system_audio(
+                duration=recording_duration,
+                device_id=device_id
+            )
+            recorded_files.append(recorded_file)
+            temp_files.append(recorded_file)
+        except Exception as e:
+            return print(f"Recording failed: {str(e)}"), "", ""
+
+    # Process recorded files along with others
+    if recorded_files:
+        if not isinstance(audio_files, list):
+            audio_files = []
+        audio_files.extend(recorded_files)
+
     def format_transcription_with_timestamps(segments):
         if keep_timestamps:
             formatted_segments = []
@@ -125,9 +153,20 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
                 start = segment.get('Time_Start', 0)
                 end = segment.get('Time_End', 0)
                 text = segment.get('Text', '').strip()
-                start_time = time.strftime('%H:%M:%S', time.gmtime(start))
-                end_time = time.strftime('%H:%M:%S', time.gmtime(end))
-                formatted_segments.append(f"[{start_time}-{end_time}] {text}")
+
+                # Check if start and end are already formatted strings
+                if isinstance(start, str) and ':' in start:
+                    # Already in HH:MM:SS format, use directly
+                    formatted_segments.append(f"[{start}-{end}] {text}")
+                else:
+                    # Numeric seconds, convert to time format
+                    try:
+                        start_time1 = time.strftime('%H:%M:%S', time.gmtime(float(start)))
+                        end_time = time.strftime('%H:%M:%S', time.gmtime(float(end)))
+                        formatted_segments.append(f"[{start_time1}-{end_time}] {text}")
+                    except (ValueError, TypeError):
+                        # Fallback if conversion fails
+                        formatted_segments.append(f"[{start}-{end}] {text}")
 
             # Join the segments with a newline to ensure proper formatting
             return "\n".join(formatted_segments)
@@ -140,13 +179,21 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
         return "\n".join(progress)
 
     def cleanup_files():
-        for file in temp_files:
-            try:
-                if os.path.exists(file):
-                    os.remove(file)
-                    update_progress(f"Temporary file {file} removed.")
-            except Exception as e:
-                update_progress(f"Failed to remove temporary file {file}: {str(e)}")
+        if not keep_original:
+            for file in temp_files:
+                try:
+                    if os.path.exists(file):
+                        os.remove(file)
+                        update_progress(f"Temporary file {file} removed.")
+                except Exception as e:
+                    update_progress(f"Failed to remove temporary file {file}: {str(e)}")
+            # Also clean recorded files
+            for file in recorded_files:
+                try:
+                    if os.path.exists(file):
+                        os.remove(file)
+                except:
+                    pass
 
     def reencode_mp3(mp3_file_path):
         try:
@@ -377,7 +424,7 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
         return update_progress(f"Processing failed: {str(e)}"), "No transcriptions available", "No summaries available"
 
 
-def format_transcription_with_timestamps(segments, keep_timestamps):
+def format_transcription_with_timestamps(segments, keep_timestamps=True):
     """
     Formats the transcription segments with or without timestamps.
 
@@ -395,9 +442,24 @@ def format_transcription_with_timestamps(segments, keep_timestamps):
             end = segment.get('Time_End', 0)
             text = segment.get('Text', '').strip()
 
+            # Check if start and end are already formatted strings
+            if isinstance(start, str) and ':' in start:
+                # Already in HH:MM:SS format, use directly
+                formatted_segments.append(f"[{start}-{end}] {text}")
+            else:
+                # Numeric seconds, convert to time format
+                try:
+                    start_time = time.strftime('%H:%M:%S', time.gmtime(float(start)))
+                    end_time = time.strftime('%H:%M:%S', time.gmtime(float(end)))
+                    formatted_segments.append(f"[{start_time}-{end_time}] {text}")
+                except (ValueError, TypeError):
+                    # Fallback if conversion fails
+                    formatted_segments.append(f"[{start}-{end}] {text}")
+            # Join the segments with a newline to ensure proper formatting
             formatted_segments.append(f"[{start:.2f}-{end:.2f}] {text}")
         return "\n".join(formatted_segments)
     else:
+        # Join the text without timestamps
         return "\n".join([segment.get('Text', '').strip() for segment in segments])
 
 

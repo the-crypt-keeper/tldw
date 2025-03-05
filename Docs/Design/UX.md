@@ -56,6 +56,7 @@ Website:
 
 https://github.com/sshh12/spark-stack
 https://github.com/abi/screenshot-to-
+https://data.perkins.org/
 https://designdetails.fm/episodes
 https://copycoder.ai/
 https://docs.replit.com/replitai/agent
@@ -68,7 +69,7 @@ https://trends.uxdesign.cc/
 https://bolters.io/
 https://github.com/abhishekkrthakur/aiaio
 https://www.phind.com/blog/phind-2-model-creation
-
+https://www.iamtamara.design/blog/designing-for-deaf-users
 https://github.com/Cloud-Code-AI/AkiraDocs
 https://ui.shadcn.com/docs
 https://www.typingmind.com/
@@ -79,6 +80,7 @@ https://uxdesign.cc/a-good-design-is-a-good-essay-197f4bd31c92
 https://github.com/Rugz007/liha
 https://astro.new/latest/
 https://github.com/AnswerDotAI/fasthtml
+https://medium.com/sadasant/god-mode-ux-why-your-next-interface-will-look-more-like-starcraft-than-slack-12498eb274d4
 https://github.com/lobehub/lobe-chat
 https://www.scoutos.com/
 https://github.com/FishiaT/yawullm

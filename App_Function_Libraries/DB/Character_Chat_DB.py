@@ -377,14 +377,14 @@ def get_character_cards() -> List[Dict]:
                     try:
                         data = json.loads(data)
                     except Exception as e:
-                        logging.error("Error parsing card 'data' as JSON: %s", e)
+                        logging.error(f"Error parsing card 'data' as JSON: {e}")
                         continue
 
                 # Extract 'name' and 'description' from the card's data.
                 name = data.get('name', 'Unnamed')
                 description = data.get('description', 'No description provided.')
                 # Log the name and the first 50 characters of the description.
-                logging.info("Card: %s - %s", name, description[:50])
+                logging.info("Card: {name} - {description[:50]}")
             else:
                 logging.warning("Card record missing 'data' field.")
 

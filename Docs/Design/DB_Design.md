@@ -11,6 +11,8 @@
 SQLite
     https://highperformancesqlite.com/watch/dot-commands
     https://www.youtube.com/watch?v=XP-h304N06I
+    https://rivet.gg/blog/2025-02-16-sqlite-on-the-server-is-misunderstood
+    https://vlcn.io/docs/cr-sqlite/intro
 
 Migrating to sqlite-vec
     https://www.youtube.com/live/xmdiwdom6Vk?t=1740s

@@ -36,6 +36,8 @@ https://github.com/lechmazur/generalization
 https://docs.ragas.io/en/stable/getstarted/rag_eval/
 https://github.com/plurch/ir_evaluation
 https://github.com/OpenBMB/UltraEval-Audio
+https://huggingface.co/papers/2502.06329
+https://arxiv.org/abs/2502.05167
 https://alibaba-nlp.github.io/WebWalker/
 https://arxiv.org/abs/2501.03491
 https://machinelearningmastery.com/rag-hallucination-detection-techniques
@@ -59,6 +61,10 @@ https://huggingface.co/DevQuasar/allenai.Llama-3.1-Tulu-3-8B-SFT-no-safety-data-
 https://huggingface.co/CohereForAI/c4ai-command-r7b-12-2024
 https://arxiv.org/html/2412.09569v1
 https://huggingface.co/tiiuae
+https://github.com/Imbernoulli/SURGE
+https://dxzxy12138.github.io/PhysReason
+https://paperswithcode.com/paper/nolima-long-context-evaluation-beyond-literal
+https://arxiv.org/abs/2502.09083
 https://ai.gopubby.com/rag-evaluation-a-visual-approach-c9af26006ef5
 https://huggingface.co/datasets/bytedance-research/ToolHop
 https://github.com/naver/bergen?tab=readme-ov-file

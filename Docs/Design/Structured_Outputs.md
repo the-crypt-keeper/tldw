@@ -1,12 +1,12 @@
 # Structured Outputs
 
-
+https://github.com/ggml-org/llama.cpp/blob/master/grammars/README.md
 https://towardsdatascience.com/diving-deeper-with-structured-outputs-b4a5d280c208
 https://generativeai.pub/building-multi-agent-llm-systems-with-pydanticai-framework-a-step-by-step-guide-to-create-ai-5e41fbba2608
 https://github.com/openai/openai-structured-outputs-samples
 https://github.com/BoundaryML/baml
 https://github.com/jcrist/msgspec
-
+https://arxiv.org/abs/2502.14905
 
 ## Introduction
 This page serves as documentation regarding the structured outputs within tldw and provides context/justification for the decisions made within the module.

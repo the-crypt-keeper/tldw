@@ -16,9 +16,12 @@ https://github.com/souzatharsis/podcastfy
 https://github.com/agituts/gemini-2-podcast
 https://github.com/meta-llama/llama-recipes/tree/main/recipes%2Fquickstart%2FNotebookLlama
 https://github.com/JarodMica/audiobook_maker
+https://github.com/prakharsr/audiobook-creator
 https://github.com/smy20011/MorningRadio
 https://github.com/aedocw/epub2tts
 https://github.com/plusuncold/autiobooks
-
+https://claudio.uk/posts/audiblez-v4.html
+https://github.com/dbamman/litbank
+https://github.com/prakharsr/audiobook-creator/
 
 

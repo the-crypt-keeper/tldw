@@ -35,6 +35,8 @@ import numpy as np
 import torch
 from scipy.io import wavfile
 from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
+import sounddevice as sd
+import wave
 #
 # Import Local
 from App_Function_Libraries.Utils.Utils import sanitize_filename, load_and_log_configs, logging
@@ -72,6 +74,225 @@ from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histo
 # 3. Use subprocess instead of os.system for ffmpeg
 # 4. Adjust CPU threads properly
 # 5. Use quantized models - compute_type="int8"
+
+#####################################
+# Memory-Saving Indefinite Recording
+#####################################
+
+class PartialTranscriptionThread(threading.Thread):
+    def __init__(
+        self,
+        audio_queue: queue.Queue,
+        stop_event: threading.Event,
+        partial_text_state: dict,
+        lock: threading.Lock,
+        live_model: str,          # model for partial
+        sample_rate=44100,
+        channels=2,
+        partial_update_interval=2.0,   # how often we attempt a partial transcription
+        partial_chunk_seconds=5,
+    ):
+        super().__init__(daemon=True)
+        self.audio_queue = audio_queue
+        self.stop_event = stop_event
+        self.partial_text_state = partial_text_state
+        self.lock = lock
+        self.live_model = live_model
+
+        self.sample_rate = sample_rate
+        self.channels = channels
+        self.partial_update_interval = partial_update_interval
+        self.partial_chunk_seconds = partial_chunk_seconds
+
+        # Rolling buffer for partial
+        self.audio_buffer = b""
+        # We only keep last X seconds in memory for partial
+        self.max_partial_bytes = int(self.partial_chunk_seconds * self.sample_rate * self.channels * 2)
+
+        self.last_ts = time.time()
+
+        # Keep track of any exceptions
+        self.exception_encountered = None
+
+    def run(self):
+        while not self.stop_event.is_set():
+            now = time.time()
+            if now - self.last_ts < self.partial_update_interval:
+                time.sleep(0.1)
+                continue
+
+            # Gather new chunks from the queue
+            new_data = []
+            while not self.audio_queue.empty():
+                chunk = self.audio_queue.get_nowait()
+                new_data.append(chunk)
+
+            if new_data:
+                combined_new_data = b"".join(new_data)
+                # Append to rolling buffer
+                self.audio_buffer += combined_new_data
+
+                # Enforce maximum partial buffer size
+                if len(self.audio_buffer) > self.max_partial_bytes:
+                    self.audio_buffer = self.audio_buffer[-self.max_partial_bytes:]
+
+            # If rolling buffer is large enough, do partial transcription
+            if len(self.audio_buffer) > (self.sample_rate * self.channels * 2):  # ~1s
+                try:
+                    # Convert from 16-bit PCM to float32
+                    audio_np = np.frombuffer(self.audio_buffer, dtype=np.int16).astype(np.float32) / 32768.0
+
+                    # If channels=2, you may want to downmix to mono:
+                    # If your STT supports stereo, skip this step.
+                    if self.channels == 2:
+                        audio_np = audio_np.reshape((-1, 2))
+                        audio_np = np.mean(audio_np, axis=1)  # simple stereo -> mono
+
+                    # FIXME - Add support for multiple languages/whisper models
+                    partial_text = transcribe_audio(
+                        audio_np,
+                        sample_rate=self.sample_rate,
+                        whisper_model=self.live_model,
+                        speaker_lang="en",
+                        transcription_provider="faster-whisper"
+                    )
+
+                    with self.lock:
+                        self.partial_text_state["text"] = partial_text
+                except Exception as e:
+                    self.exception_encountered = e
+                    logging.error(f"Partial transcription error: {e}")
+
+            self.last_ts = time.time()
+
+
+def record_audio_to_disk(device_id, output_file_path, stop_event, audio_queue):
+    """
+    Thread function that:
+    - Opens PyAudio with (44.1kHz, 2ch).
+    - Reads data in a loop, writes directly to disk, and also puts chunk into `audio_queue`.
+    - We store minimal data in RAM since each chunk is appended to file.
+    """
+    p = pyaudio.PyAudio()
+    CHUNK = 1024
+    FORMAT = pyaudio.paInt16
+    CHANNELS = 2
+    RATE = 44100
+
+    try:
+        # Validate device ID
+        device_count = p.get_device_count()
+        if device_id is None or device_id < 0 or device_id >= device_count:
+            err_msg = f"Invalid device ID: {device_id}. Valid range is 0-{device_count - 1}"
+            logging.error(err_msg)
+            raise ValueError(err_msg)
+
+        # Check device capabilities
+        device_info = p.get_device_info_by_index(device_id)
+        logging.info(f"Using device: {device_info['name']}")
+
+        if device_info['maxInputChannels'] < 1:
+            err_msg = f"Device {device_id} ({device_info['name']}) doesn't support audio input"
+            logging.error(err_msg)
+            raise ValueError(err_msg)
+
+        # Adjust channels to device capability
+        actual_channels = min(CHANNELS, int(device_info['maxInputChannels']))
+        if actual_channels != CHANNELS:
+            logging.info(f"Adjusted channels from {CHANNELS} to {actual_channels} for device limitations")
+
+        # Open audio stream
+        stream = p.open(
+            format=FORMAT,
+            channels=actual_channels,
+            rate=RATE,
+            input=True,
+            input_device_index=device_id,
+            frames_per_buffer=CHUNK
+        )
+
+        # Open the WAV for writing
+        wf = wave.open(output_file_path, 'wb')
+        wf.setnchannels(actual_channels)
+        wf.setsampwidth(2)  # 16-bit
+        wf.setframerate(RATE)
+
+        while not stop_event.is_set():
+            try:
+                data = stream.read(CHUNK, exception_on_overflow=False)
+                # write to disk
+                wf.writeframes(data)
+                # also push to queue for partial
+                audio_queue.put(data)
+            except Exception as e:
+                logging.error(f"Recording error: {e}")
+                break
+
+    except Exception as e:
+        # Enhanced error messages for common issues
+        if "9999" in str(e):
+            logging.error(f"Device {device_id} is likely in use by another application")
+        elif "Invalid sample rate" in str(e):
+            logging.error(f"Device {device_id} doesn't support {RATE}Hz sample rate")
+        else:
+            logging.error(f"Error with device {device_id}: {e}")
+        raise
+
+    finally:
+        # Ensure proper cleanup even if errors occur
+        if 'stream' in locals():
+            try:
+                stream.stop_stream()
+                stream.close()
+            except:
+                pass
+        if 'wf' in locals():
+            try:
+                wf.close()
+            except:
+                pass
+        p.terminate()
+
+
+def stop_recording_short(record_state):
+    """
+    - Signals the threads to stop
+    - Joins them with a timeout
+    - If partial thread had an exception, returns that
+    """
+    if not record_state:
+        return None, "[No active recording to stop]", None
+
+    stop_event = record_state["stop_event"]
+    rec_thread = record_state["record_thread"]
+    partial_thread = record_state["partial_thread"]
+    output_file_path = record_state["wav_path"]
+
+    stop_event.set()
+    rec_thread.join(timeout=5)
+    if rec_thread.is_alive():
+        logging.warning("record_thread didn't stop in time.")
+
+    partial_thread.join(timeout=5)
+    if partial_thread.is_alive():
+        logging.warning("partial_thread didn't stop in time.")
+
+    if partial_thread.exception_encountered:
+        return None, f"[Partial transcription error: {partial_thread.exception_encountered}]", output_file_path
+
+    return partial_thread.partial_text_state["text"], "", output_file_path
+
+
+def parse_device_id(selected_device_text: str):
+    if not selected_device_text:
+        return None
+    try:
+        parts = selected_device_text.split(":", 1)
+        return int(parts[0].strip())
+    except Exception as e:
+        logging.error(f"Could not parse device from '{selected_device_text}': {e}")
+        return None
+
 
 
 ##########################################################
@@ -237,7 +458,8 @@ class LiveAudioStreamer:
                         final_audio = np.concatenate(audio_buffer, axis=0).flatten()
                         audio_buffer.clear()
                         # Transcribe the finalized audio
-                        user_text = transcribe_audio(final_audio, sample_rate=self.sample_rate)
+                        # FIXME - Add support for multiple languages/whisper models
+                        user_text = transcribe_audio(final_audio, sample_rate=self.sample_rate, whisper_model="distil-large-v3", speaker_lang="en", transcription_provider="faster-whisper")
 
                         # Then do something with user_text (e.g. add to chatbot)
                         self.handle_transcribed_text(user_text)
@@ -402,6 +624,7 @@ def unload_whisper_model():
 
 
 def get_whisper_model(model_name, device, ):
+    #FIXME - remove call to huggingface if whisper model exists on device
     global whisper_model_instance
     if whisper_model_instance is None:
         logging.info(f"Initializing new WhisperModel with size {model_name} on device {device}")
@@ -446,7 +669,7 @@ def speech_to_text(
 
     # Convert the string to a Path object and ensure it's resolved (absolute path)
     file_path = Path(audio_file_path).resolve()
-    logging.info("speech-to-text: Audio file path: %s", file_path)
+    logging.info("speech-to-text: Audio file path: {file_path}")
 
     try:
         # Get file extension and base name
@@ -468,7 +691,7 @@ def speech_to_text(
         options = dict(language=selected_source_lang, beam_size=10, best_of=10, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
         # use function and config at top of file
-        logging.debug("speech-to-text: Using whisper model: %s", whisper_model)
+        logging.debug(f"speech-to-text: Using whisper model: {whisper_model}", )
 
         whisper_model_instance = get_whisper_model(whisper_model, processing_choice)
         segments_raw, info = whisper_model_instance.transcribe(str(file_path), **transcribe_options)
@@ -591,10 +814,10 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
                     result = subprocess.run(command, stdin=null_file, text=True, capture_output=True)
                 if result.returncode == 0:
                     logging.info("FFmpeg executed successfully")
-                    logging.debug("FFmpeg output: %s", result.stdout)
+                    logging.debug(f"FFmpeg output: {result.stdout}")
                 else:
                     logging.error("Error in running FFmpeg")
-                    logging.error("FFmpeg stderr: %s", result.stderr)
+                    logging.error(f"FFmpeg stderr: {result.stderr}")
                     raise RuntimeError(f"FFmpeg error: {result.stderr}")
             except Exception as e:
                 logging.error("Error occurred - ffmpeg doesn't like windows")
@@ -603,10 +826,10 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
             os.system(f'ffmpeg -ss 00:00:00 -i "{video_file_path}" -ar 16000 -ac 1 -c:a pcm_s16le "{out_path}"')
         else:
             raise RuntimeError("Unsupported operating system")
-        logging.info("Conversion to WAV completed: %s", out_path)
+        logging.info(f"Conversion to WAV completed: {out_path}")
         log_counter("convert_to_wav_success", labels={"file_path": video_file_path})
     except Exception as e:
-        logging.error("speech-to-text: Error transcribing audio: %s", str(e))
+        logging.error(f"speech-to-text: Error transcribing audio: {str(e)}")
         log_counter("convert_to_wav_error", labels={"file_path": video_file_path, "error": str(e)})
         return {"error": str(e)}
 
@@ -624,6 +847,37 @@ def convert_to_wav(video_file_path, offset=0, overwrite=False):
 ##########################################################
 #
 # Audio Recording Functions
+
+def test_device_availability(device_id):
+    """Test if a device is actually available for recording."""
+    if device_id is None:
+        return False
+
+    p = pyaudio.PyAudio()
+    try:
+        # Try to get device info
+        device_info = p.get_device_info_by_index(device_id)
+        if not device_info or device_info['maxInputChannels'] < 1:
+            return False
+
+        # Try to open stream briefly
+        stream = p.open(
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=44100,
+            input=True,
+            input_device_index=device_id,
+            frames_per_buffer=1024,
+            start=False
+        )
+        stream.close()
+        return True
+    except Exception as e:
+        logging.debug(f"Device {device_id} not available: {e}")
+        return False
+    finally:
+        p.terminate()
+
 
 @timeit
 def record_audio(duration, sample_rate=16000, chunk_size=1024):
@@ -654,7 +908,7 @@ def record_audio(duration, sample_rate=16000, chunk_size=1024):
 
 
 @timeit
-def stop_recording(p, stream, audio_queue, stop_recording_event, audio_thread):
+def stop_recording_infinite(p, stream, audio_queue, stop_recording_event, audio_thread):
     log_counter("stop_recording_attempt")
     start_time = time.time()
     stop_recording_event.set()
@@ -707,6 +961,120 @@ def save_audio_temp(audio_data, sample_rate=16000):
         logging.error(f"Error saving temp audio: {str(e)}")
         log_counter("save_audio_temp_error")
         return None
+
+
+# Non-Filtering version
+def get_system_audio_devices() -> List[Dict]:
+    """
+    Return available audio devices for system audio recording with better
+    identification of loopback capabilities.
+    """
+    # Keywords commonly found in device names that can capture system output
+    loopback_keywords = [
+        "loopback",  # WASAPI loopback
+        "stereo mix",  # Realtek driver
+        "monitor",  # PulseAudio monitor on Linux
+        "blackhole",  # macOS loopback driver
+        "soundflower",  # older macOS loopback driver
+        "what u hear",  # Sound Blaster
+        "output",  # Generic term that might indicate system output
+        "mix"  # Common in stereo mix devices
+    ]
+
+    devices = []
+    try:
+        host_apis = sd.query_hostapis()
+        all_devs = sd.query_devices()
+
+        for device_index, device in enumerate(all_devs):
+            # Only include input devices
+            if device["max_input_channels"] > 0:
+                name_lower = device["name"].lower()
+                api_name = host_apis[device["hostapi"]]["name"]
+
+                # Check if it might be a loopback device
+                is_likely_loopback = any(keyword in name_lower for keyword in loopback_keywords)
+
+                devices.append({
+                    "id": device_index,
+                    "name": f"{device['name']} ({api_name})" +
+                            (" [SYSTEM AUDIO]" if is_likely_loopback else ""),
+                    "hostapi": device["hostapi"],
+                    "max_input_channels": device["max_input_channels"],
+                    "max_output_channels": device["max_output_channels"],
+                    "rate": device["default_samplerate"],
+                    "is_loopback": is_likely_loopback
+                })
+
+        # Sort to put potential loopback devices first
+        devices.sort(key=lambda x: (not x.get("is_loopback"), x["name"]))
+    except Exception as e:
+        logging.error(f"Error enumerating audio devices: {e}")
+
+    return devices
+# Filtering version
+# def get_system_audio_devices() -> List[Dict]:
+#     """Get list of available system audio devices with their capabilities"""
+#     devices = []
+#     host_apis = sd.query_hostapis()
+#
+#     for device_index, device in enumerate(sd.query_devices()):
+#         if device['max_input_channels'] > 0:
+#             # Windows loopback devices show up as inputs
+#             api_name = host_apis[device['hostapi']]['name']
+#             devices.append({
+#                 'id': device_index,
+#                 'name': f"{device['name']} ({api_name})",
+#                 'is_loopback': 'loopback' in device['name'].lower(),
+#                 'hostapi': device['hostapi'],
+#                 'max_channels': device['max_input_channels'],
+#                 'rate': device['default_samplerate']
+#             })
+#
+#     # Sort devices with loopback first
+#     return sorted(devices, key=lambda x: not x['is_loopback'])
+
+
+def record_system_audio(duration: float, device_id: int, sample_rate: int = 44100,
+                        channels: int = 2, subtype: str = 'PCM_16') -> str:
+    """
+    Record system audio output to a temporary WAV file
+    Returns path to recorded file
+    """
+    temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+
+    try:
+        # Configure recording settings based on device capabilities
+        device_info = sd.query_devices(device_id)
+        actual_sample_rate = int(device_info['default_samplerate'] if device_info['default_samplerate'] > 0
+                                 else sample_rate)
+
+        logging.info(f"Starting system audio recording (Duration: {duration}s, "
+                     f"Device: {device_info['name']}, SR: {actual_sample_rate})")
+
+        audio_data = sd.rec(
+            int(duration * actual_sample_rate),
+            samplerate=actual_sample_rate,
+            channels=min(channels, device_info['max_input_channels']),
+            device=device_id,
+            dtype=np.int16,
+            blocking=True
+        )
+
+        # Save to WAV file
+        with wave.open(temp_file.name, 'wb') as wav_file:
+            wav_file.setnchannels(min(channels, device_info['max_input_channels']))
+            wav_file.setsampwidth(2)  # 16-bit PCM
+            wav_file.setframerate(actual_sample_rate)
+            wav_file.writeframes(audio_data.tobytes())
+
+        logging.info(f"Recording saved to {temp_file.name}")
+        return temp_file.name
+
+    except Exception as e:
+        temp_file.close()
+        os.unlink(temp_file.name)
+        raise RuntimeError(f"Recording failed: {str(e)}")
 
 #
 # End of Audio Recording Functions

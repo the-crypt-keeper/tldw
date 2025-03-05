@@ -238,6 +238,10 @@ def load_and_log_configs():
         anthropic_temperature = config.get('API', 'anthropic_temperature', fallback='0.7')
         anthropic_top_p = config.get('API', 'anthropic_top_p', fallback='0.95')
         anthropic_top_k = config.get('API', 'anthropic_top_k', fallback='100')
+        anthropic_max_tokens = config.get('API', 'anthropic_max_tokens', fallback='4096')
+        anthropic_api_timeout = config.get('API', 'anthropic_api_timeout', fallback='90')
+        anthropic_api_retries = config.get('API', 'anthropic_api_retry', fallback='3')
+        anthropic_api_retry_delay = config.get('API', 'anthropic_api_retry_delay', fallback='5')
 
         # Cohere
         cohere_streaming = config.get('API', 'cohere_streaming', fallback='False')
@@ -245,6 +249,10 @@ def load_and_log_configs():
         cohere_max_p = config.get('API', 'cohere_max_p', fallback='0.95')
         cohere_top_k = config.get('API', 'cohere_top_k', fallback='100')
         cohere_model = config.get('API', 'cohere_model', fallback='command-r-plus')
+        cohere_max_tokens = config.get('API', 'cohere_max_tokens', fallback='4096')
+        cohere_api_timeout = config.get('API', 'cohere_api_timeout', fallback='90')
+        cohere_api_retries = config.get('API', 'cohere_api_retry', fallback='3')
+        cohere_api_retry_delay = config.get('API', 'cohere_api_retry_delay', fallback='5')
 
         # Deepseek
         deepseek_streaming = config.get('API', 'deepseek_streaming', fallback='False')
@@ -252,12 +260,20 @@ def load_and_log_configs():
         deepseek_top_p = config.get('API', 'deepseek_top_p', fallback='0.95')
         deepseek_min_p = config.get('API', 'deepseek_min_p', fallback='0.05')
         deepseek_model = config.get('API', 'deepseek_model', fallback='deepseek-chat')
+        deepseek_max_tokens = config.get('API', 'deepseek_max_tokens', fallback='4096')
+        deepseek_api_timeout = config.get('API', 'deepseek_api_timeout', fallback='90')
+        deepseek_api_retries = config.get('API', 'deepseek_api_retry', fallback='3')
+        deepseek_api_retry_delay = config.get('API', 'deepseek_api_retry_delay', fallback='5')
 
         # Groq
         groq_model = config.get('API', 'groq_model', fallback='llama3-70b-8192')
         groq_streaming = config.get('API', 'groq_streaming', fallback='False')
         groq_temperature = config.get('API', 'groq_temperature', fallback='0.7')
         groq_top_p = config.get('API', 'groq_top_p', fallback='0.95')
+        groq_max_tokens = config.get('API', 'groq_max_tokens', fallback='4096')
+        groq_api_timeout = config.get('API', 'groq_api_timeout', fallback='90')
+        groq_api_retries = config.get('API', 'groq_api_retry', fallback='3')
+        groq_api_retry_delay = config.get('API', 'groq_api_retry_delay', fallback='5')
 
         # Google
         google_model = config.get('API', 'google_model', fallback='gemini-1.5-pro')
@@ -265,6 +281,10 @@ def load_and_log_configs():
         google_temperature = config.get('API', 'google_temperature', fallback='0.7')
         google_top_p = config.get('API', 'google_top_p', fallback='0.95')
         google_min_p = config.get('API', 'google_min_p', fallback='0.05')
+        google_max_tokens = config.get('API', 'google_max_tokens', fallback='4096')
+        google_api_timeout = config.get('API', 'google_api_timeout', fallback='90')
+        google_api_retries = config.get('API', 'google_api_retry', fallback='3')
+        google_api_retry_delay = config.get('API', 'google_api_retry_delay', fallback='5')
 
         # HuggingFace
         huggingface_model = config.get('API', 'huggingface_model', fallback='CohereForAI/c4ai-command-r-plus')
@@ -272,18 +292,30 @@ def load_and_log_configs():
         huggingface_temperature = config.get('API', 'huggingface_temperature', fallback='0.7')
         huggingface_top_p = config.get('API', 'huggingface_top_p', fallback='0.95')
         huggingface_min_p = config.get('API', 'huggingface_min_p', fallback='0.05')
+        huggingface_max_tokens = config.get('API', 'huggingface_max_tokens', fallback='4096')
+        huggingface_api_timeout = config.get('API', 'huggingface_api_timeout', fallback='90')
+        huggingface_api_retries = config.get('API', 'huggingface_api_retry', fallback='3')
+        huggingface_api_retry_delay = config.get('API', 'huggingface_api_retry_delay', fallback='5')
 
         # Mistral
         mistral_model = config.get('API', 'mistral_model', fallback='mistral-large-latest')
         mistral_streaming = config.get('API', 'mistral_streaming', fallback='False')
         mistral_temperature = config.get('API', 'mistral_temperature', fallback='0.7')
         mistral_top_p = config.get('API', 'mistral_top_p', fallback='0.95')
+        mistral_max_tokens = config.get('API', 'mistral_max_tokens', fallback='4096')
+        mistral_api_timeout = config.get('API', 'mistral_api_timeout', fallback='90')
+        mistral_api_retries = config.get('API', 'mistral_api_retry', fallback='3')
+        mistral_api_retry_delay = config.get('API', 'mistral_api_retry_delay', fallback='5')
 
         # OpenAI
         openai_model = config.get('API', 'openai_model', fallback='gpt-4o')
         openai_streaming = config.get('API', 'openai_streaming', fallback='False')
         openai_temperature = config.get('API', 'openai_temperature', fallback='0.7')
         openai_top_p = config.get('API', 'openai_top_p', fallback='0.95')
+        openai_max_tokens = config.get('API', 'openai_max_tokens', fallback='4096')
+        openai_api_timeout = config.get('API', 'openai_api_timeout', fallback='90')
+        openai_api_retries = config.get('API', 'openai_api_retry', fallback='3')
+        openai_api_retry_delay = config.get('API', 'openai_api_retry_delay', fallback='5')
 
         # OpenRouter
         openrouter_model = config.get('API', 'openrouter_model', fallback='microsoft/wizardlm-2-8x22b')
@@ -292,6 +324,10 @@ def load_and_log_configs():
         openrouter_top_p = config.get('API', 'openrouter_top_p', fallback='0.95')
         openrouter_min_p = config.get('API', 'openrouter_min_p', fallback='0.05')
         openrouter_top_k = config.get('API', 'openrouter_top_k', fallback='100')
+        openrouter_max_tokens = config.get('API', 'openrouter_max_tokens', fallback='4096')
+        openrouter_api_timeout = config.get('API', 'openrouter_api_timeout', fallback='90')
+        openrouter_api_retries = config.get('API', 'openrouter_api_retry', fallback='3')
+        openrouter_api_retry_delay = config.get('API', 'openrouter_api_retry_delay', fallback='5')
 
         # Logging Checks for model loads
         # logging.debug(f"Loaded Anthropic Model: {anthropic_model}")
@@ -313,6 +349,8 @@ def load_and_log_configs():
         kobold_top_k = config.get('Local-API', 'kobold_top_k', fallback='100')
         kobold_max_tokens = config.get('Local-API', 'kobold_max_tokens', fallback='4096')
         kobold_api_timeout = config.get('Local-API', 'kobold_api_timeout', fallback='90')
+        kobold_api_retries = config.get('Local-API', 'kobold_api_retry', fallback='3')
+        kobold_api_retry_delay = config.get('Local-API', 'kobold_api_retry_delay', fallback='5')
 
         llama_api_IP = config.get('Local-API', 'llama_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         llama_api_key = config.get('Local-API', 'llama_api_key', fallback='')
@@ -323,6 +361,8 @@ def load_and_log_configs():
         llama_top_k = config.get('Local-API', 'llama_top_k', fallback='100')
         llama_max_tokens = config.get('Local-API', 'llama_max_tokens', fallback='4096')
         llama_api_timeout = config.get('Local-API', 'llama_api_timeout', fallback='90')
+        llama_api_retries = config.get('Local-API', 'llama_api_retry', fallback='3')
+        llama_api_retry_delay = config.get('Local-API', 'llama_api_retry_delay', fallback='5')
 
         ooba_api_IP = config.get('Local-API', 'ooba_api_IP', fallback='http://127.0.0.1:5000/v1/chat/completions')
         ooba_api_key = config.get('Local-API', 'ooba_api_key', fallback='')
@@ -333,6 +373,8 @@ def load_and_log_configs():
         ooba_top_k = config.get('Local-API', 'ooba_top_k', fallback='100')
         ooba_max_tokens = config.get('Local-API', 'ooba_max_tokens', fallback='4096')
         ooba_api_timeout = config.get('Local-API', 'ooba_api_timeout', fallback='90')
+        ooba_api_retries = config.get('Local-API', 'ooba_api_retry', fallback='3')
+        ooba_api_retry_delay = config.get('Local-API', 'ooba_api_retry_delay', fallback='5')
 
         tabby_api_IP = config.get('Local-API', 'tabby_api_IP', fallback='http://127.0.0.1:5000/api/v1/generate')
         tabby_api_key = config.get('Local-API', 'tabby_api_key', fallback=None)
@@ -344,6 +386,8 @@ def load_and_log_configs():
         tabby_min_p = config.get('Local-API', 'tabby_min_p', fallback='0.05')
         tabby_max_tokens = config.get('Local-API', 'tabby_max_tokens', fallback='4096')
         tabby_api_timeout = config.get('Local-API', 'tabby_api_timeout', fallback='90')
+        tabby_api_retries = config.get('Local-API', 'tabby_api_retry', fallback='3')
+        tabby_api_retry_delay = config.get('Local-API', 'tabby_api_retry_delay', fallback='5')
 
         vllm_api_url = config.get('Local-API', 'vllm_api_IP', fallback='http://127.0.0.1:500/api/v1/chat/completions')
         vllm_api_key = config.get('Local-API', 'vllm_api_key', fallback=None)
@@ -355,6 +399,8 @@ def load_and_log_configs():
         vllm_min_p = config.get('Local-API', 'vllm_min_p', fallback='0.05')
         vllm_max_tokens = config.get('Local-API', 'vllm_max_tokens', fallback='4096')
         vllm_api_timeout = config.get('Local-API', 'vllm_api_timeout', fallback='90')
+        vllm_api_retries = config.get('Local-API', 'vllm_api_retry', fallback='3')
+        vllm_api_retry_delay = config.get('Local-API', 'vllm_api_retry_delay', fallback='5')
 
         ollama_api_url = config.get('Local-API', 'ollama_api_IP', fallback='http://127.0.0.1:11434/api/generate')
         ollama_api_key = config.get('Local-API', 'ollama_api_key', fallback=None)
@@ -364,6 +410,8 @@ def load_and_log_configs():
         ollama_top_p = config.get('Local-API', 'ollama_top_p', fallback='0.95')
         ollama_max_tokens = config.get('Local-API', 'ollama_max_tokens', fallback='4096')
         ollama_api_timeout = config.get('Local-API', 'ollama_api_timeout', fallback='90')
+        ollama_api_retries = config.get('Local-API', 'ollama_api_retry', fallback='3')
+        ollama_api_retry_delay = config.get('Local-API', 'ollama_api_retry_delay', fallback='5')
 
         aphrodite_api_url = config.get('Local-API', 'aphrodite_api_IP', fallback='http://127.0.0.1:8080/v1/chat/completions')
         aphrodite_api_key = config.get('Local-API', 'aphrodite_api_key', fallback='')
@@ -371,6 +419,8 @@ def load_and_log_configs():
         aphrodite_max_tokens = config.get('Local-API', 'aphrodite_max_tokens', fallback='4096')
         aphrodite_streaming = config.get('Local-API', 'aphrodite_streaming', fallback='False')
         aphrodite_api_timeout = config.get('Local-API', 'llama_api_timeout', fallback='90')
+        aphrodite_api_retries = config.get('Local-API', 'aphrodite_api_retry', fallback='3')
+        aphrodite_api_retry_delay = config.get('Local-API', 'aphrodite_api_retry_delay', fallback='5')
 
         custom_openai_api_key = config.get('API', 'custom_openai_api_key', fallback=None)
         custom_openai_api_ip = config.get('API', 'custom_openai_api_ip', fallback=None)
@@ -381,6 +431,8 @@ def load_and_log_configs():
         custom_openai_api_min_p = config.get('API', 'custom_openai_api_top_k', fallback='100')
         custom_openai_api_max_tokens = config.get('API', 'custom_openai_api_max_tokens', fallback='4096')
         custom_openai_api_timeout = config.get('API', 'custom_openai_api_timeout', fallback='90')
+        custom_openai_api_retries = config.get('API', 'custom_openai_api_retry', fallback='3')
+        custom_openai_api_retry_delay = config.get('API', 'custom_openai_api_retry_delay', fallback='5')
 
         # 2nd Custom OpenAI API
         custom_openai2_api_key = config.get('API', 'custom_openai2_api_key', fallback=None)
@@ -392,6 +444,8 @@ def load_and_log_configs():
         custom_openai2_api_min_p = config.get('API', 'custom_openai_api2_top_k', fallback='100')
         custom_openai2_api_max_tokens = config.get('API', 'custom_openai2_api_max_tokens', fallback='4096')
         custom_openai2_api_timeout = config.get('API', 'custom_openai2_api_timeout', fallback='90')
+        custom_openai2_api_retries = config.get('API', 'custom_openai2_api_retry', fallback='3')
+        custom_openai2_api_retry_delay = config.get('API', 'custom_openai2_api_retry_delay', fallback='5')
 
         # Logging Checks for Local API IP loads
         # logging.debug(f"Loaded Kobold API IP: {kobold_api_ip}")
@@ -587,6 +641,10 @@ def load_and_log_configs():
                 'temperature': anthropic_temperature,
                 'top_p': anthropic_top_p,
                 'top_k': anthropic_top_k,
+                'max_tokens': anthropic_max_tokens,
+                'api_timeout': anthropic_api_timeout,
+                'api_retries': anthropic_api_retries,
+                'api_retry_delay': anthropic_api_retry_delay
             },
             'cohere_api': {
                 'api_key': cohere_api_key,
@@ -594,7 +652,11 @@ def load_and_log_configs():
                 'streaming': cohere_streaming,
                 'temperature': cohere_temperature,
                 'max_p': cohere_max_p,
-                'top_k': cohere_top_k
+                'top_k': cohere_top_k,
+                'max_tokens': cohere_max_tokens,
+                'api_timeout': cohere_api_timeout,
+                'api_retries': cohere_api_retries,
+                'api_retry_delay': cohere_api_retry_delay
             },
             'deepseek_api': {
                 'api_key': deepseek_api_key,
@@ -602,7 +664,11 @@ def load_and_log_configs():
                 'streaming': deepseek_streaming,
                 'temperature': deepseek_temperature,
                 'top_p': deepseek_top_p,
-                'min_p': deepseek_min_p
+                'min_p': deepseek_min_p,
+                'max_tokens': deepseek_max_tokens,
+                'api_timeout': deepseek_api_timeout,
+                'api_retries': deepseek_api_retries,
+                'api_retry_delay': deepseek_api_retry_delay
             },
             'google_api': {
                 'api_key': google_api_key,
@@ -610,26 +676,45 @@ def load_and_log_configs():
                 'streaming': google_streaming,
                 'temperature': google_temperature,
                 'top_p': google_top_p,
-                'min_p': google_min_p
+                'min_p': google_min_p,
+                'max_tokens': google_max_tokens,
+                'api_timeout': google_api_timeout,
+                'api_retries': google_api_retries,
+                'api_retry_delay': google_api_retry_delay
             },
             'groq_api': {
                 'api_key': groq_api_key,
                 'model': groq_model,
                 'streaming': groq_streaming,
                 'temperature': groq_temperature,
-                'top_p': groq_top_p
+                'top_p': groq_top_p,
+                'max_tokens': groq_max_tokens,
+                'api_timeout': groq_api_timeout,
+                'api_retries': groq_api_retries,
+                'api_retry_delay': groq_api_retry_delay
             },
             'huggingface_api': {
                 'api_key': huggingface_api_key,
                 'model': huggingface_model,
                 'streaming': huggingface_streaming,
+                'temperature': huggingface_temperature,
+                'top_p': huggingface_top_p,
+                'min_p': huggingface_min_p,
+                'max_tokens': huggingface_max_tokens,
+                'api_timeout': huggingface_api_timeout,
+                'api_retries': huggingface_api_retries,
+                'api_retry_delay': huggingface_api_retry_delay
             },
             'mistral_api': {
                 'api_key': mistral_api_key,
                 'model': mistral_model,
                 'streaming': mistral_streaming,
                 'temperature': mistral_temperature,
-                'top_p': mistral_top_p
+                'top_p': mistral_top_p,
+                'max_tokens': mistral_max_tokens,
+                'api_timeout': mistral_api_timeout,
+                'api_retries': mistral_api_retries,
+                'api_retry_delay': mistral_api_retry_delay
             },
             'openrouter_api': {
                 'api_key': openrouter_api_key,
@@ -638,7 +723,11 @@ def load_and_log_configs():
                 'temperature': openrouter_temperature,
                 'top_p': openrouter_top_p,
                 'min_p': openrouter_min_p,
-                'top_k': openrouter_top_k
+                'top_k': openrouter_top_k,
+                'max_tokens': openrouter_max_tokens,
+                'api_timeout': openrouter_api_timeout,
+                'api_retries': openrouter_api_retries,
+                'api_retry_delay': openrouter_api_retry_delay
             },
             'openai_api': {
                 'api_key': openai_api_key,
@@ -646,6 +735,10 @@ def load_and_log_configs():
                 'streaming': openai_streaming,
                 'temperature': openai_temperature,
                 'top_p': openai_top_p,
+                'max_tokens': openai_max_tokens,
+                'api_timeout': openai_api_timeout,
+                'api_retries': openai_api_retries,
+                'api_retry_delay': openai_api_retry_delay
             },
             'elevenlabs_api': {
                 'api_key': elevenlabs_api_key,
@@ -667,6 +760,8 @@ def load_and_log_configs():
                 'top_k': llama_top_k,
                 'max_tokens': llama_max_tokens,
                 'api_timeout': llama_api_timeout,
+                'api_retries': llama_api_retries,
+                'api_retry_delay': llama_api_retry_delay
             },
             'ooba_api': {
                 'api_ip': ooba_api_IP,
@@ -678,7 +773,8 @@ def load_and_log_configs():
                 'top_k': ooba_top_k,
                 'max_tokens': ooba_max_tokens,
                 'api_timeout': ooba_api_timeout,
-
+                'api_retries': ooba_api_retries,
+                'api_retry_delay': ooba_api_retry_delay
             },
             'kobold_api': {
                 'api_ip': kobold_api_ip,
@@ -690,6 +786,8 @@ def load_and_log_configs():
                 'top_k': kobold_top_k,
                 'max_tokens': kobold_max_tokens,
                 'api_timeout': kobold_api_timeout,
+                'api_retries': kobold_api_retries,
+                'api_retry_delay': kobold_api_retry_delay
             },
             'tabby_api': {
                 'api_ip': tabby_api_IP,
@@ -702,6 +800,8 @@ def load_and_log_configs():
                 'min_p': tabby_min_p,
                 'max_tokens': tabby_max_tokens,
                 'api_timeout': tabby_api_timeout,
+                'api_retries': tabby_api_retries,
+                'api_retry_delay': tabby_api_retry_delay
             },
             'vllm_api': {
                 'api_ip': vllm_api_url,
@@ -714,6 +814,8 @@ def load_and_log_configs():
                 'min_p': vllm_min_p,
                 'max_tokens': vllm_max_tokens,
                 'api_timeout': vllm_api_timeout,
+                'api_retries': vllm_api_retries,
+                'api_retry_delay': vllm_api_retry_delay
             },
             'ollama_api': {
                 'api_url': ollama_api_url,
@@ -724,6 +826,8 @@ def load_and_log_configs():
                 'top_p': ollama_top_p,
                 'max_tokens': ollama_max_tokens,
                 'api_timeout': ollama_api_timeout,
+                'api_retries': ollama_api_retries,
+                'api_retry_delay': ollama_api_retry_delay
             },
             'aphrodite_api': {
                 'api_ip': aphrodite_api_url,
@@ -732,6 +836,8 @@ def load_and_log_configs():
                 'max_tokens': aphrodite_max_tokens,
                 'streaming': aphrodite_streaming,
                 'api_timeout': aphrodite_api_timeout,
+                'api_retries': aphrodite_api_retries,
+                'api_retry_delay': aphrodite_api_retry_delay
             },
             'custom_openai_api': {
                 'api_ip': custom_openai_api_ip,
@@ -743,6 +849,8 @@ def load_and_log_configs():
                 'top_p': custom_openai_api_top_p,
                 'min_p': custom_openai_api_min_p,
                 'api_timeout': custom_openai_api_timeout,
+                'api_retries': custom_openai_api_retries,
+                'api_retry_delay': custom_openai_api_retry_delay
             },
             'custom_openai_api_2': {
                 'api_ip': custom_openai2_api_ip,
@@ -754,6 +862,8 @@ def load_and_log_configs():
                 'top_p': custom_openai2_api_top_p,
                 'min_p': custom_openai2_api_min_p,
                 'api_timeout': custom_openai2_api_timeout,
+                'api_retries': custom_openai2_api_retries,
+                'api_retry_delay': custom_openai2_api_retry_delay
             },
             'llm_api_settings': {
                 'default_api': default_api,

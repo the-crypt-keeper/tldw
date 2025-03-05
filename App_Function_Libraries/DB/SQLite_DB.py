@@ -640,18 +640,68 @@ def mark_media_as_processed(database, media_id):
 # Keyword-related Functions
 #
 
+# Wrapper function for legacy support
+def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model,
+                          media_type='video', overwrite=False, db=None):
+    """Legacy wrapper for add_media_with_keywords"""
+    # Extract content from segments
+    if isinstance(segments, list):
+        content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
+    elif isinstance(segments, dict):
+        content = segments.get('text', '') or segments.get('content', '')
+    else:
+        content = str(segments)
+
+    # Call the new function
+    media_id, message = add_media_with_keywords(
+        url=url,
+        title=info_dict.get('title', 'Untitled'),
+        media_type=media_type,
+        content=content,
+        keywords=keywords,
+        prompt=custom_prompt_input,
+        summary=summary,
+        transcription_model=whisper_model,
+        author=info_dict.get('uploader', 'Unknown'),
+        ingestion_date=datetime.now().strftime('%Y-%m-%d'),
+        overwrite=overwrite,
+        db=db
+    )
+
+    return message  # Return just the message to maintain backward compatibility
+
+# Old call:
+#result = add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model)
+#
+# New call:
+# media_id, result = add_media_with_keywords(
+#     url=url,
+#     title=info_dict.get('title', 'Untitled'),
+#     media_type=media_type,  # from parameter or info_dict
+#     content=extract_text_from_segments(segments),  # You'll need this helper function
+#     keywords=keywords,
+#     prompt=custom_prompt_input,
+#     summary=summary,
+#     transcription_model=whisper_model,
+#     author=info_dict.get('uploader', 'Unknown'),
+#     ingestion_date=datetime.now().strftime('%Y-%m-%d'),
+#     overwrite=overwrite
+# )
+
+
 # Function to add media with keywords
 def add_media_with_keywords(url, title, media_type, content, keywords, prompt, summary, transcription_model, author,
-                            ingestion_date):
+                           ingestion_date, overwrite=False, db=None, chunk_options=None):
     log_counter("add_media_with_keywords_attempt")
     start_time = time.time()
     logging.debug(f"Entering add_media_with_keywords: URL={url}, Title={title}")
 
+    if db is None:
+        db = Database()
+
     # Set default values for missing fields
     if url is None:
         url = 'localhost'
-    elif url is not None:
-        url = url
     title = title or 'Untitled'
     media_type = media_type or 'Unknown'
     content = content or 'No content available'
@@ -663,7 +713,7 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     ingestion_date = ingestion_date or datetime.now().strftime('%Y-%m-%d')
 
     if media_type not in ['article', 'audio', 'book', 'document', 'mediawiki_article', 'mediawiki_dump',
-                          'obsidian_note', 'podcast', 'text', 'video', 'unknown']:
+                        'obsidian_note', 'podcast', 'text', 'video', 'unknown']:
         log_counter("add_media_with_keywords_error", labels={"error_type": "InvalidMediaType"})
         duration = time.time() - start_time
         log_histogram("add_media_with_keywords_duration", duration)
@@ -683,6 +733,13 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     else:
         keyword_list = ['default']
 
+    # Generate content hash
+    content_hash = hashlib.sha256(content.encode()).hexdigest()
+
+    # Generate URL if not provided
+    if not url:
+        url = f"https://No-URL-Submitted.com/{media_type}/{content_hash}"
+
     logging.info(f"Adding/updating media: URL={url}, Title={title}, Type={media_type}")
     logging.debug(f"Content (first 500 chars): {content[:500]}...")
     logging.debug(f"Keywords: {keyword_list}")
@@ -691,69 +748,106 @@ def add_media_with_keywords(url, title, media_type, content, keywords, prompt, s
     logging.info(f"Author: {author}")
     logging.info(f"Ingestion Date: {ingestion_date}")
     logging.info(f"Transcription Model: {transcription_model}")
+    logging.info(f"Overwrite: {overwrite}")
+
+    def extract_text_from_segments(segments):
+        if isinstance(segments, list):
+            return ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
+        elif isinstance(segments, dict):
+            return segments.get('text', '') or segments.get('content', '')
+        else:
+            return str(segments)
 
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Check if media already exists using both title and URL
-            existing_media_id = check_media_exists(title, url)
-            logging.debug(f"Existing media ID for {url}: {existing_media_id}")
+            # Check if media already exists using URL or content_hash
+            cursor.execute('SELECT id FROM Media WHERE url = ? OR content_hash = ?', (url, content_hash))
+            existing_media = cursor.fetchone()
+            logging.debug(f"Existing media with URL or content hash: {existing_media}")
 
-            if existing_media_id:
-                # Update existing media
-                media_id = existing_media_id
-                logging.debug(f"Updating existing media with ID: {media_id}")
-                cursor.execute('''
-                UPDATE Media 
-                SET content = ?, transcription_model = ?, type = ?, author = ?, ingestion_date = ?
-                WHERE id = ?
-                ''', (content, transcription_model, media_type, author, ingestion_date, media_id))
-                log_counter("add_media_with_keywords_update")
+            if existing_media:
+                media_id = existing_media[0]
+                logging.debug(f"Existing media ID: {media_id}")
+
+                if overwrite:
+                    # Update existing media
+                    logging.debug("Updating existing media (overwrite=True)")
+                    cursor.execute('''
+                    UPDATE Media 
+                    SET url = ?, content = ?, transcription_model = ?, title = ?, type = ?, author = ?, 
+                        ingestion_date = ?, chunking_status = ?, content_hash = ?
+                    WHERE id = ?
+                    ''', (url, content, transcription_model, title, media_type, author,
+                          ingestion_date, 'pending', content_hash, media_id))
+                    action = "updated"
+                    log_counter("add_media_with_keywords_update")
+                else:
+                    logging.debug("Media exists but not updating (overwrite=False)")
+                    action = "already exists (not updated)"
+                    log_counter("add_media_with_keywords_skipped")
             else:
                 # Insert new media
                 logging.debug("Inserting new media")
                 cursor.execute('''
-                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (url, title, media_type, content, author, ingestion_date, transcription_model))
+                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status, content_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (url, title, media_type, content, author, ingestion_date, transcription_model, 'pending', content_hash))
                 media_id = cursor.lastrowid
                 logging.debug(f"New media inserted with ID: {media_id}")
+                action = "added"
                 log_counter("add_media_with_keywords_insert")
 
-            cursor.execute('''
-            INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-            VALUES (?, ?, ?, ?)
-            ''', (media_id, prompt, summary, ingestion_date))
+            # Only proceed with modifications if the media was added or updated
+            if action in ["updated", "added"]:
+                cursor.execute('''
+                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
+                VALUES (?, ?, ?, ?)
+                ''', (media_id, prompt, summary, ingestion_date))
 
-            # Batch insert keywords
-            keyword_params = [(keyword.strip().lower(),) for keyword in keyword_list]
-            cursor.executemany('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', keyword_params)
+                # Batch insert keywords
+                keyword_params = [(keyword.strip().lower(),) for keyword in keyword_list]
+                cursor.executemany('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', keyword_params)
 
-            # Get keyword IDs
-            placeholder = ','.join(['?'] * len(keyword_list))
-            cursor.execute(f'SELECT id, keyword FROM Keywords WHERE keyword IN ({placeholder})', keyword_list)
-            keyword_ids = cursor.fetchall()
+                # Get keyword IDs
+                placeholder = ','.join(['?'] * len(keyword_list))
+                cursor.execute(f'SELECT id, keyword FROM Keywords WHERE keyword IN ({placeholder})', keyword_list)
+                keyword_ids = cursor.fetchall()
 
-            # Batch insert media-keyword associations
-            media_keyword_params = [(media_id, keyword_id) for keyword_id, _ in keyword_ids]
-            cursor.executemany('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', media_keyword_params)
+                # Batch insert media-keyword associations
+                media_keyword_params = [(media_id, keyword_id) for keyword_id, _ in keyword_ids]
+                cursor.executemany('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)', media_keyword_params)
 
-            # Update full-text search index
-            cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
-                           (media_id, title, content))
+                # Update full-text search index
+                cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
+                            (media_id, title, content))
 
-            # Add media version
-            add_media_version(conn, media_id, prompt, summary)
+                # Add media version
+                cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
+                current_version = cursor.fetchone()[0] or 0
+                cursor.execute('''
+                INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ''', (media_id, current_version + 1, prompt, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
 
             conn.commit()
-            logging.info(f"Media '{title}' successfully added/updated with ID: {media_id}")
+
+            # Add loading of chunking options from Config file
+            if action in ["updated", "added"]:
+                schedule_chunking(media_id, content, title, chunk_options)
 
             duration = time.time() - start_time
             log_histogram("add_media_with_keywords_duration", duration)
-            log_counter("add_media_with_keywords_success")
 
-            return media_id, f"Media '{title}' added/updated successfully with keywords: {', '.join(keyword_list)}"
+            if action in ["updated", "added"]:
+                log_counter("add_media_with_keywords_success")
+                message = f"Media '{title}' {action} with URL: {url} and keywords: {', '.join(keyword_list)}. Chunking scheduled."
+            else:
+                message = f"Media '{title}' {action} with URL: {url}"
+
+            logging.info(message)
+            return media_id, message
 
     except sqlite3.Error as e:
         logging.error(f"SQL Error in add_media_with_keywords: {e}")
@@ -1273,117 +1367,6 @@ def is_valid_date(date_string: str) -> bool:
         return True
     except ValueError:
         return False
-
-
-def add_media_to_database(url, info_dict, segments, summary, keywords, custom_prompt_input, whisper_model, media_type='video', overwrite=False, db=None):
-    if db is None:
-        db = Database()
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-
-            # Extract content from segments first
-            if isinstance(segments, list):
-                content = ' '.join([segment.get('Text', '') for segment in segments if 'Text' in segment])
-            elif isinstance(segments, dict):
-                content = segments.get('text', '') or segments.get('content', '')
-            else:
-                content = str(segments)
-
-            # Generate content hash
-            content_hash = hashlib.sha256(content.encode()).hexdigest()
-
-            # Generate URL if not provided
-            if not url:
-                title = info_dict.get('title', 'Untitled')
-                url = f"https://No-URL-Submitted.com/{media_type}/{content_hash}"
-
-            logging.debug(f"Checking for existing media with URL: {url}")
-
-            # Process keywords
-            if isinstance(keywords, str):
-                keyword_list = [keyword.strip().lower() for keyword in keywords.split(',')]
-            elif isinstance(keywords, (list, tuple)):
-                keyword_list = [keyword.strip().lower() for keyword in keywords]
-            else:
-                keyword_list = ['default']
-
-            # Check if media already exists by URL or content_hash
-            cursor.execute('SELECT id FROM Media WHERE url = ? OR content_hash = ?', (url, content_hash))
-            existing_media = cursor.fetchone()
-
-            logging.debug(f"Existing media: {existing_media}")
-            logging.debug(f"Overwrite flag: {overwrite}")
-
-            if existing_media:
-                media_id = existing_media[0]
-                logging.debug(f"Existing media_id: {media_id}")
-                if overwrite:
-                    logging.debug("Updating existing media")
-                    cursor.execute('''
-                    UPDATE Media 
-                    SET url = ?, content = ?, transcription_model = ?, title = ?, type = ?, author = ?, ingestion_date = ?, chunking_status = ?, content_hash = ?
-                    WHERE id = ?
-                    ''', (url, content, whisper_model, info_dict.get('title', 'Untitled'), media_type,
-                          info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), 'pending', content_hash, media_id))
-                    action = "updated"
-                else:
-                    logging.debug("Media exists but not updating (overwrite=False)")
-                    action = "already exists (not updated)"
-            else:
-                cursor.execute('''
-                INSERT INTO Media (url, title, type, content, author, ingestion_date, transcription_model, chunking_status, content_hash)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (url, info_dict.get('title', 'Untitled'), media_type, content,
-                      info_dict.get('uploader', 'Unknown'), datetime.now().strftime('%Y-%m-%d'), whisper_model, 'pending', content_hash))
-                media_id = cursor.lastrowid
-                action = "added"
-                logging.debug(f"New media_id: {media_id}")
-
-            logging.debug(f"Before MediaModifications insert, media_id: {media_id}")
-
-            # Only proceed with modifications if the media was added or updated
-            if action in ["updated", "added"]:
-                cursor.execute('''
-                INSERT INTO MediaModifications (media_id, prompt, summary, modification_date)
-                VALUES (?, ?, ?, ?)
-                ''', (media_id, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d')))
-
-            # Process keywords
-            for keyword in keyword_list:
-                cursor.execute('INSERT OR IGNORE INTO Keywords (keyword) VALUES (?)', (keyword,))
-                cursor.execute('SELECT id FROM Keywords WHERE keyword = ?', (keyword,))
-                keyword_id = cursor.fetchone()[0]
-                cursor.execute('INSERT OR IGNORE INTO MediaKeywords (media_id, keyword_id) VALUES (?, ?)',
-                               (media_id, keyword_id))
-
-            # Update full-text search index
-            cursor.execute('INSERT OR REPLACE INTO media_fts (rowid, title, content) VALUES (?, ?, ?)',
-                           (media_id, info_dict.get('title', 'Untitled'), content))
-
-            # Add media version
-            cursor.execute('SELECT MAX(version) FROM MediaVersion WHERE media_id = ?', (media_id,))
-            current_version = cursor.fetchone()[0] or 0
-            cursor.execute('''
-            INSERT INTO MediaVersion (media_id, version, prompt, summary, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            ''', (media_id, current_version + 1, custom_prompt_input, summary, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
-
-            conn.commit()
-
-        # Schedule chunking
-        schedule_chunking(media_id, content, info_dict.get('title', 'Untitled'))
-
-        action = "updated" if existing_media and overwrite else "added"
-        return f"Media '{info_dict.get('title', 'Untitled')}' {action} with URL: {url}" + \
-            (f" and keywords: {', '.join(keyword_list)}. Chunking scheduled." if action in ["updated", "added"] else "")
-
-    except DatabaseError as e:
-        logging.error(f"Database error: {e}")
-        raise
-    except Exception as e:
-        logging.error(f"Unexpected error: {e}")
-        raise DatabaseError(f"Unexpected error: {e}")
 
 
 def check_existing_media(url):

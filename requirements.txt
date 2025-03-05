@@ -44,6 +44,7 @@ pydub~=0.25.1
 pymupdf~=1.24.13
 pymupdf4llm~=0.0.17
 docling~=2.4.0
+#PyAudioWPatch # For windows system recording
 pypandoc~=1.13
 pypandoc_binary
 pytest~=8.3.2
@@ -55,6 +56,7 @@ rouge_score~=0.1.2
 sacrebleu~=2.4.2
 scikit_learn
 sentence_transformers
+sounddevice # For Handling system audio recording
 SQLAlchemy~=2.0.34
 streamlit
 tenacity~=8.5.0
@@ -92,3 +94,7 @@ keyring~=25.4.1
 pycryptodomex~=3.20.0
 lxml
 jsonlines~=3.1.0
+# System audio recording
+# pip install sounddevice numpy wave
+# brew install blackhole-2ch  # For virtual device
+# sudo apt-get install pavucontrol
