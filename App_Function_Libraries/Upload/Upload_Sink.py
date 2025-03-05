@@ -14,7 +14,7 @@ from App_Function_Libraries.Utils.Utils import load_and_log_configs, loaded_conf
 #
 # Functions:
 
-# FIXME - Setup in Config?
+# FIXME - Setup in Config
 # Global variable for compiled Yara rules.
 COMPILED_YARA_RULES = None
 
