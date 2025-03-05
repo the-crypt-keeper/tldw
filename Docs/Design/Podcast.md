@@ -22,5 +22,6 @@ https://github.com/aedocw/epub2tts
 https://github.com/plusuncold/autiobooks
 https://claudio.uk/posts/audiblez-v4.html
 https://github.com/dbamman/litbank
+https://github.com/prakharsr/audiobook-creator/
 
 

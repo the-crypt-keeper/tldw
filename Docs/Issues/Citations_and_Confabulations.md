@@ -17,7 +17,7 @@ https://github.com/tangzhy/RealCritic
 https://huggingface.co/papers/2502.09604
 https://github.com/voidism/SelfCite
 https://liveideabench.com/
-
+https://github.com/lechmazur/confabulations
 RAG
   https://www.lycee.ai/blog/rag-ragallucinations-and-how-to-fight-them
   https://huggingface.co/PleIAs/Pleias-Nano
