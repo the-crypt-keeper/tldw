@@ -5,15 +5,16 @@
 #
 # External Imports
 import os
+import platform
 import queue
 import threading
+import wave
 
 import gradio as gr
 #
 # Local Imports
 from App_Function_Libraries.Audio.Audio_Files import process_audio_files
-from App_Function_Libraries.Audio.Audio_Transcription_Lib import get_system_audio_devices, parse_device_id, \
-    record_audio_to_disk, PartialTranscriptionThread, stop_recording_short, test_device_availability
+from App_Function_Libraries.Audio.Audio_Transcription_Lib import PartialTranscriptionThread
 from App_Function_Libraries.DB.DB_Manager import list_prompts
 from App_Function_Libraries.Gradio_UI.Chat_ui import update_user_prompt
 from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models
@@ -44,31 +45,20 @@ def create_audio_processing_tab():
         ###############################################################################
         # Indefinite Recording UI: states and controls
         ###############################################################################
-        # We'll keep track of indefinite recording states here
-        recording_state = gr.State()  # dict storing references (threads, WAV path, etc.)
-        is_recording = gr.State(value=False)  # simple bool
-        partial_text_state = gr.State({"text": ""})  # holds partial transcripts
-        final_wav_path_state = gr.State(None)        # path to final WAV after stopping
+        recording_state = gr.State()  # Stores PyAudio stream, file handle, and device info
+        is_recording = gr.State(value=False)
+        partial_text_state = gr.State({"text": ""})
+        final_wav_path_state = gr.State(None)
 
-        lock = threading.Lock()  # used by partial thread if needed
+        # Shared variable (with lock) for partial transcript updates
+        lock = threading.Lock()
+        shared_partial_text = {"text": ""}
 
-        # The "Record System Audio?" checkbox
         record_system_audio = gr.Checkbox(
             label="Record System Audio Output?",
             value=False,
             info="Enable indefinite system-audio recording (loopback)."
         )
-
-        # Device, consent, partial interval, live/final model dropdowns
-        audio_devices = get_system_audio_devices()
-
-        system_audio_device = gr.Dropdown(
-            choices=[f"{d['id']}: {d['name']}" for d in audio_devices],
-            label="Select Output Device to Record",
-            visible=False
-        )
-
-        test_device_button = gr.Button("Test Selected Device")
 
         consent_checkbox = gr.Checkbox(
             label="✅ I have obtained all necessary consents to record this audio",
@@ -83,7 +73,7 @@ def create_audio_processing_tab():
         live_trans_model = gr.Dropdown(
             label="Live (Partial) Model",
             choices=whisper_models,
-            value="base",
+            value="distil-large-v3",
             visible=False
         )
         final_trans_model = gr.Dropdown(
@@ -93,54 +83,28 @@ def create_audio_processing_tab():
             visible=False
         )
 
-        # The indefinite start/stop button, partial/final text boxes, and a "transcribe now" button
         record_button = gr.Button("Start Recording", visible=False)
-        partial_txt = gr.Textbox(label="Partial Transcript (Live)", lines=3, interactive=False, visible=False)
-        final_txt = gr.Textbox(label="Final Transcript (Stopped)", lines=3, interactive=False, visible=False)
+        transcribe_now_button = gr.Button("Transcribe Full Recording", visible=False)
+        partial_txt = gr.Textbox(label="Partial Transcript (Live)", lines=6, interactive=False, visible=False)
+        final_txt = gr.Textbox(label="Final Transcript (Stopped)", lines=18, interactive=False, visible=False)
 
-        def on_test_device_click(device_str):
-            device_id = parse_device_id(device_str)
-            if device_id is None:
-                return "Please select a device first"
-
-            if test_device_availability(device_id):
-                return "✅ Device is available and working"
-            else:
-                return "❌ Device is not available or in use by another application"
-
-        test_device_button.click(
-            fn=on_test_device_click,
-            inputs=[system_audio_device],
-            outputs=[partial_txt]  # Showing result in the partial text box
-        )
-
-        transcribe_now_button = gr.Button("Transcribe Recorded Audio Now", visible=False)
+        # NEW: Audio component for playback/download after recording stops.
+        recorded_audio = gr.Audio(label="Recorded Audio", interactive=True, visible=False)
 
         ###############################################################################
         # Show/Hide logic for indefinite UI
         ###############################################################################
         def on_record_system_audio_change(enabled):
-            """
-            If user checks 'Record System Audio', show the relevant indefinite UI fields and hide the normal file upload.
-            """
+            """Updated to remove device selection"""
             return (
-                gr.update(visible=enabled),  # system_audio_device
                 gr.update(visible=enabled),  # consent_checkbox
                 gr.update(visible=enabled),  # partial_update_interval
                 gr.update(visible=enabled),  # live_trans_model
                 gr.update(visible=enabled),  # final_trans_model
-                gr.update(visible=not enabled)  # Hide the normal file uploader if indefinite is on
+                gr.update(visible=not enabled)  # Hide file uploader
             )
 
-        record_system_audio.change(
-            fn=on_record_system_audio_change,
-            inputs=[record_system_audio],
-            outputs=[system_audio_device, consent_checkbox, partial_update_interval,
-                     live_trans_model, final_trans_model]
-            + []  # we'll hide the file uploader in a moment
-        )
-
-        # We'll have a separate lambda that also toggles the record button, partial/final text, etc.
+        # Toggles the visibility of the indefinite-recording UI elements.
         def toggle_indefinite_ui(do_show):
             return (
                 gr.update(visible=do_show),  # record_button
@@ -149,29 +113,12 @@ def create_audio_processing_tab():
                 gr.update(visible=do_show)   # transcribe_now_button
             )
 
-        record_system_audio.change(
-            fn=toggle_indefinite_ui,
-            inputs=[record_system_audio],
-            outputs=[record_button, partial_txt, final_txt, transcribe_now_button]
-        )
-
         ###############################################################################
         # The indefinite record start/stop logic
         ###############################################################################
-        def toggle_recording(
-            currently_recording,
-            current_state,
-            device_str,
-            got_consent,
-            partial_interval,
-            live_model,
-            final_model
-        ):
-            """
-            If not recording, start indefinite recording (disk + partial thread).
-            If currently recording, stop and finalize.
-            """
-
+        def toggle_recording(currently_recording, current_state, got_consent, partial_interval, live_model, final_model):
+            """Handles start/stop recording and updates the partial transcript using a shared variable.
+               Also updates an audio component for playback/download."""
             if not got_consent:
                 return (
                     current_state,
@@ -179,106 +126,191 @@ def create_audio_processing_tab():
                     "Start Recording",
                     "[Consent Required]",
                     "",
-                    None
+                    None,
+                    gr.update(visible=False)  # Hide audio component if no consent
                 )
 
             if not currently_recording:
-                # --- START indefinite
-                device_id = parse_device_id(device_str)
-                stop_event = threading.Event()
-                audio_queue = queue.Queue()
+                # --- START indefinite recording
+                try:
+                    os_name = platform.system()
+                    if os_name == "Windows":
+                        # Windows: use pyaudiowpatch for WASAPI loopback recording
+                        import pyaudiowpatch as pyaudio
+                        p = pyaudio.PyAudio()
+                        wasapi_info = p.get_host_api_info_by_type(pyaudio.paWASAPI)
+                        default_speakers = p.get_device_info_by_index(wasapi_info["defaultOutputDevice"])
+                        if not default_speakers["isLoopbackDevice"]:
+                            for loopback in p.get_loopback_device_info_generator():
+                                if default_speakers["name"] in loopback["name"]:
+                                    default_speakers = loopback
+                                    break
+                            else:
+                                raise Exception("Loopback device not found")
+                        device_index = default_speakers["index"]
+                    elif os_name in ["Linux", "Darwin"]:
+                        # Linux and macOS: use PyAudio and search for a device with 'monitor' in its name
+                        import pyaudio
+                        p = pyaudio.PyAudio()
+                        device_index = None
+                        for i in range(p.get_device_count()):
+                            info = p.get_device_info_by_index(i)
+                            if "monitor" in info["name"].lower() and info["maxInputChannels"] > 0:
+                                device_index = i
+                                default_speakers = info
+                                break
+                        if device_index is None:
+                            raise Exception("No loopback/monitor device found for system audio recording. Please configure your system audio loopback.")
+                    else:
+                        raise Exception("Unsupported OS for system audio recording.")
 
-                # We'll store the WAV in the working directory or a temp folder
-                wav_path = os.path.join(os.getcwd(), "recorded_system_audio.wav")
+                    # Create WAV file
+                    wav_path = os.path.join(os.getcwd(), "recorded_system_audio.wav")
+                    wave_file = wave.open(wav_path, 'wb')
+                    wave_file.setnchannels(default_speakers["maxInputChannels"])
+                    # Use sample size from the correct library depending on OS.
+                    if os_name == "Windows":
+                        sample_size = p.get_sample_size(pyaudio.paInt16)
+                    else:
+                        sample_size = p.get_sample_size(pyaudio.paInt16)
+                    wave_file.setsampwidth(sample_size)
+                    wave_file.setframerate(int(default_speakers["defaultSampleRate"]))
 
-                # Start the disk-writing thread
-                rec_thread = threading.Thread(
-                    target=record_audio_to_disk,
-                    args=(device_id, wav_path, stop_event, audio_queue),
-                    daemon=True
-                )
-                rec_thread.start()
+                    # Create audio queue for partial transcription
+                    audio_queue = queue.Queue()
+                    stop_event = threading.Event()
 
-                # Start partial transcription
-                partial_thread = PartialTranscriptionThread(
-                    audio_queue=audio_queue,
-                    stop_event=stop_event,
-                    partial_text_state=partial_text_state.value,
-                    lock=lock,
-                    live_model=live_model,
-                    sample_rate=44100,
-                    channels=2,
-                    partial_update_interval=partial_interval,
-                    partial_chunk_seconds=5
-                )
-                partial_thread.start()
+                    # Define callback to write frames and enqueue audio data.
+                    def callback(in_data, frame_count, time_info, status):
+                        wave_file.writeframes(in_data)
+                        audio_queue.put(in_data)
+                        # paContinue is available in both libraries.
+                        return (in_data, pyaudio.paContinue)
 
-                new_state = {
-                    "stop_event": stop_event,
-                    "record_thread": rec_thread,
-                    "partial_thread": partial_thread,
-                    "wav_path": wav_path
-                }
-                partial_text_state.value["text"] = ""  # clear old partial
-                return (
-                    new_state,       # new indefinite state
-                    True,            # is_recording = True
-                    "Stop Recording",
-                    "",             # partial text
-                    "",             # final text
-                    None            # final_wav_path
-                )
+                    # Open stream using the proper device index.
+                    stream = p.open(
+                        format=pyaudio.paInt16,
+                        channels=default_speakers["maxInputChannels"],
+                        rate=int(default_speakers["defaultSampleRate"]),
+                        frames_per_buffer=512,
+                        input=True,
+                        input_device_index=device_index,
+                        stream_callback=callback
+                    )
+
+                    # Start partial transcription thread using the shared variable.
+                    partial_thread = PartialTranscriptionThread(
+                        audio_queue=audio_queue,
+                        stop_event=stop_event,
+                        partial_text_state=shared_partial_text,
+                        lock=lock,
+                        live_model=live_model,
+                        sample_rate=int(default_speakers["defaultSampleRate"]),
+                        channels=default_speakers["maxInputChannels"],
+                        partial_update_interval=partial_interval,
+                        partial_chunk_seconds=5
+                    )
+                    partial_thread.start()
+
+                    new_state = {
+                        "pyaudio": p,
+                        "stream": stream,
+                        "wave_file": wave_file,
+                        "partial_thread": partial_thread,
+                        "stop_event": stop_event,
+                        "wav_path": wav_path
+                    }
+                    return (
+                        new_state,
+                        True,
+                        "Stop Recording",
+                        "",  # Clear partial text on start
+                        "",
+                        None,
+                        gr.update(visible=False)  # Hide audio component while recording
+                    )
+                except Exception as e:
+                    logging.error(f"Recording start failed: {str(e)}")
+                    return (
+                        current_state,
+                        False,
+                        "Start Recording",
+                        f"Error: {str(e)}",
+                        "",
+                        None,
+                        gr.update(visible=False)
+                    )
             else:
-                # --- STOP indefinite
-                partial_text, partial_err, wav_path = stop_recording_short(current_state)
-                # partial_text may contain live partial transcript
-                final_msg = partial_text or ""
-                if partial_err:
-                    final_msg += f"\n{partial_err}"
+                # --- STOP indefinite recording
+                try:
+                    current_state["stop_event"].set()
+                    current_state["partial_thread"].join()
+                    current_state["stream"].stop_stream()
+                    current_state["stream"].close()
+                    current_state["wave_file"].close()
+                    current_state["pyaudio"].terminate()
 
-                # Store the final WAV path so user can do "Transcribe Now"
-                return (
-                    None,
-                    False,
-                    "Start Recording",
-                    final_msg,
-                    "",
-                    wav_path
-                )
+                    with lock:
+                        final_partial_text = shared_partial_text.get("text", "")
 
+                    return (
+                        None,
+                        False,
+                        "Start Recording",
+                        final_partial_text,  # Update final transcript with shared text
+                        "",
+                        current_state["wav_path"],
+                        gr.update(visible=True, value=current_state["wav_path"])  # Show audio component with recorded file
+                    )
+                except Exception as e:
+                    logging.error(f"Recording stop failed: {str(e)}")
+                    return (
+                        None,
+                        False,
+                        "Start Recording",
+                        f"Error stopping: {str(e)}",
+                        "",
+                        None,
+                        gr.update(visible=False)
+                    )
+
+        # Update record_button callback to include the new audio component output.
         record_button.click(
             fn=toggle_recording,
             inputs=[
                 is_recording,
                 recording_state,
-                system_audio_device,
                 consent_checkbox,
                 partial_update_interval,
                 live_trans_model,
                 final_trans_model
             ],
             outputs=[
-                recording_state,  # updated indefinite state
-                is_recording,     # bool
-                record_button,    # new button label
-                partial_txt,      # show partial (or errors)
-                final_txt,        # final transcript placeholder
-                final_wav_path_state
+                recording_state,
+                is_recording,
+                record_button,
+                partial_txt,
+                final_txt,
+                final_wav_path_state,
+                recorded_audio  # New output for audio playback/download
             ]
         )
 
         ###############################################################################
         # Timer to refresh partial transcript in UI
         ###############################################################################
-        def poll_partial(is_rec, partial_dict):
+        # Note: Removed the None input. Now the poll_partial function only accepts is_recording.
+        def poll_partial(is_rec):
+            with lock:
+                current_text = shared_partial_text.get("text", "")
             if is_rec:
-                return partial_dict.get("text", "")
-            return partial_dict.get("text", "") or "[Not Recording]"
+                return current_text
+            return current_text or "[Not Recording]"
 
         partial_refresher = gr.Timer(value=1.0)
         partial_refresher.tick(
             fn=poll_partial,
-            inputs=[is_recording, partial_text_state],
+            inputs=[is_recording],
             outputs=partial_txt
         )
 
@@ -294,8 +326,6 @@ def create_audio_processing_tab():
             if not final_wav_path or not os.path.exists(final_wav_path):
                 return "[No valid recorded WAV]", None
 
-            # You can either directly call your 'transcribe_audio' or use process_audio_files
-            # For demonstration, let's do a direct call to a helper in Audio_Transcription_Lib:
             from App_Function_Libraries.Audio.Audio_Transcription_Lib import transcribe_audio
             import wave
             import numpy as np
@@ -459,6 +489,13 @@ def create_audio_processing_tab():
                              page_display, current_page_state, total_pages_state]
                 )
 
+                record_system_audio.change(
+                    fn=on_record_system_audio_change,
+                    inputs=[record_system_audio],
+                    outputs=[consent_checkbox, partial_update_interval, live_trans_model, final_trans_model,
+                             audio_file_input]
+                )
+
                 def on_prev_page_click(cur_page, tot_pages):
                     new_page = max(cur_page - 1, 1)
                     prompts, total_pages, current_page = list_prompts(page=new_page, per_page=10)
@@ -586,7 +623,6 @@ def create_audio_processing_tab():
                 # The indefinite-recording inputs follow. If your process_audio_files
                 # doesn't handle them, it's harmless:
                 record_system_audio,
-                system_audio_device,
                 consent_checkbox
             ],
             outputs=[
@@ -594,6 +630,11 @@ def create_audio_processing_tab():
                 audio_transcription_output,
                 audio_summary_output
             ]
+        )
+        record_system_audio.change(
+            fn=toggle_indefinite_ui,
+            inputs=[record_system_audio],
+            outputs=[record_button, partial_txt, final_txt, transcribe_now_button]
         )
 
         ###############################################################################
