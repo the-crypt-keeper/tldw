@@ -52,7 +52,8 @@ Aquila
 BaiChuan omni
     https://github.com/baichuan-inc/Baichuan-Omni-1.5
 
-
+Cohere
+    https://huggingface.co/collections/CohereForAI/c4ai-aya-vision-67c4ccd395ca064308ee1484
 
 DeepSeek-VL2
     https://github.com/deepseek-ai/DeepSeek-VL2
