@@ -295,7 +295,7 @@ llama_api_retry = 3
 llama_api_retry_delay = 1
 #
 ooba_api_key =
-ooba_api_IP = http://192.168.2.235:5000/v1/chat/completions
+ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
 ooba_streaming = False
 ooba_temperature = 0.7
 ooba_top_p = 0.9
