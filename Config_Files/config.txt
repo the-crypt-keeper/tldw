@@ -44,6 +44,7 @@ character_db_path = Databases/chatDB.db
 
 
 [Chunking]
+# Chunking Defaults
 chunking_method = words
 # 'method' Can be 'words' / 'sentences' / 'paragraphs' / 'semantic' / 'tokens'
 chunk_max_size = 400
@@ -52,6 +53,87 @@ adaptive_chunking = false
 # Use ntlk+punkt to split text into sentences and then ID average sentence length and set that as the chunk size
 chunking_multi_level = false
 language = english
+#
+# Default Chunking Options for each media type
+#
+# Article Chunking
+article_chunking_method = 'words'
+article_chunk_max_size = 400
+article_chunk_overlap = 200
+article_adaptive_chunking = false
+#
+# Audio file Chunking
+audio_chunking_method = 'words'
+audio_chunk_max_size = 400
+audio_chunk_overlap = 200
+audio_adaptive_chunking = false
+audio_chunking_multi_level = false
+audio_language = english
+#
+# Book Chunking
+book_chunking_method = 'words'
+book_chunk_max_size = 400
+book_chunk_overlap = 200
+book_adaptive_chunking = false
+book_chunking_multi_level = false
+book_language = english
+#
+# Document Chunking
+document_chunking_method = 'words'
+document_chunk_max_size = 400
+document_chunk_overlap = 200
+document_adaptive_chunking = false
+document_chunking_multi_level = false
+document_language = english
+#
+# Mediawiki Article Chunking
+mediawiki_article_chunking_method = 'words'
+mediawiki_article_chunk_max_size = 400
+mediawiki_article_chunk_overlap = 200
+mediawiki_article_adaptive_chunking = false
+mediawiki_article_chunking_multi_level = false
+mediawiki_article_language = english
+#
+# Mediawiki Dump Chunking
+mediawiki_dump_chunking_method = 'words'
+mediawiki_dump_chunk_max_size = 400
+mediawiki_dump_chunk_overlap = 200
+mediawiki_dump_adaptive_chunking = false
+mediawiki_dump_chunking_multi_level = false
+mediawiki_dump_language = english
+#
+# Obsidian Note Chunking
+obsidian_note_chunking_method = 'words'
+obsidian_note_chunk_max_size = 400
+obsidian_note_chunk_overlap = 200
+obsidian_note_adaptive_chunking = false
+obsidian_note_chunking_multi_level = false
+obsidian_note_language = english
+#
+# Podcast Chunking
+podcast_chunking_method = 'words'
+podcast_chunk_max_size = 400
+podcast_chunk_overlap = 200
+podcast_adaptive_chunking = false
+podcast_chunking_multi_level = false
+podcast_language = english
+#
+# Text Chunking
+text_chunking_method = 'words'
+text_chunk_max_size = 400
+text_chunk_overlap = 200
+text_adaptive_chunking = false
+text_chunking_multi_level = false
+text_language = english
+#
+# Video Transcription Chunking
+video_chunking_method = 'words'
+video_chunk_max_size = 400
+video_chunk_overlap = 200
+video_adaptive_chunking = false
+video_chunking_multi_level = false
+video_language = english
+chunking_types = 'article', 'audio', '
 
 
 [Embeddings]
@@ -76,12 +158,18 @@ anthropic_temperature = 0.7
 anthropic_top_p = 0.95
 anthropic_min_p = 0.05
 anthropic_max_tokens = 4096
+anthropic_api_timeout = 90
+anthropic_api_retry = 3
+anthropic_api_retry_delay = 1
 #
 cohere_api_key = <cohere_api_key>
 cohere_model = command-r-plus
 cohere_streaming = True
 cohere_temperature = 0.7
 cohere_max_tokens = 4096
+cohere_api_timeout = 90
+cohere_api_retry = 3
+cohere_api_retry_delay = 1
 #
 #
 deepseek_api_key = <deepseek_api_key>
@@ -90,6 +178,10 @@ deepseek_model = deepseek-chat
 deepseek_streaming = True
 deepseek_temperature = 0.7
 deepseek_max_tokens = 4096
+deepseek_api_timeout = 90
+deepseek_api_retry = 3
+deepseek_api_retry_delay = 1
+
 #
 google_api_key = <google_api_key>
 # Available Model Options:
@@ -97,24 +189,36 @@ google_model = gemini-1.5-pro
 google_streaming = True
 google_temperature = 0.7
 google_max_tokens = 4096
+google_api_timeout = 90
+google_api_retry = 3
+google_api_retry_delay = 1
 #
 groq_api_key = <groq_api_key>
 groq_model = llama3-70b-8192
 groq_streaming = True
 groq_temperature = 0.7
 groq_max_tokens = 4096
+groq_api_timeout = 90
+groq_api_retry = 3
+groq_api_retry_delay = 1
 #
 huggingface_api_key = <huggingface_api_key>
 huggingface_model = meta-llama/Llama-3.1-70B-Instruct
 huggingface_streaming = True
 huggingface_temperature = 0.7
 huggingface_max_tokens = 4096
+huggingface_api_timeout = 90
+huggingface_api_retry = 3
+huggingface_api_retry_delay = 1
 #
 mistral_api_key = <mistral_api_key>
 mistral_model = mistral-large-latest
 mistral_streaming = True
 mistral_temperature = 0.7
 mistral_max_tokens = 4096
+mistral__api_timeout = 90
+mistral_api_retry = 3
+mistral_api_retry_delay = 1
 #
 openai_api_key = <openai_api_key>
 openai_model = gpt-4o
@@ -122,10 +226,16 @@ openai_streaming = False
 openai_temperature = 0.7
 openai_top_p = 0.95
 openai_max_tokens = 4096
+openai_api_timeout = 90
+openai_api_retry = 3
+openai_api_retry_delay = 1
 #
 openrouter_api_key = <openrouter_api_key>
 openrouter_model = mistralai/mistral-7b-instruct:free
 openrouter_max_tokens = 4096
+openrouter_api_timeout = 90
+openrouter_api_retry = 3
+openrouter_api_retry_delay = 1
 #
 elevenlabs_api_key = <eleven_labs_api_key>
 #
@@ -138,6 +248,9 @@ custom_openai_api_top_p = 0.9
 custom_openai_api_min_p = 0.05
 custom_openai_api_max_tokens = 4096
 custom_openai_api_timeout = 90
+custom_openai_api__api_retry = 3
+custom_openai_api__api_retry_delay = 1
+
 #
 custom_openai2_api_key = <custom_openai_api_key>
 custom_openai2_api_ip = <api_ip_here>
@@ -148,6 +261,9 @@ custom_openai2_api_top_p = 0.9
 custom_openai2_api_min_p = 0.05
 custom_openai2_api_max_tokens = 4096
 custom_openai2_api_timeout = 90
+custom_openai2_api_api_retry = 3
+custom_openai2_api_api_retry_delay = 1
+
 #
 default_api = openai
 
@@ -163,6 +279,8 @@ kobold_min_p = 0.05
 kobold_top_k = 100
 kobold_max_tokens = 4096
 kobold_api_timeout = 90
+kobold_api_retry = 3
+kobold_api_retry_delay = 1
 #
 llama_api_IP = http://127.0.0.1:8080/completion
 llama_api_key =
@@ -173,9 +291,11 @@ llama_min_p = 0.05
 llama_top_k = 100
 llama_max_tokens = 4096
 llama_api_timeout = 90
+llama_api_retry = 3
+llama_api_retry_delay = 1
 #
 ooba_api_key =
-ooba_api_IP = http://127.0.0.1:5000/v1/chat/completions
+ooba_api_IP = http://192.168.2.235:5000/v1/chat/completions
 ooba_streaming = False
 ooba_temperature = 0.7
 ooba_top_p = 0.9
@@ -183,6 +303,8 @@ ooba_min_p = 0.05
 ooba_top_k = 100
 ooba_max_tokens = 4096
 ooba_api_timeout = 90
+ooba_api_retry = 3
+ooba_api_retry_delay = 1
 #
 tabby_api_IP = http://127.0.0.1:5000/v1/chat/completions
 tabby_api_key =
@@ -191,6 +313,8 @@ tabby_temperature = 0.7
 tabby_top_k = 100
 tabby_max_tokens = 4096
 tabby_api_timeout = 90
+tabby_api_retry = 3
+tabby_api_retry_delay = 1
 #
 vllm_api_IP = http://127.0.0.1:8000/v1/chat/completions
 vllm_model =
@@ -202,6 +326,8 @@ vllm_min_p = 0.05
 vllm_top_k = 100
 vllm_max_tokens = 4096
 vllm_api_timeout = 90
+vllm_api_retry = 3
+vllm_api_retry_delay = 1
 #
 ollama_api_IP = http://127.0.0.1:11434/v1/chat/completions
 ollama_api_key =
@@ -210,7 +336,9 @@ ollama_streaming = False
 ollama_temperature = 0.7
 ollama_top_p = 0.9
 ollama_max_tokens = 4096
-ollama_api_timeout = 90
+ollama_api_timeout = 9009
+ollama_api_retry = 3
+ollama_api_retry_delay = 1
 #
 aphrodite_api_IP = http://127.0.0.1:8080/completion
 aphrodite_api_key =
@@ -221,6 +349,8 @@ aphrodite_min_p = 0.05
 aphrodite_model =
 aprhodite_max_tokens = 4096
 aphrodite_api_timeout = 90
+aphrodite_api_retry = 3
+aphrodite_api_retry_delay = 1
 #
 max_tokens = 4096
 local_api_timeout = 90
