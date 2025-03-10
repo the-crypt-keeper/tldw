@@ -2,6 +2,9 @@
 
 
 https://medium.com/@eliot64/bridging-legal-ai-and-trust-how-we-won-the-llm-x-law-hackathon-45081a8681d9
+https://github.com/Kain-90/RAG-Play
+https://github.com/superlinear-ai/raglite
+
 
 Unsorted
 
