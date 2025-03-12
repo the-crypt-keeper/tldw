@@ -20,6 +20,7 @@ https://huggingface.co/collections/stepfun-ai/step-audio-67b33accf45735bb21131b0
 https://github.com/mbzuai-oryx/LLMVoX
 https://github.com/abus-aikorea/voice-pro
 https://github.com/rmusser01/LiveBench/tree/llamacpp-api
+https://github.com/KartDriver/mira_converse/blob/main/server/src/server_audio_core.py
 
 ### Services
 - Google Cloud Text-to-Speech

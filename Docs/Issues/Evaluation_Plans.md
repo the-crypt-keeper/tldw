@@ -28,7 +28,8 @@
 
 LightEval + Argilla + distilabel
 - Open source, (will) support litellm and can use distilabel for synth data gen
-
+Agents
+    https://arxiv.org/html/2502.15840v1
 
 ETL
     https://github.com/opendatalab/OmniDocBench
@@ -577,6 +578,7 @@ https://github.com/opendatalab/OHR-Bench
 https://towardsdatascience.com/from-retrieval-to-intelligence-exploring-rag-agent-rag-and-evaluation-with-trulens-3c518af836ce
 https://arxiv.org/pdf/2411.09213
 https://huggingface.co/learn/cookbook/en/rag_evaluation
+
 
 
 
