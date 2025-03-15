@@ -117,6 +117,8 @@ Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)
     - **Linux:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Install_Update.sh && wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/Linux_Run_tldw.sh`
       - Install the necessary packages: `ffmpeg portaudio19-dev gcc build-essential python3-dev`
       - `chmod +x Linux_Install_Update.sh && ./Linux_Run_tldw.sh`
+      - Now run the executable installer script: `./Linux_Install_Update.sh`
+      - Then Run the app: `./Linux_Run_tldw.sh`
       - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
     - **MacOS:** `wget https://raw.githubusercontent.com/rmusser01/tldw/main/Helper_Scripts/Installer_Scripts/MacOS_Install_Update.sh`
       - `bash MacOS-Run-Install-Update.sh`
