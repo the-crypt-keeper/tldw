@@ -13,7 +13,7 @@
 - [VLM Evaluations](#vlm-evals)
 ----------------------------------------------------------------------------------------------------------------
 
-
+https://github.com/JackHopkins/factorio-learning-environment
 
 
     Answer Correctness: Checks the accuracy of the generated llm response compared to the ground truth.
@@ -28,6 +28,43 @@
 
 LightEval + Argilla + distilabel
 - Open source, (will) support litellm and can use distilabel for synth data gen
+Agents
+    https://arxiv.org/html/2502.15840v1
+
+ETL
+    https://github.com/opendatalab/OmniDocBench
+    https://huggingface.co/MMDocIR
+
+OCR/VLM
+    https://github.com/opendatalab/OHR-Bench
+    https://zerobench.github.io/
+
+web walking
+    https://arxiv.org/pdf/2501.07572v2
+
+
+TICK
+    https://arxiv.org/abs/2410.03608
+
+RAG eval dataset creation
+    https://medium.com/towards-data-science/how-to-create-a-rag-evaluation-dataset-from-documents-140daa3cbe71
+    https://arxiv.org/pdf/2409.02098v1
+
+
+
+RAG EVal
+    https://www.byhand.ai/p/beginners-guide-to-rag-evaluation
+    https://pub.towardsai.net/around-the-rag-in-80-questions-part-ii-4df03c6dba86
+    https://arxiv.org/pdf/2409.12941
+    https://arxiv.org/pdf/2410.23000
+    https://arxiv.org/pdf/2502.17163
+    https://arxiv.org/pdf/2502.18817
+        https://github.com/OpenBMB/ConsJudge
+    https://arxiv.org/pdf/2502.11444
+    https://arxiv.org/pdf/2502.01534
+    https://github.com/David-Li0406/Preference-Leakage
+    https://arxiv.org/pdf/2502.07445
+    https://arxiv.org/pdf/2502.12501
 
 
 https://nicholas.carlini.com/writing/2024/my-benchmark-for-large-language-models.html
@@ -541,6 +578,7 @@ https://github.com/opendatalab/OHR-Bench
 https://towardsdatascience.com/from-retrieval-to-intelligence-exploring-rag-agent-rag-and-evaluation-with-trulens-3c518af836ce
 https://arxiv.org/pdf/2411.09213
 https://huggingface.co/learn/cookbook/en/rag_evaluation
+
 
 
 

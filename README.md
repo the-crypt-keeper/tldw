@@ -11,10 +11,15 @@
 ## All Automated. All Local. All Yours.
 </div>
 
-### Latest Update (2/6/2025):
+### Latest Update (3/14/2025):
 <details>
 
-- F
+- Currently pausing all work on extra features, current goal is migration to FastAPI backend and a new JS frontend.
+- Finally getting away from Gradio. (Gradio was a placeholder UI to facilitate setting up the app and getting it working/showing it as a proof of concept)
+- First bits after migrating to FastAPI will be consolidation of ingestion and summarization into a single endpoint in the UI.
+- Working on TTS support for more models
+- Adding temp file upload for chatting without ingesting files into the DB
+- 
 </details>
 
 ### [Public Demo on HuggingFace Spaces](https://huggingface.co/spaces/oceansweep/Vid-Summarizer/?__theme=dark)- Demo is not working!

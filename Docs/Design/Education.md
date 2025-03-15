@@ -4,7 +4,7 @@
 ### Link Dump:
 https://arxiv.org/abs/2412.02035
 https://github.com/andreamust/NEON-GPT
-
+https://arxiv.org/abs/2412.02035v1
 https://arxiv.org/abs/2411.07407
 https://arxiv.org/abs/2412.16429
 https://huggingface.co/papers/2412.15443
@@ -17,7 +17,7 @@ https://github.com/Rolandjg/skool4free
 https://paperswithcode.com/paper/into-the-unknown-unknowns-engaged-human
 https://arxiv.org/pdf/2501.09092
 https://knowt.com/
-
+https://ai-cosmos.hashnode.dev/the-limits-of-ai-in-education-lessons-from-a-spanish-tutor-experiment
 
 one2manny
  — 
