@@ -33,11 +33,7 @@ phonemizer~=3.3.0
 Pillow~=10.3.0
 #piper-tts
 playwright~=1.44.0
-# I'm not using postgres yet...
-#psycopg2
-#psycopg2-binary
 psutil~=5.9.8
-#psycopg2-binary
 pyannote.audio
 PyAudio~=0.2.14
 pydub~=0.25.1
@@ -79,8 +75,6 @@ torchvision
 bert-score~=0.3.13
 loguru~=0.7.3
 future~=1.0.0
-psycopg2~=2.9.9
-psycopg2-binary~=2.9.10
 scikit-learn~=1.5.1
 sentence-transformers~=3.0.1
 bs4~=0.0.2
