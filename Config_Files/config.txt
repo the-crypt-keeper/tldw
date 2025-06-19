@@ -429,6 +429,19 @@ default_custom_openai_api_ip = http://
 default_custom_openai_api_streaming = True
 
 
+[STT-Settings]
+# Speech-to-Text Settings
+default_stt_provider = faster_whisper
+# Language for audio transcription (e.g., 'en' for English, 'es' for Spanish, 'fr' for French, etc.)
+# Use 'auto' to auto-detect the language or specify a language code
+default_stt_language = en
+# Whisper model to use for transcription
+# Options: tiny, base, small, medium, large, large-v2, large-v3, distil-large-v2, distil-large-v3
+default_whisper_model = distil-large-v3
+# Enable voice activity detection filter
+default_vad_filter = false
+
+
 [Search-Engines]
 # Search Defaults
 search_provider_default = google
