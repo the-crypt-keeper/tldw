@@ -1175,6 +1175,7 @@ def load_and_log_configs():
                 'analyze_search_results_prompt': analyze_search_results_prompt,
             },
         }
+        return config_data
     except Exception as e:
         logging.error(f"Error loading config: {str(e)}")
         return None
