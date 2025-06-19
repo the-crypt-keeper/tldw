@@ -41,6 +41,7 @@ pydantic==2.10.6
 pymupdf~=1.24.13
 pymupdf4llm~=0.0.17
 docling~=2.4.0
+pydantic==2.10.6 # I didn't think I could hate Gradio more than I already did.
 #PyAudioWPatch # For windows system recording
 pypandoc~=1.13
 pypandoc_binary
