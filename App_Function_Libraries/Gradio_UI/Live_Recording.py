@@ -17,7 +17,8 @@ from App_Function_Libraries.Audio.Audio_Transcription_Lib import (record_audio, 
                                                                  stop_recording_infinite, transcribe_audio)
 from App_Function_Libraries.DB.DB_Manager import add_media_to_database
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
+from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging, load_and_log_configs
+from App_Function_Libraries.Utils.Whisper_Languages import get_whisper_language_list, get_language_code
 
 #
 #######################################################################################################################
@@ -148,7 +149,7 @@ def toggle_recording(
     partial_text_state,
     final_text_state,
     whisper_model,
-    speaker_lang="en"
+    transcription_language=None
 ):
     """
     Returns:
@@ -162,6 +163,9 @@ def toggle_recording(
 
     # ---------------- START ----------------
     if not is_recording:
+        # Convert language name to code
+        lang_code = get_language_code(transcription_language) if transcription_language else "auto"
+        
         # Start indefinite recording
         log_counter("live_recording_start_attempt")
         p, stream, audio_queue, stop_event, audio_thread = record_audio_indef()
@@ -182,7 +186,7 @@ def toggle_recording(
                 sample_rate=16000,
                 update_interval=2.0,
                 whisper_model=whisper_model,
-                speaker_lang=speaker_lang
+                speaker_lang=lang_code
             )
             partial_thread.start()
 
@@ -195,7 +199,8 @@ def toggle_recording(
             "audio_thread": audio_thread,
             "partial_thread": partial_thread,
             "lock": lock,
-            "whisper_model": whisper_model
+            "whisper_model": whisper_model,
+            "lang_code": lang_code
         }
 
         # CLEAR partial/final from prior session
@@ -265,13 +270,16 @@ def toggle_recording(
         # Transcribe
         audio_np = np.frombuffer(raw_audio, dtype=np.int16).astype(np.float32) / 32768.0
 
+        # Get language code from recording state
+        lang_code = recording_state.get("lang_code", "auto")
+
         try:
             final_res = transcribe_audio(
                 audio_np,
                 transcription_method,
                 sample_rate=16000,
                 whisper_model=whisper_model,
-                speaker_lang=speaker_lang
+                speaker_lang=lang_code
             )
         except Exception as e:
             final_res = f"[Error in final transcription: {str(e)}]"
@@ -389,6 +397,20 @@ def create_live_recording_tab():
                     choices=whisper_models,
                     value="distil-large-v3"
                 )
+                
+                # Add language selection dropdown
+                loaded_config_data = load_and_log_configs()
+                default_lang = loaded_config_data['STT_Settings'].get('default_stt_language', 'en')
+                language_choices = get_whisper_language_list()
+                default_lang_name = next((name for code, name in language_choices if code == default_lang), "English")
+                
+                transcription_language = gr.Dropdown(
+                    choices=[name for code, name in language_choices],
+                    value=default_lang_name,
+                    label="Transcription Language",
+                    info="Select the language of the audio, or use Auto-detect"
+                )
+                
                 live_update = gr.Checkbox(label="Enable Live Transcription", value=False)
                 save_recording = gr.Checkbox(label="Save WAV after Stopping", value=False)
                 save_to_db_chk = gr.Checkbox(label="Save to DB after Stopping?", value=False)
@@ -433,7 +455,8 @@ def create_live_recording_tab():
                 save_recording,
                 partial_text_state,
                 final_text_state,
-                whisper_model
+                whisper_model,
+                transcription_language
             ],
             outputs=[
                 recording_state,  # 0

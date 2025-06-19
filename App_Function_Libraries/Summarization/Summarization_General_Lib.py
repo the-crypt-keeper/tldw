@@ -1926,7 +1926,7 @@ def process_video_urls(url_list, num_speakers, whisper_model, custom_prompt_inpu
     return current_progress, success_message, None, None, None, None
     #return current_progress, success_message, summary, json_file_path, summary_file_path, None
 
-def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize=False, overwrite=False):
+def perform_transcription(video_path, offset, whisper_model, vad_filter, selected_source_lang=None, diarize=False, overwrite=False):
     temp_files = []
     logging.info(f"Processing media: {video_path}")
     global segments_json_path
@@ -2036,7 +2036,7 @@ def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize
         else:
             # Generate new transcription if file doesn't exist
 
-            audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter)
+            audio_file, segments = re_generate_transcription(audio_file_path, whisper_model, vad_filter, selected_source_lang)
             if segments is None:
                 logging.error("Failed to generate new transcription")
                 return None, None
@@ -2047,14 +2047,14 @@ def perform_transcription(video_path, offset, whisper_model, vad_filter, diarize
         return None, None
 
 
-def re_generate_transcription(audio_file_path, whisper_model, vad_filter):
+def re_generate_transcription(audio_file_path, whisper_model, vad_filter, selected_source_lang=None):
     """
     Re-generate the transcription by calling speech_to_text.
     """
     global segments_json_path
     try:
         logging.info(f"Generating new transcription for {audio_file_path}")
-        segments = speech_to_text(audio_file_path, whisper_model=whisper_model, vad_filter=vad_filter)
+        segments = speech_to_text(audio_file_path, whisper_model=whisper_model, selected_source_lang=selected_source_lang, vad_filter=vad_filter)
 
         # Print the first few segments for debugging
         logging.debug(f"First few segments from speech_to_text: {segments[:2] if segments else 'None'}")

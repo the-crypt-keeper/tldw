@@ -403,7 +403,7 @@ def launch_ui(share_public=None, server_mode=False):
     #migrate_media_db_to_rag_chat_db(media_db_path, rag_chat_db_path)
 
 
-    with gr.Blocks(theme='bethecloud/storj_theme',css=css) as iface:
+    with gr.Blocks(theme='default',css=css) as iface:
         gr.HTML(
             """
             <script>

@@ -604,6 +604,9 @@ def load_and_log_configs():
 
         # STT Settings
         default_stt_provider = config.get('STT-Settings', 'default_stt_provider', fallback='faster_whisper')
+        default_stt_language = config.get('STT-Settings', 'default_stt_language', fallback='en')
+        default_whisper_model = config.get('STT-Settings', 'default_whisper_model', fallback='distil-large-v3')
+        default_vad_filter = config.get('STT-Settings', 'default_vad_filter', fallback='false')
 
         # TTS Settings
         # FIXME
@@ -1071,6 +1074,9 @@ def load_and_log_configs():
             'local_api_timeout': local_api_timeout,
             'STT_Settings': {
                 'default_stt_provider': default_stt_provider,
+                'default_stt_language': default_stt_language,
+                'default_whisper_model': default_whisper_model,
+                'default_vad_filter': default_vad_filter,
             },
             'tts_settings': {
                 'default_tts_provider': default_tts_provider,
@@ -1175,6 +1181,7 @@ def load_and_log_configs():
                 'analyze_search_results_prompt': analyze_search_results_prompt,
             },
         }
+        return config_data
     except Exception as e:
         logging.error(f"Error loading config: {str(e)}")
         return None

@@ -37,6 +37,7 @@ psutil~=5.9.8
 pyannote.audio
 PyAudio~=0.2.14
 pydub~=0.25.1
+pydantic==2.10.6 
 pymupdf~=1.24.13
 pymupdf4llm~=0.0.17
 docling~=2.4.0

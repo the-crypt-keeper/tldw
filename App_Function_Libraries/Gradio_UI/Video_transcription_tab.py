@@ -27,6 +27,7 @@ from App_Function_Libraries.Video_DL_Ingestion_Lib import parse_and_expand_urls,
 from App_Function_Libraries.Benchmarks_Evaluations.ms_g_eval import run_geval
 # Import metrics logging
 from App_Function_Libraries.Metrics.metrics_logger import log_counter, log_histogram
+from App_Function_Libraries.Utils.Whisper_Languages import get_whisper_language_list, get_language_code
 #
 #######################################################################################################################
 #
@@ -57,6 +58,19 @@ def create_video_transcription_tab():
                                        lines=5)
                 video_files = gr.File(label="Upload Video File(s) (Optional)", file_types=[".mp4", ".avi", ".mov", ".mkv", ".webm"], file_count="multiple")
                 whisper_model_input = gr.Dropdown(choices=whisper_models, value="distil-large-v3", label="Whisper Model")
+                
+                # Add language selection dropdown
+                loaded_config_data = load_and_log_configs()
+                default_lang = loaded_config_data['STT_Settings'].get('default_stt_language', 'en')
+                language_choices = get_whisper_language_list()
+                default_lang_name = next((name for code, name in language_choices if code == default_lang), "English")
+                
+                transcription_language = gr.Dropdown(
+                    choices=[name for code, name in language_choices],
+                    value=default_lang_name,
+                    label="Transcription Language",
+                    info="Select the language of the audio, or use Auto-detect"
+                )
 
                 with gr.Row():
                     diarize_input = gr.Checkbox(label="Enable Speaker Diarization", value=False)
@@ -271,6 +285,7 @@ def create_video_transcription_tab():
                         diarize,
                         vad_use,
                         whisper_model,
+                        transcription_language,
                         custom_prompt_checkbox,
                         custom_prompt,
                         chunking_options_checkbox,
@@ -402,8 +417,12 @@ def create_video_transcription_tab():
 
                                 logging.debug("Gradio_Related.py: process_url_with_metadata being called")
                                 # FIXME - Would assume this is where the multi-processing for recursive summarization would occur
+                                # Convert language name to code
+                                lang_code = get_language_code(transcription_language) if transcription_language else "auto"
+                                
                                 result = process_url_with_metadata(
                                     input_item, 2, whisper_model,
+                                    lang_code,
                                     custom_prompt,
                                     start_seconds, api_name, api_key,
                                     vad_use, False, False, summarize_recursively, 0.01, None, keywords, None, diarize,
@@ -604,7 +623,7 @@ def create_video_transcription_tab():
                     )
 
             def process_videos_wrapper(url_input, video_files, start_time, end_time, diarize, vad_use, whisper_model,
-                                       custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
+                                       transcription_language, custom_prompt_checkbox, custom_prompt, chunking_options_checkbox,
                                        perform_chunking, chunk_method, max_chunk_size, chunk_overlap,
                                        use_adaptive_chunking, use_multi_level_chunking, chunk_language,
                                        summarize_recursively, api_name, api_key, keywords, use_cookies, cookies,
@@ -663,6 +682,7 @@ def create_video_transcription_tab():
                         diarize,
                         vad_use,
                         whisper_model,
+                        transcription_language,
                         custom_prompt_checkbox,
                         custom_prompt,
                         chunking_options_checkbox,
@@ -719,6 +739,7 @@ def create_video_transcription_tab():
                 input_item,
                 num_speakers,
                 whisper_model,
+                transcription_language,
                 custom_prompt,
                 offset,
                 api_name,
@@ -896,7 +917,7 @@ def create_video_transcription_tab():
                     logging.info("process_url_with_metadata: Starting transcription...")
                     logging.info(f"process_url_with_metadata: overwrite existing?: {overwrite_existing}")
                     audio_file_path, segments = perform_transcription(video_file_path, offset, whisper_model,
-                                                                      vad_filter, diarize, overwrite_existing)
+                                                                      vad_filter, transcription_language, diarize, overwrite_existing)
 
                     if audio_file_path is None or segments is None:
                         logging.error("process_url_with_metadata: Transcription failed or segments not available.")
@@ -1110,6 +1131,7 @@ def create_video_transcription_tab():
                     diarize_input,
                     vad_checkbox,
                     whisper_model_input,
+                    transcription_language,
                     custom_prompt_checkbox,
                     custom_prompt_input,
                     chunking_options_checkbox,

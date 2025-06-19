@@ -297,7 +297,7 @@ def parse_device_id(selected_device_text: str):
 
 ##########################################################
 # Transcription Sink Function
-def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate: int = 16000, speaker_lang=None, whisper_model="distil-large-v3") -> str:
+def transcribe_audio(audio_data: np.ndarray, transcription_provider=None, sample_rate: int = 16000, speaker_lang=None, whisper_model=None) -> str:
     """
     Unified transcribe entry point.
     Chooses faster-whisper or Qwen2Audio based on config.
@@ -305,7 +305,11 @@ def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate
     loaded_config_data = load_and_log_configs()
     if not transcription_provider:
         # Load default transcription provider via config file
-        transcription_provider = loaded_config_data['STT-Settings']['default_transcriber']
+        transcription_provider = loaded_config_data['STT_Settings']['default_stt_provider']
+    if whisper_model is None:
+        whisper_model = loaded_config_data['STT_Settings'].get('default_whisper_model', 'distil-large-v3')
+    if speaker_lang is None:
+        speaker_lang = loaded_config_data['STT_Settings'].get('default_stt_language', 'en')
 
     if transcription_provider.lower() == 'qwen2audio':
         logging.info("Transcribing using Qwen2Audio")
@@ -650,15 +654,25 @@ def format_time(total_seconds: float) -> str:
 
 def speech_to_text(
     audio_file_path: str,
-    whisper_model: str = 'distil-large-v3',
-    selected_source_lang: str = 'en',  # Changed order of parameters
-    vad_filter: bool = False,
+    whisper_model: str = None,
+    selected_source_lang: str = None,  # Changed order of parameters
+    vad_filter: bool = None,
     diarize: bool = False
 ):
     """
     Transcribe audio to text using a Whisper model and optionally handle diarization.
     Saves JSON output to {filename}-whisper_model-{model}.segments.json in the same directory.
     """
+    
+    # Load defaults from config if not provided
+    loaded_config_data = load_and_log_configs()
+    if whisper_model is None:
+        whisper_model = loaded_config_data['STT_Settings'].get('default_whisper_model', 'distil-large-v3')
+    if selected_source_lang is None:
+        selected_source_lang = loaded_config_data['STT_Settings'].get('default_stt_language', 'en')
+    if vad_filter is None:
+        vad_filter_str = loaded_config_data['STT_Settings'].get('default_vad_filter', 'false')
+        vad_filter = vad_filter_str.lower() == 'true'
 
     log_counter("speech_to_text_attempt", labels={"file_path": audio_file_path, "model": whisper_model})
     time_start = time.time()

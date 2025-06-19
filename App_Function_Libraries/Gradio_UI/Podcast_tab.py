@@ -9,8 +9,10 @@ import gradio as gr
 # Local Imports
 from App_Function_Libraries.Audio.Audio_Files import process_podcast
 from App_Function_Libraries.DB.DB_Manager import list_prompts
-from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models, update_user_prompt
-from App_Function_Libraries.Utils.Utils import default_api_endpoint, global_api_endpoints, format_api_name, logging
+from App_Function_Libraries.Gradio_UI.Gradio_Shared import whisper_models
+from App_Function_Libraries.Utils.Whisper_Languages import get_whisper_language_list, get_language_code
+from App_Function_Libraries.Utils.Utils import load_and_log_configs, default_api_endpoint, global_api_endpoints, format_api_name, logging
+from App_Function_Libraries.Gradio_UI.Gradio_Shared import update_user_prompt
 #
 ########################################################################################################################
 #
@@ -194,6 +196,19 @@ def create_podcast_tab():
                 )
                 podcast_api_key_input = gr.Textbox(label="API Key (if required)", type="password")
                 podcast_whisper_model_input = gr.Dropdown(choices=whisper_models, value="distil-large-v3", label="Whisper Model")
+                
+                # Add language selection dropdown
+                loaded_config_data = load_and_log_configs()
+                default_lang = loaded_config_data['STT_Settings'].get('default_stt_language', 'en')
+                language_choices = get_whisper_language_list()
+                default_lang_name = next((name for code, name in language_choices if code == default_lang), "English")
+                
+                transcription_language = gr.Dropdown(
+                    choices=[name for code, name in language_choices],
+                    value=default_lang_name,
+                    label="Transcription Language",
+                    info="Select the language of the audio, or use Auto-detect"
+                )
 
                 keep_original_input = gr.Checkbox(label="Keep original audio file", value=False)
                 enable_diarization_input = gr.Checkbox(label="Enable speaker diarization", value=False)
@@ -250,6 +265,7 @@ def create_podcast_tab():
                 podcast_api_name_input,
                 podcast_api_key_input,
                 podcast_whisper_model_input,
+                transcription_language,
                 keep_original_input,
                 enable_diarization_input,
                 use_cookies_input,

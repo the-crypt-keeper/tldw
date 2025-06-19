@@ -36,6 +36,7 @@ from App_Function_Libraries.Utils.Utils import downloaded_files, \
     sanitize_filename, generate_unique_id, temp_files, logging
 from App_Function_Libraries.Video_DL_Ingestion_Lib import extract_metadata
 from App_Function_Libraries.Audio.Audio_Transcription_Lib import speech_to_text
+from App_Function_Libraries.Utils.Whisper_Languages import get_language_code
 from App_Function_Libraries.Chunk_Lib import improved_chunking_process
 #
 #######################################################################################################################
@@ -104,7 +105,7 @@ def download_audio_file(url, current_whisper_model="", use_cookies=False, cookie
         logging.error(f"Unexpected error downloading audio file: {str(e)}")
         raise
 
-def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_key, use_cookies, cookies, keep_original,
+def process_audio_files(audio_urls, audio_files, whisper_model, transcription_language, api_name, api_key, use_cookies, cookies, keep_original,
                         custom_keywords, custom_prompt_input, chunk_method, max_chunk_size, chunk_overlap,
                         use_adaptive_chunking, use_multi_level_chunking, chunk_language, diarize,
                         keep_timestamps, custom_title, record_system_audio, recording_duration,
@@ -116,6 +117,9 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
             raise ValueError("You must confirm you have consent to record audio")
         if not system_audio_device:
             raise ValueError("Please select an audio output device to record from")
+
+    # Convert language name to code
+    lang_code = get_language_code(transcription_language) if transcription_language else "auto"
 
     # Add recording logic before processing files
     recorded_files = []
@@ -260,7 +264,7 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
                     temp_files.append(wav_file_path)
 
                     # Transcribe audio
-                    segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=diarize)
+                    segments = speech_to_text(wav_file_path, whisper_model=whisper_model, selected_source_lang=lang_code, diarize=diarize)
 
                     # Handle segments format
                     if isinstance(segments, dict) and 'segments' in segments:
@@ -341,7 +345,7 @@ def process_audio_files(audio_urls, audio_files, whisper_model, api_name, api_ke
                     temp_files.append(wav_file_path)
 
                     # Transcribe audio
-                    segments = speech_to_text(wav_file_path, whisper_model=whisper_model, diarize=diarize)
+                    segments = speech_to_text(wav_file_path, whisper_model=whisper_model, selected_source_lang=lang_code, diarize=diarize)
 
                     if isinstance(segments, dict) and 'segments' in segments:
                         segments = segments['segments']
@@ -528,7 +532,7 @@ def download_youtube_audio(url):
 
 
 def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_key, whisper_model,
-                    keep_original=False, enable_diarization=False, use_cookies=False, cookies=None,
+                    transcription_language=None, keep_original=False, enable_diarization=False, use_cookies=False, cookies=None,
                     chunk_method=None, max_chunk_size=300, chunk_overlap=0, use_adaptive_chunking=False,
                     use_multi_level_chunking=False, chunk_language='english', keep_timestamps=True):
     """
@@ -595,6 +599,9 @@ def process_podcast(url, title, author, keywords, custom_prompt, api_name, api_k
     progress = []  # Initialize progress messages
 
     try:
+        # Convert language name to code
+        lang_code = get_language_code(transcription_language) if transcription_language else "auto"
+        
         # Handle cookies if required
         if use_cookies:
             cookies = json.loads(cookies)
@@ -639,9 +646,9 @@ Description: {metadata.get('description', 'N/A')}
         # Transcribe the podcast audio
         try:
             if enable_diarization:
-                segments = speech_to_text(audio_file, whisper_model=whisper_model, diarize=True)
+                segments = speech_to_text(audio_file, whisper_model=whisper_model, selected_source_lang=lang_code, diarize=True)
             else:
-                segments = speech_to_text(audio_file, whisper_model=whisper_model)
+                segments = speech_to_text(audio_file, whisper_model=whisper_model, selected_source_lang=lang_code)
             # SEems like this could be optimized... FIXME
             def format_segment(segment):
                 start = segment.get('start', 0)
