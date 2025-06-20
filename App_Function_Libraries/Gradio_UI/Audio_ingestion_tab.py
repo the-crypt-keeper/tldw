@@ -117,7 +117,7 @@ def create_audio_processing_tab():
         ###############################################################################
         # The indefinite record start/stop logic
         ###############################################################################
-        def toggle_recording(currently_recording, current_state, got_consent, partial_interval, live_model, final_model):
+        def toggle_recording(currently_recording, current_state, got_consent, partial_interval, live_model, final_model, transcription_language_name: str):
             """Handles start/stop recording and updates the partial transcript using a shared variable.
                Also updates an audio component for playback/download."""
             if not got_consent:
@@ -165,6 +165,7 @@ def create_audio_processing_tab():
                     else:
                         raise Exception("Unsupported OS for system audio recording.")
 
+                    lang_code = get_language_code(transcription_language_name)
                     # Create WAV file
                     wav_path = os.path.join(os.getcwd(), "recorded_system_audio.wav")
                     wave_file = wave.open(wav_path, 'wb')
@@ -209,7 +210,8 @@ def create_audio_processing_tab():
                         sample_rate=int(default_speakers["defaultSampleRate"]),
                         channels=default_speakers["maxInputChannels"],
                         partial_update_interval=partial_interval,
-                        partial_chunk_seconds=5
+                        partial_chunk_seconds=5,
+                        language_code=lang_code
                     )
                     partial_thread.start()
 
@@ -284,7 +286,8 @@ def create_audio_processing_tab():
                 consent_checkbox,
                 partial_update_interval,
                 live_trans_model,
-                final_trans_model
+                final_trans_model,
+                transcription_language
             ],
             outputs=[
                 recording_state,
@@ -318,7 +321,7 @@ def create_audio_processing_tab():
         ###############################################################################
         # A button to transcribe the final WAV "now"
         ###############################################################################
-        def do_final_transcription(final_wav_path, chosen_final_model):
+        def do_final_transcription(final_wav_path, chosen_final_model, transcription_language_name: str):
             """
             Reads the entire WAV from disk, transcribes with chosen_final_model.
             Returns final transcript text + the path for re-use if needed.
@@ -331,6 +334,7 @@ def create_audio_processing_tab():
             import wave
             import numpy as np
 
+            lang_code = get_language_code(transcription_language_name)
             try:
                 with wave.open(final_wav_path, 'rb') as wf:
                     frames = wf.getnframes()
@@ -349,7 +353,8 @@ def create_audio_processing_tab():
                     audio_data=audio_np,
                     transcription_provider="faster-whisper",  # or user config
                     sample_rate=rate,
-                    whisper_model=chosen_final_model
+                    whisper_model=chosen_final_model,
+                    speaker_lang=(None if lang_code == "auto" else lang_code)
                 )
                 return final_res, final_wav_path
             except Exception as e:
@@ -357,7 +362,7 @@ def create_audio_processing_tab():
 
         transcribe_now_button.click(
             fn=do_final_transcription,
-            inputs=[final_wav_path_state, final_trans_model],
+            inputs=[final_wav_path_state, final_trans_model, transcription_language],
             outputs=[final_txt, final_wav_path_state]
         )
 

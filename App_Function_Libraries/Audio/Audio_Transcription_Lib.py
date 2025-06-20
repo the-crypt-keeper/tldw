@@ -91,6 +91,7 @@ class PartialTranscriptionThread(threading.Thread):
         channels=2,
         partial_update_interval=2.0,   # how often we attempt a partial transcription
         partial_chunk_seconds=5,
+        language_code: str = "auto"
     ):
         super().__init__(daemon=True)
         self.audio_queue = audio_queue
@@ -98,6 +99,7 @@ class PartialTranscriptionThread(threading.Thread):
         self.partial_text_state = partial_text_state
         self.lock = lock
         self.live_model = live_model
+        self.language_code = language_code
 
         self.sample_rate = sample_rate
         self.channels = channels
@@ -153,7 +155,7 @@ class PartialTranscriptionThread(threading.Thread):
                         audio_np,
                         sample_rate=self.sample_rate,
                         whisper_model=self.live_model,
-                        speaker_lang="en",
+                        speaker_lang=(None if self.language_code == "auto" else self.language_code),
                         transcription_provider="faster-whisper"
                     )
 
@@ -702,7 +704,8 @@ def speech_to_text(
 
         logging.info('speech-to-text: Starting transcription...')
         # FIXME - revisit this
-        options = dict(language=selected_source_lang, beam_size=10, best_of=10, vad_filter=vad_filter)
+        language_for_whisper = None if selected_source_lang == "auto" else selected_source_lang
+        options = dict(language=language_for_whisper, beam_size=10, best_of=10, vad_filter=vad_filter)
         transcribe_options = dict(task="transcribe", **options)
         # use function and config at top of file
         logging.debug(f"speech-to-text: Using whisper model: {whisper_model}", )
