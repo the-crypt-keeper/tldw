@@ -20,8 +20,9 @@ https://github.com/IAAR-Shanghai/CRUD_RAG
 https://arxiv.org/abs/2412.12300
 https://huggingface.co/tencent/SongGeneration
 https://github.com/aizip/Rag-Eval-flow
-
+https://arxiv.org/pdf/2502.15840
 RAG
+    https://github.com/aizip/Rag-Eval-flow
     https://huggingface.co/datasets/teilomillet/wikipeqa
     https://www.reddit.com/r/LocalLLaMA/comments/1lee4pd/wikipeqa_an_evaluation_dataset_for_both/
 

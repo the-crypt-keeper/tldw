@@ -26,6 +26,8 @@ https://github.com/dexter-xD/rhythm
 https://github.com/Jeremy-Harper/chatterboxPro
 https://kyutai.org/next/stt
 https://huggingface.co/kyutai/stt-2.6b-en
+https://github.com/rsxdalv/chatterbox/tree/fast
+
 https://huggingface.co/spaces/webml-community/conversational-webgpu/tree/main
 https://github.com/huggingface/transformers.js-examples/tree/main/conversational-webgpu
 https://github.com/Shadowfita/parakeet-tdt-0.6b-v2-fastapi

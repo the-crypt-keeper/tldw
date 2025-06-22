@@ -14,7 +14,7 @@ https://github.com/thu-coai/Backdoor-Data-Extraction
 https://github.com/Lu3ky13/Search-for-all-leaked-keys-secrets-using-one-regex-
 https://arxiv.org/abs/2504.05652
 https://arxiv.org/abs/2506.08837
-
+https://www.anthropic.com/research/agentic-misalignment
 
 
 
