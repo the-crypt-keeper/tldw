@@ -21,6 +21,7 @@ https://arxiv.org/abs/2412.12300
 https://huggingface.co/tencent/SongGeneration
 https://github.com/aizip/Rag-Eval-flow
 https://arxiv.org/pdf/2502.15840
+https://www.reddit.com/r/LocalLLaMA/comments/1lkh3og/introducing_the_new_bs_benchmark/
 RAG
     https://github.com/aizip/Rag-Eval-flow
     https://huggingface.co/datasets/teilomillet/wikipeqa

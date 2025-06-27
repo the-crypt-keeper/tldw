@@ -13,6 +13,7 @@ https://github.com/yankooliveira/toads
 https://github.com/kortix-ai/suna
 https://github.com/joinly-ai/joinly
 https://github.com/dyad-sh/dyad
+https://github.com/openai/openai-cs-agents-demo
 https://github.com/homanmirgolbabaee/arxiv-wizard-search?tab=readme-ov-file#-arxiv-research-assistant
 https://www.youtube.com/watch?v=D7_ipDqhtwk
 https://chatboxai.app/en
@@ -34,6 +35,9 @@ https://github.com/e-p-armstrong/augmentoolkit
 https://github.com/Fosowl/agenticSeek
 https://huggingface.co/blog/python-tiny-agents
 https://github.com/3-ark/Cognito-AI_Sidekick
+https://github.com/BeehiveInnovations/zen-mcp-server
+https://ghuntley.com/atlassian-rovo-source-code/
+https://www.atlassian.com/blog/announcements/rovo-dev-command-line-interface
 https://medium.com/@yugank.aman/top-agentic-ai-design-patterns-for-architecting-ai-systems-397798b44d5c
 https://huggingface.co/eurecom-ds/Phi-3-mini-4k-socratic
 https://giovannigatti.github.io/socratic-llm/

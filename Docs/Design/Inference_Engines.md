@@ -29,8 +29,14 @@ https://github.com/intel/neural-compressor/tree/v3.2
 https://southbridge-research.notion.site/Entropixplained-11e5fec70db18022b083d7d7b0e93505
 https://arxiv.org/abs/2506.06105
 https://arxiv.org/abs/2506.12928v1
+https://github.com/LMCache/LMCache
+https://damek.github.io/random/basic-facts-about-gpus/
 
 
+
+
+https://kaitchup.substack.com/p/using-gguf-models-optimize-your-inference
+https://www.tilderesearch.com/blog/sparse-attn
 https://github.com/codelion/optillm/tree/main/optillm/plugins/deepthink
 https://magazine.sebastianraschka.com/p/practical-tips-for-finetuning-llms?utm_medium=email
 https://magazine.sebastianraschka.com/p/lora-and-dora-from-scratch?utm_medium=email

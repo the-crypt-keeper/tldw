@@ -63,9 +63,11 @@ https://designdetails.fm/episodes
 https://blikket.co/ux-vs-cro-how-harmonizing-design-and-strategy-can-skyrocket-your-ecommerce-revenue/
 https://copycoder.ai/
 https://ieeexplore.ieee.org/document/5387632
-https://www.growthmates.news/p/how-an-ai-powered-user-onboarding
+https://www.growthmates.news/p/how-an-ai-powered-user-onboardin
+https://www.nngroup.com/articles/serial-task-switching/g
 https://x.com/dot_louis/status/1884990033775493505
 https://telcontar.net/Misc/GUI/RISCOS/
+https://github.com/YuheshPandian/ICONIC
 https://guidebookgallery.org/guis
 https://medium.com/@adam.fard/how-i-actually-use-ai-in-ux-design-374187387f69
 https://aiverse.design/browse/subform-s-non-linear-conversation

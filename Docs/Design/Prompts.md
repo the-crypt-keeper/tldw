@@ -18,7 +18,7 @@ https://github.com/lks-ai/prowl
 https://rentry.co/samplers
 https://github.com/asgeirtj/system_prompts_leaks/blob/main/claude.txt
 https://openai.com/index/emergent-misalignment/
-
+https://arxiv.org/abs/2506.11930
 https://arxiv.org/abs/2506.13681
 https://github.com/MIATECHPARTNERS/PromptChains
 https://github.com/mazen160/llmquery/
@@ -30,6 +30,7 @@ https://github.com/dxlong2000/NLPromptEval
 https://cline.bot/prompts
 https://github.com/victorcarre6/llm-memorization
 https://github.com/matank001/cursor-security-rules
+https://arxiv.org/abs/2504.13656
 https://github.com/dontriskit/awesome-ai-system-prompts
 https://arxiv.org/abs/2506.06950
 https://github.com/lenankamp/AITextADV
