@@ -15,8 +15,11 @@ https://huggingface.co/nvidia/Llama-3.1-Nemotron-Nano-VL-8B-V1
 https://huggingface.co/papers/2505.23621
 https://huggingface.co/nanonets/Nanonets-OCR-s
 https://arxiv.org/abs/2506.10821
-
-
+https://huggingface.co/moonshotai/Kimi-VL-A3B-Thinking-2506
+https://cookbook.openai.com/examples/custom_image_embedding_search
+https://github.com/CornelliusYW/Multimodal-RAG-Implementation
+https://github.com/CornelliusYW/Multimodal-RAG-Implementation
+https://aiscribe.pro/news/implementing-multi-modal-rag-systems-machinelearningmastery-com/
 
 
 MAMBA

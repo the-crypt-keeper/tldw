@@ -8,7 +8,9 @@ https://huggingface.co/spaces/hf-audio/open_asr_leaderboard
 https://github.com/EvolvingLMMs-Lab/Aero-1
 https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2
 https://github.com/cxyfer/GeminiASR
+https://www.reddit.com/r/LocalLLaMA/comments/1lgv0y9/help_me_build_a_good_tts_llm_stt_stack/
 https://huggingface.co/Banafo/Kroko-ASR
+https://github.com/travisvn/chatterbox-tts-api/  
 https://huggingface.co/livekit/turn-detector
 https://github.com/livekit/agents/tree/main/livekit-plugins/livekit-plugins-turn-detector
 https://github.com/senstella/parakeet-mlx
