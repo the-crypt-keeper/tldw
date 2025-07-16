@@ -6,7 +6,14 @@ This page serves as documentation regarding the audio processing pipelines withi
 
 ## Audio Pipelines
 
-
+Remove silence via ffmpeg before/without using VAD
+```
+ffmpeg -i video-audio.m4a \
+      -af "silenceremove=start_periods=1:start_duration=0:start_threshold=-50dB:\
+                         stop_periods=-1:stop_duration=0.02:stop_threshold=-50dB,\
+                         apad=pad_dur=0.02" \
+      -c:a aac -b:a 128k output_minpause.m4a -y
+```
 
 ### Audio Language Models
 

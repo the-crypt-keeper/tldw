@@ -19,6 +19,9 @@ https://github.com/simonw/files-to-prompt
 https://ariana.dev/blog/introducing-ariana#how-we-design-it
 https://repoprompt.com/docs#s=applying-changes
 https://github.com/wrtnlabs/autobe
+https://www.tensorzero.com/blog/automatically-evaluating-ai-coding-assistants-with-each-git-commit/
+
+https://github.com/carpsesdema/AvA_Kintsugi
 
 https://github.com/yamadashy/repomix/tree/main
 https://github.com/chanhx/crabviz

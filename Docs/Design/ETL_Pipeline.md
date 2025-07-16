@@ -28,6 +28,10 @@ https://github.com/QwenLM/Qwen-Agent
   https://github.com/QwenLM/Qwen-Agent/blob/main/examples/parallel_doc_qa.py
 https://github.com/bytedance/Dolphin
 https://blog.det.life/i-spent-5-hours-understanding-how-uber-built-their-etl-pipelines-9079735c9103
+https://github.com/microsoft/markitdown/tree/main/packages/markitdown/src/markitdown/converters
+https://blog.det.life/the-end-of-etl-the-radical-shift-in-data-processing-thats-coming-next-88af7106f7a1
+
+
 
 
 ## ETL Pipelines

@@ -117,6 +117,8 @@ STORM
     https://github.com/stanford-oval/storm/blob/main/examples/storm_examples/run_storm_wiki_claude.py
     https://storm-project.stanford.edu/research/storm/
 
+
+https://diamantai.substack.com/p/ai-deep-research-explained
 https://github.com/rickyang1114/multimodal-deepresearcher/
 https://www.microsoft.com/en-us/research/wp-content/uploads/2025/06/Code_Researcher-1.pdf
 https://github.com/Paper2Poster/Paper2Poster

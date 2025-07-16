@@ -19,6 +19,13 @@ https://lukew.com/ff/entry.asp?2106?ref=sidebar
 https://github.com/topoteretes/cognee
 https://arxiv.org/abs/2505.23052
 https://help.openai.com/en/articles/10169521-projects-in-chatgpt
+https://github.com/ag2ai/SimpleDoc
+https://help.openai.com/en/articles/10169521-projects-in-chatgpt
+https://medium.com/@evgeni.n.rusev/multi-agent-ai-with-hybrid-search-cutting-document-review-time-by-80-f7367a9b1361
+https://research.google/blog/muvera-making-multi-vector-retrieval-as-fast-as-single-vector-search/
+https://www.midswirl.com/blog/road-to-sqlite-vec-exploring-sqlite-as-a-rag-vector-database
+https://github.com/bytedance/Dolphin
+https://github.com/AppFlowy-IO/AppFlowy
 
 
 
