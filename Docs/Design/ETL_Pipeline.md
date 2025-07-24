@@ -30,7 +30,22 @@ https://github.com/bytedance/Dolphin
 https://blog.det.life/i-spent-5-hours-understanding-how-uber-built-their-etl-pipelines-9079735c9103
 https://github.com/microsoft/markitdown/tree/main/packages/markitdown/src/markitdown/converters
 https://blog.det.life/the-end-of-etl-the-radical-shift-in-data-processing-thats-coming-next-88af7106f7a1
+https://github.com/allenai/olmocr
+https://github.com/GiftMungmeeprued/document-parsers-list
+https://python.langchain.com/docs/how_to/recursive_json_splitter/
+https://pypi.org/project/pdfsplit/
+https://github.com/run-llama/workflows-py/blob/main/examples/document_processing.ipynb
+https://docs.paperless-ngx.com/
+https://github.com/GiftMungmeeprued/document-parsers-list
+https://github.com/deepanwadhwa/zink
+https://github.com/cocoindex-io/cocoindex/tree/main/examples/manuals_llm_extraction
+https://cocoindex.io/blogs/academic-papers-indexing/
+https://github.com/upstash/context7
+https://github.com/dbamman/litbank
 
+ Proper citations and giant-pdf support are the real blockers here. A quick win would be to pull ISBN/DOI metadata on upload, stash it as JSON inside the notebook, then stamp APA/Vancouver refs straight into answers; Crossref’s API is free and usually nails the fields. For page-level anchors, chunk the pdf into 2-page slices at ingest and keep the slice IDs so the model can point to exact spots.
+
+On the size cap, a rolling index that streams in/out sections on demand is lighter than the hard 450-page cutoff and means you don’t have to butcher textbooks. The devs could lift the limit today by letting the user pick a “slow but deep” pass that gives the model more context tokens and time. I’ve been batching uploads through Readwise (for highlight sync) and Alfresco (for versioned docs); APIWrapper.ai slots in as the glue when I need an endpoint to pump new filings straight into the notebook without touching the UI. 
 
 
 

@@ -19,6 +19,11 @@ https://arxiv.org/pdf/2501.09092
 https://knowt.com/
 https://www.slidehero.ai/
 https://ai-cosmos.hashnode.dev/the-limits-of-ai-in-education-lessons-from-a-spanish-tutor-experiment
+https://github.com/Fimeg/NetworkChronicles
+https://repo.or.cz/DeDRM_tools-LCP.git
+
+
+
 
 one2manny
  — 

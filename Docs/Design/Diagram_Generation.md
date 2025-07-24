@@ -13,5 +13,5 @@ https://kroki.io/
 https://ratfactor.com/minslides/
 https://nbd.neocities.org/slidepresentation/Slide%20presentation%20about%20slides
 https://xosh.org/text-to-diagram/
-
-
+https://huggingface.co/OmniSVG/OmniSVG
+https://github.com/OmniSVG/OmniSVG/

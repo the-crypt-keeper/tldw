@@ -22,6 +22,15 @@ https://github.com/Extraltodeus/Quick-slap-tkinter-dia/blob/main/README.md
 https://github.com/RobViren/kokovoicelab
 https://github.com/psdwizzard/chatterbox-Audiobook
 https://sh.itjust.works/post/40062592
+https://kyutai.org/next/stt
+https://github.com/eel-brah/kokorodoki
+https://kyutai.org/next/unmute
+https://ai.google.dev/gemini-api/docs/speech-generation
+https://github.com/stepfun-ai/Step-Audio2
+https://github.com/fastrepl/hyprnote
+https://huggingface.co/nvidia/audio-flamingo-3-chat
+https://deepgram.com/
+https://docs.cartesia.ai/get-started/overview
 https://github.com/taresh18/TTSizer
 https://www.reddit.com/r/LocalLLaMA/comments/1l3c8is/grmrv3_a_set_of_models_for_reliable_grammar/
 https://github.com/dexter-xD/rhythm

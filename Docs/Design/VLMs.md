@@ -20,6 +20,20 @@ https://cookbook.openai.com/examples/custom_image_embedding_search
 https://github.com/CornelliusYW/Multimodal-RAG-Implementation
 https://github.com/CornelliusYW/Multimodal-RAG-Implementation
 https://aiscribe.pro/news/implementing-multi-modal-rag-systems-machinelearningmastery-com/
+https://pub.towardsai.net/deploy-an-in-house-vision-language-model-to-parse-millions-of-documents-say-goodbye-to-gemini-and-cdac6f77aff5
+https://huggingface.co/Skywork/Skywork-R1V3-38B
+https://huggingface.co/AIDC-AI/Ovis2-16B
+https://github.com/ekshaks/ragpipe
+https://99franklin.github.io/ocrbench_v2/
+https://github.com/opendatalab/OmniDocBench
+https://idp-leaderboard.org/
+
+
+
+
+
+
+
 
 
 MAMBA

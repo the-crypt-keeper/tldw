@@ -21,11 +21,44 @@ https://arxiv.org/abs/2412.12300
 https://huggingface.co/tencent/SongGeneration
 https://github.com/aizip/Rag-Eval-flow
 https://arxiv.org/pdf/2502.15840
+https://llmapitest.com/
+https://www.kaggle.com/benchmarks/google/facts-grounding
+https://github.com/allenai/IFBench
+https://arxiv.org/abs/2507.02825
+https://arxiv.org/abs/2506.18032
+https://accounting.penrose.com/
+https://github.com/Kiln-AI/Kiln
+https://b-score.github.io/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Self-Correction Bench
+    https://arxiv.org/pdf/2507.02778
+    https://huggingface.co/collections/kenhktsui/self-correction-bench-68623d6891eedae3ee7d5318
+
+
 https://www.reddit.com/r/LocalLLaMA/comments/1lkh3og/introducing_the_new_bs_benchmark/
 RAG
     https://github.com/aizip/Rag-Eval-flow
     https://huggingface.co/datasets/teilomillet/wikipeqa
     https://www.reddit.com/r/LocalLLaMA/comments/1lee4pd/wikipeqa_an_evaluation_dataset_for_both/
+
+
+LitBench
+    https://huggingface.co/datasets/SAA-Lab/LitBench-Test
+    https://arxiv.org/abs/2507.00769
 
 
 Creation

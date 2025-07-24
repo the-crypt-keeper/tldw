@@ -80,8 +80,8 @@ search_max_subtopics = 4
 search_custom_user_agent = "CUSTOM_USER_AGENT_HERE"
 search_blacklist_URLs = "URL1,URL2,URL3"
 ```
-
-
+https://github.com/Arindam200/awesome-ai-apps/tree/main/advance_ai_agents/deep_researcher_agent
+https://github.com/Ayanami0730/deep_research_bench
 Perplexica
    https://github.com/ItzCrazyKns/Perplexica/blob/master/src/search/metaSearchAgent.ts
    https://github.com/ItzCrazyKns/Perplexica/blob/master/src/chains/suggestionGeneratorAgent.ts
@@ -116,8 +116,8 @@ STORM
     https://github.com/stanford-oval/storm/
     https://github.com/stanford-oval/storm/blob/main/examples/storm_examples/run_storm_wiki_claude.py
     https://storm-project.stanford.edu/research/storm/
-
-
+https://medium.com/@nfigay/beyond-owl-reconsidering-ontologies-in-the-age-of-ai-and-the-semantic-web-4059b519f23d
+https://cookbook.openai.com/examples/deep_research_api/introduction_to_deep_research_api
 https://diamantai.substack.com/p/ai-deep-research-explained
 https://github.com/rickyang1114/multimodal-deepresearcher/
 https://www.microsoft.com/en-us/research/wp-content/uploads/2025/06/Code_Researcher-1.pdf
@@ -151,7 +151,8 @@ https://www.ginkgonotes.com/
 https://github.com/camel-ai/owl
 https://huggingface.co/papers/2505.16938
 https://github.com/Just-Curieous/Curie
-https://github.com/RUC-NLPIR/WebThinker
+https://github.com/RUC-NLPIR/WebThinker+
+https://moonshotai.github.io/Kimi-Researcher/
 https://github.com/Alpha-Innovator/NovelSeek
 https://arxiv.org/abs/2505.19253
 https://github.com/google-gemini/gemini-fullstack-langgraph-quickstart

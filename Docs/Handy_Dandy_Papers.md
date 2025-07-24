@@ -1,6 +1,18 @@
 # Handy Dandy Papers
 
 
+
+
+
+
+
+
+
+
+https://arxiv.org/abs/2507.06203
+
+
+https://arxiv.org/abs/2503.04722
 https://arxiv.org/pdf/2410.13098
 https://arxiv.org/pdf/2404.01413
 https://arxiv.org/abs/2411.11910
