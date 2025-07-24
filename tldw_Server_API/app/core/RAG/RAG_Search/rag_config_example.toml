@@ -1,0 +1,104 @@
+# RAG (Retrieval-Augmented Generation) Configuration
+# Add this section to your main config.toml file to configure the new modular RAG service
+
+[rag]
+# Enable the new modular RAG service (can also be set via USE_MODULAR_RAG env var)
+use_modular_service = false  # Set to true to use the new modular implementation
+
+# General RAG settings
+batch_size = 32
+num_workers = 4  # Limited for single-user TUI
+log_level = "INFO"
+log_performance_metrics = false
+
+[rag.retriever]
+# Retriever configuration
+fts_top_k = 10  # Number of results from full-text search
+vector_top_k = 10  # Number of results from vector search
+hybrid_alpha = 0.5  # Balance between FTS and vector (0=FTS only, 1=vector only)
+
+# Collection names in ChromaDB
+media_collection = "media_embeddings"
+chat_collection = "chat_embeddings"
+notes_collection = "notes_embeddings"
+
+# Similarity thresholds
+min_similarity_score = 0.3
+max_distance = 1.5
+
+[rag.processor]
+# Document processing configuration
+enable_deduplication = true
+similarity_threshold = 0.85  # For deduplication
+max_context_length = 4096  # In tokens
+max_context_chars = 16000  # Fallback character limit
+
+# Re-ranking settings
+enable_reranking = true
+reranker_provider = "flashrank"  # "flashrank", "cohere", or "none"
+rerank_top_k = 20  # Number of docs to rerank
+cohere_model = "rerank-english-v2.0"
+
+# Token counting
+use_tiktoken = true
+fallback_chars_per_token = 4
+
+[rag.generator]
+# Response generation configuration
+enable_streaming = false
+temperature = 0.7
+max_tokens = 1000
+top_p = 0.9
+frequency_penalty = 0.0
+presence_penalty = 0.0
+
+# System prompt for RAG responses
+system_prompt = """You are a helpful assistant with access to a knowledge base. 
+Use the provided context to answer questions accurately. If the context doesn't 
+contain relevant information, say so clearly."""
+
+# Citation style
+include_citations = true
+citation_style = "inline"  # "inline", "footnote", or "none"
+
+[rag.cache]
+# Caching configuration
+enable_cache = true
+cache_ttl = 3600  # 1 hour
+max_cache_size = 1000  # Maximum number of cached queries
+cache_search_results = true
+cache_embeddings = true
+
+[rag.embeddings]
+# Embeddings configuration
+model_name = "all-MiniLM-L6-v2"  # Sentence transformers model
+device = "cpu"  # "cuda", "mps", or "cpu"
+batch_size = 32
+normalize_embeddings = true
+
+[rag.chunking]
+# Document chunking configuration
+chunk_size = 400
+chunk_overlap = 100
+min_chunk_size = 50
+separators = ["\n\n", "\n", ". ", "! ", "? ", " "]
+
+[rag.memory]
+# Memory management configuration
+enable_memory_management = true
+memory_limit_mb = 512  # Memory limit for embeddings service
+cleanup_threshold = 0.9  # Trigger cleanup at 90% memory usage
+cleanup_batch_size = 100
+
+[rag.indexing]
+# Indexing configuration
+auto_index_new_content = true
+index_on_startup = false
+parallel_indexing = true
+index_batch_size = 50
+
+[rag.chroma]
+# ChromaDB configuration
+persist_directory = "~/.local/share/tldw_cli/chromadb"
+anonymized_telemetry = false
+allow_reset = false
