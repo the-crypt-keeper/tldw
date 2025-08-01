@@ -26,6 +26,37 @@ https://research.google/blog/muvera-making-multi-vector-retrieval-as-fast-as-sin
 https://www.midswirl.com/blog/road-to-sqlite-vec-exploring-sqlite-as-a-rag-vector-database
 https://github.com/bytedance/Dolphin
 https://github.com/AppFlowy-IO/AppFlowy
+https://levelup.gitconnected.com/creating-the-best-rag-finder-pipeline-for-your-dataset-88062a6fa45e
+https://medium.com/data-science-collective/let-users-talk-to-your-databases-build-a-rag-powered-sql-assistant-with-streamlit-4fc9a2ee3960
+https://www.reddit.com/r/LocalLLaMA/comments/1khjrtj/building_llm_workflows_some_observations/
+https://abdullin.com/ilya/how-to-build-best-rag/
+https://github.com/IlyaRice/RAG-Challenge-2
+https://github.com/shredEngineer/Archive-Agent/tree/main/archive_agent/core
+https://arxiv.org/html/2504.01818v1
+https://github.com/CornelliusYW/Multimodal-RAG-Implementation
+https://github.com/mixedbread-ai/maxsim-cpu
+https://arxiv.org/html/2506.23026v1#S4
+https://arxiv.org/html/2504.15629v2#bib
+https://arxiv.org/abs/2504.15629v2
+https://arxiv.org/abs/2505.17238v2
+https://arxiv.org/abs/2404.19543v2
+https://arxiv.org/html/2506.16035v2#S6
+https://arxiv.org/abs/2507.02962v3
+https://github.com/DavidZWZ/Awesome-RAG-Reasoning
+https://arxiv.org/abs/2507.12455v1
+https://medium.com/data-science/rags-with-query-routing-5552e4e41c54
+https://huggingface.co/vidore/colqwen-omni-v0.1
+https://www.ragie.ai/blog/how-we-built-multimodal-rag-for-audio-and-video
+https://arxiv.org/abs/2507.12455v1
+https://github.com/jolibrain/colette/tree/main
+https://zenn.dev/microsoft/articles/rag_textbook
+https://arxiv.org/abs/2507.09477
+https://github.com/jolibrain/colette
+https://contextual.ai/blog/document-parser-for-rag/
+https://docs.contextual.ai/api-reference/parse/parse-file
+
+https://arxiv.org/pdf/2506.00054
+
 
 
 

@@ -8,3 +8,9 @@ https://github.com/quickwit-oss/tantivy
 https://arxiv.org/abs/2501.05366
 https://github.com/ItsArnavSh/gitfindr
 https://exa.ai/
+https://huggingface.co/Menlo/Lucy-gguf
+
+
+
+
+

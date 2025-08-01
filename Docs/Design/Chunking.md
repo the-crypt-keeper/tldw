@@ -30,6 +30,6 @@ https://github.com/Unsiloed-AI/Unsiloed-chunker
 
 https://www.reddit.com/r/Rag/comments/1ljhksy/best_chunking_strategy_for_the_medical_rag_system/
 https://arxiv.org/abs/2506.16035
-
+https://docs.llamaindex.ai/en/stable/examples/node_parsers/semantic_double_merging_chunking/
 
 

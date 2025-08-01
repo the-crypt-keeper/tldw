@@ -56,6 +56,7 @@ https://github.com/pi0/clippyjs
 https://uxdesign.cc/a-study-of-gatcha-games-the-ux-of-the-pokemon-tcg-pocket-app-b291c78db86fc
 https://github.com/sshh12/spark-stack
 https://rentry.org/bloatmaxx
+https://github.com/ddkasa/textual-timepiece
 https://github.com/abi/screenshot-to-
 https://data.perkins.org/
 https://customsvg.github.io/
@@ -66,7 +67,21 @@ https://ieeexplore.ieee.org/document/5387632
 https://www.growthmates.news/p/how-an-ai-powered-user-onboardin
 https://www.nngroup.com/articles/serial-task-switching/g
 https://x.com/dot_louis/status/1884990033775493505
+https://www.nngroup.com/articles/analyze-usability-data/
+https://github.com/koaning/tuilwindcss
+https://levelup.gitconnected.com/solving-6-types-of-hallucinations-in-small-llms-a-hands-on-guide-8d15c11650d3
+https://embracethered.com/blog/posts/2025/chatgpt-how-does-chat-history-memory-preferences-work/?utm_source=www.hivefive.community&utm_medium=newsletter&utm_campaign=hive-five-223-career-dreamer
+https://uxdesign.cc/from-journey-maps-to-control-maps-17aac58b9dd9
+https://hello-jp.net/building-beyond-the-buzz/rag-design-decision-blueprint
+https://artifactsbenchmark.github.io/
+https://arxiv.org/abs/2507.05791
+https://aurachat.io/learn/introduction#why-aura
 https://telcontar.net/Misc/GUI/RISCOS/
+https://arxiv.org/abs/2507.13553
+
+
+
+
 https://github.com/YuheshPandian/ICONIC
 https://guidebookgallery.org/guis
 https://medium.com/@adam.fard/how-i-actually-use-ai-in-ux-design-374187387f69
@@ -83,6 +98,7 @@ https://github.com/Toy-97/Chat-WebUI
 https://news.ycombinator.com/item?id=43925732
 https://uxplanet.org/ui-design-with-chatgpt-4o-4d79b2a32008
 https://bolt.new/
+https://codesolvent.com/botworx/intelligent-workspace/
 https://www.nngroup.com/articles/ux-copy-sizes/
 https://github.com/gvlassis/gvtop
 https://medium.com/design-bootcamp/how-ai-is-changing-ux-design-a-personal-learning-curve-39783f5e195a

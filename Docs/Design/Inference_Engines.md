@@ -7,6 +7,9 @@
 https://huggingface.co/docs/transformers/main/en/conversations
 
 ### Llama.cpp
+https://www.youtube.com/watch?v=vW30o4U9BFE
+https://unsloth.ai/blog/dynamic-4bit
+https://github.com/iuliaturc/gguf-docs
 
 
 ### Llamafile
@@ -31,9 +34,13 @@ https://arxiv.org/abs/2506.06105
 https://arxiv.org/abs/2506.12928v1
 https://github.com/LMCache/LMCache
 https://damek.github.io/random/basic-facts-about-gpus/
-
-
-
+https://bentoml.com/llm/
+https://allenai.org/blog/flexolmo
+    https://github.com/allenai/FlexOlmo
+    https://www.datocms-assets.com/64837/1752084947-flexolmo-5.pdf
+https://kserve.github.io/website/latest/modelserving/v1beta1/llm/huggingface/kv_cache_offloading/
+https://sakana.ai/ab-mcts/
+https://www.ubicloud.com/blog/life-of-an-inference-request-vllm-v1
 
 https://kaitchup.substack.com/p/using-gguf-models-optimize-your-inference
 https://www.tilderesearch.com/blog/sparse-attn

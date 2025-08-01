@@ -14,6 +14,23 @@ https://medium.com/@sarayavalasaravikiran/optimizing-rag-with-embedding-tuning-2
 https://huggingface.co/iamgroot42/rover_nexus
 https://shawhin.medium.com/fine-tuning-text-embeddings-f913b882b11c
 https://maartengr.github.io/BERTopic/index.html
-
+https://docs.llamaindex.ai/en/stable/examples/finetuning/embeddings/finetune_embedding/
 https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

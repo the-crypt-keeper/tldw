@@ -22,6 +22,20 @@ https://github.com/t41372/Open-LLM-VTuber
 	https://www.librechat.ai/docs/features/fork
 	https://github.com/danny-avila/LibreChat
 https://github.com/PioneerMNDR/MousyHub
+- https://arxiv.org/html/2505.18092v2
+https://github.com/MVPandey/CAE
+https://rentry.org/SillyT_Lorebook
+https://rentry.org/NG_CharCard
+
+
+
+
+
+
+
+
+
+- 
 ### Introduction
 
 
