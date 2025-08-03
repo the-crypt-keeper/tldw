@@ -54,6 +54,7 @@ class MCPErrorCode(str, Enum):
     TOOL_NOT_FOUND = "tool_not_found"
     TOOL_EXECUTION_ERROR = "tool_execution_error"
     UNAUTHORIZED = "unauthorized"
+    FORBIDDEN = "forbidden"
     RATE_LIMITED = "rate_limited"
     CONTEXT_TOO_LARGE = "context_too_large"
     RESOURCE_NOT_FOUND = "resource_not_found"
@@ -190,6 +191,10 @@ class MCPConnectRequest(BaseModel):
     client_id: str
     client_info: Dict[str, Any] = {}
     requested_capabilities: Optional[List[str]] = None
+    # Authentication fields
+    auth_token: Optional[str] = None  # JWT token
+    api_key: Optional[str] = None  # API key
+    client_secret: Optional[str] = None  # Client secret for client credentials flow
 
 
 class MCPConnectResponse(BaseModel):

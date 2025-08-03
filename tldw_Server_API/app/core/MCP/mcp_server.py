@@ -35,6 +35,7 @@ from .mcp_protocol import (
 )
 from .mcp_tools import ToolRegistry, tool_registry
 from .mcp_context import ContextManager, ContextInjector
+from .mcp_auth import auth_manager, MCPClient, MCPPermission
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,8 @@ class MCPSession:
         session_id: str,
         client_id: str,
         websocket: WebSocket,
-        capabilities: MCPCapabilities
+        capabilities: MCPCapabilities,
+        client: Optional[MCPClient] = None
     ):
         self.session_id = session_id
         self.client_id = client_id
@@ -57,6 +59,7 @@ class MCPSession:
         self.last_ping = time.time()
         self.context_ids: Set[str] = set()
         self.metadata: Dict[str, Any] = {}
+        self.client = client  # Authenticated client info
     
     async def send_message(self, message: MCPMessage):
         """Send message to client"""
@@ -82,7 +85,8 @@ class MCPServer:
         max_sessions: int = 1000,
         ping_interval: int = 30,
         ping_timeout: int = 60,
-        max_message_size: int = 1024 * 1024  # 1MB
+        max_message_size: int = 1024 * 1024,  # 1MB
+        require_auth: bool = True
     ):
         self.tool_registry = tool_registry or ToolRegistry()
         self.context_manager = context_manager or ContextManager()
@@ -90,6 +94,7 @@ class MCPServer:
         self.ping_interval = ping_interval
         self.ping_timeout = ping_timeout
         self.max_message_size = max_message_size
+        self.require_auth = require_auth
         
         # Session management
         self._sessions: Dict[str, MCPSession] = {}
@@ -151,9 +156,39 @@ class MCPServer:
             
             # Handle connection
             connect_request = MCPConnectRequest(**message.params)
+            
+            # Authenticate client
+            client = None
+            if hasattr(connect_request, 'auth_token') and connect_request.auth_token:
+                # JWT authentication
+                token_data = auth_manager.verify_token(connect_request.auth_token)
+                if token_data:
+                    client = auth_manager.get_client(token_data.client_id)
+            elif hasattr(connect_request, 'api_key') and connect_request.api_key:
+                # API key authentication
+                client = auth_manager.authenticate_api_key(connect_request.api_key)
+            elif hasattr(connect_request, 'client_secret') and connect_request.client_secret:
+                # Client credentials authentication
+                client = auth_manager.authenticate_client_credentials(
+                    connect_request.client_id,
+                    connect_request.client_secret
+                )
+            
+            # If authentication is required and no valid client, reject
+            if self.require_auth and not client:
+                await self._send_error(
+                    websocket,
+                    message.id,
+                    MCPErrorCode.UNAUTHORIZED,
+                    "Authentication required"
+                )
+                await websocket.close(code=4001)
+                return
+            
             session = await self._create_session(
                 connect_request.client_id,
-                websocket
+                websocket,
+                client
             )
             
             # Send connection response
@@ -227,7 +262,8 @@ class MCPServer:
     async def _create_session(
         self,
         client_id: str,
-        websocket: WebSocket
+        websocket: WebSocket,
+        client: Optional[MCPClient] = None
     ) -> MCPSession:
         """Create a new session"""
         if len(self._sessions) >= self.max_sessions:
@@ -240,7 +276,8 @@ class MCPServer:
             session_id=session_id,
             client_id=client_id,
             websocket=websocket,
-            capabilities=self._capabilities
+            capabilities=self._capabilities,
+            client=client
         )
         
         self._sessions[session_id] = session
@@ -300,8 +337,24 @@ class MCPServer:
     
     async def _handle_list_tools(self, session: MCPSession, message: MCPRequest):
         """Handle list tools request"""
+        # Check permission to read tools
+        if session.client and not auth_manager.check_permission(
+            session.client, MCPPermission.TOOLS_READ
+        ):
+            await self._send_error(
+                session.websocket,
+                message.id,
+                MCPErrorCode.FORBIDDEN,
+                "Permission denied: tools:read"
+            )
+            return
+        
         tags = message.params.get("tags") if message.params else None
         tools = self.tool_registry.list_tools(tags=tags)
+        
+        # Filter tools based on client access
+        if session.client and session.client.allowed_tools is not None:
+            tools = [t for t in tools if t.name in session.client.allowed_tools]
         
         response = MCPResponse(
             type=MCPMessageType.LIST_TOOLS,
@@ -317,11 +370,36 @@ class MCPServer:
         try:
             request = MCPToolExecutionRequest(**message.params)
             
+            # Check permission to execute tools
+            if session.client and not auth_manager.check_permission(
+                session.client, MCPPermission.TOOLS_EXECUTE
+            ):
+                await self._send_error(
+                    session.websocket,
+                    message.id,
+                    MCPErrorCode.FORBIDDEN,
+                    "Permission denied: tools:execute"
+                )
+                return
+            
+            # Check specific tool access
+            if session.client and not auth_manager.check_tool_access(
+                session.client, request.tool_name
+            ):
+                await self._send_error(
+                    session.websocket,
+                    message.id,
+                    MCPErrorCode.FORBIDDEN,
+                    f"Access denied to tool: {request.tool_name}"
+                )
+                return
+            
             # Add session context
             context = {
                 "session_id": session.session_id,
                 "client_id": session.client_id,
-                "context_id": request.context_id
+                "context_id": request.context_id,
+                "authenticated_client": session.client
             }
             
             result = await self.tool_registry.execute(request, context)
@@ -376,6 +454,18 @@ class MCPServer:
     
     async def _handle_update_context(self, session: MCPSession, message: MCPRequest):
         """Handle update context request"""
+        # Check permission to write context
+        if session.client and not auth_manager.check_permission(
+            session.client, MCPPermission.CONTEXT_WRITE
+        ):
+            await self._send_error(
+                session.websocket,
+                message.id,
+                MCPErrorCode.FORBIDDEN,
+                "Permission denied: context:write"
+            )
+            return
+        
         context_id = message.params.get("context_id") if message.params else None
         updates = message.params.get("updates", {}) if message.params else {}
         merge = message.params.get("merge", True) if message.params else True
@@ -537,13 +627,14 @@ class MCPServer:
 _mcp_server: Optional[MCPServer] = None
 
 
-def get_mcp_server() -> MCPServer:
+def get_mcp_server(require_auth: bool = True) -> MCPServer:
     """Get or create the global MCP server instance"""
     global _mcp_server
     if _mcp_server is None:
         _mcp_server = MCPServer(
             tool_registry=tool_registry,
-            context_manager=ContextManager()
+            context_manager=ContextManager(),
+            require_auth=require_auth
         )
     return _mcp_server
 

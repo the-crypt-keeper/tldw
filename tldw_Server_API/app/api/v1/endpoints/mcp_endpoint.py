@@ -19,6 +19,16 @@ from tldw_Server_API.app.core.MCP import (
     MCPContext,
     mcp_tool
 )
+from tldw_Server_API.app.core.MCP.mcp_auth import (
+    auth_manager,
+    MCPAuthRequest,
+    MCPAuthResponse,
+    MCPRole,
+    MCPPermission,
+    MCPClient,
+    get_current_client,
+    require_permission
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +70,201 @@ class ServerStatus(BaseModel):
     capabilities: Dict[str, Any]
 
 
+class ClientCreateRequest(BaseModel):
+    """Client creation request"""
+    name: str
+    role: MCPRole = MCPRole.USER
+    permissions: Optional[List[str]] = None
+    allowed_tools: Optional[List[str]] = None
+    rate_limit: int = 100
+
+
+class ClientInfo(BaseModel):
+    """Client information"""
+    client_id: str
+    name: str
+    role: str
+    permissions: List[str]
+    created_at: str
+    rate_limit: int
+    allowed_tools: Optional[List[str]]
+
+
+# Authentication endpoints
+
+@router.post("/auth/token", response_model=MCPAuthResponse)
+async def authenticate(
+    auth_request: MCPAuthRequest
+):
+    """
+    Authenticate and get access token.
+    
+    Supports multiple authentication methods:
+    - API key authentication
+    - Client credentials (client_id + client_secret)
+    """
+    client = None
+    
+    if auth_request.api_key:
+        client = auth_manager.authenticate_api_key(auth_request.api_key)
+    elif auth_request.client_id and auth_request.client_secret:
+        client = auth_manager.authenticate_client_credentials(
+            auth_request.client_id,
+            auth_request.client_secret
+        )
+    
+    if not client:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
+    
+    # Generate token
+    token = auth_manager.generate_token(client)
+    
+    return MCPAuthResponse(
+        access_token=token,
+        token_type="bearer",
+        expires_in=86400,  # 24 hours
+        client_id=client.client_id,
+        role=client.role.value,
+        permissions=[p.value for p in client.permissions]
+    )
+
+
+@router.post(
+    "/auth/clients", 
+    response_model=Dict[str, Any],
+    dependencies=[Depends(require_permission(MCPPermission.ADMIN_USERS))]
+)
+async def create_client(
+    request: ClientCreateRequest,
+    current_client: MCPClient = Depends(get_current_client)
+):
+    """
+    Create a new MCP client (requires admin permissions).
+    
+    Returns the client info and API key. The API key is only shown once.
+    """
+    # Parse permissions
+    permissions = None
+    if request.permissions:
+        permissions = {
+            MCPPermission(p) for p in request.permissions
+            if p in [e.value for e in MCPPermission]
+        }
+    
+    # Create client
+    client, api_key = auth_manager.create_client(
+        name=request.name,
+        role=request.role,
+        permissions=permissions,
+        allowed_tools=request.allowed_tools,
+        rate_limit=request.rate_limit
+    )
+    
+    return {
+        "client": {
+            "client_id": client.client_id,
+            "name": client.name,
+            "role": client.role.value,
+            "permissions": [p.value for p in client.permissions],
+            "created_at": client.created_at.isoformat(),
+            "rate_limit": client.rate_limit,
+            "allowed_tools": client.allowed_tools
+        },
+        "api_key": api_key
+    }
+
+
+@router.get(
+    "/auth/clients",
+    response_model=List[ClientInfo],
+    dependencies=[Depends(require_permission(MCPPermission.ADMIN_USERS))]
+)
+async def list_clients(
+    current_client: MCPClient = Depends(get_current_client)
+):
+    """List all MCP clients (requires admin permissions)"""
+    clients = auth_manager.list_clients()
+    
+    return [
+        ClientInfo(
+            client_id=client.client_id,
+            name=client.name,
+            role=client.role.value,
+            permissions=[p.value for p in client.permissions],
+            created_at=client.created_at.isoformat(),
+            rate_limit=client.rate_limit,
+            allowed_tools=client.allowed_tools
+        )
+        for client in clients
+    ]
+
+
+@router.get(
+    "/auth/clients/{client_id}",
+    response_model=ClientInfo,
+    dependencies=[Depends(require_permission(MCPPermission.ADMIN_USERS))]
+)
+async def get_client(
+    client_id: str,
+    current_client: MCPClient = Depends(get_current_client)
+):
+    """Get client information (requires admin permissions)"""
+    client = auth_manager.get_client(client_id)
+    
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    return ClientInfo(
+        client_id=client.client_id,
+        name=client.name,
+        role=client.role.value,
+        permissions=[p.value for p in client.permissions],
+        created_at=client.created_at.isoformat(),
+        rate_limit=client.rate_limit,
+        allowed_tools=client.allowed_tools
+    )
+
+
+@router.delete(
+    "/auth/clients/{client_id}",
+    dependencies=[Depends(require_permission(MCPPermission.ADMIN_USERS))]
+)
+async def delete_client(
+    client_id: str,
+    current_client: MCPClient = Depends(get_current_client)
+):
+    """Delete a client (requires admin permissions)"""
+    if client_id == current_client.client_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete your own client"
+        )
+    
+    if not auth_manager.delete_client(client_id):
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    return {"status": "deleted", "client_id": client_id}
+
+
+@router.get("/auth/me", response_model=ClientInfo)
+async def get_current_client_info(
+    current_client: MCPClient = Depends(get_current_client)
+):
+    """Get current authenticated client information"""
+    return ClientInfo(
+        client_id=current_client.client_id,
+        name=current_client.name,
+        role=current_client.role.value,
+        permissions=[p.value for p in current_client.permissions],
+        created_at=current_client.created_at.isoformat(),
+        rate_limit=current_client.rate_limit,
+        allowed_tools=current_client.allowed_tools
+    )
+
+
 # WebSocket endpoint
 @router.websocket("/ws")
 async def mcp_websocket(websocket: WebSocket):
@@ -68,6 +273,10 @@ async def mcp_websocket(websocket: WebSocket):
     
     The MCP protocol uses WebSocket for real-time bidirectional communication.
     Clients must send a CONNECT message first to establish a session.
+    Authentication can be done via:
+    - auth_token: JWT token from /auth/token endpoint
+    - api_key: API key for the client
+    - client_secret: Client credentials authentication
     """
     server = get_mcp_server()
     await server.handle_websocket(websocket)
@@ -76,7 +285,9 @@ async def mcp_websocket(websocket: WebSocket):
 # REST endpoints for management and debugging
 
 @router.get("/status", response_model=ServerStatus)
-async def get_server_status():
+async def get_server_status(
+    current_client: Optional[MCPClient] = Depends(get_current_client)
+):
     """Get MCP server status"""
     server = get_mcp_server()
     

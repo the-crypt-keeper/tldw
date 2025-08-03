@@ -14,7 +14,7 @@ This document tracks the implementation progress of features being backported fr
 
 | Component | Priority | Status | Progress | Blockers |
 |-----------|----------|--------|----------|----------|
-| MCP Server | Critical | Completed | 85% | Client SDK & Auth needed |
+| MCP Server | Critical | Completed | 95% | Client SDK needed |
 | Database Migration | High | Completed | 100% | None |
 | RAG Pipeline | High | Completed | 100% | None |
 | Chunking Module | Medium | Completed | 100% | None |
@@ -127,7 +127,7 @@ This document tracks the implementation progress of features being backported fr
 - [x] Implement WebSocket handler for MCP protocol
 - [x] Create tool registration system
 - [x] Implement context management
-- [ ] Add authentication/authorization (deferred to later phase)
+- [x] Add authentication/authorization
 - [ ] Create client SDK
 - [x] Write comprehensive tests (basic test file created)
 - [x] Add API endpoints in `/app/api/v1/endpoints/mcp_endpoint.py`
@@ -377,6 +377,20 @@ This document tracks the implementation progress of features being backported fr
 
 ## Notes and Observations
 
+### 2025-08-03
+- **MCP Authentication Implementation Complete**:
+  - Created comprehensive `mcp_auth.py` module with full authentication system
+  - Implemented JWT-based token generation and validation
+  - Added role-based access control with 4 predefined roles (ADMIN, USER, SERVICE, GUEST)
+  - Created fine-grained permission system with 9 different permissions
+  - Added rate limiting support with optional Redis integration
+  - Updated MCP server to require authentication for connections
+  - Protected tool execution and context operations based on permissions
+  - Added REST endpoints for authentication and client management
+  - Created test script `test_mcp_auth.py` to demonstrate functionality
+  - Updated MCP protocol to support auth fields in CONNECT message
+  - Default admin and service clients created for bootstrapping
+
 ### 2025-08-01
 - Initial analysis complete
 - MCP Server is the most critical missing piece
@@ -418,6 +432,11 @@ The implemented migration system includes:
 - Built-in tools (echo, timestamp, list_tools)
 - tldw-specific tools (search_media, get_transcript, summarize_media)
 - REST endpoints for debugging and management
+- JWT-based authentication system
+- Role-based access control (RBAC)
+- API key authentication
+- Permission system for tools and resources
+- Rate limiting with Redis integration
 
 **Database Migrations:**
 - Automatic schema version detection and migration
@@ -430,7 +449,7 @@ The implemented migration system includes:
 
 #### What's Still Needed
 1. **Client SDK**: Python client library for easy integration
-2. **Authentication**: Add JWT-based auth to MCP connections
+2. ~~**Authentication**: Add JWT-based auth to MCP connections~~ ✓ Completed
 3. **Persistence**: Add Redis/database backend for context storage
 4. **More Tools**: Integrate with existing tldw functionality
 5. **Documentation**: Comprehensive API docs and examples
@@ -517,14 +536,13 @@ Phase 1 (Critical Components) is now complete:
 - Integration with Media_DB_v2.py
 - Comprehensive test suite
 
-**Total Phase 1 Progress: 92.5%**
+**Total Phase 1 Progress: 97.5%**
 
-The remaining 7.5% consists of:
+The remaining 2.5% consists of:
 - MCP client SDK development
-- Authentication for MCP
 - Additional documentation
 
-These items have been deferred to later phases as they are not blocking other development.
+MCP Authentication has been completed with JWT-based auth, RBAC, and fine-grained permissions.
 
 ---
 
@@ -589,7 +607,32 @@ Ready to proceed with:
 1. Web scraping pipeline enhancements
 2. Character chat improvements
 
-### ADR-005: Web Scraping Enhancement Architecture
+### ADR-005: MCP Authentication Architecture
+**Date**: 2025-08-03  
+**Status**: Accepted  
+**Context**: MCP server needed authentication and authorization to secure tool execution and resource access. The system must support multiple authentication methods and fine-grained permissions.  
+**Decision**: 
+- Implement JWT-based authentication with configurable expiry
+- Support three authentication methods: API keys, client credentials, JWT tokens
+- Create role-based access control with predefined roles (ADMIN, USER, SERVICE, GUEST)
+- Implement fine-grained permission system for tools, resources, and context operations
+- Add rate limiting per client with Redis support (optional)
+- Protect WebSocket connections with authentication in CONNECT message
+- Create REST endpoints for client management
+**Consequences**:
+- Secure MCP server with flexible authentication options
+- Fine-grained control over what each client can access
+- Rate limiting prevents abuse
+- Client management requires admin permissions
+- Redis dependency is optional for rate limiting
+**Implementation Details**:
+- `mcp_auth.py`: Complete authentication system with JWT, RBAC, and permissions
+- Authentication endpoints in MCP router for token generation
+- WebSocket handler updated to require authentication
+- Permission decorators for protecting endpoints
+- Default admin and service clients for bootstrapping
+
+### ADR-006: Web Scraping Enhancement Architecture
 **Date**: 2025-08-01  
 **Status**: Accepted  
 **Context**: Existing web scraping implementation was a placeholder with basic functionality. Production use requires concurrent scraping, rate limiting, job management, and robust error handling.  
