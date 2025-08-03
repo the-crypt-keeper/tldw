@@ -418,7 +418,7 @@ class ConfigProfileManager:
         
         # Ensure consistent assignment for user
         if user_id:
-            hash_val = int(hashlib.md5(user_id.encode()).hexdigest(), 16)
+            hash_val = int(hashlib.sha256(user_id.encode()).hexdigest(), 16)
             rand_val = (hash_val % 100) / 100.0
         else:
             import random
