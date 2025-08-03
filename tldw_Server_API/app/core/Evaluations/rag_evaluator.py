@@ -17,14 +17,15 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
-from tldw_Server_API.app.core.RAG.RAG_Search.simplified.embeddings_wrapper import EmbeddingsServiceWrapper
 
 
 class RAGEvaluator:
     """Evaluator for RAG system performance"""
     
     def __init__(self):
-        self.embedding_wrapper = EmbeddingsServiceWrapper()
+        # FIXME: Add embedding wrapper once embeddings module structure is stabilized
+        # self.embedding_wrapper = EmbeddingsServiceWrapper()
+        pass
         
     async def evaluate(
         self,
@@ -187,20 +188,42 @@ class RAGEvaluator:
     
     async def _evaluate_answer_similarity(self, response: str, ground_truth: str) -> tuple:
         """Evaluate similarity between response and ground truth"""
+        # FIXME: Replace with embedding-based similarity once embeddings module is available
+        # For now, use LLM-based similarity evaluation
+        prompt = f"""
+        Compare the similarity between the following response and ground truth answer.
+        
+        Response: {response}
+        
+        Ground Truth: {ground_truth}
+        
+        Rate similarity on a scale of 1-5 where:
+        1 = Completely different meaning
+        2 = Some shared concepts but mostly different
+        3 = Moderately similar with key differences
+        4 = Very similar with minor differences
+        5 = Nearly identical meaning
+        
+        Provide only the numeric score.
+        """
+        
         try:
-            # Use embeddings to compute similarity
-            response_embedding = await self.embedding_wrapper.generate_embedding(response)
-            truth_embedding = await self.embedding_wrapper.generate_embedding(ground_truth)
+            score_str = await asyncio.to_thread(
+                analyze,
+                response,
+                prompt,
+                "openai",  # Default to OpenAI for now
+                "",
+                temp=0.1,
+                system_message="You are an evaluation expert. Provide only numeric scores."
+            )
             
-            # Compute cosine similarity
-            similarity = cosine_similarity(
-                [response_embedding],
-                [truth_embedding]
-            )[0][0]
+            score = float(score_str.strip()) / 5.0
             
             return ("answer_similarity", {
                 "name": "answer_similarity",
-                "score": max(0.0, similarity),  # Ensure non-negative
+                "score": score,
+                "raw_score": float(score_str.strip()),
                 "explanation": "Semantic similarity to ground truth answer"
             })
             

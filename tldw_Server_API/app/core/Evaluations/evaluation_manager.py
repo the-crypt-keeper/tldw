@@ -33,7 +33,12 @@ class EvaluationManager:
     
     def _get_db_path(self) -> Path:
         """Get evaluation database path"""
-        base_path = Path(self.config.get('database', 'evaluation_db_path', 'user_databases'))
+        # FIXME: Update to use proper config structure once config API is standardized
+        database_config = self.config.get('database', {})
+        if isinstance(database_config, dict):
+            base_path = Path(database_config.get('evaluation_db_path', 'user_databases'))
+        else:
+            base_path = Path('user_databases')
         db_file = base_path / "evaluations.db"
         db_file.parent.mkdir(parents=True, exist_ok=True)
         return db_file
@@ -49,11 +54,13 @@ class EvaluationManager:
                     created_at TIMESTAMP NOT NULL,
                     input_data TEXT NOT NULL,
                     results TEXT NOT NULL,
-                    metadata TEXT,
-                    INDEX idx_type (evaluation_type),
-                    INDEX idx_created (created_at)
+                    metadata TEXT
                 )
             """)
+            
+            # Create indexes separately in SQLite
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_type ON evaluations(evaluation_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON evaluations(created_at)")
             
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS evaluation_metrics (
@@ -62,12 +69,14 @@ class EvaluationManager:
                     metric_name TEXT NOT NULL,
                     score REAL NOT NULL,
                     created_at TIMESTAMP NOT NULL,
-                    FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id),
-                    INDEX idx_eval_id (evaluation_id),
-                    INDEX idx_metric (metric_name),
-                    INDEX idx_created (created_at)
+                    FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id)
                 )
             """)
+            
+            # Create indexes for metrics table
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_eval_id ON evaluation_metrics(evaluation_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_metric ON evaluation_metrics(metric_name)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_metric_created ON evaluation_metrics(created_at)")
             
             conn.commit()
     
