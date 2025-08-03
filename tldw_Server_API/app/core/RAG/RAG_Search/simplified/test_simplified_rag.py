@@ -16,7 +16,7 @@ import json
 project_root = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from tldw_chatbook.RAG_Search.simplified import (
+from tldw_Server_API.app.core.RAG_Search.simplified import (
     RAGService, 
     RAGConfig,
     create_config_for_testing,

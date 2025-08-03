@@ -7,7 +7,7 @@ to satisfy the import requirements of the simplified RAG service.
 
 from typing import List, Dict, Any, Optional
 import logging
-from tldw_chatbook.Chunking.Chunk_Lib import Chunker
+from tldw_Server_API.app.core.Chunking.Chunk_Lib import Chunker
 
 logger = logging.getLogger(__name__)
 

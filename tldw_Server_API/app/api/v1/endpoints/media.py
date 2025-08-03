@@ -4814,7 +4814,7 @@ class XMLIngestRequest(BaseModel):
 #             segments = result_data["segments"]
 #             combined_prompt = (payload.system_prompt or "") + "\n\n" + (payload.custom_prompt or "")
 #
-#             media_id = add_media_to_database(
+#             media_id = add_media_with_keywords(
 #                 url=filename,
 #                 info_dict=info_dict,
 #                 segments=segments,

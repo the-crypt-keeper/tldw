@@ -5,7 +5,7 @@
 from tldw_Server_API.app.core.logging import logger
 from tldw_Server_API.app.core.Utils.Utils import convert_to_seconds, extract_text_from_segments
 from tldw_Server_API.app.services.ephemeral_store import ephemeral_storage
-from tldw_Server_API.app.core.DB_Management.DB_Manager import add_media_to_database
+from tldw_Server_API.app.core.DB_Management.DB_Manager import add_media_with_keywords
 # Hypothetical library that does the actual podcast ingestion/transcription:
 # e.g. from App_Function_Libraries.Audio.Audio_Files import process_podcast
 # or define your own function here

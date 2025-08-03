@@ -24,8 +24,8 @@ except ImportError:
         class ndarray:
             pass
 
-from tldw_chatbook.Embeddings.Embeddings_Lib import EmbeddingFactory, EmbeddingConfigSchema
-from tldw_chatbook.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
+from tldw_Server_API.app.core.Embeddings.Embeddings_Lib import EmbeddingFactory, EmbeddingConfigSchema
+from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
 from .circuit_breaker import get_circuit_breaker, CircuitBreakerConfig, CircuitBreakerOpenError
 
 
@@ -88,7 +88,7 @@ class EmbeddingsServiceWrapper:
         
         try:
             # Import EmbeddingConfigSchema for validation
-            from tldw_chatbook.Embeddings.Embeddings_Lib import EmbeddingConfigSchema
+            from tldw_Server_API.app.core.Embeddings.Embeddings_Lib import EmbeddingConfigSchema
             
             # Validate the configuration
             validated_config = EmbeddingConfigSchema(**config_dict)
@@ -576,7 +576,7 @@ class EmbeddingsServiceWrapper:
             config_dict = self._build_config(self.model_name, self.device, self._api_key, self._base_url, self._cache_dir)
             
             # Import and validate configuration
-            from tldw_chatbook.Embeddings.Embeddings_Lib import EmbeddingConfigSchema
+            from tldw_Server_API.app.core.Embeddings.Embeddings_Lib import EmbeddingConfigSchema
             validated_config = EmbeddingConfigSchema(**config_dict)
             
             self.factory = EmbeddingFactory(

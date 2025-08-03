@@ -27,7 +27,7 @@ from ..config_profiles import (
     ProfileType, ConfigProfileManager
 )
 from .data_models import IndexingResult
-from tldw_chatbook.Metrics.metrics_logger import log_counter, log_histogram, timeit
+from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, timeit
 
 
 class EnhancedRAGServiceV2(EnhancedRAGService):
@@ -451,4 +451,16 @@ def quick_search(
         service, _ = await create_rag_from_profile(profile, documents)
         return await service.search(query, rerank=rerank)
     
-    return asyncio.run(_search())
+    # Handle existing event loops
+    try:
+        # Try to get the current event loop
+        loop = asyncio.get_running_loop()
+        # If we're here, a loop is already running
+        # Run in a thread to avoid event loop conflicts
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(asyncio.run, _search())
+            return future.result()
+    except RuntimeError:
+        # No event loop is running, so we can use asyncio.run() directly
+        return asyncio.run(_search())

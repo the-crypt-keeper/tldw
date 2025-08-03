@@ -26,7 +26,7 @@ from .enhanced_indexing_helpers import (
     generate_embeddings_for_parent_retrieval,
     store_documents_with_parents
 )
-from tldw_chatbook.Metrics.metrics_logger import log_counter, log_histogram, timeit
+from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, timeit
 
 
 class EnhancedRAGService(RAGService):

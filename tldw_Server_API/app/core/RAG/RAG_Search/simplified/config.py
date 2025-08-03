@@ -13,7 +13,7 @@ import os
 from loguru import logger
 
 # Import the main config module to access existing configuration
-from tldw_chatbook.config import get_cli_setting, load_cli_config_and_ensure_existence, get_user_data_dir
+from tldw_Server_API.app.core.config import get_cli_setting, load_cli_config_and_ensure_existence, get_user_data_dir
 
 
 

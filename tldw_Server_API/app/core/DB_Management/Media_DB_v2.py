@@ -56,6 +56,7 @@ import logging
 import yaml
 
 from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram
+from tldw_Server_API.app.core.DB_Management.db_migration import DatabaseMigrator, MigrationError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -96,7 +97,7 @@ class MediaDatabase:
     handling sync metadata and FTS updates internally via Python code.
     Requires client_id on initialization. Includes schema versioning.
     """
-    _CURRENT_SCHEMA_VERSION = 1  # Define the version this code supports
+    _CURRENT_SCHEMA_VERSION = 4  # Updated to include MCP, embeddings, and scraping tables
 
     # <<< Schema Definition (Version 1) >>>
 
@@ -759,17 +760,49 @@ class MediaDatabase:
                 raise SchemaError(f"Database schema version ({current_db_version}) is newer than supported by code ({target_version}).")
 
             # --- Apply Migrations ---
-            if current_db_version == 0:
-                self._apply_schema_v1(conn)  # Call the updated method
-                # Verify version update AFTER _apply_schema_v1 has committed
+            if current_db_version < target_version:
+                # Use the new migration system
+                try:
+                    # Close the current connection to avoid locks
+                    conn.close()
+                    
+                    # Run migrations
+                    migrator = DatabaseMigrator(self.db_path_str)
+                    result = migrator.migrate_to_version(target_version)
+                    
+                    if result["status"] == "success":
+                        logging.info(f"Database migrated from version {result['previous_version']} to {result['current_version']}")
+                        # Get a new connection after migration
+                        conn = self._get_new_connection()
+                        # Ensure FTS tables exist
+                        conn.executescript(self._FTS_TABLES_SQL)
+                        conn.commit()
+                    else:
+                        raise SchemaError(f"Migration failed: {result}")
+                    
+                except MigrationError as e:
+                    raise SchemaError(f"Database migration failed: {e}") from e
+                    
+            elif current_db_version == 0:
+                # Fresh database, apply base schema directly
+                self._apply_schema_v1(conn)
+                # Then run migrations to get to current version
+                if target_version > 1:
+                    conn.close()
+                    migrator = DatabaseMigrator(self.db_path_str)
+                    result = migrator.migrate_to_version(target_version)
+                    if result["status"] != "success":
+                        raise SchemaError(f"Migration failed after initial schema: {result}")
+                    conn = self._get_new_connection()
+                    
+                # Verify version update
                 final_db_version = self._get_db_version(conn)
                 if final_db_version != target_version:
-                    # If this fails now, it means the commit didn't work or the read is stale
-                    raise SchemaError(f"Schema migration applied, but final DB version is {final_db_version}, expected {target_version}. Manual check required.")
-                logging.info(f"Database schema initialized/migrated to version {target_version}.")
+                    raise SchemaError(f"Schema migration applied, but final DB version is {final_db_version}, expected {target_version}.")
+                logging.info(f"Database schema initialized to version {target_version}.")
 
             else:
-                raise SchemaError(f"Migration needed from version {current_db_version} to {target_version}, but no migration path is defined in the code.")
+                raise SchemaError(f"Migration needed from version {current_db_version} to {target_version}, but no migration path is defined.")
 
         except (DatabaseError, SchemaError, sqlite3.Error) as e:
             logging.error(f"Schema initialization/migration failed: {e}", exc_info=True)

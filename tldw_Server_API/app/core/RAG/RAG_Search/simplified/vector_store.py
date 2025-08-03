@@ -26,7 +26,7 @@ import time
 import psutil
 
 from .citations import Citation, CitationType, SearchResultWithCitations
-from tldw_chatbook.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
+from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
 
 
 # Import constants from rag_service

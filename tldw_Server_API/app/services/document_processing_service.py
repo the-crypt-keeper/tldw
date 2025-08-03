@@ -15,7 +15,7 @@ from pypandoc import convert_file
 
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
 from tldw_Server_API.app.core.Chunking.Chunk_Lib import improved_chunking_process
-from tldw_Server_API.app.core.DB_Management.DB_Manager import add_media_to_database
+from tldw_Server_API.app.core.DB_Management.DB_Manager import add_media_with_keywords
 from tldw_Server_API.app.core.Utils.Utils import logging
 
 async def process_documents(
@@ -189,7 +189,7 @@ async def process_documents(
                 # (Optionally) Store in DB
                 if store_in_db:
                     # Use your own DB logic
-                    db_id = add_media_to_database(
+                    db_id = add_media_with_keywords(
                         url=url,
                         title=custom_title or os.path.basename(local_path),
                         media_type="document",
@@ -236,7 +236,7 @@ async def process_documents(
                 item_result["summary"] = summary_text
 
                 if store_in_db:
-                    db_id = add_media_to_database(
+                    db_id = add_media_with_keywords(
                         url=file_path,
                         title=custom_title or os.path.basename(file_path),
                         media_type="document",
