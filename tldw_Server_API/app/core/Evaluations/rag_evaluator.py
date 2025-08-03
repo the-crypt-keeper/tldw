@@ -1,0 +1,331 @@
+# rag_evaluator.py - RAG System Evaluation Module
+"""
+Evaluation module for RAG (Retrieval-Augmented Generation) systems.
+
+Implements metrics:
+- Relevance: How relevant is the response to the query
+- Faithfulness: Is the response grounded in retrieved contexts
+- Answer Similarity: Similarity to ground truth (if available)
+- Context Precision: Precision of retrieved contexts
+- Context Recall: Coverage of necessary information
+"""
+
+import asyncio
+from typing import List, Dict, Any, Optional
+from loguru import logger
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+
+from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
+from tldw_Server_API.app.core.RAG.RAG_Search.simplified.embeddings_wrapper import EmbeddingsServiceWrapper
+
+
+class RAGEvaluator:
+    """Evaluator for RAG system performance"""
+    
+    def __init__(self):
+        self.embedding_wrapper = EmbeddingsServiceWrapper()
+        
+    async def evaluate(
+        self,
+        query: str,
+        contexts: List[str],
+        response: str,
+        ground_truth: Optional[str] = None,
+        metrics: Optional[List[str]] = None,
+        api_name: str = "openai"
+    ) -> Dict[str, Any]:
+        """
+        Evaluate RAG system performance.
+        
+        Args:
+            query: User query
+            contexts: Retrieved context chunks
+            response: Generated response
+            ground_truth: Optional ground truth answer
+            metrics: Metrics to compute
+            api_name: LLM API to use
+            
+        Returns:
+            Evaluation results with metrics and suggestions
+        """
+        if metrics is None:
+            metrics = ["relevance", "faithfulness", "answer_similarity"]
+        
+        results = {
+            "metrics": {},
+            "suggestions": []
+        }
+        
+        # Evaluate each metric
+        tasks = []
+        if "relevance" in metrics:
+            tasks.append(self._evaluate_relevance(query, response, api_name))
+        
+        if "faithfulness" in metrics:
+            tasks.append(self._evaluate_faithfulness(response, contexts, api_name))
+        
+        if "answer_similarity" in metrics and ground_truth:
+            tasks.append(self._evaluate_answer_similarity(response, ground_truth))
+        
+        if "context_precision" in metrics:
+            tasks.append(self._evaluate_context_precision(query, contexts, api_name))
+        
+        if "context_recall" in metrics and ground_truth:
+            tasks.append(self._evaluate_context_recall(ground_truth, contexts, api_name))
+        
+        # Run evaluations in parallel
+        metric_results = await asyncio.gather(*tasks)
+        
+        # Compile results
+        for metric_name, metric_result in metric_results:
+            results["metrics"][metric_name] = metric_result
+            
+        # Generate suggestions based on scores
+        results["suggestions"] = self._generate_suggestions(results["metrics"])
+        
+        return results
+    
+    async def _evaluate_relevance(self, query: str, response: str, api_name: str) -> tuple:
+        """Evaluate relevance of response to query"""
+        prompt = f"""
+        Evaluate how relevant the following response is to the given query.
+        
+        Query: {query}
+        
+        Response: {response}
+        
+        Rate the relevance on a scale of 1-5 where:
+        1 = Completely irrelevant
+        2 = Mostly irrelevant with minor relevant points
+        3 = Partially relevant
+        4 = Mostly relevant with minor gaps
+        5 = Highly relevant and comprehensive
+        
+        Provide only the numeric score.
+        """
+        
+        try:
+            score_str = await asyncio.to_thread(
+                analyze,
+                query,
+                prompt,
+                api_name,
+                "",  # api_key
+                temp=0.1,
+                system_message="You are an evaluation expert. Provide only numeric scores."
+            )
+            
+            score = float(score_str.strip()) / 5.0  # Normalize to 0-1
+            
+            return ("relevance", {
+                "name": "relevance",
+                "score": score,
+                "raw_score": float(score_str.strip()),
+                "explanation": "Measures how well the response addresses the query"
+            })
+            
+        except Exception as e:
+            logger.error(f"Relevance evaluation failed: {e}")
+            return ("relevance", {
+                "name": "relevance",
+                "score": 0.0,
+                "explanation": f"Evaluation failed: {str(e)}"
+            })
+    
+    async def _evaluate_faithfulness(self, response: str, contexts: List[str], api_name: str) -> tuple:
+        """Evaluate if response is grounded in contexts"""
+        combined_context = "\n\n".join(contexts)
+        
+        prompt = f"""
+        Evaluate if the following response is faithful to the provided contexts.
+        Check if all claims in the response are supported by the contexts.
+        
+        Contexts:
+        {combined_context}
+        
+        Response:
+        {response}
+        
+        Rate faithfulness on a scale of 1-5 where:
+        1 = Contains many unsupported claims
+        2 = Some major unsupported claims
+        3 = Mix of supported and unsupported claims
+        4 = Mostly supported with minor unsupported details
+        5 = Fully supported by contexts
+        
+        Provide only the numeric score.
+        """
+        
+        try:
+            score_str = await asyncio.to_thread(
+                analyze,
+                response,
+                prompt,
+                api_name,
+                "",
+                temp=0.1,
+                system_message="You are an evaluation expert. Provide only numeric scores."
+            )
+            
+            score = float(score_str.strip()) / 5.0
+            
+            return ("faithfulness", {
+                "name": "faithfulness",
+                "score": score,
+                "raw_score": float(score_str.strip()),
+                "explanation": "Measures if response is grounded in retrieved contexts"
+            })
+            
+        except Exception as e:
+            logger.error(f"Faithfulness evaluation failed: {e}")
+            return ("faithfulness", {
+                "name": "faithfulness",
+                "score": 0.0,
+                "explanation": f"Evaluation failed: {str(e)}"
+            })
+    
+    async def _evaluate_answer_similarity(self, response: str, ground_truth: str) -> tuple:
+        """Evaluate similarity between response and ground truth"""
+        try:
+            # Use embeddings to compute similarity
+            response_embedding = await self.embedding_wrapper.generate_embedding(response)
+            truth_embedding = await self.embedding_wrapper.generate_embedding(ground_truth)
+            
+            # Compute cosine similarity
+            similarity = cosine_similarity(
+                [response_embedding],
+                [truth_embedding]
+            )[0][0]
+            
+            return ("answer_similarity", {
+                "name": "answer_similarity",
+                "score": max(0.0, similarity),  # Ensure non-negative
+                "explanation": "Semantic similarity to ground truth answer"
+            })
+            
+        except Exception as e:
+            logger.error(f"Answer similarity evaluation failed: {e}")
+            return ("answer_similarity", {
+                "name": "answer_similarity",
+                "score": 0.0,
+                "explanation": f"Evaluation failed: {str(e)}"
+            })
+    
+    async def _evaluate_context_precision(self, query: str, contexts: List[str], api_name: str) -> tuple:
+        """Evaluate precision of retrieved contexts"""
+        # Check each context for relevance
+        relevance_scores = []
+        
+        for i, context in enumerate(contexts):
+            prompt = f"""
+            Rate how relevant this context is to the query on a scale of 1-5.
+            
+            Query: {query}
+            
+            Context: {context}
+            
+            Provide only the numeric score.
+            """
+            
+            try:
+                score_str = await asyncio.to_thread(
+                    analyze,
+                    context,
+                    prompt,
+                    api_name,
+                    "",
+                    temp=0.1,
+                    system_message="You are an evaluation expert. Provide only numeric scores."
+                )
+                
+                relevance_scores.append(float(score_str.strip()) / 5.0)
+                
+            except:
+                relevance_scores.append(0.0)
+        
+        # Calculate precision as average relevance
+        precision = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.0
+        
+        return ("context_precision", {
+            "name": "context_precision",
+            "score": precision,
+            "explanation": "Average relevance of retrieved contexts",
+            "metadata": {"individual_scores": relevance_scores}
+        })
+    
+    async def _evaluate_context_recall(self, ground_truth: str, contexts: List[str], api_name: str) -> tuple:
+        """Evaluate if contexts contain necessary information"""
+        combined_context = "\n\n".join(contexts)
+        
+        prompt = f"""
+        Evaluate if the provided contexts contain all the information needed to answer with the ground truth.
+        
+        Ground Truth Answer: {ground_truth}
+        
+        Contexts:
+        {combined_context}
+        
+        Rate coverage on a scale of 1-5 where:
+        1 = Missing most key information
+        2 = Missing several important points
+        3 = Contains about half the needed information
+        4 = Contains most information with minor gaps
+        5 = Contains all necessary information
+        
+        Provide only the numeric score.
+        """
+        
+        try:
+            score_str = await asyncio.to_thread(
+                analyze,
+                combined_context,
+                prompt,
+                api_name,
+                "",
+                temp=0.1,
+                system_message="You are an evaluation expert. Provide only numeric scores."
+            )
+            
+            score = float(score_str.strip()) / 5.0
+            
+            return ("context_recall", {
+                "name": "context_recall",
+                "score": score,
+                "raw_score": float(score_str.strip()),
+                "explanation": "Coverage of necessary information in contexts"
+            })
+            
+        except Exception as e:
+            logger.error(f"Context recall evaluation failed: {e}")
+            return ("context_recall", {
+                "name": "context_recall",
+                "score": 0.0,
+                "explanation": f"Evaluation failed: {str(e)}"
+            })
+    
+    def _generate_suggestions(self, metrics: Dict[str, Dict]) -> List[str]:
+        """Generate improvement suggestions based on metrics"""
+        suggestions = []
+        
+        # Check relevance
+        if "relevance" in metrics and metrics["relevance"]["score"] < 0.7:
+            suggestions.append("Consider improving query understanding or response generation to better address user queries")
+        
+        # Check faithfulness
+        if "faithfulness" in metrics and metrics["faithfulness"]["score"] < 0.7:
+            suggestions.append("Improve grounding of responses in retrieved contexts to reduce hallucinations")
+        
+        # Check context precision
+        if "context_precision" in metrics and metrics["context_precision"]["score"] < 0.6:
+            suggestions.append("Enhance retrieval system to fetch more relevant contexts")
+        
+        # Check context recall
+        if "context_recall" in metrics and metrics["context_recall"]["score"] < 0.7:
+            suggestions.append("Expand retrieval to capture more comprehensive information")
+        
+        # Check answer similarity
+        if "answer_similarity" in metrics and metrics["answer_similarity"]["score"] < 0.6:
+            suggestions.append("Fine-tune generation to produce more accurate responses")
+        
+        return suggestions
