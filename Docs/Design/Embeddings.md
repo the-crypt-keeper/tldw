@@ -16,7 +16,7 @@ https://shawhin.medium.com/fine-tuning-text-embeddings-f913b882b11c
 https://maartengr.github.io/BERTopic/index.html
 https://docs.llamaindex.ai/en/stable/examples/finetuning/embeddings/finetune_embedding/
 https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
-
+https://github.com/beir-cellar/beir/wiki/Load-your-custom-dataset
 
 
 

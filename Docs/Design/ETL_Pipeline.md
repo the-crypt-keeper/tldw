@@ -42,6 +42,32 @@ https://github.com/cocoindex-io/cocoindex/tree/main/examples/manuals_llm_extract
 https://cocoindex.io/blogs/academic-papers-indexing/
 https://github.com/upstash/context7
 https://github.com/dbamman/litbank
+https://github.com/google/langextract
+https://pypi.org/project/python-pptx/
+https://github.com/landing-ai/agentic-doc 
+https://sarahconstantin.substack.com/p/the-great-data-integration-schlep
+https://github.com/AndyTheFactory/newspaper4k
+https://github.com/shutootaki/bookwith
+https://manual.calibre-ebook.com/generated/en/calibre-server.html
+https://docs.llamaindex.ai/en/stable/api_reference/node_parsers/code/#llama_index.core.node_parser.CodeSplitter
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
  Proper citations and giant-pdf support are the real blockers here. A quick win would be to pull ISBN/DOI metadata on upload, stash it as JSON inside the notebook, then stamp APA/Vancouver refs straight into answers; Crossref’s API is free and usually nails the fields. For page-level anchors, chunk the pdf into 2-page slices at ingest and keep the slice IDs so the model can point to exact spots.
 

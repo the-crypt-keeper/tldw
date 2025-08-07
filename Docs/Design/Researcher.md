@@ -138,6 +138,10 @@ https://github.com/atineiatte/deep-research-at-home
 https://github.com/zjunlp/OmniThink
 https://searchthearxiv.com/
 https://github.com/neuml/annotateai
+https://github.com/Arindam200/awesome-ai-apps/tree/main/advance_ai_agents/conference_talk_abstract_generator
+https://arxiv.org/pdf/2507.16075
+https://github.com/codelion/optillm/tree/main/optillm/plugins/deep_research
+https://github.com/murtaza-nasir/maestro
 https://eprint.iacr.org/
 https://docs.gptr.dev/docs/gpt-researcher/multi_agents/langgraph
 https://pub.towardsai.net/learn-anything-with-ai-and-the-feynman-technique-00a33f6a02bc

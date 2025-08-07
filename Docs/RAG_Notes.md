@@ -7,6 +7,19 @@ https://www.jeremykun.com/2015/04/06/markov-chain-monte-carlo-without-all-the-bu
 https://medium.com/ai-exploration-journey/how-hirag-turns-data-chaos-into-structured-knowledge-magic-ai-innovations-and-insights-35-d637b9a58d80
 https://arxiv.org/pdf/2506.00054
 
+
+
+https://iopscience.iop.org/article/10.1088/2632-2153/ad7228
+https://github.com/lamm-mit/GraphReasoning
+https://arxiv.org/abs/2409.13740
+https://github.com/Future-House/paper-qa
+https://www.lesswrong.com/posts/bT8yyJHpK64v3nh2N/ai-safety-chatbot
+https://github.com/tbroadley/ai-safety-conversational-agent
+
+
+
+
+
 https://aclanthology.org/2024.acl-long.585/
 https://dl.acm.org/doi/10.1145/3626772.3657853
 https://aclanthology.org/2024.findings-emnlp.449/
@@ -33,6 +46,8 @@ https://abdullin.com/ilya/how-to-build-best-rag/
 https://github.com/IlyaRice/RAG-Challenge-2
 https://github.com/shredEngineer/Archive-Agent/tree/main/archive_agent/core
 https://arxiv.org/html/2504.01818v1
+https://github.com/waetr/KET-RAG
+	https://arxiv.org/abs/2502.09304
 https://github.com/CornelliusYW/Multimodal-RAG-Implementation
 https://github.com/mixedbread-ai/maxsim-cpu
 https://arxiv.org/html/2506.23026v1#S4

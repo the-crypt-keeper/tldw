@@ -9,8 +9,11 @@ https://github.com/LouisShark/chatgpt_system_prompt
 https://github.com/microsoft/PromptWizard
 https://github.com/qixucen/atom
 https://gist.githubusercontent.com/transitive-bullshit/487c9cb52c75a9701d312334ed53b20c/raw/d50ae033bbb0bea41026e338e70d7435f651ae5d/claude-code-prompts.js
+https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools
 
 
+
+https://dspy.ai/api/optimizers/MIPROv2/
 https://github.com/davidkimai/Context-Engineering
 https://arxiv.org/html/2502.18600v1
 https://huggingface.co/models?search=prompts

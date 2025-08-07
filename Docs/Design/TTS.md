@@ -25,6 +25,12 @@ https://sh.itjust.works/post/40062592
 https://kyutai.org/next/stt
 https://github.com/eel-brah/kokorodoki
 https://kyutai.org/next/unmute
+https://speech.fish.audio/inference/#2-generate-semantic-tokens-from-text
+https://github.com/fishaudio/fish-speech
+https://huggingface.co/fishaudio/openaudio-s1-mini
+https://github.com/MaTeZZ/ComfyUI-HiggsAudio_2
+https://www.youtube.com/watch?v=CDJ5BuGKW6s
+
 https://ai.google.dev/gemini-api/docs/speech-generation
 https://github.com/stepfun-ai/Step-Audio2
 https://github.com/fastrepl/hyprnote
