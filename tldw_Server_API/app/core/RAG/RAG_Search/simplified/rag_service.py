@@ -15,6 +15,7 @@ import numpy as np
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 import psutil
+import threading
 
 from .embeddings_wrapper import EmbeddingsServiceWrapper
 from .vector_store import (
@@ -28,10 +29,26 @@ from .simple_cache import SimpleRAGCache, get_rag_cache
 from .db_connection_pool import get_connection_pool
 from .indexing_helpers import chunk_documents_batch, generate_embeddings_batch, store_documents_batch
 from .health_check import init_health_checker, get_health_status
+
+
+def run_async(coro):
+    """Run async function handling existing event loops."""
+    try:
+        # Try to get the current event loop
+        loop = asyncio.get_running_loop()
+        # If we're here, a loop is already running
+        # Run in a thread to avoid event loop conflicts
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
+    except RuntimeError:
+        # No event loop is running, so we can use asyncio.run() directly
+        return asyncio.run(coro)
 from .data_models import IndexingResult
-from tldw_chatbook.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
-from tldw_chatbook.Utils.path_validation import validate_path
-from tldw_chatbook.config import load_settings
+from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
+from tldw_Server_API.app.core.Utils.path_validation import validate_path
+from tldw_Server_API.app.core.config import load_settings
 
 
 # Load constants from config with fallbacks
@@ -94,7 +111,7 @@ class RAGService:
         logger.info(f"Initializing embeddings service with model: {self.config.embedding_model}")
         
         # Get model cache directory from config
-        from tldw_chatbook.config import get_model_cache_dir
+        from tldw_Server_API.app.core.config import get_model_cache_dir
         cache_dir = str(get_model_cache_dir())
         
         self.embeddings = EmbeddingsServiceWrapper(
@@ -331,7 +348,7 @@ class RAGService:
     
     def index_document_sync(self, doc_id: str, content: str, **kwargs) -> IndexingResult:
         """Synchronous version of index_document."""
-        return asyncio.run(self.index_document(doc_id, content, **kwargs))
+        return run_async(self.index_document(doc_id, content, **kwargs))
     
     async def index_batch(self, 
                          documents: List[Dict[str, Any]],
@@ -569,7 +586,7 @@ class RAGService:
     
     def search_sync(self, query: str, **kwargs) -> Union[List[SearchResult], List[SearchResultWithCitations]]:
         """Synchronous version of search."""
-        return asyncio.run(self.search(query, **kwargs))
+        return run_async(self.search(query, **kwargs))
     
     async def _semantic_search(self, 
                               query: str, 
@@ -616,7 +633,7 @@ class RAGService:
         try:
             # Get database path from vector store persist directory
             db_path = None
-            from tldw_chatbook.config import get_user_data_dir
+            from tldw_Server_API.app.core.config import get_user_data_dir
             base_dir = get_user_data_dir()
             
             if self.config.persist_directory:
@@ -656,7 +673,7 @@ class RAGService:
                     default_path = base_dir / "chacha_notes.db"
                     if not default_path.exists():
                         logger.info(f"Creating new media database at: {default_path}")
-                        from tldw_chatbook.DB.Client_Media_DB_v2 import Database as MediaDatabase
+                        from tldw_Server_API.app.core.DB.Client_Media_DB_v2 import Database as MediaDatabase
                         MediaDatabase(str(default_path), "rag_service")
                     db_path = str(default_path)
                 except Exception as e:

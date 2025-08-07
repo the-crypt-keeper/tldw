@@ -46,6 +46,9 @@ from tldw_Server_API.app.api.v1.endpoints.rag import router as retrieval_agent_r
 # Research Endpoint
 from tldw_Server_API.app.api.v1.endpoints.research import router as research_router
 #
+# Evaluation Endpoint
+from tldw_Server_API.app.api.v1.endpoints.evals import router as evaluation_router
+#
 # Sync Endpoint
 from tldw_Server_API.app.api.v1.endpoints.sync import router as sync_router
 #
@@ -53,6 +56,9 @@ from tldw_Server_API.app.api.v1.endpoints.sync import router as sync_router
 from tldw_Server_API.app.api.v1.endpoints.tools import router as tools_router
 ## Trash Endpoint
 #from tldw_Server_API.app.api.v1.endpoints.trash import router as trash_router
+#
+# MCP Endpoint
+from tldw_Server_API.app.api.v1.endpoints.mcp_endpoint import router as mcp_router
 #
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 #
@@ -201,12 +207,20 @@ app.include_router(retrieval_agent_router, prefix=f"{API_V1_PREFIX}/retrieval_ag
 app.include_router(research_router, prefix=f"{API_V1_PREFIX}/research", tags=["research"])
 
 
+# Router for Evaluation endpoint
+app.include_router(evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
+
+
 # Router for Sync endpoint
 app.include_router(sync_router, prefix=f"{API_V1_PREFIX}/sync", tags=["sync"])
 
 
 # Router for Tools endpoint
 app.include_router(tools_router, prefix=f"{API_V1_PREFIX}/tools", tags=["tools"])
+
+
+# Router for MCP (Model Context Protocol) endpoint
+app.include_router(mcp_router, prefix=f"{API_V1_PREFIX}", tags=["MCP"])
 
 
 # Router for trash endpoints - deletion of media items / trash file handling (FIXME: Secure delete vs lag on delete?)

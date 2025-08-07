@@ -26,7 +26,7 @@ from tldw_Server_API.app.core.Chunking.Chunk_Lib import (
     InvalidChunkingMethodError
 )
 from tldw_Server_API.app.api.v1.schemas.chunking_schema import ChunkingResponse, ChunkingTextRequest, \
-    ChunkingOptionsRequest
+    ChunkingOptionsRequest, ChunkedContentResponse
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze as general_llm_analyzer
 from tldw_Server_API.app.core.config import load_and_log_configs as load_server_configs
 #
@@ -210,9 +210,17 @@ async def process_text_for_chunking_json(
     if not chunk_results:
         logger.info(f"Chunking produced no results for '{request_data.file_name}'. Returning empty list.")
 
-    # FIXME chunks incorrect type
+    # Convert chunk_results to ChunkedContentResponse objects
+    chunked_responses = [
+        ChunkedContentResponse(
+            text=chunk['text'],
+            metadata=chunk['metadata']
+        )
+        for chunk in chunk_results
+    ]
+    
     return ChunkingResponse(
-        chunks=chunk_results,
+        chunks=chunked_responses,
         original_file_name=request_data.file_name,
         applied_options=ChunkingOptionsRequest(**effective_options) # Show what was actually used
     )
@@ -355,9 +363,17 @@ async def process_file_for_chunking(
         logger.error(f"Unexpected error during chunking file '{file.filename}': {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal error during file chunking: {type(e).__name__}")
 
-    # FIXME chunks incorrect type
+    # Convert chunk_results to ChunkedContentResponse objects
+    chunked_responses = [
+        ChunkedContentResponse(
+            text=chunk['text'],
+            metadata=chunk['metadata']
+        )
+        for chunk in chunk_results
+    ]
+    
     return ChunkingResponse(
-        chunks=chunk_results,
+        chunks=chunked_responses,
         original_file_name=file.filename,
         applied_options=ChunkingOptionsRequest(**effective_processing_options)
     )

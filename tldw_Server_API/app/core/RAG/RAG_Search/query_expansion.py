@@ -14,10 +14,10 @@ from typing import List, Dict, Any, Optional, Tuple
 from functools import lru_cache
 from datetime import datetime, timedelta
 
-from tldw_chatbook.RAG_Search.simplified.config import QueryExpansionConfig
-from tldw_chatbook.LLM_Calls.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_deepseek
-from tldw_chatbook.LLM_Calls.LLM_API_Calls_Local import chat_with_ollama, chat_with_local_llm
-from tldw_chatbook.config import get_cli_setting
+from tldw_Server_API.app.core.RAG_Search.simplified.config import QueryExpansionConfig
+from tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls import chat_with_openai, chat_with_anthropic, chat_with_deepseek
+from tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls_Local import chat_with_ollama, chat_with_local_llm
+from tldw_Server_API.app.core.config import get_cli_setting
 
 logger = logging.getLogger(__name__)
 

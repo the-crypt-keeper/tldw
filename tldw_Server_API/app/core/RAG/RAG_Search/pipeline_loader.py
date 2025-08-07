@@ -19,7 +19,7 @@ from functools import wraps
 import asyncio
 from loguru import logger
 
-from tldw_chatbook.Event_Handlers.Chat_Events import chat_rag_events
+from tldw_Server_API.app.core.Event_Handlers.Chat_Events import chat_rag_events
 
 
 @dataclass
@@ -218,7 +218,7 @@ class PipelineLoader:
             
             # Otherwise, use the profile-based approach
             if pipeline.profile:
-                from tldw_chatbook.RAG_Search.config_profiles import get_profile_manager
+                from tldw_Server_API.app.core.RAG_Search.config_profiles import get_profile_manager
                 
                 manager = get_profile_manager()
                 profile_config = manager.get_profile(pipeline.profile)
@@ -229,12 +229,12 @@ class PipelineLoader:
                     logger.info(f"Using profile '{pipeline.profile}' for pipeline '{pipeline.id}'")
                     
                     # For now, default to semantic search with profile
-                    from tldw_chatbook.Event_Handlers.Chat_Events.chat_rag_events import perform_full_rag_pipeline
+                    from tldw_Server_API.app.core.Event_Handlers.Chat_Events.chat_rag_events import perform_full_rag_pipeline
                     return await perform_full_rag_pipeline(app, query, sources, **params)
             
             # Fallback to basic search
             logger.warning(f"Custom pipeline '{pipeline.id}' has no implementation, using default")
-            from tldw_chatbook.Event_Handlers.Chat_Events.chat_rag_events import perform_plain_rag_search
+            from tldw_Server_API.app.core.Event_Handlers.Chat_Events.chat_rag_events import perform_plain_rag_search
             return await perform_plain_rag_search(app, query, sources, **params)
         
         return custom_pipeline
@@ -265,7 +265,7 @@ class PipelineLoader:
             
             # Fallback
             logger.warning(f"Composite pipeline '{pipeline.id}' has no valid strategy")
-            from tldw_chatbook.Event_Handlers.Chat_Events.chat_rag_events import perform_hybrid_rag_search
+            from tldw_Server_API.app.core.Event_Handlers.Chat_Events.chat_rag_events import perform_hybrid_rag_search
             return await perform_hybrid_rag_search(app, query, sources, **params)
         
         return composite_pipeline
@@ -447,7 +447,7 @@ class PipelineLoader:
         self, app, query, sources, components: Dict[str, Dict[str, Any]], **kwargs
     ) -> Tuple[List[Dict[str, Any]], str]:
         """Run an ensemble of pipelines."""
-        from tldw_chatbook.Event_Handlers.Chat_Events.chat_rag_events import format_results_for_llm
+        from tldw_Server_API.app.core.Event_Handlers.Chat_Events.chat_rag_events import format_results_for_llm
         
         all_results = []
         tasks = []

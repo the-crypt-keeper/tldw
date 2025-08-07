@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 # Local Imports
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
 from tldw_Server_API.app.core.Chunking.Chunk_Lib import chunk_xml
-from tldw_Server_API.app.core.DB_Management.DB_Manager import add_media_to_database
+from tldw_Server_API.app.core.DB_Management.DB_Manager import add_media_with_keywords
 from tldw_Server_API.app.core.Utils.Utils import logging
 #
 #######################################################################################################################
@@ -51,7 +51,7 @@ def import_xml_handler(import_file, title, author, keywords, system_prompt,
         # Use the chunk_xml function to get structured chunks
         chunks = chunk_xml(ET.tostring(root, encoding='unicode'), chunk_options)
 
-        # Convert chunks to segments format expected by add_media_to_database
+        # Convert chunks to segments format expected by add_media_with_keywords
         segments = []
         for chunk in chunks:
             segment = {
@@ -80,7 +80,7 @@ def import_xml_handler(import_file, title, author, keywords, system_prompt,
             summary = "No summary provided"
 
         # Add to database
-        result = add_media_to_database(
+        result = add_media_with_keywords(
             url=import_file.name,  # Using filename as URL
             info_dict=info_dict,
             segments=segments,

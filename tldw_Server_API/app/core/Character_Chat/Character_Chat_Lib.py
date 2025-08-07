@@ -93,14 +93,42 @@ def _prepare_character_data_for_db_storage(
     """
     db_data = input_data.copy() # Work on a copy
 
-    # Handle image_base64: convert to bytes for 'image' field, or set 'image' to None
+    # Handle image_base64: convert to bytes for 'image' field, with optimization
     if 'image_base64' in db_data:
         base64_str = db_data.pop('image_base64')
         if base64_str and isinstance(base64_str, str):
             try:
                 if ',' in base64_str and base64_str.startswith("data:image"):
                     base64_str = base64_str.split(',', 1)[1]
-                db_data['image'] = base64.b64decode(base64_str, validate=True)
+                image_bytes = base64.b64decode(base64_str, validate=True)
+                
+                # Image optimization - convert to WEBP and resize if needed
+                try:
+                    img = Image.open(io.BytesIO(image_bytes))
+                    
+                    # Convert RGBA to RGB if needed
+                    if img.mode == 'RGBA':
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        background.paste(img, mask=img.split()[3])
+                        img = background
+                    elif img.mode not in ['RGB', 'L']:
+                        img = img.convert('RGB')
+                    
+                    # Resize if too large (max 512x768)
+                    max_size = (512, 768)
+                    if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
+                        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                        logger.info(f"Resized character image from {img.size} to fit within {max_size}")
+                    
+                    # Save as optimized WEBP
+                    output = io.BytesIO()
+                    img.save(output, format='WEBP', quality=85, method=6, optimize=True)
+                    db_data['image'] = output.getvalue()
+                    logger.info(f"Optimized character image: {len(image_bytes)} -> {len(db_data['image'])} bytes")
+                except Exception as img_err:
+                    logger.warning(f"Could not optimize image, using original: {img_err}")
+                    db_data['image'] = image_bytes  # Fall back to original
+                    
             except (binascii.Error, ValueError) as e: # ValueError for invalid padding etc.
                 logger.error(f"Invalid image_base64 data for character: {e}")
                 # Raise an InputError that API can catch and convert to 400
@@ -724,16 +752,28 @@ def extract_json_from_image_file(image_file_input: Union[str, bytes, io.BytesIO]
 
         img_obj = Image.open(image_source_to_use)
 
-        # Primarily for PNG cards (TavernAI, SillyTavern convention)
-        if img_obj.format != 'PNG':
+        # Support for PNG and WEBP cards (TavernAI, SillyTavern convention)
+        if img_obj.format not in ['PNG', 'WEBP']:
             logger.warning(
-                f"Image '{file_name_for_log}' is not in PNG format (format: {img_obj.format}). 'chara' metadata extraction may fail or not be applicable.")
+                f"Image '{file_name_for_log}' is not in PNG or WEBP format (format: {img_obj.format}). 'chara' metadata extraction may fail or not be applicable.")
 
-
-        # 'text' attribute in Pillow Image objects holds metadata chunks.
+        # Enhanced metadata extraction - check multiple possible fields
+        # 'info' attribute in Pillow Image objects holds metadata chunks.
         # For PNGs, these are tEXt, zTXt, or iTXt chunks.
-        if hasattr(img_obj, 'info') and isinstance(img_obj.info, dict) and 'chara' in img_obj.info:
-            chara_base64_str = img_obj.info['chara']
+        # Also check for 'character', 'tEXt' and other common metadata fields
+        metadata_found = False
+        chara_base64_str = None
+        
+        if hasattr(img_obj, 'info') and isinstance(img_obj.info, dict):
+            # Check multiple possible metadata keys
+            for metadata_key in ['chara', 'character', 'tEXt']:
+                if metadata_key in img_obj.info:
+                    chara_base64_str = img_obj.info[metadata_key]
+                    metadata_found = True
+                    logger.debug(f"Found character data in '{metadata_key}' field")
+                    break
+        
+        if metadata_found and chara_base64_str:
             try:
                 decoded_chara_json_str = base64.b64decode(chara_base64_str).decode('utf-8')
                 json.loads(decoded_chara_json_str)  # Validate it's JSON
@@ -920,6 +960,98 @@ def parse_v1_card(card_data_json: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
+def parse_pygmalion_card(card_data_json: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Parse Pygmalion format character card.
+    
+    Pygmalion format uses char_name, char_persona, char_greeting, etc.
+    """
+    try:
+        parsed_data = {
+            'name': card_data_json.get('char_name', 'Unknown'),
+            'description': card_data_json.get('char_persona', ''),
+            'personality': card_data_json.get('char_persona', ''),  # Reuse persona as personality
+            'first_message': card_data_json.get('char_greeting', ''),
+            'message_example': card_data_json.get('example_dialogue', ''),
+            'scenario': card_data_json.get('world_scenario', ''),
+            'alternate_greetings': [],
+            'tags': [],
+            'system_prompt': card_data_json.get('char_persona', ''),  # Use persona as system prompt
+            'image_base64': card_data_json.get('char_image')
+        }
+        
+        # Validate required fields
+        if not parsed_data['name'] or parsed_data['name'] == 'Unknown':
+            logger.error("Pygmalion card missing required 'char_name' field")
+            return None
+            
+        logger.info(f"Successfully parsed Pygmalion format card: {parsed_data['name']}")
+        return parsed_data
+    except Exception as e:
+        logger.error(f"Error parsing Pygmalion card: {e}")
+        return None
+
+
+def parse_textgen_card(card_data_json: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Parse Text Generation WebUI format character card.
+    
+    Text Gen format uses context, greeting, name fields.
+    """
+    try:
+        parsed_data = {
+            'name': card_data_json.get('name', 'Unknown'),
+            'description': card_data_json.get('context', ''),
+            'personality': card_data_json.get('personality', ''),
+            'first_message': card_data_json.get('greeting', ''),
+            'message_example': card_data_json.get('example_dialogue', ''),
+            'scenario': '',  # Not typically in this format
+            'alternate_greetings': [],
+            'tags': [],
+            'system_prompt': card_data_json.get('context', ''),
+            'image_base64': card_data_json.get('image')
+        }
+        
+        # Validate required fields
+        if not parsed_data['name'] or parsed_data['name'] == 'Unknown':
+            logger.error("Text Gen card missing required 'name' field")
+            return None
+            
+        logger.info(f"Successfully parsed Text Generation WebUI format card: {parsed_data['name']}")
+        return parsed_data
+    except Exception as e:
+        logger.error(f"Error parsing Text Gen card: {e}")
+        return None
+
+
+def parse_alpaca_card(card_data_json: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Parse Alpaca/instruction format into character card.
+    
+    This format is instruction-based, so we convert it to a character.
+    """
+    try:
+        # Extract name from instruction if possible
+        instruction = card_data_json.get('instruction', '')
+        name_match = re.search(r"(?:act as|be|play|roleplay as)\s+([A-Z][a-zA-Z\s]+)", instruction, re.IGNORECASE)
+        name = name_match.group(1).strip() if name_match else "Assistant"
+        
+        parsed_data = {
+            'name': name,
+            'description': instruction,
+            'personality': card_data_json.get('input', ''),
+            'first_message': card_data_json.get('output', 'Hello! How can I help you today?'),
+            'message_example': '',
+            'scenario': instruction,
+            'alternate_greetings': [],
+            'tags': ['instruction-based'],
+            'system_prompt': instruction
+        }
+        
+        logger.info(f"Successfully parsed Alpaca/instruction format as character: {parsed_data['name']}")
+        return parsed_data
+    except Exception as e:
+        logger.error(f"Error parsing Alpaca card: {e}")
+        return None
+
+
 #
 #################################################################################
 # Character card parsing & Validation functions
@@ -1100,8 +1232,9 @@ def validate_character_book_entry(entry: Dict[str, Any], idx: int, entry_ids: Se
 def validate_v2_card(card_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """Validates a character card dictionary against the V2 specification.
 
-    Checks top-level fields like 'spec' and 'spec_version', the presence and
-    type of the 'data' node, and required/optional fields within 'data'.
+    Enhanced validation that checks top-level fields like 'spec' and 'spec_version', 
+    the presence and type of the 'data' node, and required/optional fields within 'data'.
+    Now includes proper data type validation for all fields.
     It also invokes `validate_character_book` if a 'character_book' is present.
 
     Args:
@@ -1239,11 +1372,23 @@ def import_character_card_from_json_string(json_content_str: str) -> Optional[Di
 
         parsed_card: Optional[Dict[str, Any]] = None
 
-        # Determine if V2 validation should be attempted
+        # Enhanced format detection supporting more character card formats
+        # Check for various format indicators
         is_explicit_v2_spec = card_data_dict.get('spec') == 'chara_card_v2'
-        # Consider "2.0", "2.1", etc. as valid V2 versions for initial check
         is_explicit_v2_version_str = str(card_data_dict.get('spec_version', ''))
         is_explicit_v2_version = is_explicit_v2_version_str.startswith("2.")
+        
+        # Check for Tavern/SillyTavern format
+        has_tavern_fields = all(field in card_data_dict for field in ['name', 'description', 'first_mes'])
+        
+        # Check for Pygmalion format
+        has_pygmalion_fields = 'char_name' in card_data_dict and 'char_persona' in card_data_dict
+        
+        # Check for Text Generation WebUI format
+        has_textgen_fields = 'context' in card_data_dict and 'greeting' in card_data_dict
+        
+        # Check for Alpaca/instruction format
+        has_alpaca_fields = 'instruction' in card_data_dict or 'input' in card_data_dict
 
         has_data_node_heuristic = isinstance(card_data_dict.get('data'), dict) and \
                                   'name' in card_data_dict['data']  # Heuristic for implicit V2
@@ -1272,7 +1417,24 @@ def import_character_card_from_json_string(json_content_str: str) -> Optional[Di
                         "V2 parsing failed despite passing V2 structural validation. This might indicate an issue with the parser or an edge case. Attempting V1 parsing as fallback.")
                     # `parsed_card` is None, will fall through to V1 attempt
 
-        # Fallback to V1 if V2 processing was not attempted, or if it was attempted but `parsed_card` is still None
+        # Try other known formats before falling back to V1
+        if parsed_card is None:
+            # Try Pygmalion format
+            if has_pygmalion_fields:
+                logger.info("Attempting to parse as Pygmalion format character card.")
+                parsed_card = parse_pygmalion_card(card_data_dict)
+            
+            # Try Text Generation WebUI format
+            elif has_textgen_fields:
+                logger.info("Attempting to parse as Text Generation WebUI format character card.")
+                parsed_card = parse_textgen_card(card_data_dict)
+            
+            # Try Alpaca/instruction format
+            elif has_alpaca_fields:
+                logger.info("Attempting to parse as Alpaca/instruction format.")
+                parsed_card = parse_alpaca_card(card_data_dict)
+        
+        # Fallback to V1 if other formats didn't work
         if parsed_card is None:
             logger.info("Attempting to parse as V1 character card.")
             try:
@@ -1369,7 +1531,25 @@ def load_character_card_from_string_content(content_str: str) -> Optional[Dict[s
                 json_card_data_str = match.group(1).strip()
                 logger.debug("Extracted JSON from code block.")
             else:
-                if not content.startswith('{'):  # Only error if it wasn't direct JSON to begin with
+                # Try to parse as plain text character description
+                if not content.startswith('{'):
+                    logger.debug("No JSON found, attempting to parse as plain text character description.")
+                    # Create a simple character from plain text
+                    lines = content.strip().split('\n')
+                    name_match = re.search(r"(?:name|character|i am|my name is)[:\s]+([A-Z][a-zA-Z\s]+)", lines[0] if lines else "", re.IGNORECASE)
+                    name = name_match.group(1).strip() if name_match else "Character"
+                    
+                    plain_text_card = {
+                        "name": name,
+                        "description": content.strip(),
+                        "personality": content.strip(),
+                        "first_mes": "Hello! How can I help you today?",
+                        "scenario": "You are chatting with a character",
+                        "tags": ["plain-text"]
+                    }
+                    json_card_data_str = json.dumps(plain_text_card)
+                    logger.debug(f"Created character from plain text with name: {name}")
+                else:
                     logger.error(
                         "No valid character card data found: not direct JSON, no YAML frontmatter, and no JSON code block.")
                     return None
@@ -2349,6 +2529,99 @@ def find_messages_in_conversation(
 
 # End of Conversation and Message Management Functions
 #################################################################################
+
+
+#################################################################################
+# Character Template System
+#################################################################################
+
+# Pre-defined character templates
+CHARACTER_TEMPLATES = {
+    "assistant": {
+        "name": "Assistant",
+        "description": "A helpful and knowledgeable AI assistant",
+        "personality": "Professional, friendly, and informative",
+        "first_mes": "Hello! I'm here to help you with any questions or tasks you might have. What can I assist you with today?",
+        "scenario": "You are chatting with a helpful AI assistant",
+        "tags": ["assistant", "helpful", "professional"]
+    },
+    "teacher": {
+        "name": "Teacher",
+        "description": "An experienced educator who loves sharing knowledge",
+        "personality": "Patient, encouraging, and knowledgeable",
+        "first_mes": "Good day! I'm here to help you learn. What subject would you like to explore today?",
+        "scenario": "You are in a classroom with a dedicated teacher",
+        "mes_example": "{{user}}: Can you explain this concept?\n{{char}}: Of course! Let me break it down for you step by step...",
+        "tags": ["teacher", "educational", "patient"]
+    },
+    "companion": {
+        "name": "Companion",
+        "description": "A friendly companion for casual conversation",
+        "personality": "Warm, empathetic, and engaging",
+        "first_mes": "Hey there! It's great to meet you. How has your day been?",
+        "scenario": "You're chatting with a friendly companion",
+        "tags": ["companion", "friendly", "casual"]
+    }
+}
+
+
+def get_character_template(template_name: str) -> Optional[Dict[str, Any]]:
+    """
+    Get a pre-defined character template by name.
+    
+    Args:
+        template_name: Name of the template (e.g., "assistant", "teacher", "companion")
+        
+    Returns:
+        Dictionary containing character data for the template, or None if not found
+    """
+    return CHARACTER_TEMPLATES.get(template_name.lower())
+
+
+def list_character_templates() -> List[str]:
+    """
+    Get list of available character template names.
+    
+    Returns:
+        List of template names
+    """
+    return list(CHARACTER_TEMPLATES.keys())
+
+
+def create_character_from_template(db: CharactersRAGDB, template_name: str, 
+                                 custom_name: Optional[str] = None) -> Optional[int]:
+    """
+    Create a new character in the database from a pre-defined template.
+    
+    Args:
+        db: Database instance
+        template_name: Name of the template to use
+        custom_name: Optional custom name to override the template name
+        
+    Returns:
+        Character ID if successful, None otherwise
+    """
+    template = get_character_template(template_name)
+    if not template:
+        logger.error(f"Template '{template_name}' not found")
+        return None
+    
+    char_data = template.copy()
+    
+    # Override name if custom name provided
+    if custom_name:
+        char_data["name"] = custom_name
+    
+    # Prepare for database
+    db_payload = _prepare_character_data_for_db_storage(char_data, is_update=False)
+    
+    try:
+        char_id = db.add_character_card(db_payload)
+        logger.info(f"Created character from template '{template_name}' with ID {char_id}")
+        return char_id
+    except (ConflictError, InputError, CharactersRAGDBError) as e:
+        logger.error(f"Failed to create character from template '{template_name}': {e}")
+        raise
 
 
 #
