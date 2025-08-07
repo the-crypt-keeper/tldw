@@ -11,7 +11,8 @@ build-backend = "setuptools.build_meta"
 Homepage = "https://tldwproject.com"
 Documentation = "https://docs.tldwproject.com"
 Repository = "https://github.com/rmusser01/tldw_server"
-#
+"Bug Tracker" = "https://github.com/rmusser01/tldw_server/issues"
+
 [project]
 name = "tldw"
 version = "0.1.0"
@@ -19,7 +20,24 @@ description = "A naive attempt at 'A Young Lady's Illustrated Primer'."
 requires-python = ">=3.9"
 readme = "README.md"
 license = { file = "LICENSE.txt" }
-#
+keywords = ["transcription", "summarization", "media-processing", "llm", "rag"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Linguistic",
+]
 authors = [
   { name = "Robert Musser", email = "contact@tldwproject.com" }
 ]
@@ -27,171 +45,214 @@ authors = [
 # Dependencies
 ###########################
 dependencies = [
-  # API Server
-  "aiofiles",
-  "cachetools",
-  "defusedxml",
-  "fastapi",
-  "httpx",
-  "loguru",
-  "lxml",
-  "numpy",
-  "pandas",
-  "passlib",
-  "psutil",
-  "pydantic",
-  "pydantic_core",
-  "pytest",
-  "python-dotenv",
-  "python-json-logger",
-  "python-magic",
-  "python-multipart",
-  "PyYAML",
-  "redis",
-  "scikit_learn",
-  "scipy",
-  "slowapi",
-  "starlette",
-  "toml",
-  "tqdm",
-  "uvicorn",
+  # API Server Core
+  "aiofiles>=23.0.0",
+  "cachetools>=5.0.0",
+  "defusedxml>=0.7.0",
+  "fastapi>=0.100.0",
+  "httpx>=0.24.0",
+  "loguru>=0.7.0",
+  "lxml>=4.9.0",
+  "numpy>=1.24.0",
+  "pandas>=2.0.0",
+  "passlib>=1.7.0",
+  "psutil>=5.9.0",
+  "pydantic>=2.0.0",
+  "pydantic-core>=2.0.0",
+  "python-dotenv>=1.0.0",
+  "python-json-logger>=2.0.0",
+  "python-magic>=0.4.0",
+  "python-multipart>=0.0.6",
+  "PyYAML>=6.0.0",
+  "redis>=4.5.0",
+  "scikit-learn>=1.3.0",
+  "scipy>=1.10.0",
+  "slowapi>=0.1.0",
+  "starlette>=0.31.0",
+  "toml>=0.10.0",
+  "tqdm>=4.65.0",
+  "uvicorn[standard]>=0.23.0",
+  
   # Security
-  "keyring",
-  "puremagic",
-  "pycryptodomex",
-  "PyJWT",
-  "yara_python",
-  # Audio/Video
-  "faster_whisper",
-  "pyannote.audio",
-  "PyAudio",
-  "sounddevice",
-  "soundfile",
-  "yt_dlp",
-  # Chunking/Languages
-  "chardet",
-  "fugashi",
-  "jieba",
-  "langdetect",
-  "nltk",
-  "tiktoken",
+  "keyring>=24.0.0",
+  "puremagic>=1.15",
+  "pycryptodomex>=3.18.0",
+  "PyJWT>=2.8.0",
+  "yara-python>=4.3.0",
+  
+  # Audio/Video Processing
+  "faster-whisper>=0.10.0",
+  "pyannote.audio>=3.0.0",
+  "pyannote.core>=5.0.0",
+  "pyannote.database>=5.0.0",
+  "pyannote.metrics>=3.2.0",
+  "pyannote.pipeline>=3.0.0",
+  "PyAudio>=0.2.0",
+  "sounddevice>=0.4.0",
+  "soundfile>=0.12.0",
+  "yt-dlp>=2023.12.0",
+  
+  # NLP/Text Processing
+  "chardet>=5.0.0",
+  "fugashi>=1.2.0",
+  "jieba>=0.42.0",
+  "langdetect>=1.0.0",
+  "nltk>=3.8.0",
+  "tiktoken>=0.5.0",
+  
   # Document Processing
-  "beautifulsoup4",
-  "docling",
-  "docx2txt",
-  "EbookLib",
-  "html2text",
-  "lxml_html_clean",
-  "mwparserfromhell",
-  "mwxml",
-  "pymupdf",
-  "pymupdf4llm",
-  "pypandoc",
-  "pypandoc_binary",
-  "trafilatura",
-  # LLM/ML
-  "bert_score",
-  "FlashRank",
-  "openai",
-  "rouge_score",
-  "sentence_transformers",
-  "textstat",
-  "torch",
-  "transformers",
+  "beautifulsoup4>=4.12.0",
+  "docling>=1.0.0",
+  "docx2txt>=0.8",
+  "EbookLib>=0.18",
+  "html2text>=2020.1.0",
+  "lxml-html-clean>=0.1.0",
+  "mwparserfromhell>=0.6.0",
+  "mwxml>=0.3.0",
+  "pymupdf>=1.23.0",
+  "pymupdf4llm>=0.0.5",
+  "pypandoc>=1.11",
+  "pypandoc-binary>=1.11",
+  "trafilatura>=1.6.0",
+  
+  # LLM/ML Integration
+  "bert-score>=0.3.0",
+  "flashrank>=0.2.0",
+  "openai>=1.0.0",
+  "optimum>=1.13.0",
+  "rouge-score>=0.1.0",
+  "sentence-transformers>=2.2.0",
+  "textstat>=0.7.0",
+  "torch>=2.0.0",
+  "transformers>=4.35.0",
+  
   # Research/Web
-  "arxiv",
-  "playwright",
-  "playwright_stealth",
-  "Requests",
-  "tenacity",
-  "urllib3",
-  # Vector DB
-  "chromadb",
-  # Other
-  "datasets",
-  "fire",
-  "genanki",
-  "gradio",
-  "Jinja2",
-  "joblib",
-  "Pillow"
+  "arxiv>=2.0.0",
+  "playwright>=1.40.0",
+  "playwright-stealth>=1.0.0",
+  "requests>=2.31.0",
+  "tenacity>=8.2.0",
+  "urllib3>=2.0.0",
+  
+  # Vector Database
+  "chromadb>=0.4.0",
+  
+  # Other Utilities
+  "datasets>=2.14.0",
+  "fire>=0.5.0",
+  "genanki>=0.13.0",
+  "gradio>=4.0.0",
+  "Jinja2>=3.1.0",
+  "joblib>=1.3.0",
+  "Pillow>=10.0.0"
 ]
 
 [project.optional-dependencies]
+# Development tools
+dev = [
+  "pytest>=7.4.0",
+  "pytest-asyncio>=0.21.0",
+  "pytest-cov>=4.1.0",
+  "pytest-mock>=3.11.0",
+  "pytest-timeout>=2.1.0",
+  "black>=23.0.0",
+  "mypy>=1.5.0",
+  "ruff>=0.1.0",
+  "pre-commit>=3.3.0"
+]
+
+# Gradio UI (legacy)
 gradio = [
-  "fastapi",
-  "gradio"
+  "gradio>=4.0.0"
 ]
+
+# MediaWiki processing
 media_wiki = [
-  "mwparserfromhell",
-  "mwxml"
+  "mwparserfromhell>=0.6.0",
+  "mwxml>=0.3.0"
 ]
+
+# Web research features
 web_research = [
-  "arxiv",
-  "genanki",
-  "playwright",
-  "trafilatura"
+  "arxiv>=2.0.0",
+  "genanki>=0.13.0",
+  "playwright>=1.40.0",
+  "trafilatura>=1.6.0"
 ]
+
+# Windows audio recording
 audio_recording_windows = [
-  "PyAudioWPatch"
+  "PyAudioWPatch>=0.2.12"
 ]
+
+# Speech-to-Text with NVIDIA NeMo
 STT_All = [
-  "nemo_toolkit[asr]",
-  "cython"
+  "nemo-toolkit[asr]>=1.20.0",
+  "cython>=0.29.0"
 ]
+
 STT_Parakeet = [
-  "nemo_toolkit[asr]",
-  "cython"
+  "nemo-toolkit[asr]>=1.20.0",
+  "cython>=0.29.0"
 ]
+
+# Text-to-Speech
 TTS_All = [
-  "pydub"
+  "pydub>=0.25.0"
 ]
+
 TTS_kokoro = [
-  "pydub",
-  "phonemizer",
-  "scipy",
-  "munch"
+  "pydub>=0.25.0",
+  "phonemizer>=3.2.0",
+  "scipy>=1.10.0",
+  "munch>=4.0.0"
 ]
+
 TTS_kokoro_onnx = [
-  "pydub",
-  "onnxruntime",
-  "kokoro-onnx"
+  "pydub>=0.25.0",
+  "onnxruntime>=1.16.0",
+  "kokoro-onnx>=0.1.0"
 ]
+
 TTS_sovits = [
-  "pydub"
+  "pydub>=0.25.0"
 ]
+
+# Backend options
 backend_onnx = [
-  "onnxruntime"
+  "onnxruntime>=1.16.0"
 ]
+
 backend_llama = [
-  "scikit-learn>=0.24.0",
-  "scipy>=1.6.0"
+  "llama-cpp-python>=0.2.0"
 ]
+
 backend_vllm = [
-  "scikit-learn>=0.24.0",
-  "scipy>=1.6.0"
+  "vllm>=0.2.0"
 ]
+
+# Database backends
 db_postgres = [
-  "psycopg2-binary",
-  "psycopg2"
+  "psycopg2-binary>=2.9.0",
+  "psycopg2>=2.9.0"
 ]
+
 db_opensearch = [
-  "opensearch",
-  "elasticsearch"
+  "opensearch-py>=2.3.0",
+  "elasticsearch>=8.0.0"
 ]
+
+# All optional dependencies
 all = [
-  "numpy>=1.20.0",
-  "pandas>=1.2.0",
-  "matplotlib>=3.4.0",
-  "seaborn>=0.11.0",
-  "scikit-learn>=0.24.0",
-  "scipy>=1.6.0"
+  "tldw[dev,gradio,media_wiki,web_research,STT_All,TTS_All,backend_onnx,db_postgres]"
 ]
+
 ###########################
 # Tools
 ###########################
 [tool.setuptools.packages.find]
 where = ["tldw_Server_API"]
+
 ###########################
 # Tools - Tests
 ###########################
@@ -211,3 +272,52 @@ markers = [
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+###########################
+# Tools - Code Quality
+###########################
+[tool.black]
+line-length = 120
+target-version = ['py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long
+    "B008", # do not perform function calls in argument defaults
+    "C901", # too complex
+]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

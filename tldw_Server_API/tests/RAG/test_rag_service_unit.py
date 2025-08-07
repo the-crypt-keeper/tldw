@@ -44,6 +44,8 @@ max_cache_size = 500
         
         with patch('tldw_Server_API.app.core.RAG.rag_service.config.RAGConfig.from_toml') as mock_from_toml:
             mock_config = Mock()
+            mock_config.validate.return_value = []  # Return empty list (no errors)
+            mock_config.num_workers = 2
             mock_from_toml.return_value = mock_config
             
             service = RAGService(config_path=config_file)

@@ -76,8 +76,8 @@ SAMPLE_HTML_PATH = TEST_MEDIA_DIR / "sample.html"
 SAMPLE_XML_PATH = TEST_MEDIA_DIR / "sample.xml"
 
 # Create dummy files
-# create_dummy_file(SAMPLE_VIDEO_PATH, "dummy video data") # Content doesn't need to be valid video
-# create_dummy_file(SAMPLE_AUDIO_PATH, "dummy audio data") # Content doesn't need to be valid audio
+create_dummy_file(SAMPLE_VIDEO_PATH, "dummy video data") # Content doesn't need to be valid video
+create_dummy_file(SAMPLE_AUDIO_PATH, "dummy audio data") # Content doesn't need to be valid audio
 create_dummy_file(SAMPLE_PDF_PATH, "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0>>endobj\nxref\n0 3\n0000000000 65535 f \n0000000010 00000 n \n0000000059 00000 n \ntrailer<</Size 3/Root 1 0 R>>\nstartxref\n114\n%%EOF") # Minimal PDF
 create_dummy_file(SAMPLE_EPUB_PATH, "dummy epub data") # Content doesn't need to be valid epub
 create_dummy_file(SAMPLE_TXT_PATH, "Sample TXT content.")

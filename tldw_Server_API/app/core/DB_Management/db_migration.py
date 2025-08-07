@@ -16,7 +16,7 @@ import os
 import sqlite3
 import json
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 import logging
@@ -170,6 +170,13 @@ class DatabaseMigrator:
         """Load all migrations from the migrations directory"""
         migrations = []
         
+        logger.info(f"Loading migrations from directory: {self.migrations_dir}")
+        
+        # Check if directory exists
+        if not os.path.exists(self.migrations_dir):
+            logger.warning(f"Migrations directory does not exist: {self.migrations_dir}")
+            return migrations
+        
         # Load from JSON files
         for filepath in Path(self.migrations_dir).glob("*.json"):
             try:
@@ -185,7 +192,7 @@ class DatabaseMigrator:
     
     def create_backup(self, description: str = "") -> str:
         """Create a backup of the database before migration"""
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         version = self.get_current_version()
         
         backup_filename = f"backup_v{version}_{timestamp}.db"
@@ -218,7 +225,7 @@ class DatabaseMigrator:
     def execute_migration(self, migration: Migration, direction: str = "up") -> float:
         """Execute a single migration"""
         sql = migration.up_sql if direction == "up" else migration.down_sql
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         
         with self._get_connection() as conn:
             try:
@@ -232,7 +239,7 @@ class DatabaseMigrator:
                 
                 conn.commit()
                 
-                execution_time = (datetime.utcnow() - start_time).total_seconds()
+                execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
                 
                 # Record successful migration
                 if direction == "up":
@@ -254,6 +261,19 @@ class DatabaseMigrator:
                     """, (migration.version,))
                 
                 conn.commit()
+                
+                # Update schema_version table if it exists (for compatibility with MediaDB)
+                try:
+                    if direction == "up":
+                        conn.execute("UPDATE schema_version SET version = ? WHERE 1=1", (migration.version,))
+                    else:
+                        # On downgrade, set to previous version
+                        conn.execute("UPDATE schema_version SET version = ? WHERE 1=1", (migration.version - 1,))
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    # Table doesn't exist, that's fine
+                    pass
+                
                 logger.info(
                     f"Executed migration {migration.name} ({direction}) "
                     f"in {execution_time:.2f}s"

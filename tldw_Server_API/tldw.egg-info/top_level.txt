@@ -3,5 +3,8 @@ Helper_Scripts
 Logs
 WebUI
 app
+backups
 chrome-extension
+migrations
 tests
+user_databases

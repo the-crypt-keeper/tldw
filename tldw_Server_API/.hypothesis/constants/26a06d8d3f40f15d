@@ -1,0 +1,4 @@
+# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/core/MCP/mcp_tools.py
+# hypothesis_version: 6.136.7
+
+['%Y-%m-%dT%H:%M:%SZ', 'No description', 'ToolExecutionError', 'ToolRegistry', 'a', 'arguments', 'array', 'b', 'boolean', 'builtin', 'cls', 'description', 'discovery', 'echo', 'example', 'get_timestamp', 'integer', 'iso', 'list_available_tools', 'math', 'mcp_tool', 'name', 'number', 'object', 'parameters', 'readable', 'result', 'self', 'string', 'tags', 'test', 'tool_registry', 'unix', 'utility']

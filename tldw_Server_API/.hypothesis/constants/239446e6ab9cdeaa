@@ -1,0 +1,4 @@
+# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/core/MCP/mcp_server.py
+# hypothesis_version: 6.136.7
+
+[1000, 1002, 1012, 1024, 4001, '0.1.0', 'MCPServer', 'MCPSession', 'Normal closure', 'Server shutdown', 'already_connected', 'api_key', 'auth_token', 'authenticated_client', 'cleared', 'client_id', 'client_secret', 'context_id', 'disconnecting', 'get_mcp_server', 'id', 'merge', 'name', 'session_id', 'status', 'tags', 'timestamp', 'tldw_server MCP', 'tools', 'unknown', 'updates', 'version']

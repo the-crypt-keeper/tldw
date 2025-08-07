@@ -1,0 +1,4 @@
+# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/core/Evaluations/evaluation_manager.py
+# hypothesis_version: 6.136.7
+
+[0.0, 0.3, 0.5, 10.0, ' AND created_at <= ?', ' AND created_at >= ?', ',', '?', 'Comparison Results:\n', 'LIMIT', 'SELECT *', 'SELECT COUNT(*)', '\\b(\\d+)\\b', 'all', 'average_scores', 'best_performing', 'comparison_summary', 'created_at', 'cv', 'database', 'declining', 'direction', 'evaluation_db_path', 'evaluations.db', 'explanation', 'improving', 'input_data', 'items', 'max', 'mean', 'metadata', 'metric_comparisons', 'metric_name', 'metrics', 'min', 'openai', 'overall_average', 'range', 'raw_output', 'recent_average', 'results', 'score', 'slope', 'stable', 'statistical_analysis', 'std', 'timestamp', 'total_count', 'trends', 'user_databases', '{}']

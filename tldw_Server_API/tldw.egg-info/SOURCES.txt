@@ -32,6 +32,7 @@ tldw_Server_API/app/api/v1/endpoints/register.py
 tldw_Server_API/app/api/v1/endpoints/research.py
 tldw_Server_API/app/api/v1/endpoints/sync.py
 tldw_Server_API/app/api/v1/endpoints/tools.py
+tldw_Server_API/app/api/v1/endpoints/web_scraping.py
 tldw_Server_API/app/api/v1/endpoints/websearch.py
 tldw_Server_API/app/api/v1/schemas/__init__.py
 tldw_Server_API/app/api/v1/schemas/audio_schemas.py
@@ -41,6 +42,7 @@ tldw_Server_API/app/api/v1/schemas/chat_request_schemas.py
 tldw_Server_API/app/api/v1/schemas/chunking_schema.py
 tldw_Server_API/app/api/v1/schemas/database_models.py
 tldw_Server_API/app/api/v1/schemas/embeddings_models.py
+tldw_Server_API/app/api/v1/schemas/evaluation_schema.py
 tldw_Server_API/app/api/v1/schemas/media_request_models.py
 tldw_Server_API/app/api/v1/schemas/media_response_models.py
 tldw_Server_API/app/api/v1/schemas/notes_schemas.py
@@ -89,7 +91,10 @@ tldw_Server_API/app/core/Embeddings/workers/chunking_worker.py
 tldw_Server_API/app/core/Embeddings/workers/embedding_worker.py
 tldw_Server_API/app/core/Embeddings/workers/storage_worker.py
 tldw_Server_API/app/core/Evaluations/__Init__.py
+tldw_Server_API/app/core/Evaluations/evaluation_manager.py
 tldw_Server_API/app/core/Evaluations/ms_g_eval.py
+tldw_Server_API/app/core/Evaluations/rag_evaluator.py
+tldw_Server_API/app/core/Evaluations/response_quality_evaluator.py
 tldw_Server_API/app/core/Ingestion_Media_Processing/Media_Update_lib.py
 tldw_Server_API/app/core/Ingestion_Media_Processing/Upload_Sink.py
 tldw_Server_API/app/core/Ingestion_Media_Processing/XML_Ingestion_Lib.py
@@ -124,6 +129,7 @@ tldw_Server_API/app/core/Local_LLM/Llamafile_Handler.py
 tldw_Server_API/app/core/Local_LLM/Ollama_Handler.py
 tldw_Server_API/app/core/Local_LLM/__Init__.py
 tldw_Server_API/app/core/MCP/__init__.py
+tldw_Server_API/app/core/MCP/mcp_auth.py
 tldw_Server_API/app/core/MCP/mcp_context.py
 tldw_Server_API/app/core/MCP/mcp_protocol.py
 tldw_Server_API/app/core/MCP/mcp_server.py
@@ -161,8 +167,10 @@ tldw_Server_API/app/core/RAG/RAG_Search/pipeline_integration.py
 tldw_Server_API/app/core/RAG/RAG_Search/pipeline_loader.py
 tldw_Server_API/app/core/RAG/RAG_Search/pipeline_resources.py
 tldw_Server_API/app/core/RAG/RAG_Search/query_expansion.py
+tldw_Server_API/app/core/RAG/RAG_Search/rag_analysis_report.py
 tldw_Server_API/app/core/RAG/RAG_Search/reranker.py
 tldw_Server_API/app/core/RAG/RAG_Search/table_serializer.py
+tldw_Server_API/app/core/RAG/RAG_Search/test_integration_standalone.py
 tldw_Server_API/app/core/RAG/RAG_Search/simplified/__init__.py
 tldw_Server_API/app/core/RAG/RAG_Search/simplified/circuit_breaker.py
 tldw_Server_API/app/core/RAG/RAG_Search/simplified/citations.py
@@ -219,11 +227,13 @@ tldw_Server_API/app/core/WebSearch/__init__.py
 tldw_Server_API/app/core/Web_Scraping/Article_Extractor_Lib.py
 tldw_Server_API/app/core/Web_Scraping/WebSearch_APIs.py
 tldw_Server_API/app/core/Web_Scraping/__init__.py
+tldw_Server_API/app/core/Web_Scraping/enhanced_web_scraping.py
 tldw_Server_API/app/core/Web_Scraping/cookie_scraping/cookie_cloner.py
 tldw_Server_API/app/core/Writing/__Init__.py
 tldw_Server_API/app/services/__init__.py
 tldw_Server_API/app/services/document_processing_service.py
 tldw_Server_API/app/services/ebook_processing_service.py
+tldw_Server_API/app/services/enhanced_web_scraping_service.py
 tldw_Server_API/app/services/ephemeral_store.py
 tldw_Server_API/app/services/podcast_processing_service.py
 tldw_Server_API/app/services/web_scraping_service.py

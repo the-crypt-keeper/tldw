@@ -25,7 +25,7 @@ import redis
 from pydantic import BaseModel
 
 from tldw_Server_API.app.core.config import load_and_log_configs
-from tldw_Server_API.app.core.Security.Security import JWT_SECRET_KEY
+from tldw_Server_API.app.core.Security.Security import SECRET_KEY as JWT_SECRET_KEY
 
 
 # Security scheme

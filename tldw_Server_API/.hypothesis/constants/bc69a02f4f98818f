@@ -1,0 +1,4 @@
+# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/core/MCP/mcp_protocol.py
+# hypothesis_version: 6.136.7
+
+[1024, '-', '1.0', 'MCPCapabilities', 'MCPConnectRequest', 'MCPConnectResponse', 'MCPContext', 'MCPError', 'MCPErrorCode', 'MCPMessage', 'MCPMessageType', 'MCPRequest', 'MCPResource', 'MCPResponse', 'MCPTool', 'MCPToolParameter', '_', 'capabilities', 'clear_context', 'connect', 'context_too_large', 'context_updated', 'disconnect', 'error', 'execute_tool', 'forbidden', 'get_context', 'get_resource', 'internal_error', 'invalid_params', 'invalid_request', 'json', 'list_resources', 'list_tools', 'method', 'method_not_found', 'msgpack', 'name', 'ping', 'pong', 'rate_limited', 'resource_not_found', 'resource_updated', 'result', 'status', 'tool_execution_error', 'tool_not_found', 'tool_result', 'unauthorized', 'update_context', 'uri']

@@ -139,9 +139,9 @@ def chacha_db(test_db_dir, test_user):
 @pytest.fixture
 def auth_headers(test_user):
     """Create authentication headers for the test user."""
-    # In a real scenario, you'd generate a proper JWT token
-    # For testing, we'll mock the authentication
-    return {"Authorization": f"Bearer test_token_for_user_{test_user.id}"}
+    # In single-user mode, use X-API-KEY header
+    # The value should match the default API key used in testing
+    return {"X-API-KEY": "default-secret-key-for-single-user"}
 
 
 @pytest.fixture

@@ -49,7 +49,10 @@ class RAGApplication:
         # Validate configuration
         validation_errors = config.validate()
         if validation_errors:
-            raise ConfigurationError(f"Invalid configuration: {', '.join(validation_errors)}")
+            if isinstance(validation_errors, list):
+                raise ConfigurationError(f"Invalid configuration: {', '.join(validation_errors)}")
+            else:
+                raise ConfigurationError(f"Invalid configuration: {validation_errors}")
         
         self.config = config
         

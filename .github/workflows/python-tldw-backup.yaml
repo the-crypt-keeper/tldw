@@ -1,0 +1,211 @@
+---
+name: Python tldw
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - dev
+      - main
+permissions:
+  contents: read
+jobs:
+  build-and-run-tests-latest:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ./tldw_Server_API
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-mock
+          sudo apt install portaudio19-dev python3-all-dev
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -r tldw_Server_API/requirements.txt
+          pip check
+#      - name: Create .env file
+#        run: |
+#          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+#          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+#          echo "COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}" >> .env
+#          echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" >> .env
+#          echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> .env
+#          echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> .env
+#          echo "HUGGINGFACE_API_KEY=${{ secrets.HUGGINGFACE_API_KEY }}" >> .env
+#          echo "MISTRAL_API_KEY=${{ secrets.MISTRAL_API_KEY }}" >> .env
+#          echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" >> .env
+      - name: Test ChaChaNotesDB with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd ChaChaNotesDB/
+          ls
+          pytest -s ./test_chachanotes_db.py
+      - name: Test Chat Completion Integrations with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Chat/
+          ls
+          pytest -s ./test_chat_completions_integration.py
+      - name: Test Chat Endpoint with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Chat/
+          ls
+          pytest -s ./test_chat_endpoint.py
+      - name: Test Chat Library with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Chat/
+          ls
+          pytest -s ./test_chat_functions.py
+      - name: Test Chat Request Schema with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Chat/
+          ls
+          pytest -s ./test_chat_request_schema.py
+      - name: Test Chat Prompt Template Manager with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Chat/
+          ls
+          pytest -s ./test_prompt_template_manager.py
+      - name: Test ChromaDB with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd ChromaDB/
+          ls
+          pytest -s ./test_chromadb.py
+      - name: Test Chunking Library with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Chunking/
+          ls
+          pytest -s ./test_chunk_lib.py
+      - name: Test Chunking Library with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Chunking/
+          ls
+          pytest -s ./test_chunking_endpoint.py
+      - name: Test Media Versioning Functions with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Media_Ingestion_Modification/
+          ls
+          pytest -s ./test_media_versions.py
+      - name: Test Media Processing Endpoint functions with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Media_Ingestion_Modification/
+          ls
+          pytest -s ./test_media_processing.py
+      - name: Test Media Endpoint functions with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Media_Ingestion_Modification/
+          ls
+          pytest -s ./test_media_endpoint.py
+      - name: Test MediaDB2 Library with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd MediaDB2/
+          ls
+          pytest -s ./test_sqlite_db.py
+      - name: Test Media Endpoint functions with pytest
+        run: |
+          pwd
+          ls
+          cd tldw_Server_API/
+          ls
+          cd tests/
+          ls
+          cd Media_Ingestion_Modification/
+          ls
+          pytest -s ./test_media_endpoint.py
+      - name: Test tldw runs
+        run: |
+          pwd
+           uvicorn tldw_Server_API.app.main:app 

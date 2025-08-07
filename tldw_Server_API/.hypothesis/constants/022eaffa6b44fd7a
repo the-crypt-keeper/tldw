@@ -1,0 +1,4 @@
+# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/api/v1/schemas/evaluation_schema.py
+# hypothesis_version: 6.136.7
+
+[0.0, 1.0, 1000, 'Aggregated metrics', 'Computed score', 'Custom metric name', 'Data to evaluate', 'End date filter', 'Evaluation records', 'Failed evaluations', 'Generated response', 'Identified issues', 'Items to evaluate', 'LLM API to use', 'Metric description', 'Metric name', 'Metrics to compute', 'Metrics to evaluate', 'Original prompt', 'Original source text', 'Quality metrics', 'Raw LLM output', 'Save results to file', 'Score explanation', 'Scoring criteria', 'Start date filter', 'Summary to evaluate', 'Type of evaluation', 'User query', 'all', 'answer_similarity', 'coherence', 'consistency', 'context_precision', 'context_recall', 'faithfulness', 'fluency', 'geval', 'openai', 'rag', 'relevance', 'response_quality']

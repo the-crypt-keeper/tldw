@@ -30,6 +30,7 @@
 ####f
 import hashlib
 import json
+import os
 import sqlite3
 import threading
 import time
@@ -672,7 +673,7 @@ class MediaDatabase:
             else:
                 raise DatabaseError(f"Could not determine database schema version: {e}") from e
 
-    _SCHEMA_UPDATE_VERSION_SQL_V1 = "UPDATE schema_version SET version = 1 WHERE version = 0;"
+    _SCHEMA_UPDATE_VERSION_SQL_V1 = f"UPDATE schema_version SET version = {_CURRENT_SCHEMA_VERSION} WHERE version = 0;"
 
     def _apply_schema_v1(self, conn: sqlite3.Connection):
         """Applies the full Version 1 schema, ensuring version update is part of the main script."""
@@ -712,10 +713,10 @@ class MediaDatabase:
                 # This helps debug if the update itself isn't working
                 cursor_check = conn.execute("SELECT version FROM schema_version LIMIT 1")
                 version_in_tx = cursor_check.fetchone()
-                if not version_in_tx or version_in_tx['version'] != 1:
+                if not version_in_tx or version_in_tx['version'] != self._CURRENT_SCHEMA_VERSION:
                     logging.error(f"[Schema V1] Version check *inside* transaction failed. Found: {version_in_tx['version'] if version_in_tx else 'None'}")
                     raise SchemaError("Schema version update did not take effect within the transaction.")
-                logging.debug(f"[Schema V1] Version check inside transaction confirmed version is 1.")
+                logging.debug(f"[Schema V1] Version check inside transaction confirmed version is {self._CURRENT_SCHEMA_VERSION}.")
 
             # Transaction commits here if all steps above succeeded
             logging.info(f"[Schema V1] Core Schema V1 (incl. version update) applied and committed successfully for DB: {self.db_path_str}.")
@@ -760,20 +761,39 @@ class MediaDatabase:
                 raise SchemaError(f"Database schema version ({current_db_version}) is newer than supported by code ({target_version}).")
 
             # --- Apply Migrations ---
-            if current_db_version < target_version:
-                # Use the new migration system
+            if current_db_version == 0:
+                # Fresh database, apply base schema directly at current version
+                self._apply_schema_v1(conn)
+                # Verify version update
+                final_db_version = self._get_db_version(conn)
+                if final_db_version != target_version:
+                    raise SchemaError(f"Schema applied, but final DB version is {final_db_version}, expected {target_version}.")
+                logging.info(f"Database schema initialized to version {target_version}.")
+            
+            elif current_db_version < target_version:
+                # Use the new migration system for existing databases
                 try:
-                    # Close the current connection to avoid locks
-                    conn.close()
+                    # Close the current connection to avoid locks, but not for in-memory DBs
+                    if not self.is_memory_db:
+                        conn.close()
                     
                     # Run migrations
-                    migrator = DatabaseMigrator(self.db_path_str)
+                    # For test databases, use the migrations from the source code directory
+                    migrations_dir = None
+                    if not self.is_memory_db:
+                        # Check if this is a test database by looking for test_ in the path or temp directories
+                        db_name = os.path.basename(self.db_path_str)
+                        db_dir = os.path.dirname(self.db_path_str)
+                        if "test_" in db_name or "tmp" in db_dir or "temp" in db_dir.lower():
+                            migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
+                    migrator = DatabaseMigrator(self.db_path_str, migrations_dir=migrations_dir)
                     result = migrator.migrate_to_version(target_version)
                     
                     if result["status"] == "success":
                         logging.info(f"Database migrated from version {result['previous_version']} to {result['current_version']}")
-                        # Get a new connection after migration
-                        conn = self._get_new_connection()
+                        # Get a new connection after migration (unless in-memory)
+                        if not self.is_memory_db:
+                            conn = self.get_connection()
                         # Ensure FTS tables exist
                         conn.executescript(self._FTS_TABLES_SQL)
                         conn.commit()
@@ -782,24 +802,6 @@ class MediaDatabase:
                     
                 except MigrationError as e:
                     raise SchemaError(f"Database migration failed: {e}") from e
-                    
-            elif current_db_version == 0:
-                # Fresh database, apply base schema directly
-                self._apply_schema_v1(conn)
-                # Then run migrations to get to current version
-                if target_version > 1:
-                    conn.close()
-                    migrator = DatabaseMigrator(self.db_path_str)
-                    result = migrator.migrate_to_version(target_version)
-                    if result["status"] != "success":
-                        raise SchemaError(f"Migration failed after initial schema: {result}")
-                    conn = self._get_new_connection()
-                    
-                # Verify version update
-                final_db_version = self._get_db_version(conn)
-                if final_db_version != target_version:
-                    raise SchemaError(f"Schema migration applied, but final DB version is {final_db_version}, expected {target_version}.")
-                logging.info(f"Database schema initialized to version {target_version}.")
 
             else:
                 raise SchemaError(f"Migration needed from version {current_db_version} to {target_version}, but no migration path is defined.")
