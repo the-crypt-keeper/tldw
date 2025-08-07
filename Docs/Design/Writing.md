@@ -31,7 +31,8 @@ https://github.com/sam-paech/antislop-sampler
 https://github.com/YofarDev/chapitre
 https://arxiv.org/abs/2504.17993
 https://github.com/theJayTea/WritingTools
-
+https://www.txyz.ai/products/writing
+https://lex.page/pricing
 
 
 

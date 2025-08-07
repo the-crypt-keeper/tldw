@@ -78,10 +78,10 @@ https://arxiv.org/abs/2507.05791
 https://aurachat.io/learn/introduction#why-aura
 https://telcontar.net/Misc/GUI/RISCOS/
 https://arxiv.org/abs/2507.13553
-
-
-
-
+https://16colo.rs/
+https://huggingface.co/Tesslate/UIGEN-X-32B-0727
+https://khang-nd.github.io/7.css/
+https://www.kurppahosk.com/work/nike
 https://github.com/YuheshPandian/ICONIC
 https://guidebookgallery.org/guis
 https://medium.com/@adam.fard/how-i-actually-use-ai-in-ux-design-374187387f69

@@ -35,6 +35,17 @@ https://github.com/edelauna/github-semantic-search-mcp/tree/dev/workflow#github-
 https://docs.python.org/3/library/ast.html
 https://jedi.readthedocs.io/en/latest/
 https://github.com/Sumandora/wheres/tree/master
+https://arxiv.org/abs/2505.22906
+https://github.com/stravu/crystal
+https://mahrz24.github.io/netext/
+
+
+
+
+
+
+https://github.com/Pimzino/claude-code-spec-workflow
+
 https://carper.ai/diff-models-a-new-way-to-edit-code/
 https://www.partywave.site/show/research/Graph-Based%20Source%20Code%20Analysis
 https://github.com/abinthomasonline/repo2txt

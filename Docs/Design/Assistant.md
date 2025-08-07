@@ -40,8 +40,8 @@ https://github.com/moeru-ai/airi
 https://github.com/HeavyNotFat/Agentic-AI-Desktop-Pet
 
 
-
-
+https://github.com/zeroentropy-ai/zcookbook/blob/main/guides/search_tool_for_voice_agents/search_tool_for_voice_agents.ipynb?short_path=c18b7d2
+https://github.com/augmentedstartups/Roomey_AI_Voice_Agent
 https://github.com/BeehiveInnovations/zen-mcp-server
 https://ghuntley.com/atlassian-rovo-source-code/
 https://www.atlassian.com/blog/announcements/rovo-dev-command-line-interface
@@ -52,6 +52,7 @@ https://ceur-ws.org/Vol-3879/AIxEDU2024_paper_26.pdf
 https://xata.io/blog/built-xata-mcp-server
 https://qspeak.app/
 https://github.com/Zie619/n8n-workflows
+https://github.com/LongHZ140516/Awesome-GrokAni-VituralMate
 https://www.chatprd.ai/howiai
 https://gerred.github.io/building-an-agentic-system/
 https://forgecode.dev/blog/ai-agent-best-practices/

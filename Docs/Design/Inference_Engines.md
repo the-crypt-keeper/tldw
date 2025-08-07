@@ -17,7 +17,7 @@ https://github.com/iuliaturc/gguf-docs
 
 ### TabbyAPI
 
-
+w
 ### vLLM
 
 
@@ -41,7 +41,7 @@ https://allenai.org/blog/flexolmo
 https://kserve.github.io/website/latest/modelserving/v1beta1/llm/huggingface/kv_cache_offloading/
 https://sakana.ai/ab-mcts/
 https://www.ubicloud.com/blog/life-of-an-inference-request-vllm-v1
-
+https://arxiv.org/abs/2507.21509
 https://kaitchup.substack.com/p/using-gguf-models-optimize-your-inference
 https://www.tilderesearch.com/blog/sparse-attn
 https://github.com/codelion/optillm/tree/main/optillm/plugins/deepthink
