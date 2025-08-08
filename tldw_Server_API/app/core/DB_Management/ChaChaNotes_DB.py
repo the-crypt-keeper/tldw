@@ -1708,7 +1708,12 @@ UPDATE db_schema_version
                 for key, value in card_data.items():
                     if key in self._CHARACTER_CARD_JSON_FIELDS:
                         set_clauses_sql.append(f"{key} = ?")
-                        params_for_set_clause.append(self._ensure_json_string(value))
+                        # Check if value is already a JSON string
+                        if isinstance(value, str):
+                            # Assume it's already a JSON string if it's a string
+                            params_for_set_clause.append(value)
+                        else:
+                            params_for_set_clause.append(self._ensure_json_string(value))
                         fields_updated_log.append(key)
                     elif key in updatable_direct_fields:
                         set_clauses_sql.append(f"{key} = ?")

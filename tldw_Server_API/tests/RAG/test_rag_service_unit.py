@@ -46,6 +46,7 @@ max_cache_size = 500
             mock_config = Mock()
             mock_config.validate.return_value = []  # Return empty list (no errors)
             mock_config.num_workers = 2
+            mock_config.log_level = "INFO"  # Add required log_level attribute
             mock_from_toml.return_value = mock_config
             
             service = RAGService(config_path=config_file)

@@ -337,7 +337,8 @@ async def perform_search(
 async def run_retrieval_agent(
     request_body: RetrievalAgentRequest = Body(...),
     rag_service: RAGService = Depends(get_rag_service_for_user),
-    current_user: User = Depends(get_request_user)
+    current_user: User = Depends(get_request_user),
+    chacha_db: CharactersRAGDB = Depends(get_chacha_db_for_user)
 ):
     """
     Processes user messages for RAG or research tasks.
