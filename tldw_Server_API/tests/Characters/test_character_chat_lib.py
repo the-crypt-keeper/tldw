@@ -458,7 +458,7 @@ def test_extract_json_from_image_file_unit(mock_json_loads_mod, mock_base64_mod,
     mock_base64_mod.b64decode.return_value = default_b64_return
     mock_json_loads_mod.loads.return_value = json.loads(chara_json_str)
     assert extract_json_from_image_file(str(dummy_png_path)) == chara_json_str
-    assert "not in PNG format" in caplog_handler.text
+    assert "not in PNG or WEBP format" in caplog_handler.text
     caplog_handler.clear()
     mock_img_instance.format = 'PNG'  # Reset format
 

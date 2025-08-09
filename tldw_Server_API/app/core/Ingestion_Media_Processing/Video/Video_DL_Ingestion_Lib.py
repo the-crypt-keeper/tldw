@@ -181,22 +181,42 @@ def download_video(video_url, download_path, info_dict, download_video_flag, cur
         return final_output_path_str
 
     # --- 2. Setup ffmpeg Path ---
+    import shutil
     ffmpeg_path = None
-    # (Keep the previous ffmpeg path detection logic here)
-    if sys.platform.startswith('win'):
-        local_ffmpeg = Path(os.getcwd()) / 'Bin' / 'ffmpeg.exe'
-        if local_ffmpeg.exists():
-            ffmpeg_path = str(local_ffmpeg)
+    
+    # Try to find ffmpeg using shutil.which first (works across platforms)
+    ffmpeg_path = shutil.which('ffmpeg')
+    
+    if not ffmpeg_path:
+        # Fallback to platform-specific logic
+        if sys.platform.startswith('win'):
+            local_ffmpeg = Path(os.getcwd()) / 'Bin' / 'ffmpeg.exe'
+            if local_ffmpeg.exists():
+                ffmpeg_path = str(local_ffmpeg)
+            else:
+                logging.warning(f"Local ffmpeg not found at '{local_ffmpeg}', trying 'ffmpeg' from PATH.")
+                ffmpeg_path = 'ffmpeg'
+        elif sys.platform == 'darwin':
+            # Common macOS locations for ffmpeg
+            possible_paths = [
+                '/opt/homebrew/bin/ffmpeg',  # Apple Silicon homebrew
+                '/usr/local/bin/ffmpeg',      # Intel homebrew
+                '/usr/bin/ffmpeg'              # System location
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    ffmpeg_path = path
+                    break
+            if not ffmpeg_path:
+                ffmpeg_path = 'ffmpeg'  # Last resort
         else:
-            logging.warning(f"Local ffmpeg not found at '{local_ffmpeg}', trying 'ffmpeg' from PATH.")
             ffmpeg_path = 'ffmpeg'
-    elif sys.platform.startswith(('linux', 'darwin')):
-        ffmpeg_path = 'ffmpeg'
-    else:
-        logging.warning(f"Unsupported platform {sys.platform} for ffmpeg path detection.")
-        ffmpeg_path = 'ffmpeg'
-
-    # Optional: Confirm ffmpeg works (can be removed if causing issues)
+    
+    if not ffmpeg_path:
+        logging.warning(f"Could not locate ffmpeg. yt-dlp postprocessing may fail.")
+        ffmpeg_path = 'ffmpeg'  # Use default and hope it's in PATH
+    
+    # Confirm ffmpeg works
     try:
         subprocess.run([ffmpeg_path, '-version'], check=True, capture_output=True, timeout=5)
         logging.debug(f"Confirmed ffmpeg command: {ffmpeg_path}")

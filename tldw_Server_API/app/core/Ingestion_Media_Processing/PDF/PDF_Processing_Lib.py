@@ -118,6 +118,7 @@ def docling_parse_pdf(pdf_path: str):
     DOCLING_AVAILABLE = False
     try:
         from docling.document_converter import DocumentConverter
+        DOCLING_AVAILABLE = True  # Set to True if import succeeds
     except:
         DOCLING_AVAILABLE = False
     if not DOCLING_AVAILABLE:

@@ -495,22 +495,41 @@ class TestErrorScenarios:
     """Test error handling scenarios."""
     
     @pytest.mark.asyncio
-    async def test_database_connection_error(self, async_client, auth_headers, test_user):
+    async def test_database_connection_error(self, auth_headers, test_user):
         """Test handling of database connection errors."""
+        from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
+        from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
+        from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user
+        
         _user_rag_services.clear()
         
-        # Mock database error - need to also mock chacha_db
-        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', side_effect=Exception("DB connection failed")):
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', side_effect=Exception("DB connection failed")):
-                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
-                    
-                    response = await async_client.post(
-                        "/api/v1/retrieval_agent/retrieval/search",
-                        json={"querystring": "test"},
-                        headers=auth_headers
-                    )
-                    
-                    assert response.status_code == 500
+        # Override dependencies at the app level
+        def override_get_media_db():
+            raise Exception("DB connection failed")
+        
+        def override_get_chacha_db():
+            raise Exception("DB connection failed")
+        
+        def override_get_user():
+            return test_user
+        
+        app.dependency_overrides[get_media_db_for_user] = override_get_media_db
+        app.dependency_overrides[get_chacha_db_for_user] = override_get_chacha_db
+        app.dependency_overrides[get_request_user] = override_get_user
+        
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.post(
+                    "/api/v1/retrieval_agent/retrieval/search",
+                    json={"querystring": "test"},
+                    headers=auth_headers
+                )
+                
+                assert response.status_code == 500
+        finally:
+            # Clean up overrides
+            app.dependency_overrides.clear()
     
     @pytest.mark.asyncio
     async def test_invalid_search_parameters(self, async_client, auth_headers):
@@ -528,27 +547,41 @@ class TestErrorScenarios:
         assert response.status_code == 422  # Validation error
     
     @pytest.mark.asyncio
-    async def test_rag_service_initialization_error(self, async_client, auth_headers, test_user):
+    async def test_rag_service_initialization_error(self, auth_headers, test_user, media_db, chacha_db):
         """Test handling of RAG service initialization errors."""
+        from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
+        from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
+        from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user
+        
         _user_rag_services.clear()
         
+        # Mock RAGService to fail on initialization
         with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.RAGService') as mock_service_class:
             mock_service = mock.AsyncMock()
             mock_service.initialize.side_effect = Exception("Failed to initialize")
             mock_service_class.return_value = mock_service
             
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
-                
-                response = await async_client.post(
-                    "/api/v1/retrieval_agent/retrieval/agent",
-                    json={
-                        "message": {"role": "user", "content": "test"},
-                        "mode": "rag"
-                    },
-                    headers=auth_headers
-                )
-                
-                assert response.status_code == 500
+            # Override dependencies
+            app.dependency_overrides[get_media_db_for_user] = lambda: media_db
+            app.dependency_overrides[get_chacha_db_for_user] = lambda: chacha_db
+            app.dependency_overrides[get_request_user] = lambda: test_user
+            
+            try:
+                transport = ASGITransport(app=app)
+                async with AsyncClient(transport=transport, base_url="http://test") as client:
+                    response = await client.post(
+                        "/api/v1/retrieval_agent/retrieval/agent",
+                        json={
+                            "message": {"role": "user", "content": "test"},
+                            "mode": "rag"
+                        },
+                        headers=auth_headers
+                    )
+                    
+                    assert response.status_code == 500
+            finally:
+                # Clean up overrides
+                app.dependency_overrides.clear()
 
 
 if __name__ == "__main__":

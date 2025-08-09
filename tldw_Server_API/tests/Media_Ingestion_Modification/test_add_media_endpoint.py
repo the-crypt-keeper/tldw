@@ -89,7 +89,7 @@ create_dummy_file(SAMPLE_XML_PATH, "<root><data>Sample XML</data></root>")
 
 
 # Test URLs (Stable, public URLs)
-VALID_VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ" # Short example
+VALID_VIDEO_URL = "https://www.youtube.com/watch?v=wVAkRDvQEog" # Working test video
 VALID_AUDIO_URL = "https://cdn.pixabay.com/download/audio/2023/12/02/audio_2f291f569a.mp3?filename=about-anger-179423.mp3"
 VALID_PDF_URL = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
 VALID_EPUB_URL = "https://filesamples.com/samples/ebook/epub/Alices%20Adventures%20in%20Wonderland.epub"

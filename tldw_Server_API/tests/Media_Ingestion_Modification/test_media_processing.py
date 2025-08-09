@@ -69,7 +69,7 @@ if not SAMPLE_HTML_PATH.exists(): SAMPLE_HTML_PATH.write_text("<html><body>Sampl
 if not SAMPLE_XML_PATH.exists(): SAMPLE_XML_PATH.write_text("<root><item>Sample XML for processing</item></root>", encoding='utf-8')
 
 # Test URLs
-VALID_VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+VALID_VIDEO_URL = "https://www.youtube.com/watch?v=wVAkRDvQEog"
 VALID_AUDIO_URL = "https://cdn.pixabay.com/download/audio/2023/12/02/audio_2f291f569a.mp3?filename=about-anger-179423.mp3"
 VALID_PDF_URL = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
 VALID_EPUB_URL = "https://filesamples.com/samples/ebook/epub/Alices%20Adventures%20in%20Wonderland.epub"
