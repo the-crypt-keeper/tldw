@@ -97,7 +97,13 @@ class RAGService:
         
         # Media DB retriever
         if self.media_db_path and self.media_db_path.exists():
-            media_retriever = MediaDBRetriever(self.media_db_path)
+            try:
+                media_retriever = MediaDBRetriever(self.media_db_path)
+            except TypeError as e:
+                logger.error(f"Failed to create MediaDBRetriever: {e}")
+                logger.error(f"MediaDBRetriever type: {type(MediaDBRetriever)}")
+                logger.error(f"db_path type: {type(self.media_db_path)}, value: {self.media_db_path}")
+                raise
             self.app.register_retriever(media_retriever)
             retrievers_config.append(("MediaDB", "FTS"))
             

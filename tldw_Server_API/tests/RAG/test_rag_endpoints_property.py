@@ -392,7 +392,7 @@ class RAGStateMachine(RuleBasedStateMachine):
                 "content": response
             })
         
-        note(f"Conversation {conversation_id[:8]}... has {len(self.conversations.get(conversation_id, []))} messages")
+        note(f"Conversation {str(conversation_id)[:8]}... has {len(self.conversations.get(conversation_id, []))} messages")
     
     @rule()
     def check_cache_size(self):

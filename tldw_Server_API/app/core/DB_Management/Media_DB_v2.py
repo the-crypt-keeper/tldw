@@ -673,7 +673,9 @@ class MediaDatabase:
             else:
                 raise DatabaseError(f"Could not determine database schema version: {e}") from e
 
-    _SCHEMA_UPDATE_VERSION_SQL_V1 = f"UPDATE schema_version SET version = {_CURRENT_SCHEMA_VERSION} WHERE version = 0;"
+    @property
+    def _SCHEMA_UPDATE_VERSION_SQL_V1(self):
+        return f"UPDATE schema_version SET version = {self._CURRENT_SCHEMA_VERSION} WHERE version = 0;"
 
     def _apply_schema_v1(self, conn: sqlite3.Connection):
         """Applies the full Version 1 schema, ensuring version update is part of the main script."""

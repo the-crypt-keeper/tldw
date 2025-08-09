@@ -178,15 +178,16 @@ class TestRAGServiceProcessorGenerator:
         # Ensure enable_reranking is False for default processor
         mock_rag_config.processor.enable_reranking = False
         
-        with patch('tldw_Server_API.app.core.RAG.rag_service.app.RAGApplication') as mock_app_class:
-            mock_app = Mock()
-            mock_app.register_processor = Mock()
-            mock_app_class.return_value = mock_app
-            
-            service = RAGService(config=mock_rag_config)
-            
-            # The _setup_processor is called in __init__, so verify register_processor was called
-            mock_app.register_processor.assert_called_once()
+        service = RAGService(config=mock_rag_config)
+        
+        # Mock the app's register_processor method
+        service.app.register_processor = Mock()
+        
+        # Call _setup_processor 
+        service._setup_processor()
+        
+        # Now verify register_processor was called
+        service.app.register_processor.assert_called_once()
     
     def test_setup_processor_advanced(self, mock_rag_config):
         """Test advanced processor setup with reranking."""
