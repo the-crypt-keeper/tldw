@@ -52,9 +52,9 @@ https://manual.calibre-ebook.com/generated/en/calibre-server.html
 https://docs.llamaindex.ai/en/stable/api_reference/node_parsers/code/#llama_index.core.node_parser.CodeSplitter
 
 
-
-
-
+https://github.com/huggingface/aisheets?tab=readme-ov-file#running-ai-sheets-with-custom-and-local-llms
+  https://huggingface.co/spaces/aisheets/sheets
+  https://huggingface.co/blog/aisheets
 
 
 
