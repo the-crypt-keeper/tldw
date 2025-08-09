@@ -30,7 +30,7 @@ https://github.com/fishaudio/fish-speech
 https://huggingface.co/fishaudio/openaudio-s1-mini
 https://github.com/MaTeZZ/ComfyUI-HiggsAudio_2
 https://www.youtube.com/watch?v=CDJ5BuGKW6s
-
+https://departmentofproduct.substack.com/p/new-ai-voice-features-and-use-cases?triedRedirect=true
 https://ai.google.dev/gemini-api/docs/speech-generation
 https://github.com/stepfun-ai/Step-Audio2
 https://github.com/fastrepl/hyprnote

@@ -15,7 +15,7 @@ https://arxiv.org/abs/2409.13740
 https://github.com/Future-House/paper-qa
 https://www.lesswrong.com/posts/bT8yyJHpK64v3nh2N/ai-safety-chatbot
 https://github.com/tbroadley/ai-safety-conversational-agent
-
+https://github.com/yichuan-w/LEANN?tab=readme-ov-file
 
 
 

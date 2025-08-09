@@ -38,7 +38,8 @@ https://github.com/Sumandora/wheres/tree/master
 https://arxiv.org/abs/2505.22906
 https://github.com/stravu/crystal
 https://mahrz24.github.io/netext/
-
+https://arxiv.org/pdf/2506.18315
+    https://github.com/rmusser01/Property-Based-Vibing
 
 
 
