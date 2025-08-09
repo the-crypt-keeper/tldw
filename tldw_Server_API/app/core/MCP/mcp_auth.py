@@ -12,6 +12,7 @@ Implements:
 
 import jwt
 import hashlib
+from argon2 import PasswordHasher
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Set, Any
@@ -152,6 +153,9 @@ class MCPAuthManager:
         # In-memory client store (should be replaced with database in production)
         self.clients: Dict[str, MCPClient] = {}
         
+        # Argon2 password hasher for API keys
+        self.api_key_hasher = PasswordHasher()
+        
         # Redis for rate limiting (optional)
         self.redis_client = None
         self._init_redis()
@@ -201,8 +205,8 @@ class MCPAuthManager:
         logger.info(f"Initialized {len(self.clients)} default MCP clients")
     
     def _hash_api_key(self, api_key: str) -> str:
-        """Hash an API key for storage"""
-        return hashlib.sha256(api_key.encode()).hexdigest()
+        """Hash an API key for storage using Argon2"""
+        return self.api_key_hasher.hash(api_key)
     
     def create_client(
         self,
@@ -241,13 +245,13 @@ class MCPAuthManager:
     
     def authenticate_api_key(self, api_key: str) -> Optional[MCPClient]:
         """Authenticate using API key"""
-        api_key_hash = self._hash_api_key(api_key)
-        
         for client in self.clients.values():
-            if client.api_key_hash == api_key_hash:
-                client.last_seen = datetime.now(timezone.utc)
-                return client
-        
+            try:
+                if self.api_key_hasher.verify(client.api_key_hash, api_key):
+                    client.last_seen = datetime.now(timezone.utc)
+                    return client
+            except Exception:
+                continue
         return None
     
     def authenticate_client_credentials(
