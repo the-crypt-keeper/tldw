@@ -147,6 +147,7 @@ def auth_headers(test_user):
 @pytest.fixture
 async def async_client():
     """Create an async test client."""
+    from httpx import AsyncClient, ASGITransport
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
@@ -168,7 +169,7 @@ class TestRAGSearchIntegration:
                 with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
                     
                     response = await async_client.post(
-                        "/api/v1/retrieval_agent/retrieval/search",
+                        "/api/v1/retrieval_agent/search",
                         json={
                             "querystring": "RAG implementation",
                             "search_mode": "advanced",
@@ -204,7 +205,7 @@ class TestRAGSearchIntegration:
                 with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
                     
                     response = await async_client.post(
-                        "/api/v1/retrieval_agent/retrieval/search",
+                        "/api/v1/retrieval_agent/search",
                         json={
                             "querystring": "machine learning",
                             "search_mode": "custom",
@@ -237,7 +238,7 @@ class TestRAGSearchIntegration:
                 with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
                     
                     response = await async_client.post(
-                        "/api/v1/retrieval_agent/retrieval/search",
+                        "/api/v1/retrieval_agent/search",
                         json={
                             "querystring": "vector embeddings",
                             "search_mode": "advanced",
@@ -291,7 +292,7 @@ class TestRAGAgentIntegration:
                     with mock.patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService.generate_answer', side_effect=mock_generate):
                         
                         response = await async_client.post(
-                            "/api/v1/retrieval_agent/retrieval/agent",
+                            "/api/v1/retrieval_agent/agent",
                             json={
                                 "message": {
                                     "role": "user",
@@ -343,7 +344,7 @@ class TestRAGAgentIntegration:
                     with mock.patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService.generate_answer', side_effect=mock_generate):
                         
                         response = await async_client.post(
-                            "/api/v1/retrieval_agent/retrieval/agent",
+                            "/api/v1/retrieval_agent/agent",
                             json={
                                 "message": {
                                     "role": "user",
@@ -378,7 +379,7 @@ class TestRAGAgentIntegration:
                         # Use the synchronous test client for streaming
                         with TestClient(app) as client:
                             response = client.post(
-                                "/api/v1/retrieval_agent/retrieval/agent",
+                                "/api/v1/retrieval_agent/agent",
                                 json={
                                     "message": {
                                         "role": "user",
@@ -432,7 +433,7 @@ class TestRAGAgentIntegration:
                     with mock.patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService.generate_answer', side_effect=mock_generate):
                         
                         response = await async_client.post(
-                            "/api/v1/retrieval_agent/retrieval/agent",
+                            "/api/v1/retrieval_agent/agent",
                             json={
                                 "messages": [
                                     {"role": "user", "content": "What is machine learning?"},
@@ -466,7 +467,7 @@ class TestRAGServiceCaching:
                 with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
                     
                     response1 = await async_client.post(
-                        "/api/v1/retrieval_agent/retrieval/search",
+                        "/api/v1/retrieval_agent/search",
                         json={"querystring": "test", "limit": 1},
                         headers=auth_headers
                     )
@@ -479,7 +480,7 @@ class TestRAGServiceCaching:
                     
                     # Make second request - should use cached service
                     response2 = await async_client.post(
-                        "/api/v1/retrieval_agent/retrieval/search",
+                        "/api/v1/retrieval_agent/search",
                         json={"querystring": "test2", "limit": 1},
                         headers=auth_headers
                     )
@@ -521,7 +522,7 @@ class TestErrorScenarios:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/retrieval_agent/retrieval/search",
+                    "/api/v1/retrieval_agent/search",
                     json={"querystring": "test"},
                     headers=auth_headers
                 )
@@ -535,7 +536,7 @@ class TestErrorScenarios:
     async def test_invalid_search_parameters(self, async_client, auth_headers):
         """Test validation of search parameters."""
         response = await async_client.post(
-            "/api/v1/retrieval_agent/retrieval/search",
+            "/api/v1/retrieval_agent/search",
             json={
                 "querystring": "",  # Empty query
                 "limit": -1,  # Invalid limit
@@ -570,7 +571,7 @@ class TestErrorScenarios:
                 transport = ASGITransport(app=app)
                 async with AsyncClient(transport=transport, base_url="http://test") as client:
                     response = await client.post(
-                        "/api/v1/retrieval_agent/retrieval/agent",
+                        "/api/v1/retrieval_agent/agent",
                         json={
                             "message": {"role": "user", "content": "test"},
                             "mode": "rag"

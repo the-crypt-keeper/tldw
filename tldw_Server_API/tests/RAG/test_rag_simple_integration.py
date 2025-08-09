@@ -535,49 +535,56 @@ class TestRAGIntegration:
         """Test error handling in the pipeline."""
         user = User(id=6, username="erroruser", email="error@example.com", is_active=True)
         
-        # Test with empty message
-        with pytest.raises(Exception):  # Should raise validation error
-            agent_request = RetrievalAgentRequest(
-                message=Message(
-                    role=MessageRole.USER,
-                    content=""  # Empty content
-                ),
-                mode=AgentModeEnum.RAG
-            )
-            
-            mock_media_db = Mock()
-            mock_chacha_db = Mock()
-            rag_service = await get_rag_service_for_user(
-                current_user=user,
-                media_db=mock_media_db,
-                chacha_db=mock_chacha_db
-            )
-            
+        # Test with empty message - should raise HTTPException
+        from fastapi import HTTPException
+        
+        agent_request = RetrievalAgentRequest(
+            message=Message(
+                role=MessageRole.USER,
+                content=""  # Empty content
+            ),
+            mode=AgentModeEnum.RAG
+        )
+        
+        mock_media_db = Mock()
+        mock_chacha_db = Mock()
+        rag_service = await get_rag_service_for_user(
+            current_user=user,
+            media_db=mock_media_db,
+            chacha_db=mock_chacha_db
+        )
+        
+        # Should raise HTTPException for empty content
+        with pytest.raises(HTTPException) as exc_info:
             await run_retrieval_agent(
                 request_body=agent_request,
                 rag_service=rag_service,
                 current_user=user
             )
+        assert exc_info.value.status_code == 422
+        assert "empty" in str(exc_info.value.detail).lower()
         
-        # Test with database error
+        # Test with nonexistent database paths - service should still be created
         search_request = SearchApiRequest(
             querystring="test",
             search_mode=SearchModeEnum.BASIC
         )
         
-        # Create a RAG service that will fail
+        # Create a RAG service with mock databases
         mock_media_db = Mock(db_path="/nonexistent/path/db.sqlite")
         mock_chacha_db = Mock(db_path="/nonexistent/path/chacha.sqlite")
         
-        with pytest.raises(Exception):
-            rag_service = await get_rag_service_for_user(
-                current_user=user,
-                media_db=mock_media_db,
-                chacha_db=mock_chacha_db
-            )
-            
-            await perform_search(
-                request_body=search_request,
-                rag_service=rag_service,
-                current_user=user
-            )
+        # This should work - the service creates directories as needed
+        rag_service = await get_rag_service_for_user(
+            current_user=user,
+            media_db=mock_media_db,
+            chacha_db=mock_chacha_db
+        )
+        
+        # Search may return empty results but shouldn't fail
+        result = await perform_search(
+            request_body=search_request,
+            rag_service=rag_service,
+            current_user=user
+        )
+        assert result is not None

@@ -528,10 +528,10 @@ async def get_media_item(
         raise
     except DatabaseError as e:
         logger.error(f"Database error fetching details for media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Database error retrieving media details: {e}")
+        raise HTTPException(status_code=500, detail="Database error retrieving media details")
     except Exception as e:
         logger.error(f"Unexpected error fetching details for media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred retrieving media details: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred retrieving media details")
 # async def get_media_item( # Changed to `async def` for consistency
 #     media_id: int,
 #     # --- Use the new DB dependency ---
@@ -643,13 +643,13 @@ async def get_media_item(
 #         raise
 #     except DatabaseError as e: # Catch specific DB errors
 #         logger.error(f"Database error fetching details for media {media_id}: {e}", exc_info=True)
-#         raise HTTPException(status_code=500, detail=f"Database error retrieving media details: {e}")
+#         raise HTTPException(status_code=500, detail="Database error retrieving media details")
 #     except Exception as e: # Catch other potential errors
 #         logger.error(f"Unexpected error fetching details for media {media_id}: {e}", exc_info=True)
 #         # Print traceback if needed during debugging:
 #         # import traceback
 #         # traceback.print_exc()
-#         raise HTTPException(status_code=500, detail=f"An unexpected error occurred retrieving media details: {type(e).__name__}")
+#         raise HTTPException(status_code=500, detail="An unexpected error occurred retrieving media details")
 
 ##############################################################################
 ############################## MEDIA Versioning ##############################
@@ -709,10 +709,10 @@ async def create_version(
 
     except InputError as e: # Catch specific error if media_id not found/inactive
         logger.warning(f"Cannot create version for media {media_id}: {e}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found or inactive")
     except (DatabaseError, ConflictError) as e: # Catch DB errors from new library
         logger.error(f"Database error creating version for media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
     except HTTPException: # Re-raise FastAPI exceptions
         raise
     except Exception as e:
@@ -783,7 +783,7 @@ async def list_versions(
 
     except DatabaseError as e: # Catch DB errors from new library
         logger.error(f"Database error listing versions for media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
     except HTTPException: # Re-raise FastAPI exceptions
         raise
     except Exception as e:
@@ -830,10 +830,10 @@ async def get_version(
 
     except ValueError as e: # Catch invalid version_number from standalone function
         logger.warning(f"Invalid input for get_document_version: {e}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request parameters")
     except DatabaseError as e: # Catch DB errors from new library
         logger.error(f"Database error getting version {version_number} for media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
     except HTTPException: # Re-raise FastAPI exceptions
         raise
     except Exception as e:
@@ -900,13 +900,13 @@ async def delete_version(
 
     except ConflictError as e: # Catch conflict during DB update
          logger.error(f"Conflict deleting version {version_number} (UUID: {version_uuid}) for media {media_id}: {e}", exc_info=True)
-         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Conflict during deletion: {e}")
+         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Conflict during deletion")
     except InputError as e: # Catch invalid input errors from DB method
         logger.error(f"Input error deleting version {version_number} for media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Input error: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid input provided")
     except DatabaseError as e: # Catch general DB errors
         logger.error(f"Database error deleting version {version_number} for media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error occurred")
     except HTTPException: # Re-raise FastAPI exceptions
         raise
     except Exception as e:
@@ -970,13 +970,13 @@ async def rollback_version(
 
     except ValueError as e: # Catch invalid target_version_number
         logger.warning(f"Invalid input for rollback media {media_id}: {e}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request parameters")
     except ConflictError as e: # Catch conflict during Media update
          logger.error(f"Conflict rolling back media {media_id} to version {target_version_number}: {e}", exc_info=True)
-         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Conflict during rollback: {e}")
+         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Conflict during rollback")
     except (InputError, DatabaseError) as e: # Catch DB errors
         logger.error(f"Database error rolling back media {media_id} to version {target_version_number}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error during rollback: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error during rollback")
     except HTTPException: # Re-raise FastAPI exceptions
         raise
     except Exception as e:
@@ -1173,13 +1173,13 @@ async def update_media_item(
         raise
     except ConflictError as e:
         logger.error(f"Conflict updating media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Conflict detected during update: {e}")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Conflict detected during update")
     except (DatabaseError, InputError) as e: # Catch DB errors from new library
         logger.error(f"Database/Input error updating media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database error during update: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database error during update")
     except Exception as e:
         logger.error(f"Unexpected error updating media {media_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An unexpected error occurred: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
 
 
 ##############################################################################
@@ -1450,6 +1450,7 @@ def _validate_inputs(media_type: MediaType, urls: Optional[List[str]], files: Op
     # media_type validation is handled by Pydantic's Literal type
     # Ensure at least one URL or file is provided
     if not urls and not files:
+        logger.warning("No URLs or files provided in add_media request")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No valid media sources supplied. At least one 'url' in the 'urls' list or one 'file' in the 'files' list must be provided."
@@ -2561,7 +2562,7 @@ async def add_media(
         # Handle potential errors during temp dir creation/management
         logging.error(f"OSError during processing setup: {e}", exc_info=True)
         # Cleanup is handled by TempDirManager context exit
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"OS error during setup: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="System error during setup")
     except Exception as e:
         # Catch unexpected errors, ensure cleanup
         logging.error(f"Unhandled exception in add_media endpoint: {type(e).__name__} - {e}", exc_info=True)
@@ -4833,7 +4834,7 @@ class XMLIngestRequest(BaseModel):
 #             }
 #
 #     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
+#         raise HTTPException(status_code=500, detail="Internal server error")
 
 # Your gradio_xml_ingestion_tab.py is already set up to call import_xml_handler(...) directly. If you’d prefer to unify it with the new approach, you can simply have your Gradio UI call the new POST /process-xml route, sending the file as UploadFile plus all your form fields. The existing code is fine for a local approach, but if you want your new single endpoint approach, you might adapt the code in the click() callback to do an HTTP request to /process-xml with the “mode” param, etc.
 #
@@ -4905,7 +4906,7 @@ async def ingest_mediawiki_dump_endpoint(
                 await f.write(content)
         except Exception as e:
             logger.error(f"Failed to save uploaded MediaWiki dump: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {e}")
+            raise HTTPException(status_code=500, detail="Failed to save uploaded file")
         finally:
             await dump_file.close()
 
@@ -4958,7 +4959,7 @@ async def process_mediawiki_dump_ephemeral_endpoint(
                 await f.write(content)
         except Exception as e:
             logger.error(f"Failed to save uploaded MediaWiki dump for processing: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {e}")
+            raise HTTPException(status_code=500, detail="Failed to save uploaded file")
         finally:
             await dump_file.close()
 
@@ -5063,7 +5064,7 @@ async def ingest_web_content(
             else:
                 raise ValueError("Cookies must be a dict or list of dicts.")
         except json.JSONDecodeError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON for cookies: {e}")
+            raise HTTPException(status_code=400, detail="Invalid JSON format for cookies")
 
     # 3) Choose the appropriate scraping method
     scrape_method = request.scrape_method
@@ -5381,7 +5382,7 @@ async def process_web_scraping_endpoint(
         )
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 #
 # End of Web Scraping Ingestion

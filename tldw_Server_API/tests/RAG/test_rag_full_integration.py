@@ -180,7 +180,7 @@ class TestRAGFullIntegration:
                     
                     # Create test client
                     transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+                    async with AsyncClient(transport=transport, base_url="http://test") as client:
                         # Test 1: Basic search
                         response = await client.post(
                             "/api/v1/retrieval_agent/search",
@@ -249,14 +249,12 @@ class TestRAGFullIntegration:
                     mock_media_db.return_value = Mock(db_path=str(user1_env["media_db"]))
                     mock_chacha_db.return_value = Mock(db_path=str(user1_env["chacha_db"]))
                     
-                    # Mock the LLM handler
-                    with patch('tldw_Server_API.app.core.RAG.rag_service.generation.LLMHandler') as mock_llm_class:
-                        mock_llm = Mock()
-                        mock_llm.generate = mock_llm_generate
-                        mock_llm_class.return_value = mock_llm
+                    # Mock the RAG service's generate_answer method
+                    with patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService.generate_answer') as mock_generate:
+                        mock_generate.return_value = mock_llm_generate()
                         
                         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+                    async with AsyncClient(transport=transport, base_url="http://test") as client:
                             # Test 1: Basic RAG generation
                             response = await client.post(
                                 "/api/v1/retrieval_agent/agent",
@@ -395,7 +393,7 @@ class TestRAGFullIntegration:
                         mock_stream.return_value = mock_llm_stream()
                         
                         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+                    async with AsyncClient(transport=transport, base_url="http://test") as client:
                             response = await client.post(
                                 "/api/v1/retrieval_agent/agent",
                                 json={
@@ -436,7 +434,7 @@ class TestRAGFullIntegration:
                 
                 # Test 1: Empty message
                 response = await client.post(
-                    "/retrieval/agent",
+                    "/api/v1/retrieval_agent/agent",
                     json={
                         "message": {
                             "role": "user",
@@ -448,7 +446,7 @@ class TestRAGFullIntegration:
                 
                 # Test 2: Invalid search mode
                 response = await client.post(
-                    "/retrieval/search",
+                    "/api/v1/retrieval_agent/search",
                     json={
                         "querystring": "test",
                         "search_mode": "invalid_mode"
@@ -461,7 +459,7 @@ class TestRAGFullIntegration:
                     mock_media_db.side_effect = Exception("Database connection failed")
                     
                     response = await client.post(
-                        "/retrieval/search",
+                        "/api/v1/retrieval_agent/search",
                         json={
                             "querystring": "test",
                             "search_mode": "basic"
@@ -491,16 +489,16 @@ class TestRAGFullIntegration:
                             conversation_history_checked = True
                         return {"content": "Response with context", "usage": {"total_tokens": 50}}
                     
-                    with patch('tldw_Server_API.app.core.RAG.rag_service.generation.LLMHandler') as mock_llm_class:
-                        mock_llm = Mock()
-                        mock_llm.generate = mock_llm_generate
-                        mock_llm_class.return_value = mock_llm
+                    with patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService.generate_answer') as mock_generate:
+                        async def async_mock_llm_generate(*args, **kwargs):
+                            return await mock_llm_generate(*args, **kwargs)
+                        mock_generate.side_effect = async_mock_llm_generate
                         
                         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+                    async with AsyncClient(transport=transport, base_url="http://test") as client:
                             # First message
                             response1 = await client.post(
-                                "/retrieval/agent",
+                                "/api/v1/retrieval_agent/agent",
                                 json={
                                     "message": {
                                         "role": "user",
@@ -516,7 +514,7 @@ class TestRAGFullIntegration:
                             
                             # Second message with conversation ID
                             response2 = await client.post(
-                                "/retrieval/agent",
+                                "/api/v1/retrieval_agent/agent",
                                 json={
                                     "message": {
                                         "role": "user",
@@ -614,7 +612,7 @@ class TestRAGPerformance:
                             start_time = time.time()
                             
                             response = await client.post(
-                                "/retrieval/search",
+                                "/api/v1/retrieval_agent/search",
                                 json={
                                     "querystring": "machine learning",
                                     "search_mode": "basic",

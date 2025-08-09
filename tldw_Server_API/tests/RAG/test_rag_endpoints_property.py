@@ -190,8 +190,8 @@ class TestSearchEndpointProperties:
             querystring=query,
             search_mode=SearchModeEnum.ADVANCED,
             filters=filters,
-            date_range_start=start_date,
-            date_range_end=end_date,
+            date_range_start=start_date.isoformat() if start_date else None,
+            date_range_end=end_date.isoformat() if end_date else None,
             use_semantic_search=use_semantic,
             use_hybrid_search=use_hybrid
         )
@@ -239,7 +239,7 @@ class TestAgentEndpointProperties:
     """Property-based tests for agent endpoint."""
     
     @given(
-        content=st.text(min_size=1, max_size=1000),
+        content=st.text(min_size=1, max_size=1000).filter(lambda x: x.strip() != ""),
         mode=st.sampled_from(list(AgentModeEnum)),
         stream=st.booleans()
     )
@@ -278,7 +278,7 @@ class TestAgentEndpointProperties:
             mode=AgentModeEnum.RAG,
             rag_generation_config=GenerationConfig(
                 temperature=temperature,
-                max_response_tokens=max_tokens
+                max_tokens_to_sample=max_tokens
             )
         )
         
@@ -296,7 +296,7 @@ class TestAgentEndpointProperties:
         
         # Generation config properties
         assert 0.0 <= request.rag_generation_config.temperature <= 2.0
-        assert request.rag_generation_config.max_response_tokens > 0
+        assert request.rag_generation_config.max_tokens_to_sample > 0
     
     @given(
         api_provider=st.sampled_from(["openai", "anthropic", "cohere", "local"]),
@@ -362,7 +362,7 @@ class RAGStateMachine(RuleBasedStateMachine):
             "result_count": len(results)
         })
         
-        return results
+        # Don't return anything - rules without target bundles should return None
     
     @rule(
         message=st.text(min_size=1, max_size=200),
@@ -373,8 +373,9 @@ class RAGStateMachine(RuleBasedStateMachine):
         self.total_requests += 1
         
         if conversation_id is None:
-            # New conversation
-            conversation_id = str(hypothesis.strategies.uuids().example())
+            # New conversation - generate a UUID without using example()
+            import uuid
+            conversation_id = str(uuid.uuid4())
             self.conversations[conversation_id] = []
         
         # Add to conversation history

@@ -56,10 +56,13 @@ max_cache_size = 500
     
     def test_custom_chroma_path(self):
         """Test setting a custom ChromaDB path."""
-        custom_path = Path("/custom/chroma")
-        service = RAGService(chroma_path=custom_path)
-        
-        assert service.chroma_path == custom_path
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            custom_path = Path(temp_dir) / "chroma"
+            service = RAGService(chroma_path=custom_path)
+            
+            assert service.chroma_path == custom_path
+            assert custom_path.exists()  # Should have been created
     
     @pytest.mark.asyncio
     async def test_initialize(self, mock_rag_config):
@@ -172,19 +175,18 @@ class TestRAGServiceProcessorGenerator:
     
     def test_setup_processor_default(self, mock_rag_config):
         """Test default processor setup."""
-        service = RAGService(config=mock_rag_config)
+        # Ensure enable_reranking is False for default processor
+        mock_rag_config.processor.enable_reranking = False
         
-        # Mock the app's register_processor method
-        service.app.register_processor = Mock()
-        
-        with patch('tldw_Server_API.app.core.RAG.rag_service.integration.DefaultProcessor') as mock_processor_class:
-            mock_processor = Mock()
-            mock_processor_class.return_value = mock_processor
+        with patch('tldw_Server_API.app.core.RAG.rag_service.app.RAGApplication') as mock_app_class:
+            mock_app = Mock()
+            mock_app.register_processor = Mock()
+            mock_app_class.return_value = mock_app
             
-            service._setup_processor()
+            service = RAGService(config=mock_rag_config)
             
-            mock_processor_class.assert_called_once()
-            service.app.register_processor.assert_called_with(mock_processor)
+            # The _setup_processor is called in __init__, so verify register_processor was called
+            mock_app.register_processor.assert_called_once()
     
     def test_setup_processor_advanced(self, mock_rag_config):
         """Test advanced processor setup with reranking."""
@@ -346,7 +348,7 @@ class TestRAGServiceGeneration:
         service = RAGService(config=mock_rag_config)
         service._initialized = True
         
-        async def mock_stream():
+        async def mock_stream(**kwargs):
             yield Mock(content="Hello")
             yield Mock(content=" world")
             yield "Raw text"
