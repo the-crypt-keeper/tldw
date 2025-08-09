@@ -37,7 +37,6 @@ from tldw_Server_API.app.core.RAG.rag_service.config import RAGConfig
 # Functions:
 
 router = APIRouter(
-    prefix="/retrieval",
     tags=["Retrieval Agent"],
 )
 
