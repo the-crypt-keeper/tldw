@@ -76,8 +76,8 @@ SAMPLE_HTML_PATH = TEST_MEDIA_DIR / "sample.html"
 SAMPLE_XML_PATH = TEST_MEDIA_DIR / "sample.xml"
 
 # Create dummy files
-# create_dummy_file(SAMPLE_VIDEO_PATH, "dummy video data") # Content doesn't need to be valid video
-# create_dummy_file(SAMPLE_AUDIO_PATH, "dummy audio data") # Content doesn't need to be valid audio
+create_dummy_file(SAMPLE_VIDEO_PATH, "dummy video data") # Content doesn't need to be valid video
+create_dummy_file(SAMPLE_AUDIO_PATH, "dummy audio data") # Content doesn't need to be valid audio
 create_dummy_file(SAMPLE_PDF_PATH, "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 0>>endobj\nxref\n0 3\n0000000000 65535 f \n0000000010 00000 n \n0000000059 00000 n \ntrailer<</Size 3/Root 1 0 R>>\nstartxref\n114\n%%EOF") # Minimal PDF
 create_dummy_file(SAMPLE_EPUB_PATH, "dummy epub data") # Content doesn't need to be valid epub
 create_dummy_file(SAMPLE_TXT_PATH, "Sample TXT content.")
@@ -89,7 +89,7 @@ create_dummy_file(SAMPLE_XML_PATH, "<root><data>Sample XML</data></root>")
 
 
 # Test URLs (Stable, public URLs)
-VALID_VIDEO_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ" # Short example
+VALID_VIDEO_URL = "https://www.youtube.com/watch?v=wVAkRDvQEog" # Working test video
 VALID_AUDIO_URL = "https://cdn.pixabay.com/download/audio/2023/12/02/audio_2f291f569a.mp3?filename=about-anger-179423.mp3"
 VALID_PDF_URL = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
 VALID_EPUB_URL = "https://filesamples.com/samples/ebook/epub/Alices%20Adventures%20in%20Wonderland.epub"

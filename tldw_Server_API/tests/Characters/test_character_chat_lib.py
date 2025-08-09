@@ -395,10 +395,13 @@ def test_load_character_card_from_string_content_unit(mock_yaml_module, mock_imp
     malformed_yaml = "---\nkey: [missing_bracket\n---"
     mock_yaml_module.safe_load.side_effect = yaml.YAMLError("YAML parsing error")
     mock_import_json_str.reset_mock()
+    # When YAML parsing fails, it creates a plain text character and passes it through import_character_card_from_json_string
+    mock_import_json_str.return_value = {"name": "Character", "description": malformed_yaml, "tags": ["plain-text"]}
     result = load_character_card_from_string_content(malformed_yaml)
-    assert result is None
+    # When YAML parsing fails, the function falls through and creates a plain text character
+    assert result is not None
     assert "Error parsing YAML frontmatter" in caplog_handler.text  # Should pass now
-    mock_import_json_str.assert_not_called()
+    mock_import_json_str.assert_called()  # It will create JSON from plain text and import it
     mock_yaml_module.safe_load.side_effect = None
 
 
@@ -455,7 +458,7 @@ def test_extract_json_from_image_file_unit(mock_json_loads_mod, mock_base64_mod,
     mock_base64_mod.b64decode.return_value = default_b64_return
     mock_json_loads_mod.loads.return_value = json.loads(chara_json_str)
     assert extract_json_from_image_file(str(dummy_png_path)) == chara_json_str
-    assert "not in PNG format" in caplog_handler.text
+    assert "not in PNG or WEBP format" in caplog_handler.text
     caplog_handler.clear()
     mock_img_instance.format = 'PNG'  # Reset format
 

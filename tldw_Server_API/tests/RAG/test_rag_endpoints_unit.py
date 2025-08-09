@@ -76,14 +76,14 @@ class TestGetRAGServiceForUser:
             mock_service.initialize.assert_called_once()
             
             # Verify service was cached
-            assert _user_rag_services[123] == mock_service
+            assert _user_rag_services.get(123) == mock_service
     
     @pytest.mark.asyncio
     async def test_returns_cached_service(self, mock_user, mock_media_db, mock_chacha_db):
         """Test that cached service is returned for existing user."""
         # Pre-populate cache
         mock_cached_service = Mock()
-        _user_rag_services[123] = mock_cached_service
+        _user_rag_services.set(123, mock_cached_service)
         
         # Call the function
         service = await get_rag_service_for_user(mock_user, mock_media_db, mock_chacha_db)
@@ -143,20 +143,15 @@ class TestPerformSearch:
     @pytest.mark.asyncio
     async def test_basic_search(self, search_request, mock_rag_service, mock_user):
         """Test basic search functionality."""
-        # Mock search results
+        # Mock search results - should be a list of dicts
         mock_results = [
-            Mock(
-                source=DataSource.MEDIA_DB,
-                documents=[
-                    Mock(
-                        id="doc1",
-                        content="Test document content",
-                        relevance_score=0.95,
-                        source_id="media1",
-                        metadata={"title": "Test Document"}
-                    )
-                ]
-            )
+            {
+                "id": "doc1",
+                "content": "Test document content",
+                "score": 0.95,
+                "source": "MEDIA_DB",
+                "metadata": {"title": "Test Document"}
+            }
         ]
         mock_rag_service.search.return_value = mock_results
         
@@ -166,7 +161,7 @@ class TestPerformSearch:
         # Verify search was called with correct parameters
         mock_rag_service.search.assert_called_once_with(
             query="test query",
-            sources=[DataSource.MEDIA_DB, DataSource.NOTES],
+            sources=["MEDIA_DB", "NOTES"],  # Should be strings, not enums
             filters={},
             fts_top_k=10,
             vector_top_k=0,  # semantic search not enabled
@@ -220,9 +215,9 @@ class TestPerformSearch:
         # Verify correct sources were used
         call_args = mock_rag_service.search.call_args
         sources = call_args.kwargs['sources']
-        assert DataSource.NOTES in sources
-        assert DataSource.CHARACTER_CARDS in sources
-        assert DataSource.MEDIA_DB not in sources
+        assert "NOTES" in sources
+        assert "CHARACTER_CARDS" in sources
+        assert "MEDIA_DB" not in sources
     
     @pytest.mark.asyncio
     async def test_search_error_handling(self, search_request, mock_rag_service, mock_user):
@@ -277,16 +272,20 @@ class TestRunRetrievalAgent:
             "context_size": 500
         }
         
+        # Mock chacha_db
+        mock_chacha_db = Mock()
+        mock_chacha_db.get_messages_for_conversation.return_value = []
+        
         # Call the function
-        response = await run_retrieval_agent(agent_request, mock_rag_service, mock_user)
+        response = await run_retrieval_agent(agent_request, mock_rag_service, mock_user, mock_chacha_db)
         
         # Verify generate_answer was called correctly
         mock_rag_service.generate_answer.assert_called_once()
         call_kwargs = mock_rag_service.generate_answer.call_args.kwargs
         assert call_kwargs['query'] == "What is RAG?"
-        assert DataSource.MEDIA_DB in call_kwargs['sources']
-        assert DataSource.NOTES in call_kwargs['sources']
-        assert DataSource.CHAT_HISTORY in call_kwargs['sources']
+        assert "MEDIA_DB" in call_kwargs['sources']
+        assert "NOTES" in call_kwargs['sources']
+        assert "CHAT_HISTORY" in call_kwargs['sources']
         
         # Verify response
         assert response.response_message.role == MessageRole.ASSISTANT
@@ -304,14 +303,18 @@ class TestRunRetrievalAgent:
         
         mock_rag_service.generate_answer.return_value = {"answer": "Research answer", "sources": []}
         
-        await run_retrieval_agent(request, mock_rag_service, mock_user)
+        # Mock chacha_db
+        mock_chacha_db = Mock()
+        mock_chacha_db.get_messages_for_conversation.return_value = []
+        
+        await run_retrieval_agent(request, mock_rag_service, mock_user, mock_chacha_db)
         
         # Verify research mode sources
         call_kwargs = mock_rag_service.generate_answer.call_args.kwargs
         sources = call_kwargs['sources']
-        assert DataSource.MEDIA_DB in sources
-        assert DataSource.NOTES in sources
-        assert DataSource.CHAT_HISTORY not in sources  # Not included in research mode
+        assert "MEDIA_DB" in sources
+        assert "NOTES" in sources
+        assert "CHAT_HISTORY" not in sources  # Not included in research mode
     
     @pytest.mark.asyncio
     async def test_streaming_response(self, mock_rag_service, mock_user):
@@ -330,8 +333,12 @@ class TestRunRetrievalAgent:
         
         mock_rag_service.generate_answer_stream.return_value = mock_stream()
         
+        # Mock chacha_db
+        mock_chacha_db = Mock()
+        mock_chacha_db.get_messages_for_conversation.return_value = []
+        
         # Call the function
-        response = await run_retrieval_agent(request, mock_rag_service, mock_user)
+        response = await run_retrieval_agent(request, mock_rag_service, mock_user, mock_chacha_db)
         
         # Verify streaming response
         assert hasattr(response, 'body_iterator')  # StreamingResponse
@@ -351,7 +358,11 @@ class TestRunRetrievalAgent:
         
         mock_rag_service.generate_answer.return_value = {"answer": "Follow-up answer", "sources": []}
         
-        await run_retrieval_agent(request, mock_rag_service, mock_user)
+        # Mock chacha_db
+        mock_chacha_db = Mock()
+        mock_chacha_db.get_messages_for_conversation.return_value = []
+        
+        await run_retrieval_agent(request, mock_rag_service, mock_user, mock_chacha_db)
         
         # Verify conversation history was passed
         call_kwargs = mock_rag_service.generate_answer.call_args.kwargs
@@ -375,7 +386,11 @@ class TestRunRetrievalAgent:
         
         mock_rag_service.generate_answer.return_value = {"answer": "Test", "sources": []}
         
-        await run_retrieval_agent(request, mock_rag_service, mock_user)
+        # Mock chacha_db
+        mock_chacha_db = Mock()
+        mock_chacha_db.get_messages_for_conversation.return_value = []
+        
+        await run_retrieval_agent(request, mock_rag_service, mock_user, mock_chacha_db)
         
         # Verify generation config
         gen_config = mock_rag_service.generate_answer.call_args.kwargs['generation_config']
@@ -390,8 +405,12 @@ class TestRunRetrievalAgent:
         """Test error handling in agent."""
         mock_rag_service.generate_answer.side_effect = Exception("Generation failed")
         
+        # Mock chacha_db
+        mock_chacha_db = Mock()
+        mock_chacha_db.get_messages_for_conversation.return_value = []
+        
         with pytest.raises(HTTPException) as exc_info:
-            await run_retrieval_agent(agent_request, mock_rag_service, mock_user)
+            await run_retrieval_agent(agent_request, mock_rag_service, mock_user, mock_chacha_db)
         
         assert exc_info.value.status_code == 500
         assert "Generation failed" in exc_info.value.detail
@@ -404,8 +423,12 @@ class TestRunRetrievalAgent:
             mode=AgentModeEnum.RAG
         )
         
+        # Mock chacha_db
+        mock_chacha_db = Mock()
+        mock_chacha_db.get_messages_for_conversation.return_value = []
+        
         with pytest.raises(HTTPException) as exc_info:
-            await run_retrieval_agent(request, mock_rag_service, mock_user)
+            await run_retrieval_agent(request, mock_rag_service, mock_user, mock_chacha_db)
         
         assert exc_info.value.status_code == 422
         assert "Message content cannot be empty" in exc_info.value.detail

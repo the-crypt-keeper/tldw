@@ -1,0 +1,4 @@
+# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/api/v1/endpoints/evals.py
+# hypothesis_version: 6.136.7
+
+[0.0, '/batch', '/compare', '/custom-metric', '/evaluations', '/geval', '/history', '/rag', '/response-quality', 'Evaluation complete', 'Evaluations', 'Overall Assessment:', 'answer_similarity', 'api_name', 'average scores are:', 'average_score', 'coherence', 'consistency', 'context_precision', 'context_recall', 'error', 'evaluation_id', 'evaluation_time', 'faithfulness', 'fluency', 'format_compliance', 'geval', 'improvements', 'issues', 'metrics', 'overall_quality', 'overall_score', 'rag', 'relevance', 'response_quality', 'source_text', 'suggestions', 'summary']

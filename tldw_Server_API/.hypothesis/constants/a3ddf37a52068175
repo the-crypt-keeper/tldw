@@ -1,0 +1,4 @@
+# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/core/MCP/mcp_auth.py
+# hypothesis_version: 6.136.7
+
+[100, 3600, 6379, 'Bearer', 'Client not found', 'HS256', 'MCP Administrator', 'MCP Service Account', 'MCP token expired', 'Rate limit exceeded', 'WWW-Authenticate', 'admin', 'admin-secret-key', 'admin:*', 'admin:tools', 'admin:users', 'bearer', 'client_id', 'context:read', 'context:write', 'db', 'enabled', 'exp', 'guest', 'host', 'iat', 'localhost', 'mcp-admin', 'mcp-service', 'permissions', 'port', 'redis', 'resources:delete', 'resources:read', 'resources:write', 'role', 'service', 'service-secret-key', 'tools:execute', 'tools:manage', 'tools:read', 'user']

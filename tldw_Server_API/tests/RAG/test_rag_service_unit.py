@@ -44,6 +44,9 @@ max_cache_size = 500
         
         with patch('tldw_Server_API.app.core.RAG.rag_service.config.RAGConfig.from_toml') as mock_from_toml:
             mock_config = Mock()
+            mock_config.validate.return_value = []  # Return empty list (no errors)
+            mock_config.num_workers = 2
+            mock_config.log_level = "INFO"  # Add required log_level attribute
             mock_from_toml.return_value = mock_config
             
             service = RAGService(config_path=config_file)
@@ -104,6 +107,9 @@ class TestRAGServiceRetrievers:
             config=mock_rag_config,
             media_db_path=media_db_path
         )
+        
+        # Mock the app's register_retriever method
+        service.app.register_retriever = Mock()
         
         with patch('tldw_Server_API.app.core.RAG.rag_service.integration.MediaDBRetriever') as mock_retriever_class:
             mock_retriever = Mock()
@@ -168,6 +174,9 @@ class TestRAGServiceProcessorGenerator:
         """Test default processor setup."""
         service = RAGService(config=mock_rag_config)
         
+        # Mock the app's register_processor method
+        service.app.register_processor = Mock()
+        
         with patch('tldw_Server_API.app.core.RAG.rag_service.integration.DefaultProcessor') as mock_processor_class:
             mock_processor = Mock()
             mock_processor_class.return_value = mock_processor
@@ -182,6 +191,9 @@ class TestRAGServiceProcessorGenerator:
         mock_rag_config.processor.enable_reranking = True
         service = RAGService(config=mock_rag_config)
         
+        # Mock the app's register_processor method
+        service.app.register_processor = Mock()
+        
         with patch('tldw_Server_API.app.core.RAG.rag_service.integration.AdvancedProcessor') as mock_processor_class:
             service._setup_processor()
             mock_processor_class.assert_called_once()
@@ -192,6 +204,9 @@ class TestRAGServiceProcessorGenerator:
             config=mock_rag_config,
             llm_handler=mock_llm_handler
         )
+        
+        # Mock the app's register_generator method
+        service.app.register_generator = Mock()
         
         with patch('tldw_Server_API.app.core.RAG.rag_service.integration.StreamingGenerator') as mock_gen_class:
             service._setup_generator()
@@ -204,6 +219,9 @@ class TestRAGServiceProcessorGenerator:
     def test_setup_generator_fallback(self, mock_rag_config):
         """Test fallback generator when no LLM available."""
         service = RAGService(config=mock_rag_config)
+        
+        # Mock the app's register_generator method
+        service.app.register_generator = Mock()
         
         with patch('tldw_Server_API.app.core.RAG.rag_service.integration.FallbackGenerator') as mock_gen_class:
             service._setup_generator()

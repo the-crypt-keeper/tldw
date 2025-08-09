@@ -1250,8 +1250,36 @@ def get_whisper_model(model_name, device):
             )
             whisper_model_cache[cache_key] = instance
         except (ValueError, RuntimeError) as e:
-            logging.error(f"Fatal error creating whisper model instance for key {cache_key}: {e}")
-            raise # Re-raise the exception
+            # Check if the error is related to CUDA not being available
+            if "cuda" in device.lower() and ("CUDA" in str(e) or "cuda" in str(e).lower()):
+                logging.warning(f"CUDA initialization failed for {model_name}: {e}. Falling back to CPU.")
+                # Try again with CPU
+                cpu_compute_type = "int8"
+                cpu_cache_key = (model_name, "cpu", cpu_compute_type)
+                
+                if cpu_cache_key not in whisper_model_cache:
+                    try:
+                        instance = WhisperModel(
+                            model_size_or_path=model_name,
+                            device="cpu",
+                            compute_type=cpu_compute_type
+                        )
+                        whisper_model_cache[cpu_cache_key] = instance
+                        # Also cache it under the original key to avoid retrying CUDA
+                        whisper_model_cache[cache_key] = instance
+                        logging.info(f"Successfully initialized WhisperModel on CPU as fallback")
+                        return instance
+                    except (ValueError, RuntimeError) as cpu_e:
+                        logging.error(f"Failed to initialize WhisperModel on CPU as well: {cpu_e}")
+                        raise RuntimeError(f"Failed to initialize model on both CUDA and CPU: {cpu_e}") from cpu_e
+                else:
+                    # Use existing CPU instance
+                    instance = whisper_model_cache[cpu_cache_key]
+                    whisper_model_cache[cache_key] = instance  # Cache under original key too
+                    return instance
+            else:
+                logging.error(f"Fatal error creating whisper model instance for key {cache_key}: {e}")
+                raise # Re-raise the exception
     else:
         logging.debug(f"Cache hit. Reusing existing WhisperModel instance for key: {cache_key}")
 

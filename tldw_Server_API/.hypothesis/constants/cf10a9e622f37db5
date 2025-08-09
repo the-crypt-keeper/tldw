@@ -1,0 +1,4 @@
+# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/core/Evaluations/rag_evaluator.py
+# hypothesis_version: 6.136.7
+
+[0.0, 0.1, 0.6, 0.7, 5.0, 'answer_similarity', 'context_precision', 'context_recall', 'explanation', 'faithfulness', 'individual_scores', 'metadata', 'metrics', 'name', 'openai', 'raw_score', 'relevance', 'score', 'suggestions']
