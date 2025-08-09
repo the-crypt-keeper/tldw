@@ -93,3 +93,4 @@ playwright_stealth
 Requests
 tenacity
 trafilatura
+argon2-cffi==25.1.0
