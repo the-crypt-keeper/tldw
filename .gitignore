@@ -516,3 +516,5 @@ tldw_Server_API/app/Databases/chatDB.db
 .env
 /PoC_Version/PoC_Version/Databases/chroma_db
 /.hypothesis
+*.DS_Store
+.DS_Store
