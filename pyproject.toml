@@ -72,6 +72,7 @@ dependencies = [
   "toml>=0.10.0",
   "tqdm>=4.65.0",
   "uvicorn[standard]>=0.23.0",
+  "tomli",
   
   # Security
   "keyring>=24.0.0",
