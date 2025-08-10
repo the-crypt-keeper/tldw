@@ -14,7 +14,7 @@ Repository = "https://github.com/rmusser01/tldw_server"
 "Bug Tracker" = "https://github.com/rmusser01/tldw_server/issues"
 
 [project]
-name = "tldw"
+#name = "tldw"
 version = "0.1.0"
 description = "A naive attempt at 'A Young Lady's Illustrated Primer'."
 requires-python = ">=3.9"
