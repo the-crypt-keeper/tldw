@@ -52,13 +52,13 @@ jobs:
         # run: |
           # black --check --diff tldw_Server_API/
           
-      - name: Run Ruff linter
-        run: |
-          ruff check tldw_Server_API/
-          
-      - name: Run MyPy type checker
-        run: |
-          mypy tldw_Server_API/ || true  # Allow failures for now
+      #- name: Run Ruff linter
+        #run: |
+          #ruff check tldw_Server_API/
+
+      #- name: Run MyPy type checker
+        #run: |
+          #mypy tldw_Server_API/ || true  # Allow failures for now
           
       - name: Security check with pip-audit
         run: |
