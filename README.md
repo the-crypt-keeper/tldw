@@ -2,7 +2,7 @@
 
 <h1>tldw Server - API-First Media Analysis & Research Platform</h1>
 
-[![License](https://img.shields.io/badge/license-AGPL3.0-green)](https://img.shields.io/badge/license-AGPL3.0-green)
+[![License](https://img.shields.io/badge/license-Apache%202-blue)](https://img.shields.io/badge/license-Apache%202-blue)
 [![madewithlove](https://img.shields.io/badge/made_with-%E2%9D%A4-red?style=for-the-badge&labelColor=orange)](https://github.com/rmusser01/tldw_server) 
 
 <h3>FastAPI-powered backend for media ingestion, analysis, and AI-powered research</h3>
@@ -31,17 +31,17 @@ python -m uvicorn tldw_Server_API.app.main:app --reload
 <summary>What is this? - Click-here</summary>
 
 ### What is tldw_server?
-**tldw_server** was originally a versatile tool designed to help you manage and interact with media content (videos, audio, documents, web articles, and books) via:
+**tldw_server** was originally `tldw`, a versatile tool designed to help you manage and interact with media content (videos, audio, documents, web articles, and books) via:
 1. **Ingesting**: Importing media from URLs or local files into an offline database.
 2. **Transcribing**: Automatically generating text transcripts from videos and audio using various whisper models using faster_whisper.
 3. **Analyzing(Not Just Summarizing)**: Using LLMs (local or API-based) to perform analyses of the ingested content.
 4. **Searching**: Full-text search across ingested content, including metadata like titles, authors, and keywords.
 5. **Chatting**: Interacting with ingested content using natural language queries through supported LLMs.
 
-All features are designed to run **locally** on your device, ensuring privacy and data ownership. The tool is open-source and free to use, with the goal of supporting research, learning, and personal knowledge management.
+All features were (are) designed to run **locally** on your device, ensuring privacy and data ownership. The tool was (is) open-source and free to use, with the goal of supporting research, learning, and personal knowledge management.
 
-It has now expanded slightly to  include additional features:
-- TBD
+It has now been rewritten as a FastAPI python Server application, in order to support larger deployments and multiple users. This includes:
+- FIXME
 
 </details>
 
@@ -64,6 +64,10 @@ See the [Migration Guide](#migration-guide) if upgrading from a previous version
 ---
 
 ## Core Features
+
+<summary>Core Features</summary>
+
+<details>
 
 ### Media Processing
 - **Multi-format Support**: Video, audio, PDF, EPUB, DOCX, HTML, Markdown, XML, MediaWiki dumps
@@ -103,9 +107,15 @@ See the [Migration Guide](#migration-guide) if upgrading from a previous version
 - **Authentication**: JWT-based auth with RBAC for MCP connections
 - **Evaluation Tools**: Benchmark your configurations and LLM performance
 
+</details>
 ---
 
 ## Architecture
+
+<summary>Architecture</summary>
+<details>
+### Architecture Overview
+![Architecture Overview](https://github.com/rmusser01/tldw_server/blob/main/Docs/Architecture_Overview.png)
 
 tldw_server is built as a modern, scalable API service:
 
@@ -129,10 +139,15 @@ tldw_server/
 ├── Helper_Scripts/          # Utilities
 └── config.txt              # Configuration
 ```
+</details>
 
 ---
 
 ## Installation
+
+<summary>Installation</summary>
+
+<details>
 
 ### Requirements
 - Python 3.9+
@@ -192,11 +207,17 @@ sudo dnf install ffmpeg portaudio-devel gcc gcc-c++ python3-devel
 brew install ffmpeg portaudio
 ```
 
+</details>
+
 ---
 
 ## API Documentation
 
 Full API documentation is available at `http://localhost:8000/docs` when the server is running.
+
+<summary>API Documentation</summary>
+
+<details>
 
 ### Main Endpoints
 
@@ -252,9 +273,15 @@ curl -X POST "http://localhost:8000/api/v1/chat/completions" \
 curl -X GET "http://localhost:8000/api/v1/media/search?query=machine+learning&limit=10"
 ```
 
+</details>
+
 ---
 
 ## Configuration
+
+<summary>Configuration </summary>
+
+<details>
 
 ### config.txt
 The main configuration file contains API keys and settings:
@@ -284,9 +311,15 @@ Override config.txt with environment variables:
 - `ANTHROPIC_API_KEY`
 - `DATABASE_PATH`
 
+</details>
+
 ---
 
 ## Migration Guide
+
+<summary> Migration Guide </summary>
+
+<details>
 
 ### From Gradio Version (pre-0.1.0)
 
@@ -313,9 +346,15 @@ Override config.txt with environment variables:
    - Use API directly or wait for chatbook release
    - Build your own frontend using the API
 
+</details>
+
 ---
 
 ## Development
+
+<summary> Development </summary>
+
+<details>
 
 ### Running Tests
 ```bash
@@ -328,6 +367,8 @@ python -m pytest tests/Media_Ingestion_Modification/ -v
 # With coverage
 python -m pytest --cov=tldw_Server_API --cov-report=html
 ```
+</details>
+
 
 ### More Detailed explanation of this project (tldw_project)
 <details>
@@ -466,19 +507,7 @@ See [Project_Guidelines.md](Project_Guidelines.md) for development philosophy an
 
 ## License
 
-This project is dual-licensed:
-
-### GNU Affero General Public License (AGPL)
-If you use this project under the AGPL-3.0, you must:
-- Provide the source code of any modifications
-- Make your service's source code available to users
-
-For full details, see [LICENSE.txt](LICENSE.txt).
-
-### Commercial License
-For proprietary use without AGPL obligations, contact me @ the email in my profile.
-- No obligation to provide source code.
-- Priority supoprt and additional benefits.
+This project is Licensed under an Apache 2.0 License.
 
 ---
 
