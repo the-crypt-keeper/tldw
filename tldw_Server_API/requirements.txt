@@ -36,6 +36,7 @@ scipy
 slowapi
 starlette
 toml
+tomli
 tqdm
 # API-Server AuthN/AuthZ/Security
 keyring
