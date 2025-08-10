@@ -40,8 +40,10 @@ from tldw_Server_API.app.api.v1.endpoints.notes import router as notes_router
 # Prompt Management Endpoint
 from tldw_Server_API.app.api.v1.endpoints.prompts import router as prompt_router
 #
-# RAG Endpoint
-from tldw_Server_API.app.api.v1.endpoints.rag import router as retrieval_agent_router
+# RAG Endpoint (New simplified version)
+from tldw_Server_API.app.api.v1.endpoints.rag_v2 import router as rag_router
+# Legacy RAG Endpoint (To be removed)
+# from tldw_Server_API.app.api.v1.endpoints.rag import router as retrieval_agent_router
 #
 # Research Endpoint
 from tldw_Server_API.app.api.v1.endpoints.research import router as research_router
@@ -202,8 +204,8 @@ app.include_router(notes_router, prefix=f"{API_V1_PREFIX}/notes", tags=["notes"]
 app.include_router(prompt_router, prefix=f"{API_V1_PREFIX}/prompts", tags=["prompts"])
 
 
-# Router for RAG endpoint
-app.include_router(retrieval_agent_router, prefix=f"{API_V1_PREFIX}/retrieval_agent", tags=["retrieval_agent"])
+# Router for RAG endpoint (New simplified version)
+app.include_router(rag_router, prefix=f"{API_V1_PREFIX}/rag", tags=["RAG"])
 
 
 # Router for Research endpoint

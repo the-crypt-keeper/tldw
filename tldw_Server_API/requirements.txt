@@ -84,6 +84,7 @@ arxiv
 chromadb
 #
 #Web-Related
+argon2-cffi
 beautifulsoup4
 html2text
 httpx
