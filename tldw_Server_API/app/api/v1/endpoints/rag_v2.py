@@ -243,9 +243,43 @@ def create_search_config(request: SimpleSearchRequest) -> Dict[str, Any]:
     "/search",
     response_model=SimpleSearchResponse,
     status_code=status.HTTP_200_OK,
-    summary="Simple search across databases",
+    summary="Simple RAG search",
     description="""
-    Perform a simple search with essential parameters only.
+    Perform a simple RAG (Retrieval-Augmented Generation) search across your content.
+    
+    This endpoint provides a streamlined interface for searching through ingested media,
+    documents, and notes using hybrid search (combining full-text and semantic search).
+    
+    **Key Features:**
+    - Hybrid search combining BM25 full-text and vector similarity
+    - Optional keyword filtering
+    - Database selection (media, chats, notes)
+    - Configurable result limits
+    
+    **Search Types:**
+    - `hybrid`: Combines full-text and semantic search (recommended)
+    - `semantic`: Vector similarity search only
+    - `fulltext`: BM25 full-text search only
+    
+    **Available Databases:**
+    - `media_db` or `media`: Ingested videos, audio, documents
+    - `notes`: Personal notes and annotations
+    - `characters`: Character cards and personas
+    - `chat_history` or `chats`: Conversation history
+    
+    **Example Request:**
+    ```json
+    {
+        "query": "machine learning tutorials",
+        "search_type": "hybrid",
+        "limit": 10,
+        "databases": ["media_db"],
+        "keywords": ["python", "tensorflow"]
+    }
+    ```
+    
+    **Returns:**
+    A list of relevant content chunks with titles, text, and relevance scores.
     
     - **query**: The search query string
     - **search_type**: Choose between hybrid, semantic, or fulltext search
@@ -298,15 +332,58 @@ async def simple_search(
     status_code=status.HTTP_200_OK,
     summary="Advanced search with full control",
     description="""
-    Advanced search endpoint with complete configuration options.
+    Advanced RAG search with complete configuration options for power users.
     
-    Supports:
-    - Complex metadata filters
-    - Date range filtering
-    - Custom search strategies (vanilla, query_fusion, hyde)
-    - Fine-tuned hybrid search weights
-    - Semantic similarity thresholds
-    - Full content retrieval
+    This endpoint provides full control over the search process, including advanced
+    filtering, custom strategies, and fine-tuned relevance parameters.
+    
+    **Key Features:**
+    - **Advanced Filtering**: Metadata filters, date ranges, custom field queries
+    - **Search Strategies**: Choose between vanilla, query_fusion, or HyDE
+    - **Hybrid Tuning**: Configure semantic vs full-text weights and RRF parameters
+    - **Performance Control**: Pagination with offset/limit, similarity thresholds
+    - **Full Content**: Option to retrieve complete documents instead of snippets
+    
+    **Search Strategies:**
+    - `vanilla`: Standard single-query search
+    - `query_fusion`: Generates multiple query variants for better coverage
+    - `hyde`: Hypothetical Document Embeddings for improved semantic search
+    
+    **Hybrid Configuration:**
+    - `semantic_weight`: Weight for vector similarity (0.0-1.0)
+    - `fulltext_weight`: Weight for BM25 scoring (0.0-1.0)
+    - `rrf_k`: Reciprocal Rank Fusion parameter (default: 60)
+    
+    **Example Request:**
+    ```json
+    {
+        "query": "advanced machine learning techniques",
+        "strategy": "query_fusion",
+        "search_config": {
+            "search_type": "hybrid",
+            "limit": 20,
+            "offset": 0,
+            "databases": ["media_db", "notes"],
+            "keywords": ["neural", "deep"],
+            "metadata_filters": {"language": "en", "quality": "high"},
+            "date_range": {"start": "2023-01-01", "end": "2024-12-31"},
+            "include_full_content": true,
+            "include_scores": true
+        },
+        "hybrid_config": {
+            "semantic_weight": 0.7,
+            "fulltext_weight": 0.3,
+            "rrf_k": 60
+        },
+        "semantic_config": {
+            "similarity_threshold": 0.5,
+            "rerank": true
+        }
+    }
+    ```
+    
+    **Returns:**
+    Enhanced search results with full configuration details and optional debug information.
     """
 )
 async def advanced_search(
@@ -407,12 +484,49 @@ async def advanced_search(
     status_code=status.HTTP_200_OK,
     summary="Simple Q&A agent with retrieval",
     description="""
-    Simple agent for question answering with automatic context retrieval.
+    Simple conversational agent for question answering with automatic context retrieval.
     
-    - **message**: Your question or message
-    - **conversation_id**: Optional ID to continue a conversation
-    - **search_databases**: Which databases to search for context
-    - **model**: Optional model selection (uses default if not specified)
+    This endpoint provides a straightforward interface for RAG-powered conversations,
+    automatically retrieving relevant context and generating informed responses.
+    
+    **Key Features:**
+    - **Automatic Context Retrieval**: Searches your databases for relevant information
+    - **Conversation Memory**: Continue conversations with conversation_id
+    - **Multi-Database Search**: Query across media, notes, and chat history
+    - **Smart Summarization**: Returns top 3 most relevant sources
+    
+    **How It Works:**
+    1. Searches specified databases for relevant context
+    2. Retrieves top 5 most relevant chunks
+    3. Generates response using context + conversation history
+    4. Returns response with source citations
+    
+    **Parameters:**
+    - **message**: Your question or message to the agent
+    - **conversation_id**: Optional - provide to continue an existing conversation
+    - **search_databases**: List of databases to search (defaults to ["media_db"])
+    - **model**: Optional LLM model override (defaults to system configuration)
+    
+    **Example Request:**
+    ```json
+    {
+        "message": "What are the key concepts in deep learning?",
+        "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
+        "search_databases": ["media_db", "notes"],
+        "model": "gpt-4"
+    }
+    ```
+    
+    **Returns:**
+    - Generated response text
+    - Conversation ID for follow-up messages
+    - List of sources with titles, snippets, and relevance scores
+    
+    **Use Cases:**
+    - Q&A over your document collection
+    - Contextual chat with memory
+    - Research assistance
+    - Content summarization
     """
 )
 async def simple_agent(
@@ -522,15 +636,82 @@ async def simple_agent(
     status_code=status.HTTP_200_OK,
     summary="Advanced agent with research capabilities",
     description="""
-    Advanced agent with full control over generation and search.
+    Advanced conversational agent with research capabilities and full configuration control.
     
-    Supports:
-    - RAG mode for simple Q&A
-    - Research mode for multi-step reasoning
-    - Custom system prompts
-    - Tool usage (web search, reasoning, etc.)
-    - Streaming responses
-    - Fine-tuned generation parameters
+    This endpoint provides a powerful agent interface with multiple modes, tool usage,
+    custom prompts, and streaming support for complex research and reasoning tasks.
+    
+    **Agent Modes:**
+    - **RAG**: Standard retrieval-augmented generation for Q&A
+    - **Research**: Multi-step reasoning with tool usage for complex queries
+    
+    **Available Tools (Research Mode):**
+    - `web_search`: Search the web for current information
+    - `calculator`: Perform mathematical calculations
+    - `reasoning`: Multi-step logical reasoning
+    - `code_execution`: Execute code snippets (sandboxed)
+    
+    **Advanced Features:**
+    - **Custom System Prompts**: Override default agent personality
+    - **Streaming Responses**: Real-time token streaming via SSE
+    - **Fine-tuned Generation**: Control temperature, max_tokens, etc.
+    - **Comprehensive Search Config**: Full control over retrieval
+    - **Detailed Statistics**: Search and generation metrics
+    
+    **Generation Configuration:**
+    - `model`: LLM model selection
+    - `temperature`: Creativity control (0.0-2.0)
+    - `max_tokens`: Response length limit
+    - `stream`: Enable Server-Sent Events streaming
+    - `top_p`: Nucleus sampling parameter
+    - `frequency_penalty`: Reduce repetition
+    - `presence_penalty`: Encourage topic diversity
+    
+    **Example Request (Research Mode):**
+    ```json
+    {
+        "message": "Compare the latest developments in quantum computing from major tech companies",
+        "mode": "research",
+        "tools": ["web_search", "reasoning"],
+        "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
+        "system_prompt": "You are an expert technology analyst. Provide detailed, accurate analysis.",
+        "search_config": {
+            "search_type": "hybrid",
+            "limit": 10,
+            "databases": ["media_db", "notes"],
+            "keywords": ["quantum", "computing", "IBM", "Google"]
+        },
+        "generation_config": {
+            "model": "gpt-4",
+            "temperature": 0.7,
+            "max_tokens": 2048,
+            "stream": false
+        }
+    }
+    ```
+    
+    **Streaming Example:**
+    When `stream: true`, returns Server-Sent Events:
+    ```
+    data: {"content": "Based on"}
+    data: {"content": " my research"}
+    data: {"content": ", here are"}
+    data: {"done": true}
+    ```
+    
+    **Returns (Non-streaming):**
+    - Complete response text
+    - Conversation ID
+    - Retrieved sources with relevance scores
+    - Mode and tools used
+    - Search and generation statistics
+    
+    **Use Cases:**
+    - Complex research queries
+    - Multi-step reasoning tasks
+    - Real-time chat with streaming
+    - Custom AI assistants
+    - Tool-augmented conversations
     """
 )
 async def advanced_agent(
@@ -693,7 +874,30 @@ async def advanced_agent(
 @router.get(
     "/health",
     summary="RAG service health check",
-    description="Check if the RAG service is operational"
+    description="""
+    Check the health status of the RAG service.
+    
+    This endpoint verifies that the RAG service is operational and can be used
+    for monitoring and load balancer health checks.
+    
+    **Returns:**
+    - `status`: Service health status ("healthy" or "unhealthy")
+    - `service`: Service identifier ("rag_v2")
+    - `timestamp`: Current Unix timestamp
+    
+    **Example Response:**
+    ```json
+    {
+        "status": "healthy",
+        "service": "rag_v2",
+        "timestamp": 1704067200.123
+    }
+    ```
+    
+    **HTTP Status Codes:**
+    - `200`: Service is healthy
+    - `503`: Service is unhealthy or unavailable
+    """
 )
 async def health_check():
     """Health check endpoint for RAG service"""

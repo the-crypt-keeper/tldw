@@ -28,8 +28,12 @@ from tldw_Server_API.app.api.v1.endpoints.characters_endpoint import router as c
 # Chunking Endpoint
 from tldw_Server_API.app.api.v1.endpoints.chunking import chunking_router as chunking_router
 #
-# Embedding Endpoint
-from tldw_Server_API.app.api.v1.endpoints.embeddings import router as embeddings_router
+# Embedding Endpoint (v4 with multi-provider support)
+from tldw_Server_API.app.api.v1.endpoints.embeddings_v4 import router as embeddings_router
+# Previous versions (To be removed)
+# from tldw_Server_API.app.api.v1.endpoints.embeddings_v3 import router as embeddings_router_v3
+# from tldw_Server_API.app.api.v1.endpoints.embeddings_v2 import router as embeddings_router_v2
+# from tldw_Server_API.app.api.v1.endpoints.embeddings import router as embeddings_router_old
 #
 # Media Endpoint
 from tldw_Server_API.app.api.v1.endpoints.media import router as media_router
@@ -192,8 +196,8 @@ app.include_router(character_router, prefix=f"{API_V1_PREFIX}/characters", tags=
 app.include_router(chunking_router, prefix=f"{API_V1_PREFIX}/chunking", tags=["chunking"])
 
 
-# Router for Embedding Endpoint
-app.include_router(embeddings_router, prefix=f"{API_V1_PREFIX}/embedding", tags=["embedding"])
+# Router for Embedding Endpoint (OpenAI-compatible path)
+app.include_router(embeddings_router, prefix=f"{API_V1_PREFIX}", tags=["embeddings"])
 
 
 # Router for Note Management endpoints
