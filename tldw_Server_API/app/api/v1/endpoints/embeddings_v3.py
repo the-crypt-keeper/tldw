@@ -1,10 +1,38 @@
 # embeddings_v3.py - Enhanced embeddings API with batch processing, dimensions, and token support
 """
-OpenAI-compatible embeddings API with:
-- Batch processing optimization
-- Dimensions parameter support
-- Token array input support
-- Improved performance and caching
+OpenAI-compatible Embeddings API Implementation
+
+This module provides a comprehensive embeddings service that is compatible with OpenAI's API
+while offering enhanced features for production use.
+
+## Key Features:
+- **Batch Processing**: Automatically processes large inputs in optimized batches of 100 items
+- **Dimensions Support**: Allows custom dimension reduction for compatible models (text-embedding-3-*)
+- **Token Array Input**: Supports integer token arrays as input, not just text strings
+- **Caching**: In-memory LRU cache for frequently requested embeddings
+- **Multiple Providers**: Supports OpenAI, HuggingFace, and local API providers
+
+## Token Array Inputs:
+Token arrays are the numerical representation of text after tokenization. Each token is mapped
+to a unique integer ID from the model's vocabulary. This API accepts:
+- Single token array: [15339, 11, 1917, 0] -> converts to text -> generates embedding
+- Batch token arrays: [[tokens1], [tokens2], ...] -> converts each to text -> generates embeddings
+
+## Dimension Reduction:
+For text-embedding-3-* models, you can specify a lower dimension count than the model's native
+output. This uses truncation (following OpenAI's approach) to reduce embedding size while
+maintaining most of the semantic information.
+
+## Performance Optimizations:
+- Parallel processing using ThreadPoolExecutor
+- Batch processing for large input lists
+- Caching with LRU eviction strategy
+- Async/await for non-blocking operations
+
+## Rate Limiting:
+- 60 requests per minute for standard endpoint
+- 30 requests per minute for batch endpoint
+- Maximum 2048 strings per request
 """
 
 import base64
@@ -146,7 +174,25 @@ def count_tokens_for_list(texts: List[str], model_name: str) -> int:
     return sum(count_tokens(text, model_name) for text in texts)
 
 def tokens_to_text(tokens: List[int], model_name: str) -> str:
-    """Convert token IDs back to text."""
+    """
+    Convert token IDs back to text.
+    
+    Token arrays are sequences of integer IDs that represent tokenized text. Each integer
+    corresponds to a token in the model's vocabulary. This function decodes these IDs back
+    into human-readable text.
+    
+    Args:
+        tokens: List of integer token IDs from the model's vocabulary
+        model_name: Name of the model whose tokenizer should be used
+    
+    Returns:
+        Decoded text string
+    
+    Example:
+        >>> tokens = [15339, 11, 1917, 0]  # Token IDs for "Hello, world!"
+        >>> text = tokens_to_text(tokens, "text-embedding-3-small")
+        >>> print(text)  # "Hello, world!"
+    """
     try:
         encoding = get_tokenizer(model_name)
         return encoding.decode(tokens)
@@ -317,9 +363,25 @@ def apply_dimensions_reduction(
     target_dimensions: int
 ) -> List[List[float]]:
     """
-    Reduce embedding dimensions using truncation or PCA-like approach.
-    Note: This is a simplified implementation. Production systems should use
-    proper dimensionality reduction techniques.
+    Reduce embedding dimensions using truncation.
+    
+    This follows OpenAI's approach for dimension reduction in text-embedding-3-* models.
+    The method preserves the most important dimensions by truncating the embedding vector
+    to the specified size. Research shows this simple truncation maintains most of the
+    semantic information while reducing storage and computation requirements.
+    
+    Args:
+        embeddings: List of embedding vectors to reduce
+        target_dimensions: Target number of dimensions (must be <= original dimensions)
+    
+    Returns:
+        List of dimension-reduced embedding vectors
+    
+    Note:
+        This truncation method is specifically designed for models trained with
+        Matryoshka Representation Learning, where earlier dimensions capture more
+        important information. For other models, consider using PCA or other
+        dimensionality reduction techniques.
     """
     reduced = []
     
@@ -342,21 +404,33 @@ def apply_dimensions_reduction(
     "/embeddings",
     response_model=CreateEmbeddingResponse,
     status_code=status.HTTP_200_OK,
-    summary="Create embeddings with advanced features",
+    summary="Create embeddings with advanced features including token array support",
     description="""
-    Create embedding vectors for input text with advanced features.
+    Create embedding vectors for input text with advanced features including token array inputs.
     
     **New Features:**
     - **Batch Processing**: Automatically processes large inputs in optimized batches
     - **Dimensions Support**: Specify custom dimensions for compatible models
-    - **Token Array Input**: Now supports integer token arrays
-    - **Caching**: Frequently requested embeddings are cached
+    - **Token Array Input**: Full support for integer token arrays as input
+    - **Caching**: Frequently requested embeddings are cached for performance
     
     **Supported Input Formats:**
-    - Single string
-    - Array of strings (max 2048 items, processed in batches)
-    - Array of token integers (now supported!)
-    - Array of token arrays (now supported!)
+    - Single string: `"Hello, world!"`
+    - Array of strings: `["text1", "text2", "text3"]` (max 2048 items)
+    - Array of token integers: `[15339, 11, 1917, 0]` (single tokenized text)
+    - Array of token arrays: `[[15339, 11], [1917, 0]]` (multiple tokenized texts)
+    
+    **Token Arrays Explained:**
+    Token arrays are the numerical representation of text after tokenization. Each token ID
+    corresponds to a specific token in the model's vocabulary. For example:
+    - Text: "Hello, world!" 
+    - Tokens: ["Hello", ",", " world", "!"]
+    - Token IDs: [15339, 11, 1917, 0]
+    
+    This API accepts token IDs directly, which is useful when:
+    - You've pre-tokenized text for efficiency
+    - You're working with token-level operations
+    - You need to maintain exact tokenization consistency
     
     **Available Models:**
     - `text-embedding-ada-002`: OpenAI Ada v2 (1536 dimensions)
@@ -385,7 +459,31 @@ async def create_embedding_endpoint(
     current_user: User = Depends(get_request_user),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
-    """Create embeddings for the provided input with advanced features."""
+    """
+    Create embeddings for the provided input with advanced features.
+    
+    This endpoint handles multiple input formats including raw text and token arrays.
+    When token arrays are provided, they are first decoded back to text using the
+    appropriate tokenizer, then processed through the embedding model.
+    
+    Token Array Processing:
+    1. Token IDs are validated and decoded to text
+    2. Text is processed through the embedding model
+    3. Embeddings are optionally reduced to specified dimensions
+    4. Results are cached for future requests
+    
+    Args:
+        request: FastAPI request object
+        embedding_request: Request body with input and parameters
+        current_user: Authenticated user
+        background_tasks: Background task manager for caching
+    
+    Returns:
+        CreateEmbeddingResponse with embeddings and usage statistics
+    
+    Raises:
+        HTTPException: For invalid inputs, unsupported parameters, or processing errors
+    """
     logger.info(f"User {current_user.id} requesting embeddings with model: {embedding_request.model}")
     
     if not EMBEDDINGS_AVAILABLE:
@@ -457,7 +555,9 @@ async def create_embedding_endpoint(
             num_prompt_tokens = count_tokens_for_list(embedding_request.input, embedding_request.model)
             
         elif all(isinstance(item, int) for item in embedding_request.input):
-            # Single token array - convert to text
+            # Single token array input - convert token IDs to text
+            # Token arrays are sequences of integer IDs representing tokenized text
+            # Each ID maps to a specific token in the model's vocabulary
             logger.info(f"Converting token array of length {len(embedding_request.input)} to text")
             input_was_tokens = True
             decoded_text = tokens_to_text(embedding_request.input, embedding_request.model)
@@ -465,7 +565,9 @@ async def create_embedding_endpoint(
             num_prompt_tokens = len(embedding_request.input)
             
         elif all(isinstance(item, list) and all(isinstance(x, int) for x in item) for item in embedding_request.input):
-            # Batch token arrays - convert each to text
+            # Batch token arrays - multiple tokenized texts
+            # Each inner array is a sequence of token IDs for one piece of text
+            # This format is useful for batch processing pre-tokenized content
             logger.info(f"Converting {len(embedding_request.input)} token arrays to text")
             input_was_tokens = True
             texts_to_embed = []
@@ -571,8 +673,41 @@ async def create_embedding_endpoint(
 
 @router.post(
     "/embeddings/batch",
-    summary="Batch embedding creation",
-    description="Process multiple embedding requests in a single call for better performance"
+    summary="Batch embedding creation with parallel processing",
+    description="""
+    Process multiple embedding requests in a single call for optimal performance.
+    
+    This endpoint allows you to submit multiple separate embedding requests that will
+    be processed in parallel. Each request can have different parameters (model, dimensions,
+    input format including token arrays).
+    
+    **Benefits:**
+    - Parallel processing of independent requests
+    - Reduced API call overhead
+    - Each request can use different models or parameters
+    - Supports all input formats including token arrays
+    
+    **Limitations:**
+    - Maximum 10 requests per batch
+    - Each individual request follows standard limits
+    - Partial failures return error info for failed requests
+    
+    **Example:**
+    ```json
+    [
+        {
+            "input": "First text",
+            "model": "text-embedding-3-small",
+            "dimensions": 512
+        },
+        {
+            "input": [15339, 11, 1917, 0],  // Token array input
+            "model": "text-embedding-3-large",
+            "dimensions": 1024
+        }
+    ]
+    ```
+    """
 )
 @limiter.limit("30/minute")
 async def create_embeddings_batch_endpoint(
@@ -616,7 +751,18 @@ async def create_embeddings_batch_endpoint(
 @router.get(
     "/embeddings/models",
     summary="List available embedding models",
-    description="Get a list of available embedding models and their configurations"
+    description="""
+    Get a comprehensive list of available embedding models and their configurations.
+    
+    Returns detailed information about each model including:
+    - Supported dimensions and dimension reduction capabilities
+    - Maximum token limits
+    - Provider information (OpenAI, HuggingFace, local)
+    - Feature support (token inputs, caching, etc.)
+    
+    This endpoint helps you understand which models are available and their
+    capabilities for processing different input types including token arrays.
+    """
 )
 async def list_embedding_models(
     current_user: User = Depends(get_request_user)
@@ -758,18 +904,22 @@ async def test_embedding_advanced(
             dimensions=dimensions
         )
     elif test_type == "tokens":
-        # Example token IDs (would be actual tokens in production)
+        # Example token array input - these are actual token IDs from tiktoken
+        # This demonstrates how to send pre-tokenized text as input
+        # Token IDs represent: "Hello, world! This is a test of the embeddings API."
         test_request = CreateEmbeddingRequest(
             input=[15339, 11, 1917, 0, 1115, 374, 264, 1296, 315, 279, 40188, 5446, 13],
             model="text-embedding-3-small",
             dimensions=dimensions
         )
     elif test_type == "batch_tokens":
+        # Batch token arrays - multiple pre-tokenized texts
+        # Each inner array is a complete tokenized text sequence
         test_request = CreateEmbeddingRequest(
             input=[
-                [15339, 11, 1917, 0],
-                [1115, 374, 264, 1296],
-                [315, 279, 40188, 5446]
+                [15339, 11, 1917, 0],  # "Hello, world!"
+                [1115, 374, 264, 1296],  # "This is a test"
+                [315, 279, 40188, 5446]  # "of the embeddings API"
             ],
             model="text-embedding-3-small",
             dimensions=dimensions
