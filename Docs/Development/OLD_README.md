@@ -357,7 +357,7 @@ All features are designed to run **locally** on your device, ensuring privacy an
       - Prompts.
         - Single or multiple at once, in a zip file.
     - **Export functionality for all content, as well as the ability to export the entire DB(It's SQLite...).**
-    - **Backup Management - A way to back up the DB, view backups, and restore from a backup. (WIP)**[README.md](README.md)
+    - **Backup Management - A way to back up the DB, view backups, and restore from a backup. (WIP)**[README.md](../../tldw_Server_API/README.md)
     - **'Trashcan' Support - A way to 'soft' delete content, and restore it if needed. (Helps with accidental deletions)**
     - **Ability to set various configurations via the `config.txt` file.**
 - **Where its headed:**

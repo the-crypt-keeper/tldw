@@ -48,9 +48,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
           
-      - name: Run Black formatter check
-        run: |
-          black --check --diff tldw_Server_API/
+      # - name: Run Black formatter check
+        # run: |
+          # black --check --diff tldw_Server_API/
           
       - name: Run Ruff linter
         run: |

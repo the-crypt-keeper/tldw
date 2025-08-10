@@ -1027,7 +1027,7 @@ WORKDIR /app
 RUN pip install uv
 
 # Copy only the dependency configuration files
-COPY pyproject.toml uv.lock* ./
+COPY ../../pyproject.toml uv.lock* ./
 
 # Install dependencies into a virtual environment
 RUN uv venv .venv && \
