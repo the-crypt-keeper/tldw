@@ -73,7 +73,7 @@ dependencies = [
   "tqdm>=4.65.0",
   "uvicorn[standard]>=0.23.0",
   "tomli",
-  "argon-cffi",
+  "argon2-cffi",
   
   # Security
   "keyring>=24.0.0",
