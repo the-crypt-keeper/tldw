@@ -521,3 +521,27 @@ tldw_Server_API/app/Databases/chatDB.db
 =======
 *.DS_Store
 .DS_Store
+
+# User Registration System
+.jwt_secret
+*.jwt_secret
+/user_databases/
+/migration_backups/
+/logs/*.log
+/logs/*.gz
+audit.log
+errors.log
+.env.local
+.env.production
+
+# Session and cache files
+*.session
+*.cache
+
+# Test databases
+**/test_*.db
+**/test_*.sqlite
+
+# PostgreSQL data (for local development)
+/postgres_data/
+/redis_data/
