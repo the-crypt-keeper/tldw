@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Literal, Optional
 #
 # 3rd-party imports
-from pydantic import BaseSettings, Field, validator
+from pydantic_settings import BaseSettings
+from pydantic import Field, field_validator
 #
 # Local imports
 from loguru import logger
@@ -323,21 +324,23 @@ class Settings(BaseSettings):
                 logger.error(f"Failed to save JWT secret to {secret_file}: {e}")
                 raise
     
-    @validator("JWT_SECRET_KEY")
-    def validate_jwt_secret(cls, v, values):
+    @field_validator("JWT_SECRET_KEY")
+    @classmethod
+    def validate_jwt_secret(cls, v, info):
         """Validate JWT secret strength"""
         # Skip validation in single-user mode
-        if values.get("AUTH_MODE") == "single_user":
+        if info.data.get("AUTH_MODE") == "single_user":
             return v
             
         if v and len(v) < 32:
             raise ValueError("JWT_SECRET_KEY must be at least 32 characters")
         return v
     
-    @validator("DATABASE_URL")
-    def validate_database_url(cls, v, values):
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def validate_database_url(cls, v, info):
         """Validate database URL based on auth mode"""
-        auth_mode = values.get("AUTH_MODE", "single_user")
+        auth_mode = info.data.get("AUTH_MODE", "single_user")
         
         if auth_mode == "multi_user" and v.startswith("sqlite"):
             logger.warning(
@@ -347,21 +350,20 @@ class Settings(BaseSettings):
         
         return v
     
-    @validator("REDIS_URL")
+    @field_validator("REDIS_URL")
+    @classmethod
     def validate_redis_url(cls, v):
         """Validate Redis URL format if provided"""
         if v and not (v.startswith("redis://") or v.startswith("rediss://")):
             raise ValueError("REDIS_URL must start with redis:// or rediss://")
         return v
     
-    class Config:
-        """Pydantic configuration"""
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        
-        # Allow extra fields for backward compatibility
-        extra = "allow"
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+        "extra": "allow"  # Allow extra fields for backward compatibility
+    }
 
 
 # ===== Singleton Settings Instance =====

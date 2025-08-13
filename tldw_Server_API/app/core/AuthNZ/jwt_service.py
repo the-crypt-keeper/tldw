@@ -178,6 +178,38 @@ class JWTService:
             logger.error(f"Unexpected error verifying token: {e}")
             raise InvalidTokenError(f"Token verification failed: {e}")
     
+    def decode_access_token(self, token: str) -> Dict[str, Any]:
+        """
+        Decode and verify an access token
+        
+        Args:
+            token: Access token to decode
+            
+        Returns:
+            Decoded token payload
+            
+        Raises:
+            InvalidTokenError: If token is invalid
+            ExpiredTokenError: If token has expired
+        """
+        return self.verify_token(token, token_type="access")
+    
+    def decode_refresh_token(self, token: str) -> Dict[str, Any]:
+        """
+        Decode and verify a refresh token
+        
+        Args:
+            token: Refresh token to decode
+            
+        Returns:
+            Decoded token payload
+            
+        Raises:
+            InvalidTokenError: If token is invalid
+            ExpiredTokenError: If token has expired
+        """
+        return self.verify_token(token, token_type="refresh")
+    
     def hash_token(self, token: str) -> str:
         """
         Create a SHA256 hash of a token for storage
