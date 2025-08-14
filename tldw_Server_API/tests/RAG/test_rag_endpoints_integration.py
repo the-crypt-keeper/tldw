@@ -480,7 +480,7 @@ class TestErrorScenarios:
     @pytest.mark.asyncio
     async def test_database_connection_error(self, auth_headers, test_user):
         """Test handling of database connection errors."""
-        from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
+        from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service
         from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user
         
         await rag_service_manager.cleanup_expired()
@@ -496,7 +496,7 @@ class TestErrorScenarios:
         def override_get_user():
             return test_user
         
-        app.dependency_overrides[get_rag_service_for_user] = override_get_rag_service
+        app.dependency_overrides[get_rag_service] = override_get_rag_service
         app.dependency_overrides[get_request_user] = override_get_user
         
         try:
@@ -533,7 +533,7 @@ class TestErrorScenarios:
     @pytest.mark.asyncio
     async def test_rag_service_initialization_error(self, auth_headers, test_user, media_db, chacha_db):
         """Test handling of RAG service initialization errors."""
-        from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
+        from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service
         from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user
         
         await rag_service_manager.cleanup_expired()
@@ -549,7 +549,7 @@ class TestErrorScenarios:
         def override_get_user():
             return test_user
         
-        app.dependency_overrides[get_rag_service_for_user] = override_get_rag_service
+        app.dependency_overrides[get_rag_service] = override_get_rag_service
         app.dependency_overrides[get_request_user] = override_get_user
         
         try:
