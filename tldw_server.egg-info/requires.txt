@@ -1,4 +1,5 @@
 aiofiles>=23.0.0
+argon2-cffi>=23.0.0
 cachetools>=5.0.0
 defusedxml>=0.7.0
 fastapi>=0.100.0
@@ -12,7 +13,6 @@ psutil>=5.9.0
 pydantic>=2.0.0
 pydantic-core>=2.0.0
 python-dotenv>=1.0.0
-python-json-logger>=2.0.0
 python-magic>=0.4.0
 python-multipart>=0.0.6
 PyYAML>=6.0.0
@@ -22,6 +22,7 @@ scipy>=1.10.0
 slowapi>=0.1.0
 starlette>=0.31.0
 toml>=0.10.0
+tomli>=2.0.0
 tqdm>=4.65.0
 uvicorn[standard]>=0.23.0
 keyring>=24.0.0
@@ -58,13 +59,10 @@ pymupdf4llm>=0.0.5
 pypandoc>=1.11
 pypandoc-binary>=1.11
 trafilatura>=1.6.0
-bert-score>=0.3.0
 flashrank>=0.2.0
+onnxruntime>=1.14.0
 openai>=1.0.0
 optimum>=1.13.0
-rouge-score>=0.1.0
-sentence-transformers>=2.2.0
-textstat>=0.7.0
 torch>=2.0.0
 transformers>=4.35.0
 arxiv>=2.0.0
@@ -74,12 +72,7 @@ requests>=2.31.0
 tenacity>=8.2.0
 urllib3>=2.0.0
 chromadb>=0.4.0
-datasets>=2.14.0
-fire>=0.5.0
-genanki>=0.13.0
-gradio>=4.0.0
 Jinja2>=3.1.0
-joblib>=1.3.0
 Pillow>=10.0.0
 
 [STT_All]
@@ -108,7 +101,7 @@ kokoro-onnx>=0.1.0
 pydub>=0.25.0
 
 [all]
-tldw[STT_All,TTS_All,backend_onnx,db_postgres,dev,gradio,media_wiki,web_research]
+tldw-server[STT_All,TTS_All,backend_onnx,data-tools,db_postgres,dev,evaluation,gradio,media_wiki,web_research]
 
 [audio_recording_windows]
 PyAudioWPatch>=0.2.12
@@ -121,6 +114,13 @@ onnxruntime>=1.16.0
 
 [backend_vllm]
 vllm>=0.2.0
+
+[data-tools]
+datasets>=2.14.0
+fire>=0.5.0
+genanki>=0.13.0
+joblib>=1.3.0
+python-json-logger>=2.0.0
 
 [db_opensearch]
 opensearch-py>=2.3.0
@@ -140,6 +140,12 @@ black>=23.0.0
 mypy>=1.5.0
 ruff>=0.1.0
 pre-commit>=3.3.0
+
+[evaluation]
+bert-score>=0.3.0
+rouge-score>=0.1.0
+sentence-transformers>=2.2.0
+textstat>=0.7.0
 
 [gradio]
 gradio>=4.0.0
