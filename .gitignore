@@ -1,479 +1,274 @@
 # Byte-compiled/optimized/DLL files
-
 __pycache__/
-
 *.py[cod]
-
 *$py.class
 
-*egg*.egg*
-
-
 # C extensions
-
 *.so
 
-.*egg*
-
-
 # Distribution/packaging
-
 .Python
-
 build/
-
 develop-eggs/
-
 dist/
-
 downloads/
-
-*egg.*/*
-
-*egg.*
-
-*eggs.*
-
-*egg*
-
 eggs/
-
 .eggs/
-
-Include/
-
 lib/
-
-Library
-
-Lib/
-
 lib64/
-
 parts/
-
 scripts/
-
 sdist/
-
-share/
-
-Tests/Results
-
 var/
-
 wheels/
-
 share/python-wheels/
-
 *.egg-info/
-
 .installed.cfg
-
 *.egg
-
 MANIFEST
+tldw_server.egg-info/
+tldw-server.egg-info/
 
 
 
-#PyInstaller
-
-#Usuallythesefilesarewrittenbyapythonscriptfromatemplate
-
-#beforePyInstallerbuildstheexe,soastoinjectdate/otherinfosintoit.
-
+# PyInstaller
 *.manifest
-
 *.spec
 
 
 
-#Installerlogs
-
+# Installer logs
 pip-log.txt
-
 pip-delete-this-directory.txt
 
 
 
-#Unittest/coveragereports
-
+# Unit test/coverage reports
 htmlcov/
-
 .tox/
-
 .nox/
-
 .coverage
-
 .coverage.*
-
 .cache
-
 nosetests.xml
-
 coverage.xml
-
 *.cover
-
 *.py,cover
-
 .hypothesis/
-
 .pytest_cache/
-
 cover/
 
 
 
-#Translations
-
+# Translations
 *.mo
-
 *.pot
 
 
 
-#Djangostuff:
-
+# Django stuff:
 *.log
-
 local_settings.py
-
 db.sqlite3
-
 db.sqlite3-journal
 
 
 
-#Flaskstuff:
-
+# Flask stuff:
 instance/
-
 .webassets-cache
 
 
 
-#Scrapystuff:
-
+# Scrapy stuff:
 .scrapy
 
 
 
-#Sphinxdocumentation
-
+# Sphinx documentation
 docs/_build/
 
 
 
-#PyBuilder
-
+# PyBuilder
 .pybuilder/
-
 target/
 
 
 
-#JupyterNotebook
-
+# Jupyter Notebook
 .ipynb_checkpoints
 
 
 
-#IPython
-
+# IPython
 profile_default/
-
 ipython_config.py
 
 
 
-#pyenv
-
-#Foralibraryorpackage,youmightwanttoignorethesefilessincethecodeis
-
-#intendedtoruninmultipleenvironments;otherwise,checkthemin:
-
-#.python-version
-
+# pyenv
+.python-version
 pyenv.cfg
 
 
 
-#pipenv
-
-#Accordingtopypa/pipenv#598,itisrecommendedtoincludePipfile.lockinversioncontrol.
-
-#However,incaseofcollaboration,ifhavingplatform-specificdependenciesordependencies
-
-#havingnocross-platformsupport,pipenvmayinstalldependenciesthatdon'twork,ornot
-
-#installallneededdependencies.
-
-#Pipfile.lock
+# pipenv
+Pipfile.lock
 
 
 
-#poetry
-
-#SimilartoPipfile.lock,itisgenerallyrecommendedtoincludepoetry.lockinversioncontrol.
-
-#Thisisespeciallyrecommendedforbinarypackagestoensurereproducibility,andismore
-
-#commonlyignoredforlibraries.
-
-#https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-
-#poetry.lock
+# poetry
+poetry.lock
 
 
 
-#pdm
-
-#SimilartoPipfile.lock,itisgenerallyrecommendedtoincludepdm.lockinversioncontrol.
-
-#pdm.lock
-
-#pdmstoresproject-wideconfigurationsin.pdm.toml,butitisrecommendedtonotincludeit
-
-#inversioncontrol.
-
-#https://pdm.fming.dev/#use-with-ide
-
+# pdm
+pdm.lock
 .pdm.toml
 
 
 
-#PEP582;usedbye.g.github.com/David-OConnor/pyflowandgithub.com/pdm-project/pdm
-
+# PEP 582
 __pypackages__/
 
 
 
-#Celerystuff
-
+# Celery stuff
 celerybeat-schedule
-
 celerybeat.pid
 
 
 
-#SageMathparsedfiles
-
+# SageMath parsed files
 *.sage.py
 
 
 
-#Environments
-
+# Environments
 .env
-
 .venv
-
 env/
-
 venv/
-
 ENV/
-
 env.bak/
-
 venv.bak/
 
 
 
-#Spyderprojectsettings
-
+# Spyder project settings
 .spyderproject
-
 .spyproject
 
 
 
-#Ropeprojectsettings
-
+# Rope project settings
 .ropeproject
 
 
 
-#mkdocsdocumentation
-
+# mkdocs documentation
 /site
 
 
 
-#mypy
-
+# mypy
 .mypy_cache/
-
 .dmypy.json
-
 dmypy.json
 
 
 
-#Pyretypechecker
-
+# Pyre type checker
 .pyre/
 
 
 
-#pytypestatictypeanalyzer
-
+# pytype static type analyzer
 .pytype/
 
 
 
-#Cythondebugsymbols
-
+# Cython debug symbols
 cython_debug/
 
 
 
-#PyCharm
-
-#JetBrainsspecifictemplateismaintainedinaseparateJetBrains.gitignorethatcan
-
-#befoundathttps://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-
-#andcanbeaddedtotheglobalgitignoreormergedintothisfile.Foramorenuclear
-
-#option(notrecommended)youcanuncommentthefollowingtoignoretheentireideafolder.
-
-#.idea/
+# PyCharm
+.idea/
 
 
 
-#Files
+# Media Files
+*.flac
+*.m4a
+*.mp4
+*.mp3
+*.ogg
+*.opus
+*.wav
+*.webm
 
-.flac
 
-.json
 
-.m4a
+# Project specific directories
+Results/
+Transcripts/
+Videos/
+/results
+/Bin
+/Bin2
+/marker
+/flagged
+/.gradio
 
-.mp4
-
-.mp3
-
-.ogg
-
-.opus
-
-.wav
-
+# Config files
 config.txt
 
+# PoC Version specific
+PoC_Version/
 
+# Databases
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+/user_databases/
+/PoC_Version/Databases/
+tldw_Server_API/app/Databases/
 
-#Createdfolders
-
-Results/
-
-Transcripts/
-
-Videos/
-*.wav
-/results
-diarize2.py
-/Bin2
-2summarize.py
-__pycache__/summarize.cpython-312.pyc
-PoC_Version/Config_Files/Backup_config.txt
-3summarize.py
-/.idea
-/.idea
-
- 
-PoC_Version/HF/2app.py
-/PoC_Version/HF/Results
-/flagged
-PoC_Version/Databases/media_summary.db
-wherestehlog.log
-PoC_Version/llamafile.exe
-*.llamafile
-*.gguf
-*.csv
-llama.log
-/Bin
-*.webm
-PoC_Version/Databases/prompts.db
-PoC_Version/Databases/prompts.db
-PoC_Version/Databases/prompts.db
-*.pyc
-PoC_Version/Config_Files/config.txt
-PoC_Version/Config_Files/config.txt
-PoC_Version/Helper_Scripts/desktop.ini
-/.idea
-/.idea
-all_summaries.txt
-all_transcriptions.json
-*.mp3
-*.json
-/marker
-PoC_Version/App_Function_Libraries/chroma_db/chroma.sqlite3
-PoC_Version/Databases/chroma_db/chroma.sqlite3
-/PoC_Version/Databases/chroma_db
-PoC_Version/Databases/chroma_db/chroma.sqlite3
-PoC_Version/Databases/chroma_db/chroma.sqlite3
-PoC_Version/Databases/chroma_db/chroma.sqlite3
-PoC_Version/Databases/chroma_db/chroma.sqlite3
-PoC_Version/Databases/chroma_db/chroma.sqlite3
-PoC_Version/Databases/media_summary.db-wal
-PoC_Version/Databases/media_summary.db-shm
-media_summary.db
-media_summary.db-journal
-PoC_Version/Config_Files/config.txt
-/PoC_Version/App_Function_Libraries/models/Whisper/models--Systran--faster-whisper-large-v2
-/PoC_Version/App_Function_Libraries/models/Whisper/models--Systran--faster-whisper-small.en
-/PoC_Version/App_Function_Libraries/App_Function_Libraries/models/Whisper/models--Systran--faster-whisper-large-v2
-.aider*
-/PoC_Version/Helper_Scripts/Character_Cards
-/PoC_Version/App_Function_Libraries/models/Whisper/models--Systran--faster-distil-whisper-large-v2
-/PoC_Version/App_Function_Libraries/models/Whisper/models--Systran--faster-whisper-large-v3
-/PoC_Version/Tests/Databases
-PoC_Version/Databases/test.db
-/PoC_Version/Tests/RAG/Databases
-/PoC_Version/Tests/ChromaDB/Databases
-/PoC_Version/Tests/ChromaDB/Databases
-PoC_Version/Tests/ChromaDB/Databases/chroma_db/chroma.sqlite3
-mediawiki_import.log
-character_chat.db
-temp_5e104bc0-3e34-498d-8d9a-b3381e0a8996.png
-temp_b2984f32-b16a-4eba-9d05-e9b19a3b6edf.png
-/PoC_Version/App_Function_Libraries/models/Whisper/models--Systran--faster-whisper-medium
-PoC_Version/Databases/chatDB.db
-/PoC_Version/App_Function_Libraries/onnx_models
-/PoC_Version/App_Function_Libraries/models/Whisper
-rag_qa_chat.db
-PoC_Version/Databases/rag_qa.db
-/PoC_Version/App_Function_Libraries/embedding_models
-/PoC_Version/Databases/backup
-/PoC_Version/App_Function_Libraries/models/embedding_models
-app.log
+# Model files
 *.onnx
 *.pth
 *.pt
 *.dll
-/.gradio
-PoC_Version/Config_Files/config.txt
-/PoC_Version/Databases
-tldw_Server_API/app/Databases/server_media_summary.db
-tldw_Server_API/app/Databases/chatDB.db
-*.mp4
-/tldw_Server_API/app/core/Ingestion_Media_Processing/models/Whisper
-*.db-wal
-*.db-shm
-*.db
-/user_databases
-.env
-/PoC_Version/PoC_Version/Databases/chroma_db
-/.hypothesis
+*.llamafile
+*.gguf
+/tldw_Server_API/app/core/Ingestion_Media_Processing/models/
+
+# Log files
+*.log
+app.log
+llama.log
+mediawiki_import.log
+audit.log
+errors.log
+
+# Data files
+*.csv
+*.json
+all_summaries.txt
+all_transcriptions.json
+
+# Temporary files
+temp_*.png
+
+# Editor files
+.aider*
+desktop.ini
 # macOS
 .DS_Store
-=======
 *.DS_Store
-.DS_Store
 
 # User Registration System
 .jwt_secret
@@ -495,6 +290,6 @@ errors.log
 **/test_*.db
 **/test_*.sqlite
 
-# PostgreSQL data (for local development)
+# Database data (for local development)
 /postgres_data/
 /redis_data/
