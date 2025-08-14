@@ -40,9 +40,13 @@ authors = [
 dependencies = [
   # API Server Core
   "aiofiles>=23.0.0",
+  "aiosqlite",
+  "apscheduler>=3.10.0",
   "argon2-cffi>=23.0.0",
+  "asyncpg",
   "cachetools>=5.0.0",
   "defusedxml>=0.7.0",
+  "email-validator>=2.0.0",
   "fastapi>=0.100.0",
   "httpx>=0.24.0",
   "loguru>=0.7.0",
@@ -53,8 +57,8 @@ dependencies = [
   "psutil>=5.9.0",
   "pydantic>=2.0.0",
   "pydantic-core>=2.0.0",
-  "email-validator>=2.0.0",
   "python-dotenv>=1.0.0",
+  "python-jose",
   "python-magic>=0.4.0",
   "python-multipart>=0.0.6",
   "PyYAML>=6.0.0",
@@ -67,12 +71,14 @@ dependencies = [
   "tomli>=2.0.0",
   "tqdm>=4.65.0",
   "uvicorn[standard]>=0.23.0",
+
   
   # Security
   "keyring>=24.0.0",
   "puremagic>=1.15",
   "pycryptodomex>=3.18.0",
   "PyJWT>=2.8.0",
+  "python-jose[cryptography]>=3.3.0",
   "yara-python>=4.3.0",
   
   # Audio/Video Processing
