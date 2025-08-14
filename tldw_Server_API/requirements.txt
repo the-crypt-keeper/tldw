@@ -21,6 +21,7 @@ cachetools
 defusedxml
 email-validator
 fastapi
+hypothesis
 loguru
 lxml
 numpy
