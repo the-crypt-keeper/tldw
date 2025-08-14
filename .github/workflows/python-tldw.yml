@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-quality-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-pip-quality-v2-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-quality-
             ${{ runner.os }}-pip-
@@ -46,6 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install email-validator
           pip install -e ".[dev]"
           
       # - name: Run Black formatter check
@@ -101,7 +102,7 @@ jobs:
             ~/.cache/pip
             ~/Library/Caches/pip
             ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-pip-v2-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-${{ matrix.python-version }}-
             ${{ runner.os }}-pip-
@@ -125,6 +126,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install email-validator
           pip install -e ".[dev]"
           # Install platform-specific dependencies
           if [ "${{ runner.os }}" = "Windows" ]; then
@@ -190,7 +192,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-integration-${{ hashFiles('pyproject.toml') }}
+          key: ${{ runner.os }}-pip-integration-v2-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-integration-
             ${{ runner.os }}-pip-
@@ -203,6 +205,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install email-validator
           pip install -e ".[dev]"
           
       - name: Run integration tests
@@ -256,6 +259,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install email-validator
           pip install -e ".[dev]"
           
       - name: Run external API tests
@@ -294,6 +298,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install email-validator
           pip install -e "."
           
       - name: Test server startup
