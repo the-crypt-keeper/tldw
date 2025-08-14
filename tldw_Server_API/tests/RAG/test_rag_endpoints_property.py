@@ -14,7 +14,7 @@ import hypothesis
 from hypothesis import given, strategies as st, assume, settings, note
 from hypothesis.stateful import RuleBasedStateMachine, rule, initialize, invariant
 
-from tldw_Server_API.app.api.v1.schemas.rag_schemas import (
+from tldw_Server_API.app.api.v1.schemas.rag_schemas_simple import (
     SearchApiRequest,
     SearchModeEnum,
     RetrievalAgentRequest,

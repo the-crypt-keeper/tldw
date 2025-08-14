@@ -35,7 +35,7 @@ class RegisterRequest(BaseModel):
         ...,
         min_length=3,
         max_length=50,
-        regex="^[a-zA-Z0-9_-]+$",
+        pattern="^[a-zA-Z0-9_-]+$",
         description="Username (alphanumeric, underscore, hyphen only)"
     )
     email: EmailStr = Field(..., description="Valid email address")

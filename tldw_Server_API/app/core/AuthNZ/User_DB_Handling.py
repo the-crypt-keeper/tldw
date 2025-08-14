@@ -20,9 +20,13 @@ except ImportError:
     print("WARNING: Users_DB module not found. Multi-user mode will likely fail.")
 
 # Security & Config
-from tldw_Server_API.app.core.Security.Security import decode_access_token, TokenData
+# Old JWT handling - to be replaced
+# from tldw_Server_API.app.core.Security.Security import decode_access_token, TokenData
 # Import the settings dictionary directly
 from tldw_Server_API.app.core.config import settings
+# New JWT service
+from tldw_Server_API.app.core.AuthNZ.jwt_service import get_jwt_service
+from tldw_Server_API.app.core.AuthNZ.exceptions import InvalidTokenError, TokenExpiredError
 # Utils
 from loguru import logger
 # API Dependencies
@@ -75,7 +79,7 @@ async def verify_single_user_api_key(api_key: str = Header(..., alias="X-API-KEY
 async def verify_jwt_and_fetch_user(token: str = Depends(oauth2_scheme)) -> User:
     """
     Dependency to verify JWT and fetch user details in multi-user mode.
-    Reads settings from the imported 'settings' dictionary.
+    Uses the new JWT service for token validation.
     """
     # Check mode from the dictionary
     if settings["SINGLE_USER_MODE"]:
@@ -96,13 +100,24 @@ async def verify_jwt_and_fetch_user(token: str = Depends(oauth2_scheme)) -> User
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Decode token using settings from the dictionary
-    token_data: Optional[TokenData] = decode_access_token(token) # Assumes decode_access_token uses config internally or is passed values
-    if token_data is None or token_data.user_id is None:
-         logger.warning("Token decoding failed or user_id missing in token payload.")
-         raise credentials_exception
-
-    user_id = token_data.user_id
+    # Use new JWT service to decode token
+    jwt_service = get_jwt_service()
+    try:
+        payload = jwt_service.decode_access_token(token)
+        user_id = payload.get("user_id") or payload.get("sub")  # Handle both formats
+        if not user_id:
+            logger.warning("Token payload missing user_id/sub claim")
+            raise credentials_exception
+        # Convert to int if it's a string
+        if isinstance(user_id, str):
+            user_id = int(user_id)
+    except (InvalidTokenError, TokenExpiredError) as e:
+        logger.warning(f"Token validation failed: {e}")
+        raise credentials_exception
+    except Exception as e:
+        logger.error(f"Unexpected error decoding token: {e}")
+        raise credentials_exception
+    
     logger.debug(f"Token decoded successfully for user_id: {user_id}")
 
     # --- Fetch and Validate User Data ---

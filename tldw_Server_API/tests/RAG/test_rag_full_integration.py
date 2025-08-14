@@ -20,7 +20,7 @@ from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from tldw_Server_API.app.core.RAG.rag_service.integration import RAGService
 from tldw_Server_API.app.core.RAG.rag_service.config import RAGConfig
-from tldw_Server_API.app.api.v1.endpoints.rag import _user_rag_services
+from tldw_Server_API.app.api.v1.endpoints.rag_v2 import _user_rag_services
 
 
 class TestRAGFullIntegration:
@@ -212,7 +212,7 @@ class TestRAGFullIntegration:
             chacha_db = CharactersRAGDB(str(user1_env["chacha_db"]), client_id=str(test_users[0].id))
             
             # Mock the RAG service to use our test databases
-            from tldw_Server_API.app.api.v1.endpoints.rag import get_rag_service_for_user
+            from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
             async def mock_get_rag_service():
                 rag_service = RAGService(
                     config=RAGConfig(),
@@ -390,7 +390,7 @@ class TestRAGFullIntegration:
         )
         
         # Mock the RAG service for user1
-        from tldw_Server_API.app.api.v1.endpoints.rag import get_rag_service_for_user
+        from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
         async def mock_get_rag_service_user1():
             rag_service = RAGService(
                 config=RAGConfig(),
@@ -502,7 +502,7 @@ class TestRAGFullIntegration:
                 yield chunk
         
         # Mock the RAG service
-        from tldw_Server_API.app.api.v1.endpoints.rag import get_rag_service_for_user
+        from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
         async def mock_get_rag_service():
             rag_service = RAGService(
                 config=RAGConfig(),
@@ -601,7 +601,7 @@ class TestRAGFullIntegration:
                 assert response.status_code == 422
                 
                 # Test 3: Database error simulation
-                from tldw_Server_API.app.api.v1.endpoints.rag import get_rag_service_for_user
+                from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
                 
                 async def override_get_rag_service():
                     from fastapi import HTTPException, status
@@ -738,7 +738,7 @@ class TestRAGPerformance:
         user = User(id=1, username="perftest", email="perf@test.com", is_active=True)
         
         # Mock the RAG service
-        from tldw_Server_API.app.api.v1.endpoints.rag import get_rag_service_for_user
+        from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
         async def mock_get_rag_service():
             rag_service = RAGService(
                 config=RAGConfig(),

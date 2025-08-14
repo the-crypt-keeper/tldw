@@ -16,6 +16,9 @@ from starlette.staticfiles import StaticFiles
 #
 # Local Imports
 #
+# Auth Endpoint (NEW)
+from tldw_Server_API.app.api.v1.endpoints.auth import router as auth_router
+#
 # Audio Endpoint
 from tldw_Server_API.app.api.v1.endpoints.audio import router as audio_router
 #
@@ -63,6 +66,9 @@ from tldw_Server_API.app.api.v1.endpoints.sync import router as sync_router
 #
 # Tools Endpoint
 from tldw_Server_API.app.api.v1.endpoints.tools import router as tools_router
+#
+# Users Endpoint (NEW)
+from tldw_Server_API.app.api.v1.endpoints.users import router as users_router
 ## Trash Endpoint
 #from tldw_Server_API.app.api.v1.endpoints.trash import router as trash_router
 #
@@ -123,11 +129,6 @@ logger.info("Loguru logger configured with SPECIFIC standard logging interceptio
 
 BASE_DIR     = Path(__file__).resolve().parent
 FAVICON_PATH = BASE_DIR / "static" / "favicon.ico"
-app = FastAPI(
-    title="tldw API",
-    version="0.0.1",
-    description="Version 0.0.1: Smooth Slide | FastAPI Backend for the tldw project"
-)
 
 ############################# TEST DB Handling #####################################
 # --- TEST DB Instance ---
@@ -135,18 +136,60 @@ test_db_instance_ref = None # Global or context variable to hold the test DB ins
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup code can go here
+    # Startup: Initialize auth services
+    logger.info("App Startup: Initializing authentication services...")
+    try:
+        # Initialize database pool for auth
+        from tldw_Server_API.app.core.AuthNZ.database import get_db_pool
+        db_pool = await get_db_pool()
+        logger.info("App Startup: Database pool initialized")
+        
+        # Initialize session manager
+        from tldw_Server_API.app.core.AuthNZ.session_manager import get_session_manager
+        session_manager = await get_session_manager()
+        logger.info("App Startup: Session manager initialized")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize auth services: {e}")
+        # Continue startup even if auth services fail (for backward compatibility)
+    
     yield
-    # Shutdown code
+    
+    # Shutdown: Clean up resources
+    logger.info("App Shutdown: Cleaning up resources...")
+    
+    # Close auth database pool
+    try:
+        if 'db_pool' in locals():
+            await db_pool.close()
+            logger.info("App Shutdown: Auth database pool closed")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error closing auth database pool: {e}")
+    
+    # Shutdown session manager
+    try:
+        if 'session_manager' in locals():
+            await session_manager.shutdown()
+            logger.info("App Shutdown: Session manager shutdown")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error shutting down session manager: {e}")
+    
+    # Original test DB cleanup
     global test_db_instance_ref
     if test_db_instance_ref and hasattr(test_db_instance_ref, 'close_all_connections'):
-        logger.info("App Shutdown: Closing DB connections")
+        logger.info("App Shutdown: Closing test DB connections")
         test_db_instance_ref.close_all_connections()
     else:
         logger.info("App Shutdown: No test DB instance found to close")
 #
 ############################# End of Test DB Handling###################
 
+# Create FastAPI app with lifespan
+app = FastAPI(
+    title="tldw API",
+    version="0.0.1",
+    description="Version 0.0.1: Smooth Slide | FastAPI Backend for the tldw project",
+    lifespan=lifespan
+)
 
 # --- FIX: Add CORS Middleware ---
 # Import from config
@@ -176,6 +219,12 @@ async def favicon():
 @app.get("/")
 async def root():
     return {"message": "Welcome to the tldw API; If you're seeing this, the server is running!"}
+
+# Router for authentication endpoints (NEW)
+app.include_router(auth_router, prefix=f"{API_V1_PREFIX}", tags=["authentication"])
+
+# Router for user management endpoints (NEW)
+app.include_router(users_router, prefix=f"{API_V1_PREFIX}", tags=["users"])
 
 # Router for media endpoints/media file handling
 app.include_router(media_router, prefix=f"{API_V1_PREFIX}/media", tags=["media"])

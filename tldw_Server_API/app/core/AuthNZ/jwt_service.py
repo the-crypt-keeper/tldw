@@ -37,8 +37,7 @@ class JWTService:
         
         # JWT configuration
         self.algorithm = self.settings.JWT_ALGORITHM
-        self.access_token_expire = timedelta(minutes=self.settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        self.refresh_token_expire = timedelta(days=self.settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        # Note: We don't cache timedeltas to allow dynamic configuration changes during testing
         
         # Get the persistent secret key
         self.secret_key = self.settings.JWT_SECRET_KEY
@@ -66,8 +65,8 @@ class JWTService:
         Returns:
             Encoded JWT access token
         """
-        # Calculate expiration
-        expire = datetime.utcnow() + self.access_token_expire
+        # Calculate expiration dynamically from settings
+        expire = datetime.utcnow() + timedelta(minutes=self.settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         
         # Build token payload
         payload = {
@@ -109,8 +108,8 @@ class JWTService:
         Returns:
             Encoded JWT refresh token
         """
-        # Calculate expiration
-        expire = datetime.utcnow() + self.refresh_token_expire
+        # Calculate expiration dynamically from settings
+        expire = datetime.utcnow() + timedelta(days=self.settings.REFRESH_TOKEN_EXPIRE_DAYS)
         
         # Build token payload (minimal claims for refresh token)
         payload = {

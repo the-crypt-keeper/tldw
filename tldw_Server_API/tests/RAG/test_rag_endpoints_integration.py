@@ -22,7 +22,7 @@ from tldw_Server_API.app.main import app
 from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User
-from tldw_Server_API.app.api.v1.endpoints.rag import _user_rag_services
+from tldw_Server_API.app.api.v1.endpoints.rag_v2 import _user_rag_services
 
 
 @pytest.fixture(scope="module")
@@ -498,7 +498,7 @@ class TestErrorScenarios:
     @pytest.mark.asyncio
     async def test_database_connection_error(self, auth_headers, test_user):
         """Test handling of database connection errors."""
-        from tldw_Server_API.app.api.v1.endpoints.rag import get_rag_service_for_user
+        from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
         from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user
         
         _user_rag_services.clear()
@@ -551,7 +551,7 @@ class TestErrorScenarios:
     @pytest.mark.asyncio
     async def test_rag_service_initialization_error(self, auth_headers, test_user, media_db, chacha_db):
         """Test handling of RAG service initialization errors."""
-        from tldw_Server_API.app.api.v1.endpoints.rag import get_rag_service_for_user
+        from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
         from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user
         
         _user_rag_services.clear()

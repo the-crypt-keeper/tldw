@@ -20,9 +20,9 @@ from tldw_Server_API.app.services.storage_quota_service import StorageQuotaServi
 from tldw_Server_API.app.core.AuthNZ.exceptions import (
     AuthenticationError,
     InvalidTokenError,
-    ExpiredTokenError,
+    TokenExpiredError,
     UserNotFoundError,
-    UserInactiveError,
+    AccountInactiveError,
     InsufficientPermissionsError
 )
 
@@ -141,7 +141,7 @@ async def get_current_user(
         
         return user
         
-    except ExpiredTokenError:
+    except TokenExpiredError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",

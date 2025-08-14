@@ -9,13 +9,13 @@ from datetime import datetime
 from unittest.mock import Mock, patch, AsyncMock
 import pytest
 
-from tldw_Server_API.app.api.v1.endpoints.rag import (
+from tldw_Server_API.app.api.v1.endpoints.rag_v2 import (
     get_rag_service_for_user,
     perform_search,
     run_retrieval_agent,
     _user_rag_services
 )
-from tldw_Server_API.app.api.v1.schemas.rag_schemas import (
+from tldw_Server_API.app.api.v1.schemas.rag_schemas_simple import (
     SearchApiRequest,
     RetrievalAgentRequest,
     Message,

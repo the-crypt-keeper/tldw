@@ -9,6 +9,8 @@ from loguru import logger
 from starlette import status
 
 from tldw_Server_API.app.core.config import settings
+from tldw_Server_API.app.core.AuthNZ.jwt_service import get_jwt_service
+from tldw_Server_API.app.core.AuthNZ.exceptions import InvalidTokenError, TokenExpiredError
 
 #
 # Local Imports
@@ -36,18 +38,36 @@ async def verify_token(Token: str = Header(None)):  # Token is the API key itsel
             logger.warning(f"Invalid token received. Expected: '{expected_token[:5]}...', Got: '{Token[:10]}...'")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token.")
     else:
-        # Multi-user mode: This is where JWT validation or other multi-user auth would go.
-        # For now, to make tests that might hit this branch work without full JWT,
-        # we can have a placeholder. If your tests always override verify_token for multi-user
-        # or if multi-user is not yet fully implemented for prompts.py, this part might be less critical.
-        # If you have a specific test token for multi-user scenarios, you could check against that.
-        # For now, let's assume this endpoint is primarily tested in single-user mode based on your fixtures
-        # or that verify_token is mocked for multi-user.
-        # If it *must* pass for a fixed multi-user test token:
-        # if Token != "fixed_multi_user_test_token_if_any": # Replace with actual test token if used
-        #     logger.warning("Multi-user mode token verification not fully implemented or token mismatch.")
-        #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token for multi-user mode (placeholder).")
-        pass  # Placeholder: In multi-user mode, assume other mechanisms or it's mocked.
+        # Multi-user mode: Validate JWT token
+        jwt_service = get_jwt_service()
+        try:
+            # In multi-user mode, the token should be a JWT (not prefixed with "Bearer ")
+            # since this is a header token, not from the Authorization header
+            payload = jwt_service.decode_access_token(Token)
+            
+            # Check if token has valid user information
+            user_id = payload.get("user_id") or payload.get("sub")
+            if not user_id:
+                logger.warning("JWT token missing user_id/sub claim")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token: missing user information"
+                )
+            
+            logger.debug(f"JWT token validated for user_id: {user_id}")
+            
+        except (InvalidTokenError, TokenExpiredError) as e:
+            logger.warning(f"JWT validation failed: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Invalid or expired token: {e}"
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error validating JWT: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error validating authentication token"
+            )
 
     return True
 

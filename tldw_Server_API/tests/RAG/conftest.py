@@ -407,8 +407,8 @@ def setup_test_environment(monkeypatch, temp_db_dir):
     monkeypatch.setenv("JWT_SECRET_KEY", "test_secret_key")
     
     # Clear any cached services
-    from tldw_Server_API.app.api.v1.endpoints.rag import _user_rag_services
-    _user_rag_services.clear()
+    from tldw_Server_API.app.api.v1.endpoints.rag_v2 import rag_service_manager
+    rag_service_manager.cleanup_expired()
 
 
 # Performance testing fixtures
