@@ -105,7 +105,7 @@ jobs:
           ls
           cd Chat/
           ls
-          pytest -s ./test_chat_request_schema.py
+          pytest -s ./test_chat_request_schemas.py
       - name: Test Chat Prompt Template Manager with pytest
         run: |
           pwd
