@@ -32,6 +32,7 @@ pydantic_core
 pydantic[email]
 pytest
 python-dotenv
+python-jose
 python_magic
 python-multipart
 PyYAML
