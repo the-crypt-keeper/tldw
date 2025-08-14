@@ -43,6 +43,7 @@ dependencies = [
   "argon2-cffi>=23.0.0",
   "cachetools>=5.0.0",
   "defusedxml>=0.7.0",
+  "email_validator",
   "fastapi>=0.100.0",
   "httpx>=0.24.0",
   "loguru>=0.7.0",
