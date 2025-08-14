@@ -49,7 +49,7 @@ dependencies = [
   "email-validator>=2.0.0",
   "fastapi>=0.100.0",
   "httpx>=0.24.0",
-  "hypothesis".
+  "hypothesis",
   "loguru>=0.7.0",
   "lxml>=4.9.0",
   "numpy>=1.24.0",
