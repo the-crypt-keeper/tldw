@@ -584,15 +584,16 @@ async def simple_agent(
             "model": request.model or settings.get("DEFAULT_LLM_MODEL", "gpt-3.5-turbo"),
             "temperature": 0.7,
             "max_tokens": 1024,
-            "messages": conversation_history + [
-                {"role": "system", "content": "You are a helpful assistant. Use the provided context to answer questions accurately."},
-                {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {request.message}"}
-            ]
+            "conversation_history": conversation_history
         }
         
-        response = await rag_service.generate(**generation_config)
+        result = await rag_service.generate_answer(
+            query=request.message,
+            sources=map_databases_to_sources(request.search_databases),
+            **generation_config
+        )
         
-        # Format sources
+        # Format sources from context results
         sources = [
             Source(
                 title=r.get("title", "Untitled"),
@@ -609,14 +610,14 @@ async def simple_agent(
                 chacha_db.save_message(
                     conversation_id=conversation_id,
                     sender="assistant",
-                    content=response,
+                    content=result.get("answer", ""),
                     metadata={"sources": len(sources)}
                 )
             except Exception as e:
                 logger.warning(f"Failed to save conversation: {e}")
         
         return SimpleAgentResponse(
-            response=response,
+            response=result.get("answer", "I couldn't generate a response."),
             conversation_id=conversation_id,
             sources=sources
         )
@@ -807,7 +808,7 @@ async def advanced_agent(
         if generation_config.get("stream"):
             # Streaming response
             async def generate_stream():
-                async for chunk in rag_service.generate_stream(messages=messages, **generation_config):
+                async for chunk in rag_service.generate_answer_stream(messages=messages, **generation_config):
                     yield f"data: {json.dumps({'content': chunk})}\n\n"
                 yield f"data: {json.dumps({'done': True})}\n\n"
             
@@ -817,7 +818,7 @@ async def advanced_agent(
             )
         else:
             # Regular response
-            response = await rag_service.generate(messages=messages, **generation_config)
+            response = await rag_service.generate_answer(messages=messages, **generation_config)
             
             # Format sources
             sources = [

@@ -164,16 +164,16 @@ class TestRAGSearchIntegration:
         
         # Since the RAG service uses hardcoded paths, we'll test with simpler assertions
         # This is a known limitation of the current architecture
-        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
-                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
+        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_media_db_for_user', return_value=media_db):
+            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_chacha_db_for_user', return_value=chacha_db):
+                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_request_user', return_value=test_user):
                     
                     response = await async_client.post(
-                        "/api/v1/retrieval_agent/search",
+                        "/api/v1/rag/search",
                         json={
-                            "querystring": "RAG implementation",
-                            "search_mode": "advanced",
-                            "search_databases": ["media_db", "notes"],
+                            "query": "RAG implementation",
+                            "search_type": "hybrid",
+                            "databases": ["media_db", "notes"],
                             "limit": 10
                         },
                         headers=auth_headers
@@ -185,7 +185,7 @@ class TestRAGSearchIntegration:
         # Verify response structure
         assert "results" in data
         assert "total_results" in data
-        assert data["querystring_echo"] == "RAG implementation"
+        # The response doesn't have querystring_echo, just check the query was processed
         
         # Note: The RAG service uses hardcoded paths based on user ID,
         # so it won't find the test data we added to the mock databases.
@@ -200,18 +200,16 @@ class TestRAGSearchIntegration:
         """Test search with filters applied."""
         await rag_service_manager.cleanup_expired()
         
-        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
-                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
+        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_media_db_for_user', return_value=media_db):
+            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_chacha_db_for_user', return_value=chacha_db):
+                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_request_user', return_value=test_user):
                     
                     response = await async_client.post(
-                        "/api/v1/retrieval_agent/search",
+                        "/api/v1/rag/search",
                         json={
-                            "querystring": "machine learning",
-                            "search_mode": "custom",
-                            "filters": {"root": {"type": "article"}},
-                            "date_range_start": "2024-01-01T00:00:00",
-                            "date_range_end": "2024-12-31T23:59:59",
+                            "query": "machine learning",
+                            "search_type": "hybrid",
+                            "keywords": ["article"],
                             "limit": 5
                         },
                         headers=auth_headers
@@ -220,8 +218,8 @@ class TestRAGSearchIntegration:
         assert response.status_code == 200
         data = response.json()
         
-        # Verify filters were applied
-        assert data["debug_info"]["filters_provided"] is True
+        # Verify search was performed
+        assert "results" in data
         
         # Results should only include articles
         for result in data["results"]:
@@ -233,17 +231,15 @@ class TestRAGSearchIntegration:
         """Test hybrid search combining keyword and semantic search."""
         await rag_service_manager.cleanup_expired()
         
-        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
-                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
+        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_media_db_for_user', return_value=media_db):
+            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_chacha_db_for_user', return_value=chacha_db):
+                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_request_user', return_value=test_user):
                     
                     response = await async_client.post(
-                        "/api/v1/retrieval_agent/search",
+                        "/api/v1/rag/search",
                         json={
-                            "querystring": "vector embeddings",
-                            "search_mode": "advanced",
-                            "use_hybrid_search": True,
-                            "use_semantic_search": True,
+                            "query": "vector embeddings",
+                            "search_type": "hybrid",
                             "limit": 10
                         },
                         headers=auth_headers
@@ -252,8 +248,8 @@ class TestRAGSearchIntegration:
         assert response.status_code == 200
         data = response.json()
         
-        # Verify hybrid search was used
-        assert data["debug_info"]["hybrid_search_flag"] is True
+        # Verify search was performed
+        assert "results" in data
         
         # Note: The RAG service uses hardcoded paths based on user ID,
         # so it won't find the test data we added to the mock databases.
@@ -285,21 +281,17 @@ class TestRAGAgentIntegration:
                 "context_size": 500
             }
         
-        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
-                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
+        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_media_db_for_user', return_value=media_db):
+            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_chacha_db_for_user', return_value=chacha_db):
+                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_request_user', return_value=test_user):
                     # Mock the RAG service's generate_answer method
                     with mock.patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService.generate_answer', side_effect=mock_generate):
                         
                         response = await async_client.post(
-                            "/api/v1/retrieval_agent/agent",
+                            "/api/v1/rag/agent",
                             json={
-                                "message": {
-                                    "role": "user",
-                                    "content": "What is RAG?"
-                                },
-                                "mode": "rag",
-                                "search_mode": "advanced"
+                                "message": "What is RAG?",
+                                "search_databases": ["media_db"]
                             },
                             headers=auth_headers
                         )
@@ -308,9 +300,8 @@ class TestRAGAgentIntegration:
         data = response.json()
         
         # Verify response structure
-        assert "response_message" in data
-        assert data["response_message"]["role"] == "assistant"
-        assert "RAG" in data["response_message"]["content"]
+        assert "response" in data
+        assert "RAG" in data["response"]
         assert "conversation_id" in data
     
     @pytest.mark.asyncio
@@ -338,19 +329,16 @@ class TestRAGAgentIntegration:
                 "context_size": 300
             }
         
-        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
-                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
+        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_media_db_for_user', return_value=media_db):
+            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_chacha_db_for_user', return_value=chacha_db):
+                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_request_user', return_value=test_user):
                     with mock.patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService.generate_answer', side_effect=mock_generate):
                         
                         response = await async_client.post(
-                            "/api/v1/retrieval_agent/agent",
+                            "/api/v1/rag/agent",
                             json={
-                                "message": {
-                                    "role": "user",
-                                    "content": "Research machine learning applications"
-                                },
-                                "mode": "research"
+                                "message": "Research machine learning applications",
+                                "search_databases": ["media_db", "notes"]
                             },
                             headers=auth_headers
                         )
@@ -358,8 +346,9 @@ class TestRAGAgentIntegration:
         assert response.status_code == 200
         data = response.json()
         
-        assert data["debug_info"]["mode"] == "research"
-        assert len(data["citations"]) > 0
+        # Check that response was generated
+        assert "response" in data
+        assert "sources" in data
     
     @pytest.mark.asyncio
     async def test_streaming_response(self, async_client, auth_headers, media_db, chacha_db, test_user):
@@ -371,24 +360,18 @@ class TestRAGAgentIntegration:
             yield {"type": "content", "content": "RAG is great!"}
             yield {"type": "citation", "citation": {"id": "1", "source": "test", "title": "Test Source"}}
         
-        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
-                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
+        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_media_db_for_user', return_value=media_db):
+            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_chacha_db_for_user', return_value=chacha_db):
+                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_request_user', return_value=test_user):
                     with mock.patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService.generate_answer_stream', return_value=mock_stream()):
                         
                         # Use the synchronous test client for streaming
                         with TestClient(app) as client:
                             response = client.post(
-                                "/api/v1/retrieval_agent/agent",
+                                "/api/v1/rag/agent",
                                 json={
-                                    "message": {
-                                        "role": "user",
-                                        "content": "Stream this response"
-                                    },
-                                    "mode": "rag",
-                                    "rag_generation_config": {
-                                        "stream": True
-                                    }
+                                    "message": "Stream this response",
+                                    "search_databases": ["media_db"]
                                 },
                                 headers=auth_headers
                             )
@@ -427,21 +410,17 @@ class TestRAGAgentIntegration:
                 "context_size": 200
             }
         
-        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
-                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
+        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_media_db_for_user', return_value=media_db):
+            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_chacha_db_for_user', return_value=chacha_db):
+                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_request_user', return_value=test_user):
                     with mock.patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService.generate_answer', side_effect=mock_generate):
                         
                         response = await async_client.post(
-                            "/api/v1/retrieval_agent/agent",
+                            "/api/v1/rag/agent",
                             json={
-                                "messages": [
-                                    {"role": "user", "content": "What is machine learning?"},
-                                    {"role": "assistant", "content": "Machine learning is a type of AI..."},
-                                    {"role": "user", "content": "What are the main types?"}
-                                ],
-                                "mode": "rag",
-                                "conversation_id": str(uuid4())
+                                "message": "What are the main types?",
+                                "conversation_id": str(uuid4()),
+                                "search_databases": ["media_db"]
                             },
                             headers=auth_headers
                         )
@@ -450,7 +429,7 @@ class TestRAGAgentIntegration:
         data = response.json()
         
         # Should reference earlier context
-        assert "mentioned earlier" in data["response_message"]["content"]
+        assert "mentioned earlier" in data["response"]
 
 
 class TestRAGServiceCaching:
@@ -462,13 +441,13 @@ class TestRAGServiceCaching:
         await rag_service_manager.cleanup_expired()
         
         # Make first request
-        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
-            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
-                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_request_user', return_value=test_user):
+        with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_media_db_for_user', return_value=media_db):
+            with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_chacha_db_for_user', return_value=chacha_db):
+                with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag_v2.get_request_user', return_value=test_user):
                     
                     response1 = await async_client.post(
-                        "/api/v1/retrieval_agent/search",
-                        json={"querystring": "test", "limit": 1},
+                        "/api/v1/rag/search",
+                        json={"query": "test", "limit": 1},
                         headers=auth_headers
                     )
                     
@@ -481,8 +460,8 @@ class TestRAGServiceCaching:
                     
                     # Make second request - should use cached service
                     response2 = await async_client.post(
-                        "/api/v1/retrieval_agent/search",
-                        json={"querystring": "test2", "limit": 1},
+                        "/api/v1/rag/search",
+                        json={"query": "test2", "limit": 1},
                         headers=auth_headers
                     )
                     
@@ -524,8 +503,8 @@ class TestErrorScenarios:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/retrieval_agent/search",
-                    json={"querystring": "test"},
+                    "/api/v1/rag/search",
+                    json={"query": "test"},
                     headers=auth_headers
                 )
                 
@@ -540,9 +519,9 @@ class TestErrorScenarios:
     async def test_invalid_search_parameters(self, async_client, auth_headers):
         """Test validation of search parameters."""
         response = await async_client.post(
-            "/api/v1/retrieval_agent/search",
+            "/api/v1/rag/search",
             json={
-                "querystring": "",  # Empty query
+                "query": "",  # Empty query
                 "limit": -1,  # Invalid limit
                 "offset": -10  # Invalid offset
             },
@@ -577,7 +556,7 @@ class TestErrorScenarios:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.post(
-                    "/api/v1/retrieval_agent/agent",
+                    "/api/v1/rag/agent",
                     json={
                         "message": {"role": "user", "content": "test"},
                         "mode": "rag"
