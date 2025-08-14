@@ -16,6 +16,7 @@ soundfile
 aiofiles
 cachetools
 defusedxml
+email-validator
 fastapi
 loguru
 lxml
@@ -25,6 +26,7 @@ passlib
 psutil
 pydantic
 pydantic_core
+pydantic[email]
 pytest
 python-dotenv
 python_magic
