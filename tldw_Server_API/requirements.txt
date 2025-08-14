@@ -14,6 +14,9 @@ soundfile
 #
 # API-Server
 aiofiles
+asyncpg
+aiosqlite
+apscheduler
 cachetools
 defusedxml
 email-validator
