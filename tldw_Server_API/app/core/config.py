@@ -167,12 +167,12 @@ def load_openai_mappings() -> Dict:
     api_component_root = current_file_path.parent.parent.parent  # This should be /project_root/tldw_server_api/
 
     mapping_path = api_component_root / "Config_Files" / "openai_tts_mappings.json"
-    logger.info(f"Attempting to load OpenAI TTS mappings from: {str(mapping_path)}")
+    logger.debug(f"Attempting to load OpenAI TTS mappings from: {str(mapping_path)}")
     try:
         with open(mapping_path, "r") as f:
             return json.load(f)
     except Exception as e:
-        logger.error(f"Failed to load OpenAI TTS mappings from {mapping_path}: {e}", exc_info=True)
+        logger.debug(f"Failed to load OpenAI TTS mappings from {mapping_path}: {e}")
         # Fallback to a default or raise an error
         return {
             "models": {"tts-1": "openai_official_tts-1"},
