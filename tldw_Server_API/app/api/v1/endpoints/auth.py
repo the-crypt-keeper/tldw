@@ -33,10 +33,12 @@ from tldw_Server_API.app.api.v1.API_Deps.auth_deps import (
 )
 from tldw_Server_API.app.core.AuthNZ.database import get_db_pool
 from tldw_Server_API.app.core.AuthNZ.password_service import PasswordService
-from tldw_Server_API.app.core.AuthNZ.jwt_service import JWTService
+from tldw_Server_API.app.core.AuthNZ.jwt_service import JWTService, get_jwt_service
 from tldw_Server_API.app.core.AuthNZ.session_manager import SessionManager
 from tldw_Server_API.app.core.AuthNZ.rate_limiter import RateLimiter
 from tldw_Server_API.app.services.registration_service import RegistrationService
+from tldw_Server_API.app.core.AuthNZ.settings import Settings, get_settings
+from tldw_Server_API.app.services.audit_service import get_audit_service, AuditAction
 from tldw_Server_API.app.core.AuthNZ.exceptions import (
     AuthenticationError,
     InvalidCredentialsError,
@@ -71,9 +73,9 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db=Depends(get_db_transaction),
     password_service: PasswordService = Depends(get_password_service_dep),
-    jwt_service: JWTService = Depends(get_jwt_service_dep),
     session_manager: SessionManager = Depends(get_session_manager_dep),
-    rate_limiter: RateLimiter = Depends(get_rate_limiter_dep)
+    rate_limiter: RateLimiter = Depends(get_rate_limiter_dep),
+    settings: Settings = Depends(get_settings)
 ) -> TokenResponse:
     """
     OAuth2 compatible login endpoint
@@ -91,9 +93,13 @@ async def login(
         HTTPException: 401 if credentials invalid, 403 if account inactive
     """
     try:
-        # Log login attempt
+        # Get client info
         client_ip = request.client.host if request.client else "unknown"
+        user_agent = request.headers.get("User-Agent", "Unknown")
         logger.info(f"Login attempt for user: {form_data.username} from IP: {client_ip}")
+        
+        # Get audit service
+        audit_service = await get_audit_service()
         
         # Fetch user from database
         user = None
@@ -137,6 +143,15 @@ async def login(
             # Log failed attempt
             logger.warning(f"Failed login: Invalid password for user {user['username']}")
             
+            # Audit log failed login
+            await audit_service.log_login(
+                user_id=user['id'],
+                username=user['username'],
+                ip_address=client_ip,
+                user_agent=user_agent,
+                success=False
+            )
+            
             # Record failed attempt in rate limiter
             await rate_limiter.record_failed_attempt(client_ip, "login")
             
@@ -154,16 +169,23 @@ async def login(
                 detail="Account is inactive. Please contact support."
             )
         
-        # Generate tokens
-        access_token = jwt_service.create_access_token(
-            user_id=user['id'],
-            username=user['username'],
-            role=user['role']
-        )
-        
-        refresh_token = jwt_service.create_refresh_token(
-            user_id=user['id']
-        )
+        # Generate tokens based on auth mode
+        if settings.AUTH_MODE == "single_user":
+            # For single-user mode, return simple tokens
+            access_token = f"single-user-token-{user['id']}"
+            refresh_token = f"single-user-refresh-{user['id']}"
+        else:
+            # For multi-user mode, use JWT
+            jwt_service = get_jwt_service()
+            access_token = jwt_service.create_access_token(
+                user_id=user['id'],
+                username=user['username'],
+                role=user['role']
+            )
+            
+            refresh_token = jwt_service.create_refresh_token(
+                user_id=user['id']
+            )
         
         # Create session
         user_agent = request.headers.get("User-Agent", "Unknown")
@@ -193,11 +215,20 @@ async def login(
         # Log successful login
         logger.info(f"Successful login for user: {user['username']} (ID: {user['id']})")
         
+        # Audit log successful login
+        await audit_service.log_login(
+            user_id=user['id'],
+            username=user['username'],
+            ip_address=client_ip,
+            user_agent=user_agent,
+            success=True
+        )
+        
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
             token_type="bearer",
-            expires_in=jwt_service.settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )
         
     except HTTPException:
@@ -256,9 +287,9 @@ async def logout(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     request: RefreshTokenRequest,
-    jwt_service: JWTService = Depends(get_jwt_service_dep),
     session_manager: SessionManager = Depends(get_session_manager_dep),
-    db=Depends(get_db_transaction)
+    db=Depends(get_db_transaction),
+    settings: Settings = Depends(get_settings)
 ) -> TokenResponse:
     """
     Refresh access token using refresh token
@@ -273,17 +304,24 @@ async def refresh_token(
         HTTPException: 401 if refresh token invalid or expired
     """
     try:
-        # Decode refresh token
-        payload = jwt_service.decode_refresh_token(request.refresh_token)
-        
-        # Check if token is blacklisted
-        if await session_manager.is_token_blacklisted(request.refresh_token):
-            raise InvalidTokenError("Refresh token has been revoked")
-        
-        # Get user from database
-        user_id = payload.get("user_id")
-        if not user_id:
-            raise InvalidTokenError("Invalid refresh token payload")
+        # Handle based on auth mode
+        if settings.AUTH_MODE == "single_user":
+            # Simple token validation for single-user mode
+            if not request.refresh_token.startswith("single-user-refresh-"):
+                raise InvalidTokenError("Invalid refresh token format")
+            user_id = int(request.refresh_token.split("-")[-1])
+        else:
+            # JWT validation for multi-user mode
+            jwt_service = get_jwt_service()
+            payload = jwt_service.decode_refresh_token(request.refresh_token)
+            
+            # Check if token is blacklisted
+            if await session_manager.is_token_blacklisted(request.refresh_token):
+                raise InvalidTokenError("Refresh token has been revoked")
+            
+            user_id = payload.get("user_id")
+            if not user_id:
+                raise InvalidTokenError("Invalid refresh token payload")
         
         # Fetch user
         user = None
@@ -312,12 +350,16 @@ async def refresh_token(
                 columns = ['id', 'uuid', 'username', 'email', 'password_hash', 'role']
                 user = dict(zip(columns[:len(user)], user))
         
-        # Generate new access token
-        new_access_token = jwt_service.create_access_token(
-            user_id=user['id'],
-            username=user['username'],
-            role=user['role']
-        )
+        # Generate new access token based on auth mode
+        if settings.AUTH_MODE == "single_user":
+            new_access_token = f"single-user-token-{user['id']}"
+        else:
+            jwt_service = get_jwt_service()
+            new_access_token = jwt_service.create_access_token(
+                user_id=user['id'],
+                username=user['username'],
+                role=user['role']
+            )
         
         # Keep the same refresh token
         # Optionally, you could rotate refresh tokens here
@@ -328,7 +370,7 @@ async def refresh_token(
             access_token=new_access_token,
             refresh_token=request.refresh_token,
             token_type="bearer",
-            expires_in=jwt_service.settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )
         
     except (TokenExpiredError, InvalidTokenError) as e:

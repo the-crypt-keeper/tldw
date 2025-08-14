@@ -46,12 +46,12 @@ async def get_db_transaction():
 
 async def get_password_service_dep() -> PasswordService:
     """Get password service dependency"""
-    return await get_password_service()
+    return get_password_service()
 
 
 async def get_jwt_service_dep() -> JWTService:
     """Get JWT service dependency"""
-    return await get_jwt_service()
+    return get_jwt_service()
 
 
 async def get_session_manager_dep() -> SessionManager:
@@ -334,12 +334,13 @@ async def check_auth_rate_limit(
     client_ip = request.client.host if request.client else "unknown"
     
     # Use stricter limits for auth endpoints
-    allowed, retry_after = await rate_limiter.check_rate_limit(
+    allowed, metadata = await rate_limiter.check_rate_limit(
         client_ip, 
         "auth", 
-        max_requests=5,  # Stricter limit
-        window_seconds=60
+        limit=5,  # Stricter limit (5 requests per minute)
+        window_minutes=1
     )
+    retry_after = metadata.get("retry_after", 60)
     
     if not allowed:
         raise HTTPException(

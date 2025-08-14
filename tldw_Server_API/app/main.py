@@ -220,11 +220,19 @@ async def favicon():
 async def root():
     return {"message": "Welcome to the tldw API; If you're seeing this, the server is running!"}
 
+# Router for health monitoring endpoints (NEW)
+from tldw_Server_API.app.api.v1.endpoints.health import router as health_router
+app.include_router(health_router, prefix=f"{API_V1_PREFIX}", tags=["health"])
+
 # Router for authentication endpoints (NEW)
 app.include_router(auth_router, prefix=f"{API_V1_PREFIX}", tags=["authentication"])
 
 # Router for user management endpoints (NEW)
 app.include_router(users_router, prefix=f"{API_V1_PREFIX}", tags=["users"])
+
+# Router for admin endpoints (NEW)
+from tldw_Server_API.app.api.v1.endpoints.admin import router as admin_router
+app.include_router(admin_router, prefix=f"{API_V1_PREFIX}", tags=["admin"])
 
 # Router for media endpoints/media file handling
 app.include_router(media_router, prefix=f"{API_V1_PREFIX}/media", tags=["media"])

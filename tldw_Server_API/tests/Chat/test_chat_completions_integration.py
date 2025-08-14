@@ -42,10 +42,13 @@ def client():
 
 @pytest.fixture
 def valid_auth_token() -> str:
-    # This MUST match the value of os.getenv("API_BEARER") in the app's runtime environment.
+    # In single-user mode, API_BEARER is not used, so we use the default token
+    # This matches the value from config.py for single-user mode
     token = "default-secret-key-for-single-user"
-    if os.getenv("API_BEARER") != token:
-        pytest.fail(f"MISMATCH: API_BEARER is '{os.getenv('API_BEARER')}' but test token is '{token}'")
+    api_bearer = os.getenv("API_BEARER")
+    # Only check for mismatch if API_BEARER is actually set
+    if api_bearer is not None and api_bearer != token:
+        pytest.fail(f"MISMATCH: API_BEARER is '{api_bearer}' but test token is '{token}'")
     return token
 
 
