@@ -297,5 +297,22 @@ async def health_check():
     return {"status": "healthy"}
 
 #
+## Entry point for running the server
+########################################################################################################################
+def run_server():
+    """Run the FastAPI server using uvicorn."""
+    import uvicorn
+    uvicorn.run(
+        "tldw_Server_API.app.main:app",
+        host="127.0.0.1",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
+
+if __name__ == "__main__":
+    run_server()
+
+#
 ## End of main.py
 ########################################################################################################################

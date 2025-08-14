@@ -2,25 +2,20 @@
 # pyproject.toml for tldw_Server_API
 ###########################
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
 ###########################
 # Project Info
 ###########################
-[project.urls]
-Homepage = "https://tldwproject.com"
-Documentation = "https://docs.tldwproject.com"
-Repository = "https://github.com/rmusser01/tldw_server"
-"Bug Tracker" = "https://github.com/rmusser01/tldw_server/issues"
-
 [project]
-#name = "tldw"
+name = "tldw-server"
 version = "0.1.0"
-description = "A naive attempt at 'A Young Lady's Illustrated Primer'."
+description = "A comprehensive research assistant and media analysis platform - Too Long; Didn't Watch Server"
 requires-python = ">=3.9"
 readme = "README.md"
-license = { file = "LICENSE.txt" }
-keywords = ["transcription", "summarization", "media-processing", "llm", "rag"]
+license = { text = "AGPL-3.0-or-later OR Commercial" }
+keywords = ["transcription", "summarization", "media-processing", "llm", "rag", "fastapi", "research-assistant"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -37,13 +32,11 @@ classifiers = [
     "Topic :: Multimedia :: Video",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Text Processing :: Linguistic",
+    "Framework :: FastAPI",
 ]
 authors = [
   { name = "Robert Musser", email = "contact@tldwproject.com" }
 ]
-###########################
-# Dependencies
-###########################
 dependencies = [
   # API Server Core
   "aiofiles>=23.0.0",
@@ -149,6 +142,13 @@ dependencies = [
   "Pillow>=10.0.0"
 ]
 
+[project.urls]
+Homepage = "https://tldwproject.com"
+Documentation = "https://docs.tldwproject.com"
+Repository = "https://github.com/rmusser01/tldw_server"
+"Bug Tracker" = "https://github.com/rmusser01/tldw_server/issues"
+"Source Code" = "https://github.com/rmusser01/tldw_server"
+
 [project.optional-dependencies]
 # Development tools
 dev = [
@@ -246,14 +246,47 @@ db_opensearch = [
 
 # All optional dependencies
 all = [
-  "tldw[dev,gradio,media_wiki,web_research,STT_All,TTS_All,backend_onnx,db_postgres]"
+  "tldw-server[dev,gradio,media_wiki,web_research,STT_All,TTS_All,backend_onnx,db_postgres]"
 ]
 
 ###########################
-# Tools
+# Entry Points
 ###########################
+[project.scripts]
+tldw-server = "tldw_Server_API.app.main:run_server"
+
+###########################
+# Tools - Package Discovery
+###########################
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
-where = ["tldw_Server_API"]
+where = ["."]
+include = ["tldw_Server_API", "tldw_Server_API.*"]
+exclude = [
+  "tests*",
+  "docs*",
+  "Helper_Scripts*",
+  "*.tests",
+  "*.tests.*",
+  "tests.*",
+]
+
+[tool.setuptools.package-data]
+tldw_Server_API = [
+  "Config_Files/*.txt",
+  "Config_Files/*.yaml",
+  "Helper_Scripts/**/*",
+  "static/**/*",
+  "WebUI/**/*",
+  "app/static/**/*",
+  "**/*.yaml",
+  "**/*.json",
+  "**/*.html",
+  "**/*.css",
+  "**/*.js",
+]
 
 ###########################
 # Tools - Tests
@@ -262,7 +295,9 @@ where = ["tldw_Server_API"]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources:",
     "ignore::DeprecationWarning:pyannote.core.notebook:",
-    "ignore::DeprecationWarning:speechbrain.pretrained:"
+    "ignore::DeprecationWarning:speechbrain.pretrained:",
+    "ignore::DeprecationWarning:transformers:",
+    "ignore::DeprecationWarning:torch:"
 ]
 markers = [
     "unit: marks tests as unit tests",
@@ -270,14 +305,21 @@ markers = [
     "external_api: marks tests that require external API access",
     "local_llm_service: marks tests that require local LLM service",
     "timeout: marks tests with custom timeout settings", 
-    "benchmark: marks performance benchmark tests"
+    "benchmark: marks performance benchmark tests",
+    "slow: marks tests that take a long time to run"
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-testpaths = ["tests"]
+testpaths = ["tldw_Server_API/tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--verbose",
+    "--tb=short",
+    "--disable-warnings"
+]
 
 ###########################
 # Tools - Code Quality
@@ -303,6 +345,10 @@ extend-exclude = '''
 [tool.ruff]
 line-length = 120
 target-version = "py39"
+src = ["tldw_Server_API"]
+extend-include = ["*.ipynb"]
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -311,15 +357,47 @@ select = [
     "B",  # flake8-bugbear
     "C4", # flake8-comprehensions
     "UP", # pyupgrade
+    "N",  # pep8-naming
+    "SIM", # flake8-simplify
 ]
 ignore = [
     "E501", # line too long
     "B008", # do not perform function calls in argument defaults
     "C901", # too complex
+    "N802", # function name should be lowercase
+    "N806", # variable in function should be lowercase
 ]
+exclude = [
+    "migrations",
+    "__pycache__",
+    "*.egg-info",
+    "build",
+    "dist",
+    "tests",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tldw_Server_API"]
 
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+follow_imports = "silent"
+show_error_codes = true
+strict_equality = true
+files = ["tldw_Server_API"]
+exclude = [
+    "tests",
+    "migrations",
+    "build",
+    "dist",
+]

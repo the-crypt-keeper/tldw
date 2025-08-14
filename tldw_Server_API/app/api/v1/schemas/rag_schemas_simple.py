@@ -421,3 +421,59 @@ class ErrorResponse(BaseModel):
                 "code": "INVALID_SEARCH_TYPE"
             }
         }
+
+
+# ============= Compatibility Classes for Tests =============
+# These classes are added to support existing tests that expect the old schema structure
+
+class SearchModeEnum(str, Enum):
+    """Search modes for backward compatibility with tests"""
+    BASIC = "basic"
+    ADVANCED = "advanced"
+    CUSTOM = "custom"
+
+
+class AgentModeEnum(str, Enum):
+    """Agent modes for backward compatibility with tests"""
+    RAG = "rag"
+    RESEARCH = "research"
+
+
+class MessageRole(str, Enum):
+    """Message roles for chat context"""
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
+
+
+class Message(BaseModel):
+    """Chat message for conversations"""
+    role: MessageRole
+    content: str
+
+
+class SearchApiRequest(BaseModel):
+    """Compatibility wrapper for search requests - maps to SimpleSearchRequest"""
+    query: str = Field(..., description="Search query string")
+    mode: Optional[SearchModeEnum] = Field(default=SearchModeEnum.BASIC, description="Search mode")
+    top_k: Optional[int] = Field(default=10, ge=1, le=100, description="Number of results to return")
+    filters: Optional[Dict[str, Any]] = Field(default=None, description="Optional filters")
+    data_sources: Optional[List[str]] = Field(default=None, description="Databases to search")
+    
+    # Additional fields expected by tests
+    search_databases: Optional[List[str]] = Field(default=None, description="Databases to search (alias)")
+    offset: Optional[int] = Field(default=0, ge=0, description="Pagination offset")
+    date_range_start: Optional[str] = Field(default=None, description="Start date for filtering")
+    date_range_end: Optional[str] = Field(default=None, description="End date for filtering")
+    use_semantic_search: Optional[bool] = Field(default=False, description="Enable semantic search")
+    use_hybrid_search: Optional[bool] = Field(default=True, description="Enable hybrid search")
+
+
+class RetrievalAgentRequest(BaseModel):
+    """Compatibility wrapper for agent requests - maps to SimpleAgentRequest"""
+    message: Optional[Message] = Field(default=None, description="Single message")
+    messages: Optional[List[Message]] = Field(default=None, description="Conversation history")
+    mode: Optional[AgentModeEnum] = Field(default=AgentModeEnum.RAG, description="Agent mode")
+    rag_generation_config: Optional[GenerationConfig] = Field(default=None, description="Generation config")
+    api_config: Optional[Dict[str, Any]] = Field(default=None, description="API configuration")
+    search_config: Optional[Dict[str, Any]] = Field(default=None, description="Search configuration")

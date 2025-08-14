@@ -1,0 +1,2 @@
+[console_scripts]
+tldw-server = tldw_Server_API.app.main:run_server

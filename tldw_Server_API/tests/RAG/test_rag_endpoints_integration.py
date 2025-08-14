@@ -22,7 +22,7 @@ from tldw_Server_API.app.main import app
 from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User
-from tldw_Server_API.app.api.v1.endpoints.rag_v2 import _user_rag_services
+from tldw_Server_API.app.api.v1.endpoints.rag_v2 import rag_service_manager
 
 
 @pytest.fixture(scope="module")
@@ -160,7 +160,7 @@ class TestRAGSearchIntegration:
     async def test_search_across_databases(self, async_client, auth_headers, media_db, chacha_db, test_user):
         """Test searching across multiple databases."""
         # Clear any cached services
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         # Since the RAG service uses hardcoded paths, we'll test with simpler assertions
         # This is a known limitation of the current architecture
@@ -198,7 +198,7 @@ class TestRAGSearchIntegration:
     @pytest.mark.asyncio
     async def test_search_with_filters(self, async_client, auth_headers, media_db, chacha_db, test_user):
         """Test search with filters applied."""
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
             with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
@@ -231,7 +231,7 @@ class TestRAGSearchIntegration:
     @pytest.mark.asyncio
     async def test_hybrid_search(self, async_client, auth_headers, media_db, chacha_db, test_user):
         """Test hybrid search combining keyword and semantic search."""
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
             with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_chacha_db_for_user', return_value=chacha_db):
@@ -275,7 +275,7 @@ class TestRAGAgentIntegration:
     @pytest.mark.asyncio
     async def test_rag_generation_basic(self, async_client, auth_headers, media_db, chacha_db, test_user):
         """Test basic RAG answer generation."""
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         # Mock LLM response
         async def mock_generate(*args, **kwargs):
@@ -316,7 +316,7 @@ class TestRAGAgentIntegration:
     @pytest.mark.asyncio
     async def test_research_mode(self, async_client, auth_headers, media_db, chacha_db, test_user):
         """Test research mode with different sources."""
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         async def mock_generate(*args, **kwargs):
             # Verify research mode sources were used
@@ -364,7 +364,7 @@ class TestRAGAgentIntegration:
     @pytest.mark.asyncio
     async def test_streaming_response(self, async_client, auth_headers, media_db, chacha_db, test_user):
         """Test streaming response generation."""
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         async def mock_stream(*args, **kwargs):
             yield {"type": "content", "content": "Streaming response: "}
@@ -413,7 +413,7 @@ class TestRAGAgentIntegration:
     @pytest.mark.asyncio
     async def test_conversation_context(self, async_client, auth_headers, media_db, chacha_db, test_user):
         """Test conversation with history context."""
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         async def mock_generate(*args, **kwargs):
             # Verify conversation history was passed
@@ -459,7 +459,7 @@ class TestRAGServiceCaching:
     @pytest.mark.asyncio
     async def test_service_caching(self, async_client, auth_headers, media_db, chacha_db, test_user):
         """Test that RAG services are cached and reused."""
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         # Make first request
         with mock.patch('tldw_Server_API.app.api.v1.endpoints.rag.get_media_db_for_user', return_value=media_db):
@@ -475,8 +475,9 @@ class TestRAGServiceCaching:
                     assert response1.status_code == 200
                     
                     # Get the cached service (in single-user mode, always user ID 0)
-                    service1 = _user_rag_services.get(0)
-                    assert service1 is not None
+                    cache_entry1 = rag_service_manager._cache.get(0)
+                    assert cache_entry1 is not None
+                    service1 = cache_entry1['service'] if cache_entry1 else None
                     
                     # Make second request - should use cached service
                     response2 = await async_client.post(
@@ -488,7 +489,9 @@ class TestRAGServiceCaching:
                     assert response2.status_code == 200
                     
                     # Verify same service was used
-                    service2 = _user_rag_services.get(0)
+                    cache_entry2 = rag_service_manager._cache.get(0)
+                    assert cache_entry2 is not None
+                    service2 = cache_entry2['service'] if cache_entry2 else None
                     assert service2 is service1  # Same instance
 
 
@@ -501,7 +504,7 @@ class TestErrorScenarios:
         from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
         from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user
         
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         # Override dependencies at the app level to simulate DB connection errors
         async def override_get_rag_service():
@@ -554,7 +557,7 @@ class TestErrorScenarios:
         from tldw_Server_API.app.api.v1.endpoints.rag_v2 import get_rag_service_for_user
         from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user
         
-        _user_rag_services.clear()
+        await rag_service_manager.cleanup_expired()
         
         # Override dependency to simulate initialization error
         async def override_get_rag_service():
