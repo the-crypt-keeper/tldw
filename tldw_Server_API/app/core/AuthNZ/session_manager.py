@@ -537,6 +537,113 @@ class SessionManager:
             logger.error(f"Failed to refresh session: {e}")
             raise SessionError(f"Failed to refresh session: {e}")
     
+    async def update_session_tokens(
+        self,
+        session_id: int,
+        access_token: str,
+        refresh_token: str
+    ):
+        """Update session with actual tokens after creation"""
+        if not self._initialized:
+            await self.initialize()
+        
+        try:
+            # Hash tokens for storage
+            access_token_hash = hashlib.sha256(access_token.encode()).hexdigest()
+            refresh_token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+            
+            if self.db_pool.pool:
+                # PostgreSQL
+                await self.db_pool.execute(
+                    """
+                    UPDATE sessions
+                    SET token_hash = $1,
+                        refresh_token_hash = $2
+                    WHERE id = $3
+                    """,
+                    access_token_hash, refresh_token_hash, session_id
+                )
+            else:
+                # SQLite
+                await self.db_pool.execute(
+                    """
+                    UPDATE sessions
+                    SET token_hash = ?,
+                        refresh_token_hash = ?
+                    WHERE id = ?
+                    """,
+                    access_token_hash, refresh_token_hash, session_id
+                )
+            
+            logger.debug(f"Updated session {session_id} with token hashes")
+            
+        except Exception as e:
+            logger.error(f"Failed to update session tokens: {e}")
+            raise SessionError(f"Failed to update session tokens: {e}")
+    
+    async def is_token_blacklisted(self, token: str) -> bool:
+        """
+        Check if a token has been blacklisted/revoked
+        
+        Args:
+            token: JWT token to check
+            
+        Returns:
+            True if token is blacklisted, False otherwise
+        """
+        if not self._initialized:
+            await self.initialize()
+        
+        try:
+            # Hash the token for storage/comparison
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+            
+            # Check Redis cache first if available
+            if self.redis_client:
+                try:
+                    blacklisted = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        self.redis_client.get,
+                        f"blacklist:{token_hash}"
+                    )
+                    if blacklisted:
+                        return True
+                except RedisError:
+                    pass  # Fall back to database
+            
+            # Check database for revoked sessions
+            if self.db_pool.pool:
+                # PostgreSQL
+                result = await self.db_pool.fetchval(
+                    """
+                    SELECT COUNT(*) 
+                    FROM sessions 
+                    WHERE token_hash = $1 AND is_revoked = true
+                    """,
+                    token_hash
+                )
+            else:
+                # SQLite
+                result = await self.db_pool.fetchval(
+                    """
+                    SELECT COUNT(*) 
+                    FROM sessions 
+                    WHERE token_hash = ? AND is_revoked = 1
+                    """,
+                    token_hash
+                )
+            
+            return result > 0
+            
+        except Exception as e:
+            logger.error(f"Error checking token blacklist: {e}")
+            # Fail open - if we can't check, assume not blacklisted
+            return False
+    
+    async def get_user_sessions(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get all sessions for a user (alias for get_active_sessions)"""
+        return await self.get_active_sessions(user_id)
+    
     async def get_active_sessions(self, user_id: int) -> List[Dict[str, Any]]:
         """Get all active sessions for a user"""
         if not self._initialized:

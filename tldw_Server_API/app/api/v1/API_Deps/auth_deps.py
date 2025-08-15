@@ -113,27 +113,33 @@ async def get_current_user(
             raise InvalidTokenError("Token has been revoked")
         
         # Get user from database
-        user_id = payload.get("user_id")
+        # JWT standard uses 'sub' for subject (user ID)
+        user_id = payload.get("sub") or payload.get("user_id")
         if not user_id:
             raise InvalidTokenError("Invalid token payload")
         
+        # Convert to int if it's a string
+        try:
+            user_id = int(user_id)
+        except (ValueError, TypeError):
+            raise InvalidTokenError("Invalid user ID in token")
+        
         # Fetch user from database
-        user = await db_pool.fetchone(
-            "SELECT * FROM users WHERE id = ? AND is_active = ?",
-            user_id, True
-        )
+        if db_pool.pool:  # PostgreSQL
+            user = await db_pool.fetchone(
+                "SELECT * FROM users WHERE id = $1 AND is_active = $2",
+                user_id, True
+            )
+        else:  # SQLite
+            user = await db_pool.fetchone(
+                "SELECT * FROM users WHERE id = ? AND is_active = ?",
+                user_id, 1
+            )
         
         if not user:
             raise UserNotFoundError(f"User {user_id}")
         
-        # Update session activity
-        session_id = payload.get("session_id")
-        if session_id:
-            client_ip = request.client.host if request.client else None
-            user_agent = request.headers.get("User-Agent")
-            await session_manager.update_session_activity(
-                session_id, client_ip, user_agent
-            )
+        # Session activity is already updated during token validation in session_manager
         
         # Convert to dict if needed
         if hasattr(user, 'dict'):

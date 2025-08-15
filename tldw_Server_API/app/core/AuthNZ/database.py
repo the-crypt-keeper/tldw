@@ -12,6 +12,7 @@ import asyncio
 import asyncpg
 import aiosqlite
 from loguru import logger
+from fastapi import HTTPException
 #
 # Local imports
 from tldw_Server_API.app.core.AuthNZ.settings import Settings, get_settings
@@ -165,6 +166,9 @@ class DatabasePool:
                 logger.debug("PostgreSQL transaction committed successfully")
             except asyncpg.exceptions.TooManyConnectionsError:
                 raise ConnectionPoolExhaustedError()
+            except HTTPException as e:
+                # Re-raise HTTP exceptions unchanged
+                raise
             except Exception as e:
                 logger.error(f"PostgreSQL transaction error: {e}")
                 raise TransactionError("PostgreSQL transaction", str(e))
@@ -190,6 +194,9 @@ class DatabasePool:
                 if "database is locked" in str(e):
                     raise DatabaseLockError()
                 raise TransactionError("SQLite transaction", str(e))
+            except HTTPException as e:
+                # Re-raise HTTP exceptions unchanged
+                raise
             except Exception as e:
                 logger.error(f"SQLite transaction error: {e}")
                 raise TransactionError("SQLite transaction", str(e))

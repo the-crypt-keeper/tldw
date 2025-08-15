@@ -169,34 +169,63 @@ async def login(
                 detail="Account is inactive. Please contact support."
             )
         
+        # Create session first to get session_id
+        user_agent = request.headers.get("User-Agent", "Unknown")
+        
         # Generate tokens based on auth mode
         if settings.AUTH_MODE == "single_user":
             # For single-user mode, return simple tokens
             access_token = f"single-user-token-{user['id']}"
             refresh_token = f"single-user-refresh-{user['id']}"
+            
+            # Create session with tokens
+            session_info = await session_manager.create_session(
+                user_id=user['id'],
+                access_token=access_token,
+                refresh_token=refresh_token,
+                ip_address=client_ip,
+                user_agent=user_agent
+            )
         else:
-            # For multi-user mode, use JWT
+            # For multi-user mode, create a temporary session first
+            # Use unique placeholders to avoid duplicate token hash constraints
+            import secrets
+            temp_access = f"temp_access_{secrets.token_urlsafe(16)}"
+            temp_refresh = f"temp_refresh_{secrets.token_urlsafe(16)}"
+            
+            temp_session_info = await session_manager.create_session(
+                user_id=user['id'],
+                access_token=temp_access,  # Will update with actual token
+                refresh_token=temp_refresh,  # Will update with actual token
+                ip_address=client_ip,
+                user_agent=user_agent
+            )
+            
+            session_id = temp_session_info['session_id']
+            
+            # Create JWT tokens with session_id
             jwt_service = get_jwt_service()
             access_token = jwt_service.create_access_token(
                 user_id=user['id'],
                 username=user['username'],
-                role=user['role']
+                role=user['role'],
+                additional_claims={"session_id": session_id}
             )
             
             refresh_token = jwt_service.create_refresh_token(
                 user_id=user['id'],
-                username=user['username']
+                username=user['username'],
+                additional_claims={"session_id": session_id}
             )
-        
-        # Create session
-        user_agent = request.headers.get("User-Agent", "Unknown")
-        session_info = await session_manager.create_session(
-            user_id=user['id'],
-            access_token=access_token,
-            refresh_token=refresh_token,
-            ip_address=client_ip,
-            user_agent=user_agent
-        )
+            
+            # Update session with actual tokens
+            await session_manager.update_session_tokens(
+                session_id=session_id,
+                access_token=access_token,
+                refresh_token=refresh_token
+            )
+            
+            session_info = temp_session_info
         
         # Update last login time
         if hasattr(db, 'execute'):
@@ -320,9 +349,16 @@ async def refresh_token(
             if await session_manager.is_token_blacklisted(request.refresh_token):
                 raise InvalidTokenError("Refresh token has been revoked")
             
-            user_id = payload.get("user_id")
+            # JWT standard uses 'sub' for subject (user ID)
+            user_id = payload.get("sub") or payload.get("user_id")
             if not user_id:
                 raise InvalidTokenError("Invalid refresh token payload")
+            
+            # Convert to int if it's a string
+            try:
+                user_id = int(user_id)
+            except (ValueError, TypeError):
+                raise InvalidTokenError("Invalid user ID in refresh token")
         
         # Fetch user
         user = None
@@ -457,6 +493,19 @@ async def register(
             detail=str(e)
         )
     except Exception as e:
+        # Check if it's a transaction error wrapping a duplicate user error
+        error_msg = str(e).lower()
+        if "username already exists" in error_msg or "email already exists" in error_msg:
+            logger.warning(f"Registration failed - duplicate user (wrapped): {e}")
+            if "username" in error_msg:
+                detail = "Username already exists"
+            else:
+                detail = "Email already exists"
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=detail
+            )
+        
         logger.error(f"Unexpected registration error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -478,18 +527,23 @@ async def get_current_user_info(
     Returns:
         UserResponse with current user details
     """
+    # Ensure UUID is a string
+    user_uuid = current_user.get('uuid')
+    if user_uuid and not isinstance(user_uuid, str):
+        user_uuid = str(user_uuid)
+    
     return UserResponse(
         id=current_user['id'],
-        uuid=current_user['uuid'],
+        uuid=user_uuid or '',  # Provide empty string if missing
         username=current_user['username'],
         email=current_user['email'],
         role=current_user['role'],
-        is_active=current_user['is_active'],
-        is_verified=current_user['is_verified'],
-        created_at=current_user['created_at'],
+        is_active=current_user.get('is_active', True),
+        is_verified=current_user.get('is_verified', True),
+        created_at=current_user.get('created_at', datetime.utcnow()),
         last_login=current_user.get('last_login'),
-        storage_quota_mb=current_user['storage_quota_mb'],
-        storage_used_mb=current_user['storage_used_mb']
+        storage_quota_mb=current_user.get('storage_quota_mb', 1000),
+        storage_used_mb=current_user.get('storage_used_mb', 0.0)
     )
 
 

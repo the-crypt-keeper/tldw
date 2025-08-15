@@ -96,7 +96,8 @@ class JWTService:
     def create_refresh_token(
         self,
         user_id: int,
-        username: str
+        username: str,
+        additional_claims: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Create a refresh token for a user
@@ -104,6 +105,7 @@ class JWTService:
         Args:
             user_id: User's database ID
             username: User's username
+            additional_claims: Additional claims to include in token
             
         Returns:
             Encoded JWT refresh token
@@ -120,6 +122,10 @@ class JWTService:
             "jti": str(uuid4()),
             "type": "refresh"
         }
+        
+        # Add any additional claims
+        if additional_claims:
+            payload.update(additional_claims)
         
         # Encode the token
         try:
