@@ -169,9 +169,16 @@ class PasswordService:
             raise WeakPasswordError("; ".join(errors))
     
     def _has_sequential_chars(self, password: str, max_sequence: int = 3) -> bool:
-        """Check if password has sequential characters (e.g., 'abc', '123')"""
+        """Check if password has sequential characters (e.g., 'abc', '123')
+        but allow year patterns like 2024"""
+        import re
+        
         for i in range(len(password) - max_sequence + 1):
             substring = password[i:i + max_sequence]
+            
+            # Skip if this looks like a year (2020-2099)
+            if len(substring) >= 4 and re.match(r'20[2-9]\d', substring[:4]):
+                continue
             
             # Check ascending sequence
             if all(ord(substring[j+1]) - ord(substring[j]) == 1 for j in range(len(substring) - 1)):

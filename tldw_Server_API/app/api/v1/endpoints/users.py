@@ -60,9 +60,14 @@ async def get_current_user_profile(
     Returns:
         UserResponse with user details
     """
+    # Convert UUID to string if it's a UUID object
+    user_uuid = current_user.get('uuid', '')
+    if user_uuid and not isinstance(user_uuid, str):
+        user_uuid = str(user_uuid)
+    
     return UserResponse(
         id=current_user['id'],
-        uuid=current_user.get('uuid', ''),
+        uuid=user_uuid,
         username=current_user['username'],
         email=current_user.get('email', ''),
         role=current_user.get('role', 'user'),
@@ -160,10 +165,11 @@ async def change_password(
     """
     try:
         # Verify current password
-        if not password_service.verify_password(
+        is_valid, _ = password_service.verify_password(
             request.current_password, 
             current_user['password_hash']
-        ):
+        )
+        if not is_valid:
             logger.warning(f"Failed password change attempt for user {current_user['username']}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

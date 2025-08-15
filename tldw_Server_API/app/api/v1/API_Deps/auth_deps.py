@@ -30,7 +30,7 @@ from tldw_Server_API.app.core.AuthNZ.exceptions import (
 #
 # Security scheme for JWT bearer tokens
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 #######################################################################################################################
@@ -101,6 +101,14 @@ async def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
+    # Check if credentials are provided
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
     try:
         # Extract token
         token = credentials.credentials

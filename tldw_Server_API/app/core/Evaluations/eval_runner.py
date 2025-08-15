@@ -636,3 +636,11 @@ class EvaluationRunner:
         if run:
             return run["status"]
         return None
+    
+    # Alias for compatibility with tests
+    async def run_evaluation_async(self, run_id: str, eval_config: Dict[str, Any]):
+        """Alias for run_evaluation to match test expectations"""
+        eval_id = eval_config.get("eval_id")
+        if not eval_id:
+            raise ValueError("eval_id required in eval_config")
+        return await self.run_evaluation(run_id, eval_id, eval_config, background=True)

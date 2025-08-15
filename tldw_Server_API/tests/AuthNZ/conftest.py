@@ -35,6 +35,10 @@ TEST_DB_PORT = int(os.getenv("TEST_DB_PORT", "5432"))
 TEST_DB_USER = os.getenv("TEST_DB_USER", "tldw_user")
 TEST_DB_PASSWORD = os.getenv("TEST_DB_PASSWORD", "TestPassword123!")
 
+# Import TestClient for isolated environment
+from fastapi.testclient import TestClient
+from tldw_Server_API.app.main import app
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -44,9 +48,216 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(autouse=True)
+async def reset_singletons():
+    """Auto-reset all singletons before and after each test for clean state."""
+    # Reset before test
+    from tldw_Server_API.app.core.AuthNZ.database import reset_db_pool
+    from tldw_Server_API.app.core.AuthNZ.session_manager import reset_session_manager
+    from tldw_Server_API.app.core.AuthNZ.settings import reset_settings
+    
+    await reset_db_pool()
+    await reset_session_manager()
+    reset_settings()
+    
+    # Clear any FastAPI dependency overrides
+    app.dependency_overrides.clear()
+    
+    yield
+    
+    # Reset after test
+    await reset_db_pool()
+    await reset_session_manager()
+    reset_settings()
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def isolated_test_environment(monkeypatch):
+    """Create isolated DB and app instance for each test - TRUE ONE DB PER TEST."""
+    import uuid as uuid_lib
+    
+    # 1. Generate unique DB name for this test
+    db_name = f"tldw_test_{uuid_lib.uuid4().hex[:8]}"
+    logger.info(f"Creating isolated test database: {db_name}")
+    
+    # 2. Create the unique database
+    conn = await asyncpg.connect(
+        host=TEST_DB_HOST,
+        port=TEST_DB_PORT,
+        user=TEST_DB_USER,
+        password=TEST_DB_PASSWORD,
+        database="postgres"
+    )
+    
+    try:
+        # Drop if exists (cleanup from failed tests)
+        await conn.execute(f"""
+            SELECT pg_terminate_backend(pid) 
+            FROM pg_stat_activity 
+            WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
+        """)
+        await conn.execute(f"DROP DATABASE IF EXISTS {db_name}")
+        
+        # Create new database
+        await conn.execute(f"CREATE DATABASE {db_name}")
+        logger.info(f"Created test database: {db_name}")
+    finally:
+        await conn.close()
+    
+    # 3. Create schema in the new database
+    test_conn = await asyncpg.connect(
+        host=TEST_DB_HOST,
+        port=TEST_DB_PORT,
+        user=TEST_DB_USER,
+        password=TEST_DB_PASSWORD,
+        database=db_name
+    )
+    
+    try:
+        # Create all required tables
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                uuid UUID UNIQUE NOT NULL,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role VARCHAR(50) NOT NULL DEFAULT 'user',
+                is_active BOOLEAN DEFAULT TRUE,
+                is_verified BOOLEAN DEFAULT FALSE,
+                storage_quota_mb INTEGER DEFAULT 5120,
+                storage_used_mb FLOAT DEFAULT 0.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP,
+                email_verified_at TIMESTAMP,
+                two_factor_enabled BOOLEAN DEFAULT FALSE,
+                two_factor_secret TEXT,
+                created_by INTEGER REFERENCES users(id)
+            )
+        """)
+        
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash TEXT UNIQUE NOT NULL,
+                refresh_token_hash TEXT UNIQUE,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ip_address VARCHAR(45),
+                user_agent TEXT,
+                device_id VARCHAR(255),
+                is_active BOOLEAN DEFAULT TRUE,
+                is_revoked BOOLEAN DEFAULT FALSE,
+                revoked_at TIMESTAMP,
+                revoked_by INTEGER REFERENCES users(id),
+                revoke_reason TEXT
+            )
+        """)
+        
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS password_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS registration_codes (
+                id SERIAL PRIMARY KEY,
+                code VARCHAR(255) UNIQUE NOT NULL,
+                max_uses INTEGER DEFAULT 1,
+                uses_count INTEGER DEFAULT 0,
+                expires_at TIMESTAMP,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                role_to_grant VARCHAR(50) DEFAULT 'user',
+                is_active BOOLEAN DEFAULT TRUE
+            )
+        """)
+        
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                action VARCHAR(255) NOT NULL,
+                details JSONB,
+                ip_address VARCHAR(45),
+                user_agent TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Create indexes
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash)")
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id)")
+        
+        logger.info(f"Created schema in test database: {db_name}")
+    finally:
+        await test_conn.close()
+    
+    # 4. Set environment variables for this test
+    db_url = f"postgresql://{TEST_DB_USER}:{TEST_DB_PASSWORD}@{TEST_DB_HOST}:{TEST_DB_PORT}/{db_name}"
+    monkeypatch.setenv("AUTH_MODE", "multi_user")
+    monkeypatch.setenv("DATABASE_URL", db_url)
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-for-testing-only")
+    monkeypatch.setenv("ENABLE_REGISTRATION", "true")
+    monkeypatch.setenv("REQUIRE_REGISTRATION_CODE", "false")
+    monkeypatch.setenv("RATE_LIMIT_ENABLED", "false")
+    
+    # 5. Reset ALL singletons to force fresh initialization with new DB
+    from tldw_Server_API.app.core.AuthNZ.database import reset_db_pool
+    from tldw_Server_API.app.core.AuthNZ.session_manager import reset_session_manager
+    from tldw_Server_API.app.core.AuthNZ.settings import reset_settings
+    
+    await reset_db_pool()
+    await reset_session_manager()
+    reset_settings()
+    
+    # 6. Clear app dependency overrides
+    app.dependency_overrides.clear()
+    
+    # 7. Create TestClient (DB exists, singletons reset, env vars set)
+    with TestClient(app) as client:
+        yield client, db_name
+    
+    # 8. Cleanup: reset singletons again
+    await reset_db_pool()
+    await reset_session_manager()
+    reset_settings()
+    
+    # 9. Drop the unique database
+    cleanup_conn = await asyncpg.connect(
+        host=TEST_DB_HOST,
+        port=TEST_DB_PORT,
+        user=TEST_DB_USER,
+        password=TEST_DB_PASSWORD,
+        database="postgres"
+    )
+    
+    try:
+        await cleanup_conn.execute(f"""
+            SELECT pg_terminate_backend(pid) 
+            FROM pg_stat_activity 
+            WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
+        """)
+        await cleanup_conn.execute(f"DROP DATABASE IF EXISTS {db_name}")
+        logger.info(f"Dropped test database: {db_name}")
+    finally:
+        await cleanup_conn.close()
+
+
+@pytest.fixture(scope="session")
 async def setup_test_database():
-    """Create and setup the test database for the test module."""
+    """Create and setup the test database for the test session."""
     # Connect to postgres database to create test database
     conn = await asyncpg.connect(
         host=TEST_DB_HOST,
@@ -100,7 +311,8 @@ async def setup_test_database():
                 last_login TIMESTAMP,
                 email_verified_at TIMESTAMP,
                 two_factor_enabled BOOLEAN DEFAULT FALSE,
-                two_factor_secret TEXT
+                two_factor_secret TEXT,
+                created_by INTEGER REFERENCES users(id)
             )
         """)
         
@@ -115,7 +327,12 @@ async def setup_test_database():
                 last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 ip_address VARCHAR(45),
                 user_agent TEXT,
-                is_active BOOLEAN DEFAULT TRUE
+                device_id VARCHAR(255),
+                is_active BOOLEAN DEFAULT TRUE,
+                is_revoked BOOLEAN DEFAULT FALSE,
+                revoked_at TIMESTAMP,
+                revoked_by INTEGER REFERENCES users(id),
+                revoke_reason TEXT
             )
         """)
         
@@ -189,7 +406,7 @@ async def setup_test_database():
         await cleanup_conn.close()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 async def clean_database(setup_test_database):
     """Ensure database is clean before each test."""
     conn = await asyncpg.connect(
@@ -235,7 +452,7 @@ async def clean_database(setup_test_database):
 
 @pytest.fixture
 async def test_db_pool(setup_test_database, clean_database):
-    """Create a test database pool connected to the test PostgreSQL database with transaction isolation."""
+    """Create a test database pool connected to the test PostgreSQL database."""
     test_database_url = f"postgresql://{TEST_DB_USER}:{TEST_DB_PASSWORD}@{TEST_DB_HOST}:{TEST_DB_PORT}/{TEST_DB_NAME}"
     
     test_settings = Settings(
@@ -250,33 +467,9 @@ async def test_db_pool(setup_test_database, clean_database):
     pool = DatabasePool(test_settings)
     await pool.initialize()
     
-    # Create a connection and start a transaction for test isolation
-    conn = await pool.acquire()
-    transaction = await conn.transaction()
-    await transaction.start()
-    
     try:
-        # Make the connection available to the pool for tests
-        pool._test_connection = conn
-        pool._test_transaction = transaction
-        
-        # Override acquire to return the test connection
-        original_acquire = pool.acquire
-        async def test_acquire():
-            return conn
-        pool.acquire = test_acquire
-        
         yield pool
     finally:
-        # Rollback the transaction to undo all test changes
-        try:
-            await transaction.rollback()
-            logger.debug("Rolled back test transaction")
-        except Exception as e:
-            logger.error(f"Error rolling back transaction: {e}")
-        
-        # Release the connection back to the pool
-        await pool.release(conn)
         await pool.close()
 
 
@@ -369,8 +562,7 @@ async def registration_service(test_db_pool, password_service):
     """Create a registration service instance for testing."""
     return RegistrationService(
         db_pool=test_db_pool,
-        password_service=password_service,
-        require_registration_code=False
+        password_service=password_service
     )
 
 
@@ -504,7 +696,10 @@ def valid_access_token(jwt_service, test_user):
 @pytest.fixture
 def valid_refresh_token(jwt_service, test_user):
     """Create a valid refresh token for testing."""
-    return jwt_service.create_refresh_token(user_id=test_user['id'])
+    return jwt_service.create_refresh_token(
+        user_id=test_user['id'],
+        username=test_user['username']
+    )
 
 
 @pytest.fixture

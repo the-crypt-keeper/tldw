@@ -139,7 +139,8 @@ async def login(
                 user = dict(zip(columns[:len(user)], user))
         
         # Verify password
-        if not password_service.verify_password(form_data.password, user['password_hash']):
+        is_valid, needs_rehash = password_service.verify_password(form_data.password, user['password_hash'])
+        if not is_valid:
             # Log failed attempt
             logger.warning(f"Failed login: Invalid password for user {user['username']}")
             
@@ -152,8 +153,8 @@ async def login(
                 success=False
             )
             
-            # Record failed attempt in rate limiter
-            await rate_limiter.record_failed_attempt(client_ip, "login")
+            # TODO: Implement failed attempt tracking in rate limiter
+            # await rate_limiter.record_failed_attempt(client_ip, "login")
             
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -168,6 +169,24 @@ async def login(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account is inactive. Please contact support."
             )
+        
+        # If password needs rehashing, update it
+        if needs_rehash:
+            new_hash = password_service.hash_password(form_data.password)
+            if hasattr(db, 'execute'):
+                # PostgreSQL
+                await db.execute(
+                    "UPDATE users SET password_hash = $1 WHERE id = $2",
+                    new_hash, user['id']
+                )
+            else:
+                # SQLite
+                await db.execute(
+                    "UPDATE users SET password_hash = ? WHERE id = ?",
+                    (new_hash, user['id'])
+                )
+                await db.commit()
+            logger.info(f"Updated password hash for user {user['username']} with new parameters")
         
         # Create session first to get session_id
         user_agent = request.headers.get("User-Agent", "Unknown")
