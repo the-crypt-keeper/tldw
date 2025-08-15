@@ -20,7 +20,11 @@ from tldw_Server_API.app.core.AuthNZ.exceptions import (
     DatabaseError,
     ConnectionPoolExhaustedError,
     TransactionError,
-    DatabaseLockError
+    DatabaseLockError,
+    DuplicateUserError,
+    WeakPasswordError,
+    InvalidRegistrationCodeError,
+    RegistrationError
 )
 
 #######################################################################################################################
@@ -169,6 +173,9 @@ class DatabasePool:
             except HTTPException as e:
                 # Re-raise HTTP exceptions unchanged
                 raise
+            except (DuplicateUserError, WeakPasswordError, InvalidRegistrationCodeError, RegistrationError) as e:
+                # Re-raise registration exceptions unchanged
+                raise
             except Exception as e:
                 logger.error(f"PostgreSQL transaction error: {e}")
                 raise TransactionError("PostgreSQL transaction", str(e))
@@ -196,6 +203,9 @@ class DatabasePool:
                 raise TransactionError("SQLite transaction", str(e))
             except HTTPException as e:
                 # Re-raise HTTP exceptions unchanged
+                raise
+            except (DuplicateUserError, WeakPasswordError, InvalidRegistrationCodeError, RegistrationError) as e:
+                # Re-raise registration exceptions unchanged
                 raise
             except Exception as e:
                 logger.error(f"SQLite transaction error: {e}")

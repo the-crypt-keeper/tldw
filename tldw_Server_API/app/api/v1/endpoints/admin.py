@@ -734,9 +734,9 @@ async def get_audit_log(
         
         # Date filter
         if hasattr(db, 'fetchrow'):
-            conditions.append(f"created_at > CURRENT_TIMESTAMP - INTERVAL '{days} days'")
+            conditions.append(f"a.created_at > CURRENT_TIMESTAMP - INTERVAL '{days} days'")
         else:
-            conditions.append("datetime(created_at) > datetime('now', ? || ' days')")
+            conditions.append("datetime(a.created_at) > datetime('now', ? || ' days')")
             params.append(f"-{days}")
         
         where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""

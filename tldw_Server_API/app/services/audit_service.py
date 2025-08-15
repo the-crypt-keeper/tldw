@@ -374,6 +374,14 @@ async def get_audit_service() -> AuditService:
     return _audit_service
 
 
+async def reset_audit_service():
+    """Reset audit service singleton (for testing)"""
+    global _audit_service
+    if _audit_service:
+        await _audit_service.shutdown()
+        _audit_service = None
+
+
 #######################################################################################################################
 #
 # Convenience Functions

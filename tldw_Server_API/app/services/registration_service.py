@@ -656,6 +656,14 @@ async def get_registration_service() -> RegistrationService:
     return _registration_service
 
 
+async def reset_registration_service():
+    """Reset registration service singleton (for testing)"""
+    global _registration_service
+    if _registration_service:
+        await _registration_service.shutdown()
+        _registration_service = None
+
+
 #
 # End of registration_service.py
 #######################################################################################################################

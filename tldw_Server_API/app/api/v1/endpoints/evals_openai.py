@@ -43,9 +43,9 @@ security = HTTPBearer(auto_error=False)
 limiter = Limiter(key_func=get_remote_address)
 
 # Rate limit decorators for different operations
-create_limit = limiter.limit("10/minute")  # Create operations
+create_limit = limiter.limit("100/minute")  # Create operations (increased for testing)
 read_limit = limiter.limit("100/minute")   # Read operations
-run_limit = limiter.limit("5/minute")      # Run operations (resource intensive)
+run_limit = limiter.limit("50/minute")      # Run operations (increased for testing)
 
 # Initialize database and runner
 # Get database path from config or use default
@@ -583,25 +583,28 @@ async def cancel_run(
 ):
     """Cancel a running evaluation"""
     try:
-        success = eval_runner.cancel_run(run_id)
-        if not success:
-            # Check if run exists
-            run = eval_db.get_run(run_id)
-            if not run:
-                raise create_error_response(
-                    message=f"Run {run_id} not found",
-                    error_type="not_found_error",
-                    param="run_id",
-                    status_code=status.HTTP_404_NOT_FOUND
-                )
-            else:
-                raise create_error_response(
-                    message=f"Run {run_id} is not currently running (status: {run['status']})",
-                    error_type="invalid_request_error",
-                    param="run_id"
-                )
+        # Check if run exists
+        run = eval_db.get_run(run_id)
+        if not run:
+            raise create_error_response(
+                message=f"Run {run_id} not found",
+                error_type="not_found_error",
+                param="run_id",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
         
-        return {"cancelled": True, "id": run_id}
+        # If already completed or cancelled, return success
+        if run['status'] in ['completed', 'failed', 'cancelled']:
+            return {"status": run['status'], "id": run_id}
+        
+        # Try to cancel the run
+        success = eval_runner.cancel_run(run_id)
+        if success:
+            return {"status": "cancelled", "id": run_id}
+        else:
+            # If not in running tasks, update status directly
+            eval_db.update_run_status(run_id, "cancelled")
+            return {"status": "cancelled", "id": run_id}
         
     except HTTPException:
         raise

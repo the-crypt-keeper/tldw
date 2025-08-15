@@ -55,10 +55,14 @@ async def reset_singletons():
     from tldw_Server_API.app.core.AuthNZ.database import reset_db_pool
     from tldw_Server_API.app.core.AuthNZ.session_manager import reset_session_manager
     from tldw_Server_API.app.core.AuthNZ.settings import reset_settings
+    from tldw_Server_API.app.services.registration_service import reset_registration_service
+    from tldw_Server_API.app.services.audit_service import reset_audit_service
     
     await reset_db_pool()
     await reset_session_manager()
     reset_settings()
+    await reset_registration_service()
+    await reset_audit_service()
     
     # Clear any FastAPI dependency overrides
     app.dependency_overrides.clear()
@@ -69,6 +73,8 @@ async def reset_singletons():
     await reset_db_pool()
     await reset_session_manager()
     reset_settings()
+    await reset_registration_service()
+    await reset_audit_service()
     app.dependency_overrides.clear()
 
 
@@ -190,6 +196,7 @@ async def isolated_test_environment(monkeypatch):
                 action VARCHAR(255) NOT NULL,
                 target_type VARCHAR(100),
                 target_id INTEGER,
+                success BOOLEAN DEFAULT TRUE,
                 details JSONB,
                 ip_address VARCHAR(45),
                 user_agent TEXT,
@@ -215,16 +222,21 @@ async def isolated_test_environment(monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-for-testing-only")
     monkeypatch.setenv("ENABLE_REGISTRATION", "true")
     monkeypatch.setenv("REQUIRE_REGISTRATION_CODE", "false")
+    monkeypatch.setenv("EMAIL_VERIFICATION_REQUIRED", "false")
     monkeypatch.setenv("RATE_LIMIT_ENABLED", "false")
     
     # 5. Reset ALL singletons to force fresh initialization with new DB
     from tldw_Server_API.app.core.AuthNZ.database import reset_db_pool
     from tldw_Server_API.app.core.AuthNZ.session_manager import reset_session_manager
     from tldw_Server_API.app.core.AuthNZ.settings import reset_settings
+    from tldw_Server_API.app.services.registration_service import reset_registration_service
+    from tldw_Server_API.app.services.audit_service import reset_audit_service
     
     await reset_db_pool()
     await reset_session_manager()
     reset_settings()
+    await reset_registration_service()
+    await reset_audit_service()
     
     # 6. Clear app dependency overrides
     app.dependency_overrides.clear()
@@ -237,6 +249,8 @@ async def isolated_test_environment(monkeypatch):
     await reset_db_pool()
     await reset_session_manager()
     reset_settings()
+    await reset_registration_service()
+    await reset_audit_service()
     
     # 9. Drop the unique database
     cleanup_conn = await asyncpg.connect(
@@ -372,6 +386,7 @@ async def setup_test_database():
                 action VARCHAR(255) NOT NULL,
                 target_type VARCHAR(100),
                 target_id INTEGER,
+                success BOOLEAN DEFAULT TRUE,
                 details JSONB,
                 ip_address VARCHAR(45),
                 user_agent TEXT,
