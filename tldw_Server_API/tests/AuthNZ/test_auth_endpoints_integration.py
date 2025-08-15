@@ -30,7 +30,7 @@ class TestAuthEndpointsIntegration:
         """Test successful login."""
         # Setup mock
         test_user_copy = test_user.copy()
-        test_user_copy['password_hash'] = password_service.hash_password("testpass123")
+        test_user_copy['password_hash'] = password_service.hash_password("Test@Pass#2024")
         
         mock_db_pool.fetchrow = AsyncMock(return_value=test_user_copy)
         mock_db_pool.execute = AsyncMock()
@@ -49,7 +49,7 @@ class TestAuthEndpointsIntegration:
                 "/api/v1/auth/login",
                 data={
                     "username": "testuser",
-                    "password": "testpass123"
+                    "password": "Test@Pass#2024"
                 }
             )
         
@@ -107,7 +107,7 @@ class TestAuthEndpointsIntegration:
                 "/api/v1/auth/login",
                 data={
                     "username": "inactiveuser",
-                    "password": "testpass123"
+                    "password": "Test@Pass#2024"
                 }
             )
         
@@ -143,7 +143,7 @@ class TestAuthEndpointsIntegration:
                 json={
                     "username": "newuser",
                     "email": "new@example.com",
-                    "password": "SecurePass123!"
+                    "password": "Secure@Pass#2024!"
                 }
             )
         
@@ -174,7 +174,7 @@ class TestAuthEndpointsIntegration:
                 json={
                     "username": "existinguser",
                     "email": "existing@example.com",
-                    "password": "SecurePass123!"
+                    "password": "Secure@Pass#2024!"
                 }
             )
         

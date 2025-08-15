@@ -1,15 +1,21 @@
 """
 Shared fixtures and configuration for AuthNZ tests.
+Provides PostgreSQL test database isolation with transaction rollback.
 """
 
+import os
 import pytest
 import asyncio
+import uuid
 import tempfile
 import shutil
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, Any, AsyncGenerator
-from unittest.mock import Mock, AsyncMock
+from typing import Dict, Any, AsyncGenerator, Optional
+from unittest.mock import Mock, AsyncMock, MagicMock
+
+import asyncpg
+from loguru import logger
 
 from tldw_Server_API.app.core.AuthNZ.database import DatabasePool
 from tldw_Server_API.app.core.AuthNZ.password_service import PasswordService
@@ -18,7 +24,16 @@ from tldw_Server_API.app.core.AuthNZ.settings import Settings
 from tldw_Server_API.app.core.AuthNZ.session_manager import SessionManager
 from tldw_Server_API.app.core.AuthNZ.rate_limiter import RateLimiter
 from tldw_Server_API.app.services.registration_service import RegistrationService
+from tldw_Server_API.app.services.audit_service import AuditService
+from tldw_Server_API.app.services.storage_quota_service import StorageQuotaService
 from tldw_Server_API.app.core.config import settings
+
+# Test database configuration
+TEST_DB_NAME = "tldw_test"
+TEST_DB_HOST = os.getenv("TEST_DB_HOST", "localhost")
+TEST_DB_PORT = int(os.getenv("TEST_DB_PORT", "5432"))
+TEST_DB_USER = os.getenv("TEST_DB_USER", "tldw_user")
+TEST_DB_PASSWORD = os.getenv("TEST_DB_PASSWORD", "TestPassword123!")
 
 
 @pytest.fixture(scope="session")
@@ -29,18 +44,245 @@ def event_loop():
     loop.close()
 
 
-@pytest.fixture(scope="session")
-async def test_db_dir():
-    """Create a temporary directory for test databases."""
-    temp_dir = tempfile.mkdtemp(prefix="auth_test_")
-    yield Path(temp_dir)
-    # Cleanup after tests
-    shutil.rmtree(temp_dir, ignore_errors=True)
+@pytest.fixture(scope="module")
+async def setup_test_database():
+    """Create and setup the test database for the test module."""
+    # Connect to postgres database to create test database
+    conn = await asyncpg.connect(
+        host=TEST_DB_HOST,
+        port=TEST_DB_PORT,
+        user=TEST_DB_USER,
+        password=TEST_DB_PASSWORD,
+        database="postgres"
+    )
+    
+    try:
+        # Drop test database if it exists
+        await conn.execute(f"""
+            SELECT pg_terminate_backend(pid) 
+            FROM pg_stat_activity 
+            WHERE datname = '{TEST_DB_NAME}' AND pid <> pg_backend_pid()
+        """)
+        await conn.execute(f"DROP DATABASE IF EXISTS {TEST_DB_NAME}")
+        
+        # Create test database
+        await conn.execute(f"CREATE DATABASE {TEST_DB_NAME}")
+        logger.info(f"Created test database: {TEST_DB_NAME}")
+        
+    finally:
+        await conn.close()
+    
+    # Connect to test database and create schema
+    test_conn = await asyncpg.connect(
+        host=TEST_DB_HOST,
+        port=TEST_DB_PORT,
+        user=TEST_DB_USER,
+        password=TEST_DB_PASSWORD,
+        database=TEST_DB_NAME
+    )
+    
+    try:
+        # Create tables
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                uuid UUID UNIQUE NOT NULL,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role VARCHAR(50) NOT NULL DEFAULT 'user',
+                is_active BOOLEAN DEFAULT TRUE,
+                is_verified BOOLEAN DEFAULT FALSE,
+                storage_quota_mb INTEGER DEFAULT 5120,
+                storage_used_mb FLOAT DEFAULT 0.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP,
+                email_verified_at TIMESTAMP,
+                two_factor_enabled BOOLEAN DEFAULT FALSE,
+                two_factor_secret TEXT
+            )
+        """)
+        
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash TEXT UNIQUE NOT NULL,
+                refresh_token_hash TEXT UNIQUE,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ip_address VARCHAR(45),
+                user_agent TEXT,
+                is_active BOOLEAN DEFAULT TRUE
+            )
+        """)
+        
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS password_history (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS registration_codes (
+                id SERIAL PRIMARY KEY,
+                code VARCHAR(255) UNIQUE NOT NULL,
+                max_uses INTEGER DEFAULT 1,
+                uses_count INTEGER DEFAULT 0,
+                expires_at TIMESTAMP,
+                created_by INTEGER REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                role_to_grant VARCHAR(50) DEFAULT 'user',
+                is_active BOOLEAN DEFAULT TRUE
+            )
+        """)
+        
+        await test_conn.execute("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                action VARCHAR(255) NOT NULL,
+                details JSONB,
+                ip_address VARCHAR(45),
+                user_agent TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Create indexes
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash)")
+        await test_conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user_id ON audit_log(user_id)")
+        
+        logger.info("Created test database schema")
+        
+    finally:
+        await test_conn.close()
+    
+    yield
+    
+    # Cleanup: Drop test database after all tests
+    cleanup_conn = await asyncpg.connect(
+        host=TEST_DB_HOST,
+        port=TEST_DB_PORT,
+        user=TEST_DB_USER,
+        password=TEST_DB_PASSWORD,
+        database="postgres"
+    )
+    
+    try:
+        await cleanup_conn.execute(f"""
+            SELECT pg_terminate_backend(pid) 
+            FROM pg_stat_activity 
+            WHERE datname = '{TEST_DB_NAME}' AND pid <> pg_backend_pid()
+        """)
+        await cleanup_conn.execute(f"DROP DATABASE IF EXISTS {TEST_DB_NAME}")
+        logger.info(f"Dropped test database: {TEST_DB_NAME}")
+    finally:
+        await cleanup_conn.close()
+
+
+@pytest.fixture
+async def clean_database(setup_test_database):
+    """Ensure database is clean before each test."""
+    conn = await asyncpg.connect(
+        host=TEST_DB_HOST,
+        port=TEST_DB_PORT,
+        user=TEST_DB_USER,
+        password=TEST_DB_PASSWORD,
+        database=TEST_DB_NAME
+    )
+    
+    try:
+        # Clean all tables in correct order (respecting foreign keys)
+        await conn.execute("TRUNCATE TABLE audit_log CASCADE")
+        await conn.execute("TRUNCATE TABLE registration_codes CASCADE")
+        await conn.execute("TRUNCATE TABLE password_history CASCADE")
+        await conn.execute("TRUNCATE TABLE sessions CASCADE")
+        await conn.execute("TRUNCATE TABLE users CASCADE")
+        
+        logger.debug("Cleaned test database tables")
+    finally:
+        await conn.close()
+    
+    yield
+    
+    # Clean up after test
+    cleanup_conn = await asyncpg.connect(
+        host=TEST_DB_HOST,
+        port=TEST_DB_PORT,
+        user=TEST_DB_USER,
+        password=TEST_DB_PASSWORD,
+        database=TEST_DB_NAME
+    )
+    
+    try:
+        await cleanup_conn.execute("TRUNCATE TABLE audit_log CASCADE")
+        await cleanup_conn.execute("TRUNCATE TABLE registration_codes CASCADE")
+        await cleanup_conn.execute("TRUNCATE TABLE password_history CASCADE")
+        await cleanup_conn.execute("TRUNCATE TABLE sessions CASCADE")
+        await cleanup_conn.execute("TRUNCATE TABLE users CASCADE")
+    finally:
+        await cleanup_conn.close()
+
+
+@pytest.fixture
+async def test_db_pool(setup_test_database, clean_database):
+    """Create a test database pool connected to the test PostgreSQL database with transaction isolation."""
+    test_database_url = f"postgresql://{TEST_DB_USER}:{TEST_DB_PASSWORD}@{TEST_DB_HOST}:{TEST_DB_PORT}/{TEST_DB_NAME}"
+    
+    test_settings = Settings(
+        AUTH_MODE="multi_user",
+        DATABASE_URL=test_database_url,
+        JWT_SECRET_KEY="test-secret-key-for-testing-only",
+        ENABLE_REGISTRATION=True,
+        REQUIRE_REGISTRATION_CODE=False,
+        RATE_LIMIT_ENABLED=False
+    )
+    
+    pool = DatabasePool(test_settings)
+    await pool.initialize()
+    
+    # Create a connection and start a transaction for test isolation
+    conn = await pool.acquire()
+    transaction = await conn.transaction()
+    await transaction.start()
+    
+    try:
+        # Make the connection available to the pool for tests
+        pool._test_connection = conn
+        pool._test_transaction = transaction
+        
+        # Override acquire to return the test connection
+        original_acquire = pool.acquire
+        async def test_acquire():
+            return conn
+        pool.acquire = test_acquire
+        
+        yield pool
+    finally:
+        # Rollback the transaction to undo all test changes
+        try:
+            await transaction.rollback()
+            logger.debug("Rolled back test transaction")
+        except Exception as e:
+            logger.error(f"Error rolling back transaction: {e}")
+        
+        # Release the connection back to the pool
+        await pool.release(conn)
+        await pool.close()
 
 
 @pytest.fixture
 async def mock_db_pool():
-    """Create a mock database pool for testing."""
+    """Create a mock database pool for unit testing."""
     pool = AsyncMock(spec=DatabasePool)
     
     # Mock connection context manager
@@ -50,9 +292,14 @@ async def mock_db_pool():
     
     # Mock fetchone for user queries
     pool.fetchone = AsyncMock()
+    pool.fetchrow = AsyncMock()
+    pool.fetch = AsyncMock()
+    pool.fetchval = AsyncMock()
     
     # Mock execute for updates
     pool.execute = AsyncMock()
+    pool.acquire = AsyncMock()
+    pool.release = AsyncMock()
     
     return pool
 
@@ -100,9 +347,9 @@ def jwt_service(jwt_settings):
 
 
 @pytest.fixture
-async def session_manager(mock_db_pool):
+async def session_manager(test_db_pool):
     """Create a session manager instance for testing."""
-    manager = SessionManager(db_pool=mock_db_pool)
+    manager = SessionManager(db_pool=test_db_pool)
     yield manager
     # Cleanup
     await manager.shutdown()
@@ -118,72 +365,129 @@ async def rate_limiter():
 
 
 @pytest.fixture
-async def registration_service(mock_db_pool, password_service):
+async def registration_service(test_db_pool, password_service):
     """Create a registration service instance for testing."""
     return RegistrationService(
-        db_pool=mock_db_pool,
+        db_pool=test_db_pool,
         password_service=password_service,
         require_registration_code=False
     )
 
 
 @pytest.fixture
-def test_user():
-    """Create a test user dictionary."""
+async def audit_service(test_db_pool):
+    """Create an audit service instance for testing."""
+    return AuditService(test_db_pool)
+
+
+@pytest.fixture
+async def storage_service(test_db_pool):
+    """Create a storage quota service instance for testing."""
+    return StorageQuotaService(test_db_pool)
+
+
+@pytest.fixture
+async def test_user(test_db_pool, password_service):
+    """Create a test user in the database."""
+    user_uuid = str(uuid.uuid4())
+    password = "Test@Pass#2024!"
+    password_hash = password_service.hash_password(password)
+    
+    async with test_db_pool.acquire() as conn:
+        user = await conn.fetchrow("""
+            INSERT INTO users (
+                uuid, username, email, password_hash, role,
+                is_active, is_verified, storage_quota_mb, storage_used_mb
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, uuid, username, email, role, is_active, is_verified,
+                      storage_quota_mb, storage_used_mb, created_at
+        """, user_uuid, "testuser", "test@example.com", password_hash,
+            "user", True, True, 5120, 0.0)
+    
     return {
-        'id': 1,
-        'uuid': 'test-uuid-123',
-        'username': 'testuser',
-        'email': 'test@example.com',
-        'password_hash': '$2b$12$test_hash',  # Mock hash
-        'role': 'user',
-        'is_active': True,
-        'is_verified': True,
-        'created_at': datetime.utcnow(),
-        'updated_at': datetime.utcnow(),
-        'last_login': datetime.utcnow(),
-        'storage_quota_mb': 1000,
-        'storage_used_mb': 100
+        "id": user["id"],
+        "uuid": str(user["uuid"]),
+        "username": user["username"],
+        "email": user["email"],
+        "role": user["role"],
+        "is_active": user["is_active"],
+        "is_verified": user["is_verified"],
+        "storage_quota_mb": user["storage_quota_mb"],
+        "storage_used_mb": user["storage_used_mb"],
+        "created_at": user["created_at"],
+        "password": password,
+        "password_hash": password_hash
     }
 
 
 @pytest.fixture
-def admin_user():
-    """Create a test admin user dictionary."""
+async def admin_user(test_db_pool, password_service):
+    """Create an admin test user in the database."""
+    user_uuid = str(uuid.uuid4())
+    password = "Admin@Pass#2024!"
+    password_hash = password_service.hash_password(password)
+    
+    async with test_db_pool.acquire() as conn:
+        user = await conn.fetchrow("""
+            INSERT INTO users (
+                uuid, username, email, password_hash, role,
+                is_active, is_verified, storage_quota_mb, storage_used_mb
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, uuid, username, email, role, is_active, is_verified,
+                      storage_quota_mb, storage_used_mb, created_at
+        """, user_uuid, "admin", "admin@example.com", password_hash,
+            "admin", True, True, 10240, 0.0)
+    
     return {
-        'id': 2,
-        'uuid': 'admin-uuid-456',
-        'username': 'adminuser',
-        'email': 'admin@example.com',
-        'password_hash': '$2b$12$admin_hash',  # Mock hash
-        'role': 'admin',
-        'is_active': True,
-        'is_verified': True,
-        'created_at': datetime.utcnow(),
-        'updated_at': datetime.utcnow(),
-        'last_login': datetime.utcnow(),
-        'storage_quota_mb': 10000,
-        'storage_used_mb': 500
+        "id": user["id"],
+        "uuid": str(user["uuid"]),
+        "username": user["username"],
+        "email": user["email"],
+        "role": user["role"],
+        "is_active": user["is_active"],
+        "is_verified": user["is_verified"],
+        "storage_quota_mb": user["storage_quota_mb"],
+        "storage_used_mb": user["storage_used_mb"],
+        "created_at": user["created_at"],
+        "password": password,
+        "password_hash": password_hash
     }
 
 
 @pytest.fixture
-def inactive_user():
-    """Create an inactive test user dictionary."""
+async def inactive_user(test_db_pool, password_service):
+    """Create an inactive test user in the database."""
+    user_uuid = str(uuid.uuid4())
+    password = "Inactive@Pass#2024!"
+    password_hash = password_service.hash_password(password)
+    
+    async with test_db_pool.acquire() as conn:
+        user = await conn.fetchrow("""
+            INSERT INTO users (
+                uuid, username, email, password_hash, role,
+                is_active, is_verified, storage_quota_mb, storage_used_mb
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, uuid, username, email, role, is_active, is_verified,
+                      storage_quota_mb, storage_used_mb, created_at
+        """, user_uuid, "inactiveuser", "inactive@example.com", password_hash,
+            "user", False, True, 5120, 0.0)
+    
     return {
-        'id': 3,
-        'uuid': 'inactive-uuid-789',
-        'username': 'inactiveuser',
-        'email': 'inactive@example.com',
-        'password_hash': '$2b$12$inactive_hash',  # Mock hash
-        'role': 'user',
-        'is_active': False,
-        'is_verified': True,
-        'created_at': datetime.utcnow(),
-        'updated_at': datetime.utcnow(),
-        'last_login': None,
-        'storage_quota_mb': 1000,
-        'storage_used_mb': 0
+        "id": user["id"],
+        "uuid": str(user["uuid"]),
+        "username": user["username"],
+        "email": user["email"],
+        "role": user["role"],
+        "is_active": user["is_active"],
+        "is_verified": user["is_verified"],
+        "storage_quota_mb": user["storage_quota_mb"],
+        "storage_used_mb": user["storage_used_mb"],
+        "created_at": user["created_at"],
+        "password": password,
+        "password_hash": password_hash
     }
 
 
@@ -228,3 +532,11 @@ def auth_headers(valid_access_token):
 def api_key_headers():
     """Create API key headers for single-user mode."""
     return {"X-API-KEY": settings.get("SINGLE_USER_API_KEY", "test-api-key")}
+
+
+@pytest.fixture(autouse=True)
+def clear_app_overrides():
+    """Clear FastAPI app dependency overrides after each test."""
+    yield
+    from tldw_Server_API.app.main import app
+    app.dependency_overrides.clear()

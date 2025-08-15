@@ -84,7 +84,7 @@ class TestUserEndpoints:
         """Test changing user password."""
         # Setup user with known password
         test_user_copy = test_user.copy()
-        test_user_copy['password_hash'] = password_service.hash_password("oldpass123")
+        test_user_copy['password_hash'] = password_service.hash_password("Old@Pass#2024")
         
         mock_db_pool.fetchrow = AsyncMock(return_value=test_user_copy)
         mock_db_pool.execute = AsyncMock()
@@ -110,8 +110,8 @@ class TestUserEndpoints:
                 "/api/v1/users/change-password",
                 headers={"Authorization": f"Bearer {valid_access_token}"},
                 json={
-                    "current_password": "oldpass123",
-                    "new_password": "NewSecurePass123!"
+                    "current_password": "Old@Pass#2024",
+                    "new_password": "New@Secure#2024!"
                 }
             )
         
@@ -125,7 +125,7 @@ class TestUserEndpoints:
     async def test_change_password_wrong_current(self, mock_db_pool, password_service, test_user, valid_access_token):
         """Test changing password with wrong current password."""
         test_user_copy = test_user.copy()
-        test_user_copy['password_hash'] = password_service.hash_password("oldpass123")
+        test_user_copy['password_hash'] = password_service.hash_password("Old@Pass#2024")
         
         mock_db_pool.fetchrow = AsyncMock(return_value=test_user_copy)
         
@@ -151,7 +151,7 @@ class TestUserEndpoints:
                 headers={"Authorization": f"Bearer {valid_access_token}"},
                 json={
                     "current_password": "wrongpass",
-                    "new_password": "NewSecurePass123!"
+                    "new_password": "New@Secure#2024!"
                 }
             )
         
