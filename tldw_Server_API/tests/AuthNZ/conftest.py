@@ -134,7 +134,8 @@ async def isolated_test_environment(monkeypatch):
                 email_verified_at TIMESTAMP,
                 two_factor_enabled BOOLEAN DEFAULT FALSE,
                 two_factor_secret TEXT,
-                created_by INTEGER REFERENCES users(id)
+                created_by INTEGER REFERENCES users(id),
+                password_changed_at TIMESTAMP
             )
         """)
         
@@ -172,12 +173,13 @@ async def isolated_test_environment(monkeypatch):
                 id SERIAL PRIMARY KEY,
                 code VARCHAR(255) UNIQUE NOT NULL,
                 max_uses INTEGER DEFAULT 1,
-                uses_count INTEGER DEFAULT 0,
+                times_used INTEGER DEFAULT 0,
                 expires_at TIMESTAMP,
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 role_to_grant VARCHAR(50) DEFAULT 'user',
-                is_active BOOLEAN DEFAULT TRUE
+                is_active BOOLEAN DEFAULT TRUE,
+                metadata JSONB
             )
         """)
         
@@ -186,6 +188,8 @@ async def isolated_test_environment(monkeypatch):
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 action VARCHAR(255) NOT NULL,
+                target_type VARCHAR(100),
+                target_id INTEGER,
                 details JSONB,
                 ip_address VARCHAR(45),
                 user_agent TEXT,
@@ -312,7 +316,8 @@ async def setup_test_database():
                 email_verified_at TIMESTAMP,
                 two_factor_enabled BOOLEAN DEFAULT FALSE,
                 two_factor_secret TEXT,
-                created_by INTEGER REFERENCES users(id)
+                created_by INTEGER REFERENCES users(id),
+                password_changed_at TIMESTAMP
             )
         """)
         
@@ -350,12 +355,13 @@ async def setup_test_database():
                 id SERIAL PRIMARY KEY,
                 code VARCHAR(255) UNIQUE NOT NULL,
                 max_uses INTEGER DEFAULT 1,
-                uses_count INTEGER DEFAULT 0,
+                times_used INTEGER DEFAULT 0,
                 expires_at TIMESTAMP,
                 created_by INTEGER REFERENCES users(id),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 role_to_grant VARCHAR(50) DEFAULT 'user',
-                is_active BOOLEAN DEFAULT TRUE
+                is_active BOOLEAN DEFAULT TRUE,
+                metadata JSONB
             )
         """)
         
@@ -364,6 +370,8 @@ async def setup_test_database():
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 action VARCHAR(255) NOT NULL,
+                target_type VARCHAR(100),
+                target_id INTEGER,
                 details JSONB,
                 ip_address VARCHAR(45),
                 user_agent TEXT,

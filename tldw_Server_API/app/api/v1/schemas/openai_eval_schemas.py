@@ -96,7 +96,7 @@ class UpdateEvaluationRequest(OpenAIBaseModel):
     description: Optional[str] = None
     eval_spec: Optional[EvaluationSpec] = None
     dataset_id: Optional[str] = None
-    metadata: Optional[EvaluationMetadata] = None
+    metadata: Optional[Union[EvaluationMetadata, Dict[str, Any]]] = None
 
 
 class EvaluationResponse(OpenAIBaseModel):

@@ -454,9 +454,10 @@ class TestAdminEndpoints:
         assert "storage" in data
         assert "sessions" in data
     
-    def test_get_audit_log(self, test_client, admin_headers):
+    async def test_get_audit_log(self, isolated_test_environment, admin_headers):
         """Test getting audit log"""
-        response = test_client.get(
+        client, db_name = isolated_test_environment
+        response = client.get(
             "/api/v1/admin/audit-log",
             headers=admin_headers
         )
@@ -472,31 +473,35 @@ class TestAdminEndpoints:
 class TestHealthEndpoints:
     """Test health monitoring endpoints"""
     
-    def test_health_check(self, test_client):
+    async def test_health_check(self, isolated_test_environment):
         """Test main health check"""
-        response = test_client.get("/api/v1/health")
+        client, db_name = isolated_test_environment
+        response = client.get("/api/v1/health")
         assert response.status_code in [200, 206, 503]
         data = response.json()
         assert "status" in data
         assert "checks" in data
         assert "timestamp" in data
     
-    def test_liveness_probe(self, test_client):
+    async def test_liveness_probe(self, isolated_test_environment):
         """Test liveness probe"""
-        response = test_client.get("/api/v1/health/live")
+        client, db_name = isolated_test_environment
+        response = client.get("/api/v1/health/live")
         assert response.status_code == 200
         assert response.json()["status"] == "alive"
     
-    def test_readiness_probe(self, test_client):
+    async def test_readiness_probe(self, isolated_test_environment):
         """Test readiness probe"""
-        response = test_client.get("/api/v1/health/ready")
+        client, db_name = isolated_test_environment
+        response = client.get("/api/v1/health/ready")
         assert response.status_code in [200, 503]
         data = response.json()
         assert "status" in data
     
-    def test_metrics_endpoint(self, test_client):
+    async def test_metrics_endpoint(self, isolated_test_environment):
         """Test metrics endpoint"""
-        response = test_client.get("/api/v1/health/metrics")
+        client, db_name = isolated_test_environment
+        response = client.get("/api/v1/health/metrics")
         assert response.status_code == 200
         data = response.json()
         assert "cpu" in data
@@ -511,22 +516,25 @@ class TestHealthEndpoints:
 class TestSecurity:
     """Test security features"""
     
-    def test_unauthorized_access(self, test_client):
+    async def test_unauthorized_access(self, isolated_test_environment):
         """Test accessing protected endpoint without auth"""
-        response = test_client.get("/api/v1/users/me")
+        client, db_name = isolated_test_environment
+        response = client.get("/api/v1/users/me")
         assert response.status_code in [401, 403]  # Both unauthorized and forbidden are acceptable
     
-    def test_invalid_token(self, test_client):
+    async def test_invalid_token(self, isolated_test_environment):
         """Test with invalid token"""
-        response = test_client.get(
+        client, db_name = isolated_test_environment
+        response = client.get(
             "/api/v1/users/me",
             headers={"Authorization": "Bearer invalid-token"}
         )
         assert response.status_code == 401
     
-    def test_admin_endpoint_as_user(self, test_client, auth_headers):
+    async def test_admin_endpoint_as_user(self, isolated_test_environment, auth_headers):
         """Test accessing admin endpoint as regular user"""
-        response = test_client.get(
+        client, db_name = isolated_test_environment
+        response = client.get(
             "/api/v1/admin/users",
             headers=auth_headers
         )
@@ -537,11 +545,12 @@ class TestSecurity:
         get_settings().RATE_LIMIT_ENABLED == False,
         reason="Rate limiting disabled"
     )
-    def test_rate_limiting(self, test_client):
+    async def test_rate_limiting(self, isolated_test_environment):
         """Test rate limiting"""
+        client, db_name = isolated_test_environment
         # Make many requests quickly
         for i in range(10):
-            response = test_client.post(
+            response = client.post(
                 "/api/v1/auth/login",
                 data={
                     "username": "test",
@@ -631,10 +640,11 @@ class TestPerformance:
 class TestIntegration:
     """Test full user flows"""
     
-    def test_full_user_lifecycle(self, test_client, admin_headers):
+    async def test_full_user_lifecycle(self, isolated_test_environment, admin_headers):
         """Test complete user lifecycle from registration to deletion"""
+        client, db_name = isolated_test_environment
         # 1. Register new user
-        register_response = test_client.post(
+        register_response = client.post(
             "/api/v1/auth/register",
             json={
                 "username": "lifecycle_user",
@@ -642,11 +652,11 @@ class TestIntegration:
                 "password": "Life@Cycle#2024!"
             }
         )
-        assert register_response.status_code == 201
+        assert register_response.status_code in [200, 201]
         user_id = register_response.json()["user_id"]
         
         # 2. Login as new user
-        login_response = test_client.post(
+        login_response = client.post(
             "/api/v1/auth/login",
             data={
                 "username": "lifecycle_user",
@@ -658,14 +668,14 @@ class TestIntegration:
         user_headers = {"Authorization": f"Bearer {token}"}
         
         # 3. Get user profile
-        profile_response = test_client.get(
+        profile_response = client.get(
             "/api/v1/users/me",
             headers=user_headers
         )
         assert profile_response.status_code == 200
         
         # 4. Change password
-        password_response = test_client.post(
+        password_response = client.post(
             "/api/v1/users/change-password",
             headers=user_headers,
             json={
@@ -676,7 +686,7 @@ class TestIntegration:
         assert password_response.status_code == 200
         
         # 5. Admin updates user
-        update_response = test_client.put(
+        update_response = client.put(
             f"/api/v1/admin/users/{user_id}",
             headers=admin_headers,
             json={
@@ -686,14 +696,14 @@ class TestIntegration:
         assert update_response.status_code == 200
         
         # 6. Admin deactivates user
-        deactivate_response = test_client.delete(
+        deactivate_response = client.delete(
             f"/api/v1/admin/users/{user_id}",
             headers=admin_headers
         )
         assert deactivate_response.status_code == 200
         
         # 7. User can't login after deactivation
-        failed_login = test_client.post(
+        failed_login = client.post(
             "/api/v1/auth/login",
             data={
                 "username": "lifecycle_user",

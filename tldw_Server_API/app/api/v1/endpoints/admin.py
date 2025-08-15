@@ -145,7 +145,7 @@ async def list_users(
             else:
                 user_dict = {
                     "id": row[0],
-                    "uuid": row[1],
+                    "uuid": str(row[1]) if row[1] and not isinstance(row[1], str) else row[1],
                     "username": row[2],
                     "email": row[3],
                     "role": row[4],
@@ -217,6 +217,10 @@ async def get_user_details(
         
         # Remove sensitive fields
         user.pop('password_hash', None)
+        
+        # Convert UUID to string if needed
+        if 'uuid' in user and user['uuid'] and not isinstance(user['uuid'], str):
+            user['uuid'] = str(user['uuid'])
         
         return user
         

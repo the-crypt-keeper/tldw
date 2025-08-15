@@ -288,6 +288,11 @@ async def update_evaluation(
                 error_type="invalid_request_error"
             )
         
+        # Handle metadata - if it's a dict from EvaluationMetadata model, extract it
+        if "metadata" in updates and isinstance(updates["metadata"], dict):
+            # Already a dict, use as-is
+            pass
+        
         success = eval_db.update_evaluation(eval_id, updates)
         if not success:
             raise create_error_response(
@@ -311,7 +316,7 @@ async def update_evaluation(
         )
 
 
-@router.delete("/v1/evals/{eval_id}")
+@router.delete("/v1/evals/{eval_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_evaluation(
     eval_id: str,
     api_key: str = Depends(verify_api_key)
@@ -327,7 +332,8 @@ async def delete_evaluation(
                 status_code=status.HTTP_404_NOT_FOUND
             )
         
-        return {"deleted": True, "id": eval_id}
+        # Return nothing for 204 No Content
+        return
         
     except HTTPException:
         raise
@@ -694,7 +700,7 @@ async def stream_run_progress(
 
 # ============= Dataset Endpoints =============
 
-@router.post("/v1/datasets", response_model=DatasetResponse)
+@router.post("/v1/datasets", response_model=DatasetResponse, status_code=status.HTTP_201_CREATED)
 async def create_dataset(
     dataset_request: CreateDatasetRequest,
     api_key: str = Depends(verify_api_key)
@@ -786,7 +792,7 @@ async def get_dataset(
         )
 
 
-@router.delete("/v1/datasets/{dataset_id}")
+@router.delete("/v1/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_dataset(
     dataset_id: str,
     api_key: str = Depends(verify_api_key)
@@ -802,7 +808,8 @@ async def delete_dataset(
                 status_code=status.HTTP_404_NOT_FOUND
             )
         
-        return {"deleted": True, "id": dataset_id}
+        # Return nothing for 204 No Content
+        return
         
     except HTTPException:
         raise

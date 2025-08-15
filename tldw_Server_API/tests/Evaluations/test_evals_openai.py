@@ -261,7 +261,12 @@ class TestEvaluationCRUD:
         """Test getting non-existent evaluation"""
         response = client.get("/v1/evals/eval_nonexistent", headers=auth_headers)
         assert response.status_code == 404
-        assert "error" in response.json()
+        data = response.json()
+        # Handle FastAPI error response format
+        if "detail" in data and isinstance(data["detail"], dict):
+            assert "error" in data["detail"]
+        else:
+            assert "error" in data
 
 
 class TestDatasetOperations:
@@ -469,7 +474,12 @@ class TestErrorHandling:
             headers=auth_headers
         )
         assert response.status_code == 404
-        assert "error" in response.json()
+        data = response.json()
+        # Handle FastAPI error response format
+        if "detail" in data and isinstance(data["detail"], dict):
+            assert "error" in data["detail"]
+        else:
+            assert "error" in data
     
     def test_large_dataset(self, client, auth_headers):
         """Test handling large dataset"""

@@ -201,7 +201,10 @@ class EvaluationRunner:
     ) -> Callable:
         """Get the appropriate evaluation function"""
         if eval_type == "model_graded":
-            sub_type = eval_spec.get("sub_type", "summarization")
+            sub_type = eval_spec.get("sub_type")
+            # Default to summarization if sub_type is None or empty
+            if not sub_type:
+                sub_type = "summarization"
             
             if sub_type == "summarization":
                 return self._eval_summarization
