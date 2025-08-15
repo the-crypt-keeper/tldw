@@ -159,8 +159,10 @@ class DatabasePool:
             conn = None
             try:
                 conn = await self.pool.acquire()
+                # Start a transaction using async with
                 async with conn.transaction():
                     yield conn
+                logger.debug("PostgreSQL transaction committed successfully")
             except asyncpg.exceptions.TooManyConnectionsError:
                 raise ConnectionPoolExhaustedError()
             except Exception as e:

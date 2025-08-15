@@ -184,7 +184,8 @@ async def login(
             )
             
             refresh_token = jwt_service.create_refresh_token(
-                user_id=user['id']
+                user_id=user['id'],
+                username=user['username']
             )
         
         # Create session
