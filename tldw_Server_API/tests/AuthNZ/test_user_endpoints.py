@@ -349,7 +349,19 @@ class TestUserEndpointsProperty:
     @hypothesis_settings(max_examples=10, deadline=5000, suppress_health_check=[HealthCheck.function_scoped_fixture])
     async def test_update_profile_with_various_emails(self, email, mock_db_pool, test_user, valid_access_token):
         """Test updating profile with various email formats."""
-        updated_user = {**test_user, 'email': email}
+        # Import email-validator to normalize the email the same way Pydantic does
+        from email_validator import validate_email, EmailNotValidError
+        
+        # Normalize the email using email-validator (same as Pydantic's EmailStr)
+        try:
+            # This will normalize IDN domains from Punycode to Unicode
+            validation = validate_email(email, check_deliverability=False)
+            normalized_email = validation.normalized.lower()
+        except (EmailNotValidError, Exception):
+            # If validation fails, just use lowercase
+            normalized_email = email.lower()
+        
+        updated_user = {**test_user, 'email': normalized_email}
         
         # Setup mock connection with proper transaction context
         mock_conn = AsyncMock()
@@ -392,8 +404,8 @@ class TestUserEndpointsProperty:
         else:
             assert response.status_code == 200
             data = response.json()
-            # Email should be lowercased by the endpoint
-            assert data["email"] == email.lower()
+            # Email should be normalized and lowercased by the endpoint
+            assert data["email"] == normalized_email
         
         app.dependency_overrides.clear()
     
