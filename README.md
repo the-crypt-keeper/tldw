@@ -22,9 +22,20 @@ cd tldw_server
 python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp config.txt.example config.txt  # Configure your API keys
+
+# Configure API providers
+cp config.txt.example config.txt  # Add your LLM API keys
+
+# Setup authentication (choose single or multi-user mode)
+cp .env.authnz.template .env
+# For single-user: Set AUTH_MODE=single_user and generate API key
+# For multi-user: Set AUTH_MODE=multi_user and generate JWT secret
+python -m tldw_Server_API.app.core.AuthNZ.initialize
+
+# Start server
 python -m uvicorn tldw_Server_API.app.main:app --reload
 # API docs: http://127.0.0.1:8000/docs
+# Your API key will be shown in console (single-user mode)
 ```
 
 <details>
@@ -83,11 +94,13 @@ See the [Migration Guide](#migration-guide) if upgrading from a previous version
 - **Flexible Analysis**: Multiple chunking strategies and prompt customization
 - **Evaluation System**: G-Eval, RAG evaluation, response quality metrics
 
-### Search & Retrieval
-- **Hybrid Search**: SQLite FTS5 + ChromaDB vector embeddings
-- **Advanced RAG**: Query expansion, re-ranking, and contextual retrieval
-- **Metadata Search**: By title, author, URL, tags, content
-- **Smart Caching**: Multi-level caching with semantic matching
+### Search & Retrieval (RAG v2)
+- **Production-Ready RAG**: 100% test coverage, fully async architecture
+- **Hybrid Search**: BM25 (SQLite FTS5) + vector embeddings (ChromaDB) with Reciprocal Rank Fusion
+- **Advanced Strategies**: Query Fusion, HyDE (Hypothetical Document Embeddings), vanilla search
+- **Multi-Source Retrieval**: Search across media, notes, characters, and chat history simultaneously
+- **Smart Caching**: LRU cache with semantic matching and TTL management
+- **Flexible Configuration**: Fine-tune semantic/fulltext weights, similarity thresholds, and reranking
 
 ### API Capabilities
 - **OpenAI Compatible**: `/chat/completions` endpoint for drop-in replacement
@@ -173,6 +186,11 @@ pip install -r requirements.txt
 cp config.txt.example config.txt
 # Edit config.txt with your API keys
 
+# Setup Authentication (First Time Only)
+cp .env.authnz.template .env
+# Edit .env with secure values (see Authentication Setup below)
+python -m tldw_Server_API.app.core.AuthNZ.initialize
+
 # Run server
 python -m uvicorn tldw_Server_API.app.main:app --reload
 ```
@@ -211,6 +229,131 @@ brew install ffmpeg portaudio
 
 ---
 
+## Authentication Setup
+
+<summary>Authentication Setup</summary>
+
+<details>
+
+The tldw_server uses the AuthNZ module for authentication, supporting both single-user (personal) and multi-user (team) deployments.
+
+### Quick Setup (Single-User Mode)
+
+For personal use, the simplest setup:
+
+```bash
+# 1. Copy the authentication template
+cp .env.authnz.template .env
+
+# 2. Generate a secure API key
+python -c "import secrets; print('SINGLE_USER_API_KEY=' + secrets.token_urlsafe(32))"
+
+# 3. Add the generated key to your .env file
+# Edit .env and replace SINGLE_USER_API_KEY value
+
+# 4. Set AUTH_MODE to single_user in .env
+AUTH_MODE=single_user
+
+# 5. Initialize the authentication system
+python -m tldw_Server_API.app.core.AuthNZ.initialize
+
+# 6. Start the server - your API key will be displayed in the console
+python -m uvicorn tldw_Server_API.app.main:app --reload
+```
+
+When the server starts, you'll see:
+```
+INFO: 🔑 Single-user mode active
+INFO: 📌 API Key: your-generated-api-key-here
+INFO: Use header 'X-API-KEY: your-key' for authentication
+```
+
+Use this API key in all requests:
+```bash
+curl -H "X-API-KEY: your-api-key" http://localhost:8000/api/v1/media/search
+```
+
+### Multi-User Setup (Team/Production)
+
+For team deployments with user management:
+
+```bash
+# 1. Copy and configure authentication
+cp .env.authnz.template .env
+
+# 2. Generate secure keys
+python -c "import secrets; print('JWT_SECRET_KEY=' + secrets.token_urlsafe(32))"
+python -c "from cryptography.fernet import Fernet; print('SESSION_ENCRYPTION_KEY=' + Fernet.generate_key().decode())"
+
+# 3. Edit .env file:
+#    - Set AUTH_MODE=multi_user
+#    - Add generated JWT_SECRET_KEY
+#    - Add generated SESSION_ENCRYPTION_KEY
+#    - Configure database settings
+
+# 4. Initialize and create admin user
+python -m tldw_Server_API.app.core.AuthNZ.initialize
+# You'll be prompted to create an admin user
+
+# 5. Start the server
+python -m uvicorn tldw_Server_API.app.main:app --reload
+```
+
+Login to get JWT token:
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "your-password"}'
+```
+
+Use the token in requests:
+```bash
+curl -H "Authorization: Bearer your-jwt-token" \
+  http://localhost:8000/api/v1/media/search
+```
+
+### Configuration Options
+
+Key settings in `.env`:
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `AUTH_MODE` | `single_user` or `multi_user` | `multi_user` |
+| `JWT_SECRET_KEY` | Secret for JWT signing (multi-user) | Required for multi-user |
+| `SINGLE_USER_API_KEY` | API key for single-user mode | Required for single-user |
+| `ENABLE_REGISTRATION` | Allow new user registration | `false` |
+| `DATABASE_URL` | User database location | `sqlite:///./Databases/users.db` |
+
+### Security Best Practices
+
+1. **Never commit `.env` to version control** - Add to `.gitignore`
+2. **Use strong, unique keys** - Generate with the provided commands
+3. **Enable HTTPS in production** - Required for secure cookies
+4. **Rotate keys periodically** - Use the API key rotation feature
+5. **Monitor authentication failures** - Check logs for attacks
+
+### Troubleshooting
+
+**"JWT_SECRET_KEY not set"**
+- Ensure JWT_SECRET_KEY is set in your .env file for multi-user mode
+
+**"API key not found"**
+- Check that X-API-KEY header is included in requests
+- Verify the API key matches what's in .env (single-user) or displayed at startup
+
+**"Rate limit exceeded"**
+- Default: 60 requests/minute for authenticated users
+- Adjust RATE_LIMIT_PER_MINUTE in .env if needed
+
+### Documentation
+
+- **[AuthNZ Developer Guide](Docs/Development/AuthNZ-Developer-Guide.md)** - Architecture and extending the authentication system
+- **[AuthNZ API Guide](Docs/API-related/AuthNZ-API-Guide.md)** - Complete API reference with examples
+
+</details>
+
+---
+
 ## API Documentation
 
 Full API documentation is available at `http://localhost:8000/docs` when the server is running.
@@ -231,6 +374,13 @@ Full API documentation is available at `http://localhost:8000/docs` when the ser
 - `POST /api/v1/chat/completions` - Chat completion (OpenAI format)
 - `GET /api/v1/chat/history` - Get chat history
 - `POST /api/v1/chat/characters` - Character chat
+
+#### RAG (Retrieval-Augmented Generation)
+- `POST /api/v1/rag/search` - Simple hybrid search across databases
+- `POST /api/v1/rag/search/advanced` - Advanced search with full configuration
+- `POST /api/v1/rag/agent` - Q&A agent with automatic context retrieval
+- `POST /api/v1/rag/agent/advanced` - Research agent with tools and streaming
+- `GET /api/v1/rag/health` - RAG service health status
 
 #### Content Management
 - `POST /api/v1/notes` - Create note
@@ -273,7 +423,38 @@ curl -X POST "http://localhost:8000/api/v1/chat/completions" \
 curl -X GET "http://localhost:8000/api/v1/media/search?query=machine+learning&limit=10"
 ```
 
+#### RAG Search & Q&A
+```bash
+# Hybrid search across your content
+curl -X POST "http://localhost:8000/api/v1/rag/search" \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key" \
+  -d '{
+    "query": "machine learning concepts",
+    "search_type": "hybrid",
+    "databases": ["media_db", "notes"]
+  }'
+
+# Q&A with automatic context retrieval
+curl -X POST "http://localhost:8000/api/v1/rag/agent" \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key" \
+  -d '{
+    "message": "Explain neural networks based on my notes",
+    "search_databases": ["media_db", "notes"]
+  }'
+```
+
 </details>
+
+---
+
+## RAG Documentation
+
+The RAG module has comprehensive documentation for both developers and API consumers:
+
+- **[RAG Developer Guide](Docs/Development/RAG-Developer-Guide.md)** - Architecture, components, testing, and extending the RAG module
+- **[RAG API Guide](Docs/API-related/RAG-API-Guide.md)** - Complete API reference with examples in JavaScript, Python, and cURL
 
 ---
 

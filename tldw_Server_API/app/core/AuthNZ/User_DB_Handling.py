@@ -9,21 +9,8 @@ from fastapi import Depends, HTTPException, status, Header
 from pydantic import BaseModel, ValidationError
 #
 # Local Imports
-# User Management DB (Import attempted, but may not be used/needed in single-user mode)
-try:
-    # Make sure this import path is correct if/when you add Users_DB
-    from tldw_Server_API.app.core.DB_Management.Users_DB import get_user_by_id, UserNotFoundError
-except ImportError:
-    # Define dummy versions if the module doesn't exist yet
-    class UserNotFoundError(Exception): pass
-    async def get_user_by_id(user_id: int): return None
-    print("WARNING: Users_DB module not found. Multi-user mode will likely fail.")
-
-# Security & Config
-# Old JWT handling - to be replaced
-# from tldw_Server_API.app.core.Security.Security import decode_access_token, TokenData
-# Import the settings dictionary directly
-from tldw_Server_API.app.core.config import settings
+# New unified settings
+from tldw_Server_API.app.core.AuthNZ.settings import get_settings, is_single_user_mode, is_multi_user_mode
 # New JWT service
 from tldw_Server_API.app.core.AuthNZ.jwt_service import get_jwt_service
 from tldw_Server_API.app.core.AuthNZ.exceptions import InvalidTokenError, TokenExpiredError
@@ -43,12 +30,20 @@ class User(BaseModel):
     is_active: bool = True
 
 # --- Single User "Dummy" Object ---
-# Created when in single-user mode using values from the settings dictionary
-_single_user_instance = User(
-    id=settings["SINGLE_USER_FIXED_ID"],
-    username="single_user",
-    is_active=True
-)
+# Created when in single-user mode using values from the settings
+_single_user_instance = None
+
+def get_single_user_instance() -> User:
+    """Get or create the single user instance"""
+    global _single_user_instance
+    if _single_user_instance is None:
+        settings = get_settings()
+        _single_user_instance = User(
+            id=settings.SINGLE_USER_FIXED_ID,
+            username="single_user",
+            is_active=True
+        )
+    return _single_user_instance
 
 #######################################################################################################################
 
@@ -57,15 +52,16 @@ _single_user_instance = User(
 async def verify_single_user_api_key(api_key: str = Header(..., alias="X-API-KEY")):
     """
     Dependency to verify the fixed API key in single-user mode.
-    Reads settings from the imported 'settings' dictionary.
+    Uses the unified settings system.
     """
-    # Check mode from the dictionary
-    if not settings["SINGLE_USER_MODE"]:
+    # Check mode using the helper function
+    if not is_single_user_mode():
          logger.error("verify_single_user_api_key called unexpectedly in multi-user mode.")
          raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Configuration error")
 
-    # Compare with the API key from the dictionary
-    if api_key != settings["SINGLE_USER_API_KEY"]:
+    # Compare with the API key from settings
+    settings = get_settings()
+    if api_key != settings.SINGLE_USER_API_KEY:
         logger.warning(f"Invalid API Key received in single-user mode: '{api_key[:5]}...'")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -81,18 +77,20 @@ async def verify_jwt_and_fetch_user(token: str = Depends(oauth2_scheme)) -> User
     Dependency to verify JWT and fetch user details in multi-user mode.
     Uses the new JWT service for token validation.
     """
-    # Check mode from the dictionary
-    if settings["SINGLE_USER_MODE"]:
+    # Check mode using the helper function
+    if is_single_user_mode():
          logger.error("verify_jwt_and_fetch_user called unexpectedly in single-user mode.")
          raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Configuration error")
 
-    # Check if Users DB is configured via settings dictionary
-    if not settings["USERS_DB_CONFIGURED"]:
-         logger.error("Multi-user mode requires Users DB, but it's not configured (USERS_DB_ENABLED!=true).")
-         raise HTTPException(
-             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-             detail="Multi-user mode requires Users DB configuration."
-         )
+    # Import Users_DB here to avoid import errors in single-user mode
+    try:
+        from tldw_Server_API.app.core.DB_Management.Users_DB import get_user_by_id, UserNotFoundError
+    except ImportError:
+        logger.error("Multi-user mode requires Users_DB module, but it's not available.")
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Multi-user mode requires Users_DB implementation."
+        )
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -204,15 +202,16 @@ async def get_request_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="X-API-KEY header required for single-user mode"
             )
-        if api_key != settings["SINGLE_USER_API_KEY"]:
+        settings = get_settings()
+        if api_key != settings.SINGLE_USER_API_KEY:
             logger.warning(
-                f"Single-User Mode: Invalid X-API-KEY. Expected: '{settings['SINGLE_USER_API_KEY']}', Got: '{api_key[:10]}...'")
+                f"Single-User Mode: Invalid X-API-KEY. Got: '{api_key[:10]}...'")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid X-API-KEY"
             )
         logger.debug("Single-user API Key verified. Returning fixed user object.")
-        return _single_user_instance  # _single_user_instance should be defined in this file
+        return get_single_user_instance()  # Use the getter function
     else:
         # Multi-User Mode: Bearer token is primary.
         # 'api_key' might be present or None, but we ignore it in multi-user mode if 'token' is valid.

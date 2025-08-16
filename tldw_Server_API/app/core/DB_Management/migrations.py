@@ -180,8 +180,14 @@ class MigrationManager:
 
 # ============= Evaluation Database Migrations =============
 
-def create_evaluations_migrations() -> MigrationManager:
-    """Create migrations for the evaluations database."""
+def create_evaluations_migrations(db_path: Optional[Path] = None) -> MigrationManager:
+    """Create migrations for the evaluations database.
+    
+    Args:
+        db_path: Optional path to database (uses default if not provided)
+    """
+    if db_path is None:
+        db_path = Path("Databases/evaluations.db")
     
     def migration_001_initial_schema(conn: sqlite3.Connection):
         """Create initial evaluation tables."""
@@ -261,7 +267,7 @@ def create_evaluations_migrations() -> MigrationManager:
             conn.execute("ALTER TABLE internal_evaluations ADD COLUMN embedding_model TEXT")
     
     # Create manager and add migrations
-    manager = MigrationManager(Path("Databases/evaluations.db"))
+    manager = MigrationManager(db_path)
     
     manager.add_migration(Migration(
         1, "initial_schema", 
@@ -303,7 +309,7 @@ def migrate_evaluations_database(db_path: Optional[Path] = None) -> None:
     manager = MigrationManager(db_path)
     
     # Add all migrations
-    migrations = create_evaluations_migrations()
+    migrations = create_evaluations_migrations(db_path)
     for migration in migrations.migrations:
         manager.add_migration(migration)
     

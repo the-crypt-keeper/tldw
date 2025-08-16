@@ -1,9 +1,11 @@
 # session_manager.py
-# Description: Session management with Redis caching and automatic cleanup
+# Description: Session management with Redis caching, encryption, and automatic cleanup
 #
 # Imports
 import json
 import hashlib
+import secrets
+import base64
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 import asyncio
@@ -13,6 +15,9 @@ import redis
 from redis.exceptions import RedisError, ConnectionError as RedisConnectionError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from loguru import logger
 #
 # Local imports
@@ -30,7 +35,7 @@ from tldw_Server_API.app.core.AuthNZ.exceptions import (
 # Session Manager Class
 
 class SessionManager:
-    """Manages user sessions with database persistence and optional Redis caching"""
+    """Manages user sessions with database persistence, encryption, and optional Redis caching"""
     
     def __init__(
         self,
@@ -43,6 +48,8 @@ class SessionManager:
         self.redis_client: Optional[redis.Redis] = None
         self.scheduler = AsyncIOScheduler()
         self._initialized = False
+        self.cipher_suite: Optional[Fernet] = None
+        self._init_encryption()
         
     async def initialize(self):
         """Initialize session manager and start cleanup scheduler"""
@@ -89,11 +96,64 @@ class SessionManager:
             )
         
         self._initialized = True
-        logger.info("SessionManager initialized")
+        logger.info("SessionManager initialized with encryption enabled")
+    
+    def _init_encryption(self):
+        """Initialize encryption for session tokens"""
+        # Get or generate encryption key
+        encryption_key = self._get_or_create_encryption_key()
+        self.cipher_suite = Fernet(encryption_key)
+        logger.debug("Session token encryption initialized")
+    
+    def _get_or_create_encryption_key(self) -> bytes:
+        """Get or create encryption key for session tokens"""
+        # Try to get key from settings/environment
+        if hasattr(self.settings, 'SESSION_ENCRYPTION_KEY') and self.settings.SESSION_ENCRYPTION_KEY:
+            # Decode from base64 if provided as string
+            if isinstance(self.settings.SESSION_ENCRYPTION_KEY, str):
+                return base64.urlsafe_b64decode(self.settings.SESSION_ENCRYPTION_KEY)
+            return self.settings.SESSION_ENCRYPTION_KEY
+        
+        # Derive key from JWT secret for consistency
+        if self.settings.AUTH_MODE == "multi_user" and self.settings.JWT_SECRET_KEY:
+            # Use PBKDF2 to derive encryption key from JWT secret
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=b'session_encryption_salt_v1',  # Static salt for deterministic key
+                iterations=100000,
+            )
+            key_material = kdf.derive(self.settings.JWT_SECRET_KEY.encode())
+            return base64.urlsafe_b64encode(key_material)
+        
+        # Generate new key if nothing else available (development only)
+        logger.warning("Generating temporary session encryption key - SET SESSION_ENCRYPTION_KEY for production!")
+        return Fernet.generate_key()
     
     def hash_token(self, token: str) -> str:
-        """Create SHA256 hash of token for storage"""
+        """Create SHA256 hash of token for lookup/indexing"""
         return hashlib.sha256(token.encode()).hexdigest()
+    
+    def encrypt_token(self, token: str) -> str:
+        """Encrypt a token for secure storage"""
+        if not self.cipher_suite:
+            self._init_encryption()
+        
+        encrypted = self.cipher_suite.encrypt(token.encode())
+        return base64.urlsafe_b64encode(encrypted).decode('utf-8')
+    
+    def decrypt_token(self, encrypted_token: str) -> str:
+        """Decrypt a stored token"""
+        if not self.cipher_suite:
+            self._init_encryption()
+        
+        try:
+            encrypted_bytes = base64.urlsafe_b64decode(encrypted_token.encode('utf-8'))
+            decrypted = self.cipher_suite.decrypt(encrypted_bytes)
+            return decrypted.decode('utf-8')
+        except Exception as e:
+            logger.error(f"Failed to decrypt token: {e}")
+            raise InvalidSessionError("Failed to decrypt session token")
     
     async def create_session(
         self,
@@ -121,8 +181,13 @@ class SessionManager:
         if not self._initialized:
             await self.initialize()
         
+        # Hash tokens for indexing/lookup
         access_hash = self.hash_token(access_token)
         refresh_hash = self.hash_token(refresh_token)
+        
+        # Encrypt tokens for secure storage
+        encrypted_access = self.encrypt_token(access_token)
+        encrypted_refresh = self.encrypt_token(refresh_token)
         expires_at = datetime.utcnow() + timedelta(
             minutes=self.settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
@@ -137,13 +202,15 @@ class SessionManager:
                         """
                         INSERT INTO sessions (
                             user_id, token_hash, refresh_token_hash,
+                            encrypted_token, encrypted_refresh,
                             expires_at, ip_address, user_agent, device_id
                         )
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                         RETURNING id
                         """,
-                        user_id, access_hash, refresh_hash, expires_at,
-                        ip_address, user_agent, device_id
+                        user_id, access_hash, refresh_hash,
+                        encrypted_access, encrypted_refresh,
+                        expires_at, ip_address, user_agent, device_id
                     )
                 else:
                     # SQLite
@@ -151,12 +218,14 @@ class SessionManager:
                         """
                         INSERT INTO sessions (
                             user_id, token_hash, refresh_token_hash,
-                            expires_at, ip_address, user_agent
+                            encrypted_token, encrypted_refresh,
+                            expires_at, ip_address, user_agent, device_id
                         )
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (user_id, access_hash, refresh_hash, 
-                         expires_at.isoformat(), ip_address, user_agent)
+                        (user_id, access_hash, refresh_hash,
+                         encrypted_access, encrypted_refresh,
+                         expires_at.isoformat(), ip_address, user_agent, device_id)
                     )
                     session_id = cursor.lastrowid
                     await conn.commit()

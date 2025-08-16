@@ -224,6 +224,17 @@ class Settings(BaseSettings):
         description="Session cleanup interval in hours"
     )
     
+    # ===== Encryption Settings =====
+    SESSION_ENCRYPTION_KEY: Optional[str] = Field(
+        default=None,
+        description="Base64-encoded Fernet key for session token encryption (auto-generated if not set)"
+    )
+    
+    API_KEY_PEPPER: Optional[str] = Field(
+        default=None,
+        description="Additional secret for API key hashing (recommended for production)"
+    )
+    
     # ===== Monitoring =====
     ENABLE_HEALTH_CHECK: bool = Field(
         default=True,
