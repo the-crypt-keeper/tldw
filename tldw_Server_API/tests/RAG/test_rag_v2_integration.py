@@ -8,6 +8,7 @@ import asyncio
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any
+from unittest.mock import patch, MagicMock
 import pytest
 from httpx import AsyncClient
 from fastapi.testclient import TestClient
@@ -33,17 +34,27 @@ class TestRAGV2Integration:
         # Store original settings
         self.original_user_db_dir = settings.get("USER_DB_BASE_DIR", "/tmp/users")
         self.original_single_user = settings.get("SINGLE_USER_MODE", True)
+        self.original_csrf_enabled = settings.get("CSRF_ENABLED", True)
         
         # Configure for testing
         settings["USER_DB_BASE_DIR"] = str(self.user_base_dir)
         settings["SINGLE_USER_MODE"] = True  # Use single-user mode for simpler testing
+        settings["CSRF_ENABLED"] = False  # Disable CSRF for testing
         
         # Create test client
         self.client = TestClient(app)
         
         # Default API key for authentication
         self.DEFAULT_API_KEY = "default-secret-key-for-single-user"
-        self.auth_headers = {"Authorization": f"Bearer {self.DEFAULT_API_KEY}"}
+        
+        # Get CSRF token first
+        csrf_response = self.client.get("/")  # Any GET request to get CSRF cookie
+        csrf_token = csrf_response.cookies.get("csrf_token", "test-csrf-token")
+        
+        self.auth_headers = {
+            "Authorization": f"Bearer {self.DEFAULT_API_KEY}",
+            "X-CSRF-Token": csrf_token  # Add CSRF token to headers
+        }
         
         # Create test user directory structure
         self.test_user_id = 0  # Single user mode uses user ID 0
@@ -64,6 +75,7 @@ class TestRAGV2Integration:
         app.dependency_overrides.clear()
         settings["USER_DB_BASE_DIR"] = self.original_user_db_dir
         settings["SINGLE_USER_MODE"] = self.original_single_user
+        settings["CSRF_ENABLED"] = self.original_csrf_enabled
         shutil.rmtree(self.temp_dir, ignore_errors=True)
     
     def create_test_environment(self):

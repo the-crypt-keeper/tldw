@@ -31,13 +31,8 @@ from tldw_Server_API.app.api.v1.endpoints.characters_endpoint import router as c
 # Chunking Endpoint
 from tldw_Server_API.app.api.v1.endpoints.chunking import chunking_router as chunking_router
 #
-# Embedding Endpoint (v5 production version with security fixes)
-from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import router as embeddings_router
-# Previous versions (To be removed)
-# from tldw_Server_API.app.api.v1.endpoints.embeddings_v4 import router as embeddings_router_v4
-# from tldw_Server_API.app.api.v1.endpoints.embeddings_v3 import router as embeddings_router_v3
-# from tldw_Server_API.app.api.v1.endpoints.embeddings_v2 import router as embeddings_router_v2
-# from tldw_Server_API.app.api.v1.endpoints.embeddings import router as embeddings_router_old
+# Embedding Endpoint (v5 enhanced version with circuit breaker)
+from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import router as embeddings_router
 #
 # Media Endpoint
 from tldw_Server_API.app.api.v1.endpoints.media import router as media_router
@@ -208,6 +203,10 @@ app.add_middleware(
     allow_methods=["*"], # Must include OPTIONS, GET, POST, DELETE etc.
     allow_headers=["*"],
 )
+
+# Add CSRF Protection Middleware (NEW)
+from tldw_Server_API.app.core.AuthNZ.csrf_protection import add_csrf_protection
+add_csrf_protection(app)
 
 # Static files serving
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")

@@ -296,8 +296,13 @@ class RateLimiter:
                 
         except Exception as e:
             logger.error(f"Database rate limit check failed: {e}")
-            # On error, allow the request (fail open)
-            return True, {"error": "Rate limit check failed"}
+            # On error, deny the request (fail closed) for security
+            return False, {
+                "error": "Rate limit check failed",
+                "limit": limit,
+                "remaining": 0,
+                "retry_after": 60  # Conservative retry time
+            }
     
     async def check_user_rate_limit(
         self,

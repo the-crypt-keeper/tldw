@@ -169,24 +169,31 @@ class PasswordService:
             raise WeakPasswordError("; ".join(errors))
     
     def _has_sequential_chars(self, password: str, max_sequence: int = 3) -> bool:
-        """Check if password has sequential characters (e.g., 'abc', '123')
-        but allow year patterns like 2024"""
-        import re
+        """Check if password has sequential characters (e.g., 'abc', '123')"""
         
         for i in range(len(password) - max_sequence + 1):
             substring = password[i:i + max_sequence]
             
-            # Skip if this looks like a year (2020-2099)
-            if len(substring) >= 4 and re.match(r'20[2-9]\d', substring[:4]):
-                continue
+            # Check if all characters are digits or all are letters
+            all_digits = all(c.isdigit() for c in substring)
+            all_letters = all(c.isalpha() for c in substring)
             
-            # Check ascending sequence
-            if all(ord(substring[j+1]) - ord(substring[j]) == 1 for j in range(len(substring) - 1)):
-                return True
-            
-            # Check descending sequence
-            if all(ord(substring[j]) - ord(substring[j+1]) == 1 for j in range(len(substring) - 1)):
-                return True
+            if all_digits or all_letters:
+                # Check ascending sequence
+                if all(ord(substring[j+1]) - ord(substring[j]) == 1 for j in range(len(substring) - 1)):
+                    # Allow years 2000-2099 as special case
+                    if all_digits and len(substring) == 4:
+                        try:
+                            year = int(substring)
+                            if 2000 <= year <= 2099:
+                                continue  # Allow valid years
+                        except ValueError:
+                            pass
+                    return True
+                
+                # Check descending sequence
+                if all(ord(substring[j]) - ord(substring[j+1]) == 1 for j in range(len(substring) - 1)):
+                    return True
         
         return False
     

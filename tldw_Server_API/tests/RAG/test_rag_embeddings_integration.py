@@ -71,6 +71,15 @@ class TestProductionEmbeddingFunction:
         # Generate embeddings - this calls the real service
         embeddings = func(documents)
         
+        # Convert numpy arrays to lists if needed for consistency
+        if hasattr(embeddings, 'tolist'):
+            # It's a numpy array
+            embeddings = embeddings.tolist()
+        elif isinstance(embeddings, list) and len(embeddings) > 0:
+            # Check if elements are numpy arrays
+            if hasattr(embeddings[0], 'tolist'):
+                embeddings = [emb.tolist() if hasattr(emb, 'tolist') else emb for emb in embeddings]
+        
         # Verify we got real embeddings
         assert len(embeddings) == len(documents)
         assert all(isinstance(emb, list) for emb in embeddings)

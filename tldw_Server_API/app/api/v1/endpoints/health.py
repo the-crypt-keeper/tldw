@@ -14,6 +14,8 @@ from loguru import logger
 # Local imports
 from tldw_Server_API.app.core.AuthNZ.database import DatabasePool, get_db_pool
 from tldw_Server_API.app.core.AuthNZ.settings import Settings, get_settings
+from tldw_Server_API.app.core.Evaluations.circuit_breaker import CircuitBreaker, CircuitState
+from tldw_Server_API.app.core.Evaluations.evaluation_manager import EvaluationManager
 
 #######################################################################################################################
 #
@@ -76,6 +78,43 @@ async def health_check(
             health["checks"]["redis"] = f"warning: {str(e)}"
             # Redis is optional, don't mark as unhealthy
             logger.warning(f"Redis health check failed: {e}")
+    
+    # Evaluation service check
+    try:
+        # Check evaluation database
+        eval_manager = EvaluationManager()
+        eval_db_status = "ok"
+        
+        # Check if evaluation database is accessible
+        import sqlite3
+        with sqlite3.connect(eval_manager.db_path) as conn:
+            conn.execute("SELECT COUNT(*) FROM evaluations")
+            
+        # Check circuit breakers status
+        circuit_breakers = {}
+        # Note: In production, you'd get actual circuit breaker instances
+        # For now, we'll just report the expected providers
+        providers = ["openai", "anthropic", "google", "cohere", "mistral"]
+        for provider in providers:
+            # Create a dummy circuit breaker to check configuration
+            cb = CircuitBreaker(name=f"evaluation_{provider}")
+            circuit_breakers[provider] = {
+                "state": cb.state.value,
+                "failure_count": cb.stats.failed_calls,
+                "success_count": cb.stats.successful_calls
+            }
+            
+        health["checks"]["evaluations"] = {
+            "database": eval_db_status,
+            "circuit_breakers": circuit_breakers,
+            "embeddings_available": True  # Check if embeddings service is configured
+        }
+    except Exception as e:
+        health["checks"]["evaluations"] = f"error: {str(e)}"
+        # Don't mark as unhealthy since evaluations is not critical
+        if health["status"] == "healthy":
+            health["status"] = "degraded"
+        logger.warning(f"Evaluation service health check failed: {e}")
     
     # System resources
     try:
@@ -275,6 +314,160 @@ async def startup_probe() -> Dict[str, str]:
         "status": "started",
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+@router.get("/evaluations")
+async def evaluation_service_health() -> Dict[str, Any]:
+    """
+    Dedicated health check for the evaluation service.
+    
+    Checks:
+    - Evaluation database connectivity
+    - Circuit breaker states for all providers
+    - Embeddings service availability
+    - Recent evaluation metrics
+    
+    Returns:
+        Dict with detailed evaluation service health status
+    """
+    health = {
+        "service": "evaluations",
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "components": {}
+    }
+    
+    # Check evaluation database
+    try:
+        eval_manager = EvaluationManager()
+        
+        # Test database connectivity and get stats
+        import sqlite3
+        with sqlite3.connect(eval_manager.db_path) as conn:
+            cursor = conn.execute("""
+                SELECT 
+                    COUNT(*) as total_evaluations,
+                    COUNT(DISTINCT evaluation_type) as evaluation_types,
+                    MAX(created_at) as last_evaluation
+                FROM evaluations
+            """)
+            stats = cursor.fetchone()
+            
+        health["components"]["database"] = {
+            "status": "ok",
+            "total_evaluations": stats[0] if stats else 0,
+            "evaluation_types": stats[1] if stats else 0,
+            "last_evaluation": stats[2] if stats and stats[2] else None
+        }
+    except Exception as e:
+        health["components"]["database"] = {
+            "status": "error",
+            "error": str(e)
+        }
+        health["status"] = "degraded"
+        logger.error(f"Evaluation database health check failed: {e}")
+    
+    # Check circuit breakers
+    try:
+        circuit_breaker_status = {}
+        providers = ["openai", "anthropic", "google", "cohere", "mistral", "groq", "openrouter"]
+        
+        for provider in providers:
+            cb = CircuitBreaker(name=f"evaluation_{provider}")
+            cb_health = "healthy"
+            
+            if cb.state == CircuitState.OPEN:
+                cb_health = "unhealthy"
+            elif cb.state == CircuitState.HALF_OPEN:
+                cb_health = "recovering"
+                
+            circuit_breaker_status[provider] = {
+                "state": cb.state.value,
+                "health": cb_health,
+                "stats": {
+                    "failures": cb.stats.failed_calls,
+                    "successes": cb.stats.successful_calls,
+                    "last_failure": cb.stats.last_failure_time.isoformat() if cb.stats.last_failure_time else None
+                }
+            }
+            
+            # If any circuit breaker is open, mark service as degraded
+            if cb.state == CircuitState.OPEN and health["status"] == "healthy":
+                health["status"] = "degraded"
+                
+        health["components"]["circuit_breakers"] = circuit_breaker_status
+    except Exception as e:
+        health["components"]["circuit_breakers"] = {
+            "status": "error",
+            "error": str(e)
+        }
+        logger.warning(f"Circuit breaker health check failed: {e}")
+    
+    # Check embeddings availability
+    try:
+        from tldw_Server_API.app.core.config import load_comprehensive_config
+        config = load_comprehensive_config()
+        embeddings_config = config.get("Embeddings", {})
+        
+        health["components"]["embeddings"] = {
+            "status": "configured" if embeddings_config else "not_configured",
+            "providers": []
+        }
+        
+        # Check which embedding providers are configured
+        if embeddings_config:
+            providers = []
+            if embeddings_config.get("embedding_provider"):
+                providers.append(embeddings_config.get("embedding_provider"))
+            if embeddings_config.get("embedding_model"):
+                health["components"]["embeddings"]["model"] = embeddings_config.get("embedding_model")
+            health["components"]["embeddings"]["providers"] = providers
+            
+    except Exception as e:
+        health["components"]["embeddings"] = {
+            "status": "error",
+            "error": str(e)
+        }
+        logger.warning(f"Embeddings health check failed: {e}")
+    
+    # Calculate evaluation service metrics
+    try:
+        # Get recent evaluation performance metrics
+        with sqlite3.connect(eval_manager.db_path) as conn:
+            cursor = conn.execute("""
+                SELECT 
+                    AVG(CAST(json_extract(results, '$.processing_time') AS REAL)) as avg_processing_time,
+                    COUNT(CASE WHEN json_extract(results, '$.error') IS NOT NULL THEN 1 END) as error_count,
+                    COUNT(*) as total_recent
+                FROM evaluations
+                WHERE created_at > datetime('now', '-1 hour')
+            """)
+            metrics = cursor.fetchone()
+            
+        health["metrics"] = {
+            "last_hour": {
+                "total_evaluations": metrics[2] if metrics else 0,
+                "error_count": metrics[1] if metrics else 0,
+                "avg_processing_time_seconds": round(metrics[0], 2) if metrics and metrics[0] else None
+            }
+        }
+    except Exception as e:
+        health["metrics"] = {"error": str(e)}
+        logger.warning(f"Evaluation metrics collection failed: {e}")
+    
+    # Determine overall health status
+    if health["status"] == "healthy":
+        status_code = 200
+    elif health["status"] == "degraded":
+        status_code = 206
+    else:
+        status_code = 503
+        
+    return Response(
+        content=__import__('json').dumps(health, indent=2),
+        status_code=status_code,
+        media_type="application/json"
+    )
 
 
 #

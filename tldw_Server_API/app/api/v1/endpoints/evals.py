@@ -13,7 +13,7 @@ Provides endpoints for:
 import asyncio
 import time
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, Depends, status, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Query, Request, Response
 from loguru import logger
 
 # Import schemas
@@ -33,6 +33,13 @@ from tldw_Server_API.app.core.Evaluations.ms_g_eval import run_geval
 from tldw_Server_API.app.core.Evaluations.rag_evaluator import RAGEvaluator
 from tldw_Server_API.app.core.Evaluations.response_quality_evaluator import ResponseQualityEvaluator
 from tldw_Server_API.app.core.Evaluations.evaluation_manager import EvaluationManager
+from tldw_Server_API.app.core.Evaluations.metrics import (
+    get_metrics, track_request_metrics, track_evaluation_metrics
+)
+
+# Import rate limiting and auth dependencies
+from tldw_Server_API.app.core.AuthNZ.rate_limiter import RateLimiter, get_rate_limiter
+from tldw_Server_API.app.api.v1.API_Deps.auth_deps import get_rate_limiter_dep
 
 # Create router
 router = APIRouter(prefix="/evaluations", tags=["Evaluations"])
@@ -43,7 +50,60 @@ rag_evaluator = RAGEvaluator()
 quality_evaluator = ResponseQualityEvaluator()
 
 
-@router.post("/geval", response_model=GEvalResponse)
+# Rate limiting dependency for evaluation endpoints
+async def check_evaluation_rate_limit(
+    request: Request,
+    rate_limiter: RateLimiter = Depends(get_rate_limiter_dep)
+):
+    """
+    Check rate limit for evaluation endpoints.
+    
+    Evaluation operations are expensive, so we apply stricter limits:
+    - Standard evaluations: 10 requests per minute
+    - Batch evaluations: 5 requests per minute
+    
+    Args:
+        request: FastAPI request object
+        rate_limiter: Rate limiter instance
+        
+    Raises:
+        HTTPException: If rate limit exceeded
+    """
+    # Get client IP
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Determine endpoint type from path
+    path = request.url.path
+    if "batch" in path:
+        # Stricter limit for batch operations
+        limit = 5
+        endpoint_type = "eval_batch"
+    else:
+        # Standard limit for single evaluations
+        limit = 10
+        endpoint_type = "eval_standard"
+    
+    # Check rate limit
+    allowed, metadata = await rate_limiter.check_rate_limit(
+        client_ip,
+        endpoint_type,
+        limit=limit,
+        window_minutes=1
+    )
+    retry_after = metadata.get("retry_after", 60)
+    
+    if not allowed:
+        logger.warning(f"Rate limit exceeded for {client_ip} on {endpoint_type}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded. Please retry after {retry_after} seconds",
+            headers={"Retry-After": str(retry_after)}
+        )
+
+
+@router.post("/geval", response_model=GEvalResponse, dependencies=[Depends(check_evaluation_rate_limit)])
+@track_request_metrics("/evaluations/geval")
+@track_evaluation_metrics("geval")
 async def evaluate_summary_geval(request: GEvalRequest):
     """
     Evaluate a summary using G-Eval metrics.
@@ -142,7 +202,9 @@ async def evaluate_summary_geval(request: GEvalRequest):
         )
 
 
-@router.post("/rag", response_model=RAGEvaluationResponse)
+@router.post("/rag", response_model=RAGEvaluationResponse, dependencies=[Depends(check_evaluation_rate_limit)])
+@track_request_metrics("/evaluations/rag")
+@track_evaluation_metrics("rag")
 async def evaluate_rag_system(request: RAGEvaluationRequest):
     """
     Evaluate RAG system performance.
@@ -217,7 +279,7 @@ async def evaluate_rag_system(request: RAGEvaluationRequest):
         )
 
 
-@router.post("/response-quality", response_model=ResponseQualityResponse)
+@router.post("/response-quality", response_model=ResponseQualityResponse, dependencies=[Depends(check_evaluation_rate_limit)])
 async def evaluate_response_quality(request: ResponseQualityRequest):
     """
     Evaluate the quality of a generated response.
@@ -267,7 +329,9 @@ async def evaluate_response_quality(request: ResponseQualityRequest):
         )
 
 
-@router.post("/batch", response_model=BatchEvaluationResponse)
+@router.post("/batch", response_model=BatchEvaluationResponse, dependencies=[Depends(check_evaluation_rate_limit)])
+@track_request_metrics("/evaluations/batch")
+@track_evaluation_metrics("batch")
 async def evaluate_batch(request: BatchEvaluationRequest):
     """
     Perform batch evaluation of multiple items.
@@ -333,7 +397,7 @@ async def evaluate_batch(request: BatchEvaluationRequest):
         )
 
 
-@router.post("/history", response_model=EvaluationHistoryResponse)
+@router.post("/history", response_model=EvaluationHistoryResponse, dependencies=[Depends(check_evaluation_rate_limit)])
 async def get_evaluation_history(request: EvaluationHistoryRequest):
     """
     Retrieve evaluation history with filtering and aggregation.
@@ -357,7 +421,7 @@ async def get_evaluation_history(request: EvaluationHistoryRequest):
         )
 
 
-@router.post("/custom-metric", response_model=CustomMetricResponse)
+@router.post("/custom-metric", response_model=CustomMetricResponse, dependencies=[Depends(check_evaluation_rate_limit)])
 async def evaluate_custom_metric(request: CustomMetricRequest):
     """
     Evaluate using a custom metric definition.
@@ -384,7 +448,7 @@ async def evaluate_custom_metric(request: CustomMetricRequest):
         )
 
 
-@router.post("/compare", response_model=EvaluationComparisonResponse)
+@router.post("/compare", response_model=EvaluationComparisonResponse, dependencies=[Depends(check_evaluation_rate_limit)])
 async def compare_evaluations(request: EvaluationComparisonRequest):
     """
     Compare multiple evaluations to identify improvements or regressions.
@@ -403,3 +467,20 @@ async def compare_evaluations(request: EvaluationComparisonRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Comparison failed: {str(e)}"
         )
+
+
+@router.get("/metrics", include_in_schema=False)
+async def get_evaluation_metrics(request: Request):
+    """
+    Prometheus metrics endpoint for evaluation service.
+    
+    Returns metrics in Prometheus text format.
+    This endpoint is not rate-limited to allow monitoring systems to scrape it.
+    """
+    metrics = get_metrics()
+    metrics_output = metrics.get_metrics()
+    
+    return Response(
+        content=metrics_output,
+        media_type="text/plain; version=0.0.4; charset=utf-8"
+    )

@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Evaluations API provides OpenAI-compatible endpoints for creating, managing, and running evaluations on AI model outputs. All endpoints require authentication via Bearer token.
+The Evaluations API provides comprehensive evaluation capabilities for assessing the quality of AI-generated content, including summaries, RAG responses, and general text generation. The API supports multiple evaluation frameworks and metrics, with built-in rate limiting, health monitoring, and metrics collection.
 
-**Base URL**: `http://localhost:8000`  
+**Base URL**: `http://localhost:8000/api/v1`  
 **API Version**: `v1`  
-**Authentication**: Bearer token in Authorization header
+**Authentication**: Bearer token in Authorization header (multi-user mode) or default key (single-user mode)
 
 ## Authentication
 

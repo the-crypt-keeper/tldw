@@ -60,12 +60,30 @@ class EvaluationManager:
             migrate_evaluations_database(self.db_path)
             logger.info("Database migrations applied successfully")
         except Exception as e:
-            logger.error(f"Failed to apply database migrations: {e}")
-            # Fall back to basic table creation if migrations fail
-            self._init_database_fallback()
+            # In production, database migration failures should be fatal
+            # This ensures consistency and prevents silent data corruption
+            error_msg = f"CRITICAL: Failed to apply database migrations to {self.db_path}: {e}"
+            logger.critical(error_msg)
+            
+            # Check if we're in a production environment
+            import os
+            env = os.getenv('ENVIRONMENT', 'development').lower()
+            
+            if env in ['production', 'staging']:
+                # Fail loudly in production/staging
+                raise RuntimeError(error_msg) from e
+            else:
+                # In development, log a warning but continue with fallback
+                logger.warning("Running in development mode - using fallback database initialization")
+                self._init_database_fallback()
     
     def _init_database_fallback(self):
-        """Fallback database initialization without migrations"""
+        """Fallback database initialization without migrations
+        
+        WARNING: This method should ONLY be used in development environments.
+        Production deployments must use the migration system to ensure
+        database schema consistency.
+        """
         with sqlite3.connect(self.db_path) as conn:
             # Create basic tables if they don't exist
             conn.execute("""
