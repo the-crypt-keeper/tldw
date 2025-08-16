@@ -31,9 +31,10 @@ from tldw_Server_API.app.api.v1.endpoints.characters_endpoint import router as c
 # Chunking Endpoint
 from tldw_Server_API.app.api.v1.endpoints.chunking import chunking_router as chunking_router
 #
-# Embedding Endpoint (v4 with multi-provider support)
-from tldw_Server_API.app.api.v1.endpoints.embeddings_v4 import router as embeddings_router
+# Embedding Endpoint (v5 production version with security fixes)
+from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import router as embeddings_router
 # Previous versions (To be removed)
+# from tldw_Server_API.app.api.v1.endpoints.embeddings_v4 import router as embeddings_router_v4
 # from tldw_Server_API.app.api.v1.endpoints.embeddings_v3 import router as embeddings_router_v3
 # from tldw_Server_API.app.api.v1.endpoints.embeddings_v2 import router as embeddings_router_v2
 # from tldw_Server_API.app.api.v1.endpoints.embeddings import router as embeddings_router_old

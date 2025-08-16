@@ -20,32 +20,57 @@ from loguru import logger
 import numpy as np
 
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
-from tldw_Server_API.app.core.config import load_and_log_configs
+from tldw_Server_API.app.core.config import load_comprehensive_config
+import os
 
 
 class EvaluationManager:
     """Manages evaluation operations and persistence"""
     
     def __init__(self):
-        self.config = load_and_log_configs()
+        self.config = load_comprehensive_config()
         self.db_path = self._get_db_path()
         self._init_database()
     
     def _get_db_path(self) -> Path:
         """Get evaluation database path"""
-        # FIXME: Update to use proper config structure once config API is standardized
-        database_config = self.config.get('database', {})
-        if isinstance(database_config, dict):
-            base_path = Path(database_config.get('evaluation_db_path', 'user_databases'))
+        # Use the same path as the OpenAI-compatible evaluations DB
+        if self.config and self.config.has_section("Database"):
+            db_path = self.config.get("Database", "evaluations_db_path", fallback="Databases/evaluations.db")
         else:
-            base_path = Path('user_databases')
-        db_file = base_path / "evaluations.db"
-        db_file.parent.mkdir(parents=True, exist_ok=True)
-        return db_file
+            db_path = "Databases/evaluations.db"
+        
+        # Make absolute if relative
+        if not os.path.isabs(db_path):
+            # Get the project root (4 levels up from this file)
+            project_root = Path(__file__).parent.parent.parent.parent
+            db_path = project_root / db_path
+        else:
+            db_path = Path(db_path)
+        
+        # Ensure directory exists
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return db_path
     
     def _init_database(self):
         """Initialize evaluation database"""
         with sqlite3.connect(self.db_path) as conn:
+            # Check if evaluations table exists with old schema
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='evaluations'")
+            table_exists = cursor.fetchone() is not None
+            
+            if table_exists:
+                # Check if it has the old schema (evaluation_type column)
+                cursor.execute("PRAGMA table_info(evaluations)")
+                columns = [col[1] for col in cursor.fetchall()]
+                
+                if 'evaluation_type' not in columns:
+                    # Table exists but with OpenAI-compatible schema, skip initialization
+                    logger.info("Using existing OpenAI-compatible evaluations database")
+                    return
+            
+            # Create table only if it doesn't exist
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS evaluations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,8 +84,11 @@ class EvaluationManager:
             """)
             
             # Create indexes separately in SQLite
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_type ON evaluations(evaluation_type)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON evaluations(created_at)")
+            try:
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_type ON evaluations(evaluation_type)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON evaluations(created_at)")
+            except sqlite3.OperationalError as e:
+                logger.warning(f"Could not create indexes: {e}")
             
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS evaluation_metrics (

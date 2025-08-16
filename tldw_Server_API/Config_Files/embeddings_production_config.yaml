@@ -1,0 +1,305 @@
+# embeddings_production_config.yaml
+# Production configuration for embeddings service v5
+# 
+# This file documents all configuration options for the production embeddings service.
+# Copy this template and customize for your environment.
+
+# ==============================================================================
+# Service Configuration
+# ==============================================================================
+
+service:
+  name: embeddings-v5-production
+  version: 5.0.0
+  environment: production  # Options: development, staging, production
+  
+  # Startup checks
+  require_dependencies: true  # Fail if embedding libraries not available
+  verify_providers_on_startup: true  # Check provider API keys on startup
+  
+# ==============================================================================
+# API Configuration  
+# ==============================================================================
+
+api:
+  # Rate limiting (per user)
+  rate_limit:
+    requests_per_minute: 60
+    burst_size: 10
+    
+  # Request limits
+  max_input_length: 2048  # Maximum number of texts in single request
+  max_text_length: 8192   # Maximum length of individual text
+  max_batch_size: 100     # Maximum texts processed in single batch
+  
+  # Timeouts
+  request_timeout_seconds: 30
+  provider_timeout_seconds: 25
+  
+  # Authentication
+  require_authentication: true
+  admin_endpoints_require_admin: true
+  
+# ==============================================================================
+# Cache Configuration
+# ==============================================================================
+
+cache:
+  # Type of cache to use
+  type: memory  # Options: memory, redis
+  
+  # Memory cache settings
+  memory:
+    max_size: 5000  # Maximum number of cached embeddings
+    ttl_seconds: 3600  # Time to live (1 hour)
+    cleanup_interval_seconds: 300  # Cleanup expired entries every 5 minutes
+    
+  # Redis cache settings (if type: redis)
+  redis:
+    url: redis://localhost:6379/1
+    key_prefix: embeddings:v5:
+    ttl_seconds: 3600
+    max_connections: 50
+    
+# ==============================================================================
+# Provider Configuration
+# ==============================================================================
+
+providers:
+  # Default provider when not specified
+  default: openai
+  
+  # OpenAI configuration
+  openai:
+    enabled: true
+    api_key: ${OPENAI_API_KEY}  # From environment variable
+    api_url: https://api.openai.com/v1
+    models:
+      - text-embedding-ada-002
+      - text-embedding-3-small
+      - text-embedding-3-large
+    default_model: text-embedding-3-small
+    max_retries: 3
+    timeout_seconds: 20
+    
+  # HuggingFace configuration
+  huggingface:
+    enabled: true
+    cache_dir: ./models/huggingface
+    models:
+      - sentence-transformers/all-MiniLM-L6-v2
+      - sentence-transformers/all-mpnet-base-v2
+      - BAAI/bge-large-en-v1.5
+    default_model: sentence-transformers/all-MiniLM-L6-v2
+    device: cuda  # Options: cpu, cuda, mps
+    max_length: 512
+    trust_remote_code: false
+    
+  # Cohere configuration
+  cohere:
+    enabled: false
+    api_key: ${COHERE_API_KEY}
+    api_url: https://api.cohere.ai
+    models:
+      - embed-english-v3.0
+      - embed-multilingual-v3.0
+    default_model: embed-english-v3.0
+    
+  # Local API configuration
+  local_api:
+    enabled: false
+    api_url: http://localhost:8080/v1/embeddings
+    api_key: ${LOCAL_API_KEY}
+    models:
+      - custom-model-1
+    default_model: custom-model-1
+    
+# ==============================================================================
+# Connection Pool Configuration
+# ==============================================================================
+
+connection_pool:
+  # Pool size per provider
+  size_per_provider: 20
+  
+  # Connection limits
+  max_connections: 100
+  max_connections_per_host: 20
+  
+  # Timeouts
+  connect_timeout: 5
+  read_timeout: 30
+  
+  # Keep-alive
+  keepalive_timeout: 30
+  force_close_idle_after: 300
+  
+# ==============================================================================
+# Retry Configuration
+# ==============================================================================
+
+retry:
+  # Maximum number of retries
+  max_attempts: 3
+  
+  # Backoff strategy
+  strategy: exponential  # Options: fixed, exponential
+  
+  # Exponential backoff settings
+  exponential:
+    multiplier: 1
+    min_wait_seconds: 2
+    max_wait_seconds: 10
+    
+  # Which errors to retry
+  retry_on:
+    - ConnectionError
+    - TimeoutError
+    - ServiceUnavailable
+    
+  # Circuit breaker
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5  # Open circuit after 5 consecutive failures
+    recovery_timeout: 60  # Try again after 60 seconds
+    half_open_requests: 2  # Test with 2 requests in half-open state
+    
+# ==============================================================================
+# Monitoring & Observability
+# ==============================================================================
+
+monitoring:
+  # Metrics
+  metrics:
+    enabled: true
+    prometheus:
+      enabled: true
+      port: 9090
+      path: /metrics
+      
+  # Logging
+  logging:
+    level: INFO  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    format: json  # Options: json, text
+    
+    # Structured logging fields
+    include_fields:
+      - timestamp
+      - level
+      - message
+      - user_id
+      - request_id
+      - provider
+      - model
+      - duration
+      - error
+      
+  # Tracing
+  tracing:
+    enabled: false
+    provider: jaeger  # Options: jaeger, zipkin, datadog
+    sample_rate: 0.1  # Sample 10% of requests
+    
+  # Health checks
+  health_check:
+    enabled: true
+    path: /health
+    include_details: true  # Include cache stats, active requests, etc.
+    
+# ==============================================================================
+# Performance Tuning
+# ==============================================================================
+
+performance:
+  # Threading
+  thread_pool_size: 20  # Size of thread pool for sync operations
+  
+  # Async settings
+  max_concurrent_requests: 100
+  max_concurrent_batches: 10
+  
+  # Memory management
+  max_memory_mb: 2048  # Maximum memory usage
+  gc_threshold: 1024   # Trigger GC after this many requests
+  
+  # Model loading
+  preload_models: []  # Models to preload on startup
+  model_cache_size: 5  # Number of models to keep in memory
+  
+# ==============================================================================
+# Security Configuration
+# ==============================================================================
+
+security:
+  # API key handling
+  api_keys:
+    storage: environment  # Options: environment, vault, file
+    rotation_days: 90     # Rotate keys every 90 days
+    
+  # Input validation
+  validation:
+    strict_mode: true
+    max_text_length: 8192
+    allowed_characters: "ascii_printable"  # Options: ascii_printable, unicode
+    
+  # Admin access
+  admin:
+    require_admin_role: true
+    admin_endpoints:
+      - /embeddings/cache
+      - /embeddings/metrics
+      
+  # Rate limiting by tier
+  rate_limits:
+    anonymous: 10  # Requests per minute
+    authenticated: 60
+    premium: 300
+    admin: 1000
+    
+# ==============================================================================
+# Deployment Configuration
+# ==============================================================================
+
+deployment:
+  # Server settings
+  host: 0.0.0.0
+  port: 8000
+  workers: 4  # Number of worker processes
+  
+  # Graceful shutdown
+  shutdown_timeout: 30  # Seconds to wait for requests to complete
+  
+  # Health probes (for Kubernetes)
+  probes:
+    liveness:
+      path: /health/live
+      initial_delay: 10
+      period: 30
+      
+    readiness:
+      path: /health/ready
+      initial_delay: 5
+      period: 10
+      
+# ==============================================================================
+# Environment Variables
+# ==============================================================================
+# 
+# The following environment variables should be set:
+#
+# Required:
+#   - OPENAI_API_KEY: OpenAI API key (if using OpenAI provider)
+#   - APP_ENV: Environment (development/staging/production)
+#
+# Optional:
+#   - COHERE_API_KEY: Cohere API key (if using Cohere)
+#   - VOYAGE_API_KEY: Voyage API key (if using Voyage)
+#   - GOOGLE_API_KEY: Google API key (if using Google)
+#   - MISTRAL_API_KEY: Mistral API key (if using Mistral)
+#   - LOCAL_API_KEY: Local API key (if using local provider)
+#   - REDIS_URL: Redis connection URL (if using Redis cache)
+#   - LOG_LEVEL: Logging level (DEBUG/INFO/WARNING/ERROR)
+#   - PROMETHEUS_PORT: Port for Prometheus metrics
+#   - MAX_WORKERS: Number of worker processes
+#
+# ==============================================================================

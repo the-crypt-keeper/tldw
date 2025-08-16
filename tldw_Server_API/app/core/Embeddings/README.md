@@ -1,8 +1,29 @@
-# Embeddings Scale-Out Architecture
+# Embeddings System Architecture
 
-This directory contains the implementation of a scalable, distributed embeddings processing pipeline for the tldw_server.
+This directory contains both single-user and multi-user (scale-out) embeddings implementations for tldw_server.
 
-## Overview
+## 🎯 Current Status
+
+- **ACTIVE**: Single-user system using `embeddings_v5_production.py`
+- **FUTURE**: Multi-user scale-out system (implemented but not integrated)
+
+## Single-User System (Currently Active)
+
+The production system uses a synchronous API with direct embedding generation:
+
+### Key Files
+- **API**: `/app/api/v1/endpoints/embeddings_v5_production.py` - OpenAI-compatible REST API
+- **Core**: `Embeddings_Server/Embeddings_Create.py` - Embedding generation logic
+- **Storage**: `ChromaDB_Library.py` - Vector database management
+
+### Features
+- ✅ Multiple provider support (OpenAI, HuggingFace, Cohere, etc.)
+- ✅ TTL-based caching for performance
+- ✅ **Security**: Fails explicitly when dependencies missing (no fake embeddings!)
+- ✅ Prometheus metrics and monitoring
+- ✅ Automatic retry with exponential backoff
+
+## Multi-User Scale-Out System (Future)
 
 The architecture follows a fan-out pattern with specialized worker pools for each stage of the embeddings pipeline:
 

@@ -1,4 +1,0 @@
-# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/core/DB_Management/db_migration.py
-# hypothesis_version: 6.136.7
-
-[0.0, '%Y%m%d_%H%M%S', '*.json', '-_', '.json', ';', 'DatabaseMigrator', 'Migration', 'MigrationError', 'actual', 'backup_path', 'backups', 'before_rollback', 'checksum', 'checksum_mismatch', 'current_version', 'description', 'direction', 'down', 'down_sql', 'execution_time', 'expected', 'get_migrator', 'issue', 'message', 'migrate_database', 'migrations', 'migrations_applied', 'name', 'no_change', 'no_migrations', 'original_path', 'previous_version', 'r', 'restored_from', 'safety_backup', 'size', 'status', 'success', 'target_version', 'timestamp', 'total_execution_time', 'up', 'up_sql', 'version', 'w']

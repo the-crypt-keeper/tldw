@@ -24,6 +24,7 @@ from tenacity import (
 )
 
 from tldw_Server_API.app.core.Chat.Chat_Functions import chat_api_call
+from tldw_Server_API.app.core.config import load_comprehensive_config
 
 #from tldw_Server_API.app.core.Chat.Chat_Functions import (
 #    chat_api_call
@@ -35,12 +36,8 @@ from tldw_Server_API.app.core.Chat.Chat_Functions import chat_api_call
 
 logger = logging.getLogger(__name__)
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Construct the path to the config file
-config_path = os.path.join(current_dir, 'Config_Files', 'config.txt')
-# Read the config file
-config = configparser.ConfigParser()
-config.read(config_path)
+# Use the centralized config loading instead of hardcoded path
+config = load_comprehensive_config()
 
 
 def aggregate(
@@ -374,6 +371,11 @@ def validate_inputs(document: str, summary: str, api_name: str, api_key: str) ->
     if api_name.lower() not in ["openai", "anthropic", "cohere", "groq", "openrouter", "deepseek", "huggingface",
                                 "mistral", "llama.cpp", "kobold", "ooba", "tabbyapi", "vllm", "local-llm", "ollama"]:
         raise ValueError(f"Unsupported API: {api_name}")
+    
+    # Check if API key is required for the given API
+    commercial_apis = ["openai", "anthropic", "cohere", "groq", "openrouter", "deepseek", "huggingface", "mistral"]
+    if api_name.lower() in commercial_apis and not api_key:
+        raise ValueError(f"API key is required for {api_name}. Please provide a valid API key.")
 
 
 def detailed_api_error(api_name: str, error: Exception) -> str:

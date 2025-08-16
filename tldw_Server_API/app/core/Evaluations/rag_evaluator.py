@@ -23,9 +23,17 @@ class RAGEvaluator:
     """Evaluator for RAG system performance"""
     
     def __init__(self):
-        # FIXME: Add embedding wrapper once embeddings module structure is stabilized
-        # self.embedding_wrapper = EmbeddingsServiceWrapper()
-        pass
+        # TODO: Add embedding wrapper once embeddings module structure is stabilized
+        # For now, using text-based similarity as fallback
+        self.embedding_available = False
+        try:
+            # Try to import embeddings module (will fail for now)
+            # from tldw_Server_API.app.core.Embeddings import EmbeddingsServiceWrapper
+            # self.embedding_wrapper = EmbeddingsServiceWrapper()
+            # self.embedding_available = True
+            pass
+        except ImportError:
+            logger.info("Embeddings module not available, using text-based similarity fallback")
         
     async def evaluate(
         self,
@@ -188,8 +196,8 @@ class RAGEvaluator:
     
     async def _evaluate_answer_similarity(self, response: str, ground_truth: str) -> tuple:
         """Evaluate similarity between response and ground truth"""
-        # FIXME: Replace with embedding-based similarity once embeddings module is available
-        # For now, use LLM-based similarity evaluation
+        # TODO: Use embedding-based similarity once embeddings module is available
+        # Currently using LLM-based similarity evaluation as fallback
         prompt = f"""
         Compare the similarity between the following response and ground truth answer.
         

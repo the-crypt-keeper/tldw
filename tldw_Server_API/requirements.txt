@@ -36,6 +36,8 @@ python-dotenv
 python-jose
 python_magic
 python-multipart
+prometheus-client
+pynvml
 PyYAML
 redis
 scikit_learn
