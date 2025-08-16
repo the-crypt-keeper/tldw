@@ -18,6 +18,7 @@ from pathlib import Path
 import asyncio
 from loguru import logger
 import numpy as np
+from tldw_Server_API.app.core.DB_Management.migrations import migrate_evaluations_database
 
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
 from tldw_Server_API.app.core.config import load_comprehensive_config
@@ -53,24 +54,20 @@ class EvaluationManager:
         return db_path
     
     def _init_database(self):
-        """Initialize evaluation database"""
+        """Initialize evaluation database using migration system"""
+        try:
+            # Apply all pending migrations
+            migrate_evaluations_database(self.db_path)
+            logger.info("Database migrations applied successfully")
+        except Exception as e:
+            logger.error(f"Failed to apply database migrations: {e}")
+            # Fall back to basic table creation if migrations fail
+            self._init_database_fallback()
+    
+    def _init_database_fallback(self):
+        """Fallback database initialization without migrations"""
         with sqlite3.connect(self.db_path) as conn:
-            # Check if evaluations table exists with old schema
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='evaluations'")
-            table_exists = cursor.fetchone() is not None
-            
-            if table_exists:
-                # Check if it has the old schema (evaluation_type column)
-                cursor.execute("PRAGMA table_info(evaluations)")
-                columns = [col[1] for col in cursor.fetchall()]
-                
-                if 'evaluation_type' not in columns:
-                    # Table exists but with OpenAI-compatible schema, skip initialization
-                    logger.info("Using existing OpenAI-compatible evaluations database")
-                    return
-            
-            # Create table only if it doesn't exist
+            # Create basic tables if they don't exist
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS evaluations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,16 +76,27 @@ class EvaluationManager:
                     created_at TIMESTAMP NOT NULL,
                     input_data TEXT NOT NULL,
                     results TEXT NOT NULL,
-                    metadata TEXT
+                    metadata TEXT,
+                    user_id TEXT,
+                    status TEXT DEFAULT 'completed',
+                    error_message TEXT,
+                    completed_at TIMESTAMP,
+                    embedding_provider TEXT,
+                    embedding_model TEXT
                 )
             """)
             
-            # Create indexes separately in SQLite
-            try:
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_type ON evaluations(evaluation_type)")
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON evaluations(created_at)")
-            except sqlite3.OperationalError as e:
-                logger.warning(f"Could not create indexes: {e}")
+            # Create indexes
+            for index_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_type ON evaluations(evaluation_type)",
+                "CREATE INDEX IF NOT EXISTS idx_created ON evaluations(created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_user_id ON evaluations(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_status ON evaluations(status)"
+            ]:
+                try:
+                    conn.execute(index_sql)
+                except sqlite3.OperationalError:
+                    pass  # Index might already exist
             
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS evaluation_metrics (
@@ -102,9 +110,15 @@ class EvaluationManager:
             """)
             
             # Create indexes for metrics table
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_eval_id ON evaluation_metrics(evaluation_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_metric ON evaluation_metrics(metric_name)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_metric_created ON evaluation_metrics(created_at)")
+            for index_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_eval_id ON evaluation_metrics(evaluation_id)",
+                "CREATE INDEX IF NOT EXISTS idx_metric ON evaluation_metrics(metric_name)",
+                "CREATE INDEX IF NOT EXISTS idx_metric_created ON evaluation_metrics(created_at)"
+            ]:
+                try:
+                    conn.execute(index_sql)
+                except sqlite3.OperationalError:
+                    pass
             
             conn.commit()
     

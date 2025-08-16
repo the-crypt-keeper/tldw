@@ -830,6 +830,36 @@ def create_embeddings_batch(
         raise
 
 
+async def create_embeddings_batch_async(
+        texts: List[str],
+        user_app_config: Dict[str, Any],
+        model_id_override: Optional[str] = None,
+) -> List[List[float]]:
+    """
+    Async wrapper for create_embeddings_batch.
+    Creates embeddings for multiple texts asynchronously.
+    
+    Args:
+        texts: List of texts to embed
+        user_app_config: Configuration dictionary containing 'embedding_config'
+        model_id_override: Optional model ID to override the default
+        
+    Returns:
+        List of embedding vectors (list of floats for each text)
+    """
+    import asyncio
+    
+    # Run the synchronous function in a thread pool to avoid blocking
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,  # Use default executor
+        create_embeddings_batch,
+        texts,
+        user_app_config,
+        model_id_override
+    )
+
+
 def create_embedding(
         text: str,
         user_app_config: Dict[str, Any],
@@ -883,6 +913,67 @@ def create_embedding(
                   labels={"provider": provider_to_log, "model_id": model_id_to_log})
     log_counter("create_embedding_success", labels={"provider": provider_to_log, "model_id": model_id_to_log})
     return embedding_data
+
+def get_embedding_config() -> Dict[str, Any]:
+    """
+    Get the default embedding configuration.
+    Returns a configuration dictionary for use with embedding functions.
+    """
+    from tldw_Server_API.app.core.config import settings
+    
+    # Get embedding settings from config
+    embedding_settings = settings.get("EMBEDDING_CONFIG", {})
+    
+    # Build the configuration in the expected format
+    config = {
+        "embedding_config": {
+            "default_model_id": embedding_settings.get('embedding_model', 'text-embedding-3-small'),
+            "models": {}
+        }
+    }
+    
+    # Add model configurations based on provider
+    provider = embedding_settings.get('embedding_provider', 'openai')
+    model = embedding_settings.get('embedding_model', 'text-embedding-3-small')
+    
+    # Add default configurations for common models
+    if provider == 'openai':
+        config["embedding_config"]["models"][model] = {
+            "provider": "openai",
+            "model_name_or_path": model,
+            "api_key": embedding_settings.get('embedding_api_key', settings.get("OPENAI_API_KEY", ""))
+        }
+    elif provider == 'huggingface':
+        config["embedding_config"]["models"][model] = {
+            "provider": "huggingface",
+            "model_name_or_path": model,
+            "trust_remote_code": False,
+            "hf_cache_dir_subpath": "huggingface_cache"
+        }
+    elif provider == 'local_api':
+        config["embedding_config"]["models"][model] = {
+            "provider": "local_api",
+            "model_name_or_path": model,
+            "api_url": embedding_settings.get('embedding_api_url', 'http://localhost:8080/v1/embeddings'),
+            "api_key": embedding_settings.get('embedding_api_key', '')
+        }
+    
+    # Add common HuggingFace models that might be requested
+    common_hf_models = [
+        "sentence-transformers/all-MiniLM-L6-v2",
+        "sentence-transformers/all-mpnet-base-v2"
+    ]
+    
+    for hf_model in common_hf_models:
+        if hf_model not in config["embedding_config"]["models"]:
+            config["embedding_config"]["models"][hf_model] = {
+                "provider": "huggingface",
+                "model_name_or_path": hf_model,
+                "trust_remote_code": False,
+                "hf_cache_dir_subpath": "huggingface_cache"
+            }
+    
+    return config
 
 #
 # Legacy exports for backward compatibility

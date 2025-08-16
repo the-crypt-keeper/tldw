@@ -27,11 +27,23 @@ from tldw_Server_API.app.core.DB_Management.Evaluations_DB import EvaluationsDat
 class EvaluationRunner:
     """Manages asynchronous evaluation execution"""
     
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, max_concurrent_evals: int = 10, eval_timeout: int = 60):
+        """
+        Initialize evaluation runner with concurrency controls.
+        
+        Args:
+            db_path: Path to evaluations database
+            max_concurrent_evals: Maximum number of concurrent evaluations
+            eval_timeout: Timeout in seconds for each evaluation
+        """
         self.db = EvaluationsDatabase(db_path)
         self.rag_evaluator = RAGEvaluator()
         self.quality_evaluator = ResponseQualityEvaluator()
         self.running_tasks = {}  # Track running evaluations
+        
+        # Concurrency control
+        self.semaphore = asyncio.Semaphore(max_concurrent_evals)
+        self.eval_timeout = eval_timeout
     
     async def run_evaluation(
         self,
@@ -235,31 +247,52 @@ class EvaluationRunner:
         eval_config: Dict[str, Any],
         max_workers: int
     ) -> List[Dict[str, Any]]:
-        """Process a batch of samples"""
-        # Create tasks for parallel processing
+        """Process a batch of samples with proper concurrency control"""
+        
+        async def eval_with_timeout_and_semaphore(sample, sample_id):
+            """Evaluate a single sample with timeout and semaphore control"""
+            async with self.semaphore:
+                try:
+                    # Apply timeout to individual evaluation
+                    result = await asyncio.wait_for(
+                        eval_fn(
+                            sample=sample,
+                            eval_spec=eval_spec,
+                            config=eval_config,
+                            sample_id=sample_id
+                        ),
+                        timeout=self.eval_timeout
+                    )
+                    return result
+                except asyncio.TimeoutError:
+                    logger.error(f"Evaluation timeout for {sample_id}")
+                    return {"sample_id": sample_id, "error": f"Timeout after {self.eval_timeout}s"}
+                except Exception as e:
+                    logger.error(f"Evaluation failed for {sample_id}: {e}")
+                    return {"sample_id": sample_id, "error": str(e)}
+        
+        # Create tasks with proper error handling
         tasks = []
         for i, sample in enumerate(batch):
-            task = eval_fn(
-                sample=sample,
-                eval_spec=eval_spec,
-                config=eval_config,
-                sample_id=f"sample_{i:04d}"
-            )
+            sample_id = f"sample_{i:04d}"
+            task = eval_with_timeout_and_semaphore(sample, sample_id)
             tasks.append(task)
         
-        # Run with limited concurrency
-        results = []
-        for i in range(0, len(tasks), max_workers):
-            batch_tasks = tasks[i:i + max_workers]
-            batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-            
-            for result in batch_results:
-                if isinstance(result, Exception):
-                    results.append({"error": str(result)})
-                else:
-                    results.append(result)
+        # Process all tasks concurrently (semaphore will limit actual concurrency)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        return results
+        # Handle any unexpected exceptions from gather
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append({
+                    "sample_id": f"sample_{i:04d}",
+                    "error": str(result)
+                })
+            else:
+                processed_results.append(result)
+        
+        return processed_results
     
     # ============= Evaluation Functions =============
     
@@ -276,13 +309,16 @@ class EvaluationRunner:
             source_text = sample["input"].get("source_text", "")
             summary = sample["input"].get("summary", "")
             
-            # Run G-Eval
-            result = await asyncio.to_thread(
+            # Run G-Eval with controlled thread pool usage
+            # Use a dedicated executor to avoid exhausting the default thread pool
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,  # Use default executor but with timeout control
                 run_geval,
-                transcript=source_text,
-                summary=summary,
-                api_name=eval_spec.get("evaluator_model", "openai"),
-                save=False
+                source_text,
+                summary,
+                eval_spec.get("evaluator_model", "openai"),
+                False  # save=False
             )
             
             # Parse results

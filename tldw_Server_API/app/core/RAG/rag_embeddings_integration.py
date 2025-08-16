@@ -111,28 +111,34 @@ class ProductionEmbeddingFunction(EmbeddingFunction):
         try:
             if self.use_async:
                 # Run async function in sync context
+                config = get_embedding_config()  # Get default config
+                # Override with our settings
+                if self.provider and self.model_id:
+                    config["embedding_config"]["default_model_id"] = self.model_id
+                
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 try:
                     embeddings = loop.run_until_complete(
                         create_embeddings_batch_async(
                             texts=input,
-                            provider=self.provider,
-                            model_id=self.model_id,
-                            api_key=self.api_key,
-                            api_url=self.api_url
+                            user_app_config=config,
+                            model_id_override=self.model_id
                         )
                     )
                 finally:
                     loop.close()
             else:
-                # Use synchronous version
+                # Use synchronous version - build config in expected format
+                config = get_embedding_config()  # Get default config
+                # Override with our settings
+                if self.provider and self.model_id:
+                    config["embedding_config"]["default_model_id"] = self.model_id
+                
                 embeddings = create_embeddings_batch(
                     texts=input,
-                    provider=self.provider,
-                    model_id=self.model_id,
-                    api_key=self.api_key,
-                    api_url=self.api_url
+                    user_app_config=config,
+                    model_id_override=self.model_id
                 )
             
             # Convert numpy array to list if needed

@@ -17,23 +17,43 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
+from tldw_Server_API.app.core.RAG.rag_embeddings_integration import (
+    RAGEmbeddingsIntegration,
+    create_rag_embeddings_integration
+)
+from tldw_Server_API.app.core.Evaluations.circuit_breaker import (
+    llm_circuit_breaker,
+    CircuitOpenError
+)
 
 
 class RAGEvaluator:
     """Evaluator for RAG system performance"""
     
-    def __init__(self):
-        # TODO: Add embedding wrapper once embeddings module structure is stabilized
-        # For now, using text-based similarity as fallback
+    def __init__(self, embedding_provider: str = "openai", embedding_model: str = "text-embedding-3-small", api_key: Optional[str] = None):
+        """
+        Initialize RAG evaluator with production embeddings.
+        
+        Args:
+            embedding_provider: Provider for embeddings (openai, huggingface, cohere)
+            embedding_model: Model to use for embeddings
+            api_key: Optional API key for the embedding provider
+        """
         self.embedding_available = False
+        self.embeddings_integration = None
+        
         try:
-            # Try to import embeddings module (will fail for now)
-            # from tldw_Server_API.app.core.Embeddings import EmbeddingsServiceWrapper
-            # self.embedding_wrapper = EmbeddingsServiceWrapper()
-            # self.embedding_available = True
-            pass
-        except ImportError:
-            logger.info("Embeddings module not available, using text-based similarity fallback")
+            # Initialize production embeddings integration
+            self.embeddings_integration = create_rag_embeddings_integration(
+                provider=embedding_provider,
+                model=embedding_model,
+                api_key=api_key
+            )
+            self.embedding_available = True
+            logger.info(f"Initialized RAG evaluator with {embedding_provider}/{embedding_model} embeddings")
+        except Exception as e:
+            logger.warning(f"Failed to initialize embeddings integration: {e}. Using LLM-based fallback.")
+            self.embedding_available = False
         
     async def evaluate(
         self,
@@ -83,12 +103,30 @@ class RAGEvaluator:
         if "context_recall" in metrics and ground_truth:
             tasks.append(self._evaluate_context_recall(ground_truth, contexts, api_name))
         
-        # Run evaluations in parallel
-        metric_results = await asyncio.gather(*tasks)
-        
-        # Compile results
-        for metric_name, metric_result in metric_results:
-            results["metrics"][metric_name] = metric_result
+        # Run evaluations in parallel with error handling
+        try:
+            # Use return_exceptions=True to handle individual failures
+            metric_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Compile results and handle exceptions
+            failed_metrics = []
+            for i, result in enumerate(metric_results):
+                if isinstance(result, Exception):
+                    # Log the failure but continue with other metrics
+                    metric_name = metrics[i] if i < len(metrics) else f"metric_{i}"
+                    logger.error(f"Metric {metric_name} failed: {result}")
+                    failed_metrics.append(metric_name)
+                else:
+                    metric_name, metric_result = result
+                    results["metrics"][metric_name] = metric_result
+            
+            # Add information about failed metrics
+            if failed_metrics:
+                results["failed_metrics"] = failed_metrics
+                results["partial_results"] = True
+        except Exception as e:
+            logger.error(f"Critical failure in evaluation: {e}")
+            raise ValueError(f"Evaluation failed: {str(e)}")
             
         # Generate suggestions based on scores
         results["suggestions"] = self._generate_suggestions(results["metrics"])
@@ -115,7 +153,9 @@ class RAGEvaluator:
         """
         
         try:
-            score_str = await asyncio.to_thread(
+            # Use circuit breaker for LLM call
+            score_str = await llm_circuit_breaker.call_with_breaker(
+                api_name,
                 analyze,
                 query,
                 prompt,
@@ -134,13 +174,14 @@ class RAGEvaluator:
                 "explanation": "Measures how well the response addresses the query"
             })
             
+        except CircuitOpenError as e:
+            logger.warning(f"Circuit breaker open for relevance evaluation: {e}")
+            # Re-raise with more context
+            raise ValueError(f"Service temporarily unavailable for relevance evaluation: {str(e)}")
         except Exception as e:
             logger.error(f"Relevance evaluation failed: {e}")
-            return ("relevance", {
-                "name": "relevance",
-                "score": 0.0,
-                "explanation": f"Evaluation failed: {str(e)}"
-            })
+            # Raise exception instead of returning 0.0
+            raise ValueError(f"Relevance evaluation failed: {str(e)}")
     
     async def _evaluate_faithfulness(self, response: str, contexts: List[str], api_name: str) -> tuple:
         """Evaluate if response is grounded in contexts"""
@@ -188,16 +229,46 @@ class RAGEvaluator:
             
         except Exception as e:
             logger.error(f"Faithfulness evaluation failed: {e}")
-            return ("faithfulness", {
-                "name": "faithfulness",
-                "score": 0.0,
-                "explanation": f"Evaluation failed: {str(e)}"
-            })
+            # Raise exception instead of returning 0.0
+            raise ValueError(f"Faithfulness evaluation failed: {str(e)}")
     
     async def _evaluate_answer_similarity(self, response: str, ground_truth: str) -> tuple:
         """Evaluate similarity between response and ground truth"""
-        # TODO: Use embedding-based similarity once embeddings module is available
-        # Currently using LLM-based similarity evaluation as fallback
+        
+        # Use embedding-based similarity if available
+        if self.embedding_available and self.embeddings_integration:
+            try:
+                # Get embeddings for both texts
+                response_embedding = await self.embeddings_integration.embed_query(response)
+                ground_truth_embedding = await self.embeddings_integration.embed_query(ground_truth)
+                
+                # Calculate cosine similarity
+                # Reshape for sklearn if needed
+                if response_embedding.ndim == 1:
+                    response_embedding = response_embedding.reshape(1, -1)
+                if ground_truth_embedding.ndim == 1:
+                    ground_truth_embedding = ground_truth_embedding.reshape(1, -1)
+                
+                similarity = cosine_similarity(response_embedding, ground_truth_embedding)[0][0]
+                
+                # Convert similarity to 1-5 scale for consistency
+                # Cosine similarity ranges from -1 to 1, but typically 0 to 1 for text
+                # Map [0, 1] to [1, 5]
+                raw_score = 1 + (similarity * 4)  # Maps 0->1, 0.5->3, 1->5
+                score = similarity  # Keep normalized 0-1 score
+                
+                return ("answer_similarity", {
+                    "name": "answer_similarity",
+                    "score": score,
+                    "raw_score": raw_score,
+                    "explanation": "Embedding-based semantic similarity to ground truth answer",
+                    "method": "embeddings"
+                })
+                
+            except Exception as e:
+                logger.warning(f"Embedding-based similarity failed: {e}. Falling back to LLM-based evaluation.")
+        
+        # Fallback to LLM-based similarity evaluation
         prompt = f"""
         Compare the similarity between the following response and ground truth answer.
         
@@ -232,16 +303,14 @@ class RAGEvaluator:
                 "name": "answer_similarity",
                 "score": score,
                 "raw_score": float(score_str.strip()),
-                "explanation": "Semantic similarity to ground truth answer"
+                "explanation": "LLM-based semantic similarity to ground truth answer",
+                "method": "llm"
             })
             
         except Exception as e:
             logger.error(f"Answer similarity evaluation failed: {e}")
-            return ("answer_similarity", {
-                "name": "answer_similarity",
-                "score": 0.0,
-                "explanation": f"Evaluation failed: {str(e)}"
-            })
+            # Raise exception instead of returning 0.0 (fixing error handling issue)
+            raise ValueError(f"Answer similarity evaluation failed: {str(e)}")
     
     async def _evaluate_context_precision(self, query: str, contexts: List[str], api_name: str) -> tuple:
         """Evaluate precision of retrieved contexts"""
@@ -329,11 +398,8 @@ class RAGEvaluator:
             
         except Exception as e:
             logger.error(f"Context recall evaluation failed: {e}")
-            return ("context_recall", {
-                "name": "context_recall",
-                "score": 0.0,
-                "explanation": f"Evaluation failed: {str(e)}"
-            })
+            # Raise exception instead of returning 0.0
+            raise ValueError(f"Context recall evaluation failed: {str(e)}")
     
     def _generate_suggestions(self, metrics: Dict[str, Dict]) -> List[str]:
         """Generate improvement suggestions based on metrics"""
@@ -360,3 +426,11 @@ class RAGEvaluator:
             suggestions.append("Fine-tune generation to produce more accurate responses")
         
         return suggestions
+    
+    def close(self):
+        """Clean up resources including embeddings integration."""
+        if self.embeddings_integration:
+            try:
+                self.embeddings_integration.close()
+            except Exception as e:
+                logger.warning(f"Error closing embeddings integration: {e}")

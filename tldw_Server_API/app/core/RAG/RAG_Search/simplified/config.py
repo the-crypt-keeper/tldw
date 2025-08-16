@@ -13,7 +13,34 @@ import os
 from loguru import logger
 
 # Import the main config module to access existing configuration
-from tldw_Server_API.app.core.config import get_cli_setting, load_cli_config_and_ensure_existence, get_user_data_dir
+from tldw_Server_API.app.core.config import settings
+
+# Compatibility functions for missing config functions
+def get_cli_setting(section, key, default=None):
+    """Get a setting from the config, with fallback to default"""
+    if isinstance(key, str) and '.' in key:
+        # Handle nested keys like "rag.embedding"
+        parts = key.split('.')
+        value = settings
+        for part in parts:
+            value = value.get(part, {}) if isinstance(value, dict) else {}
+        return value if value else default
+    
+    # Get from settings
+    value = settings.get(section, {})
+    if isinstance(value, dict) and key:
+        return value.get(key, default)
+    return value if value else default
+
+def get_user_data_dir():
+    """Get the user data directory"""
+    from pathlib import Path
+    base_dir = settings.get("USER_DATA_BASE_DIR", "./user_databases")
+    return Path(base_dir)
+
+def load_cli_config_and_ensure_existence():
+    """Compatibility function - config is already loaded"""
+    return settings
 
 
 

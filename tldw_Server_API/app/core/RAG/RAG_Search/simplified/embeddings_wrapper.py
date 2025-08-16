@@ -24,8 +24,17 @@ except ImportError:
         class ndarray:
             pass
 
-from tldw_Server_API.app.core.Embeddings.Embeddings_Lib import EmbeddingFactory, EmbeddingConfigSchema
-from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
+from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import (
+    create_embeddings_batch,
+    create_embedding,
+    EmbeddingConfigSchema
+)
+from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, timeit
+
+# Define log_gauge as log_counter if not available (for compatibility)
+def log_gauge(metric_name, value, labels=None):
+    """Compatibility wrapper for gauge metrics - uses counter as fallback"""
+    log_counter(metric_name, labels=labels, value=value)
 from .circuit_breaker import get_circuit_breaker, CircuitBreakerConfig, CircuitBreakerOpenError
 
 
@@ -83,23 +92,11 @@ class EmbeddingsServiceWrapper:
         # Note API key source without logging sensitive info
         self._has_api_key = bool(api_key or os.environ.get("OPENAI_API_KEY"))
         
-        # Determine provider and model configuration
-        config_dict = self._build_config(model_name, self.device, api_key, base_url, cache_dir)
+        # Build configuration for embeddings
+        self.config = self._build_config(model_name, self.device, api_key, base_url, cache_dir)
         
         try:
-            # Import EmbeddingConfigSchema for validation
-            from tldw_Server_API.app.core.Embeddings.Embeddings_Lib import EmbeddingConfigSchema
-            
-            # Validate the configuration
-            validated_config = EmbeddingConfigSchema(**config_dict)
-            
-            # Initialize factory with validated configuration
-            self.factory = EmbeddingFactory(
-                cfg=validated_config,
-                max_cached=cache_size,
-                idle_seconds=900,  # 15 minutes idle timeout
-                allow_dynamic_hf=True  # Allow loading HF models not in config
-            )
+            # Validate that we can create embeddings
             logger.info(f"Initialized embeddings service with model: {model_name}, device: {self.device}, cache_size: {cache_size}")
             
             # Log initialization metrics
@@ -231,7 +228,7 @@ class EmbeddingsServiceWrapper:
         logger.debug(f"Built embedding config: provider={provider}, model={model_path}")
         return config
     
-    @timeit("embeddings_create_operation")
+    @timeit
     def create_embeddings(self, texts: List[str]) -> np.ndarray:
         """
         Create embeddings for texts using the configured model.
@@ -295,15 +292,15 @@ class EmbeddingsServiceWrapper:
                 logger.debug(f"Cache miss for embedding batch")
             
             # Use the factory's embed method with circuit breaker protection
-            logger.debug(f"Calling factory.embed with {len(texts)} texts")
+            logger.debug(f"Calling create_embeddings_batch with {len(texts)} texts")
             
             # Define the embedding function for circuit breaker
-            def embed_with_factory():
-                return self.factory.embed(texts, as_list=False)
+            def embed_with_function():
+                return create_embeddings_batch(texts, self.config, self.model_name)
             
             try:
-                embeddings = self._circuit_breaker.call_sync(embed_with_factory)
-                logger.debug(f"Factory returned embeddings of type {type(embeddings)}, shape: {embeddings.shape if hasattr(embeddings, 'shape') else 'N/A'}")
+                embeddings = self._circuit_breaker.call_sync(embed_with_function)
+                logger.debug(f"create_embeddings_batch returned embeddings of type {type(embeddings)}, length: {len(embeddings) if embeddings else 0}")
             except CircuitBreakerOpenError as e:
                 # Circuit is open, fail fast
                 self._errors_count += 1
@@ -368,11 +365,15 @@ class EmbeddingsServiceWrapper:
         logger.info(f"Creating embeddings asynchronously for batch of {len(texts)} texts")
         
         try:
-            # Use the factory's async embed method with circuit breaker protection
+            # Import the async version we just created
+            from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import create_embeddings_batch_async
+            
+            # Use the async embed method with circuit breaker protection
+            async def embed_async():
+                return await create_embeddings_batch_async(texts, self.config, self.model_name)
+            
             try:
-                embeddings = await self._circuit_breaker.call_async(
-                    self.factory.async_embed, texts, as_list=False
-                )
+                embeddings = await self._circuit_breaker.call_async(embed_async)
             except CircuitBreakerOpenError as e:
                 # Circuit is open, fail fast
                 self._errors_count += 1
@@ -447,7 +448,7 @@ class EmbeddingsServiceWrapper:
             logger.warning(f"Could not determine embedding dimension: {e}")
             return None
     
-    @timeit("embeddings_prefetch_models")
+    @timeit
     def prefetch_model(self, model_ids: Optional[List[str]] = None):
         """
         Prefetch and cache models for faster first-use.
