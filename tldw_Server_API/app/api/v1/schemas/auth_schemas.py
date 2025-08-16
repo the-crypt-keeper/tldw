@@ -88,6 +88,27 @@ class RefreshTokenRequest(BaseModel):
     }
 
 
+class UpdateProfileRequest(BaseModel):
+    """Request model for updating user profile."""
+    email: Optional[EmailStr] = Field(None, description="New email address")
+    
+    @field_validator('email')
+    @classmethod
+    def email_lowercase(cls, v):
+        """Normalize email to lowercase"""
+        if v:
+            return v.lower()
+        return v
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "email": "newemail@example.com"
+            }
+        }
+    }
+
+
 class PasswordChangeRequest(BaseModel):
     """Password change request"""
     current_password: str = Field(..., description="Current password")

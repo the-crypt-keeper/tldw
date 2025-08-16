@@ -650,16 +650,44 @@ class SessionManager:
             await self.initialize()
         
         try:
-            sessions = await self.db_pool.fetchall(
-                """
-                SELECT id, ip_address, user_agent, device_id,
-                       created_at, last_activity, expires_at
-                FROM sessions
-                WHERE user_id = ? AND is_active = ?
-                ORDER BY last_activity DESC
-                """,
-                user_id, True
-            )
+            async with self.db_pool.acquire() as conn:
+                if hasattr(conn, 'fetch'):
+                    # PostgreSQL
+                    rows = await conn.fetch(
+                        """
+                        SELECT id, ip_address, user_agent, device_id,
+                               created_at, last_activity, expires_at
+                        FROM sessions
+                        WHERE user_id = $1 AND is_active = TRUE
+                        ORDER BY last_activity DESC
+                        """,
+                        user_id
+                    )
+                    sessions = [dict(row) for row in rows]
+                else:
+                    # SQLite
+                    cursor = await conn.execute(
+                        """
+                        SELECT id, ip_address, user_agent, device_id,
+                               created_at, last_activity, expires_at
+                        FROM sessions
+                        WHERE user_id = ? AND is_active = 1
+                        ORDER BY last_activity DESC
+                        """,
+                        (user_id,)
+                    )
+                    rows = await cursor.fetchall()
+                    sessions = []
+                    for row in rows:
+                        sessions.append({
+                            "id": row[0],
+                            "ip_address": row[1],
+                            "user_agent": row[2],
+                            "device_id": row[3],
+                            "created_at": row[4],
+                            "last_activity": row[5],
+                            "expires_at": row[6]
+                        })
             
             return sessions
             

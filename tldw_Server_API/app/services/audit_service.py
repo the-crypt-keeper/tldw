@@ -357,6 +357,11 @@ class AuditService:
         except Exception as e:
             logger.error(f"Failed to get audit trail for user {user_id}: {e}")
             return []
+    
+    async def shutdown(self):
+        """Shutdown the audit service (cleanup resources)"""
+        # Nothing specific to cleanup currently, but added for consistency
+        pass
 
 
 #######################################################################################################################

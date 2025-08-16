@@ -273,7 +273,7 @@ async def isolated_test_environment(monkeypatch):
         await cleanup_conn.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def setup_test_database():
     """Create and setup the test database for the test session."""
     # Connect to postgres database to create test database

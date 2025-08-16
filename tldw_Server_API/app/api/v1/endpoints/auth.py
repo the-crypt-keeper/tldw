@@ -72,6 +72,7 @@ async def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db=Depends(get_db_transaction),
+    jwt_service: JWTService = Depends(get_jwt_service_dep),
     password_service: PasswordService = Depends(get_password_service_dep),
     session_manager: SessionManager = Depends(get_session_manager_dep),
     rate_limiter: RateLimiter = Depends(get_rate_limiter_dep),
@@ -223,7 +224,6 @@ async def login(
             session_id = temp_session_info['session_id']
             
             # Create JWT tokens with session_id
-            jwt_service = get_jwt_service()
             access_token = jwt_service.create_access_token(
                 user_id=user['id'],
                 username=user['username'],
@@ -336,6 +336,7 @@ async def logout(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     request: RefreshTokenRequest,
+    jwt_service: JWTService = Depends(get_jwt_service_dep),
     session_manager: SessionManager = Depends(get_session_manager_dep),
     db=Depends(get_db_transaction),
     settings: Settings = Depends(get_settings)
@@ -361,7 +362,6 @@ async def refresh_token(
             user_id = int(request.refresh_token.split("-")[-1])
         else:
             # JWT validation for multi-user mode
-            jwt_service = get_jwt_service()
             payload = jwt_service.decode_refresh_token(request.refresh_token)
             
             # Check if token is blacklisted
@@ -410,7 +410,6 @@ async def refresh_token(
         if settings.AUTH_MODE == "single_user":
             new_access_token = f"single-user-token-{user['id']}"
         else:
-            jwt_service = get_jwt_service()
             new_access_token = jwt_service.create_access_token(
                 user_id=user['id'],
                 username=user['username'],

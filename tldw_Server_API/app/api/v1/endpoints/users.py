@@ -12,6 +12,7 @@ from loguru import logger
 # Local imports
 from tldw_Server_API.app.api.v1.schemas.auth_schemas import (
     UserResponse,
+    UpdateProfileRequest,
     PasswordChangeRequest,
     MessageResponse,
     SessionResponse,
@@ -82,7 +83,7 @@ async def get_current_user_profile(
 
 @router.put("/me", response_model=UserResponse)
 async def update_user_profile(
-    email: Optional[str] = None,
+    request: UpdateProfileRequest,
     current_user: Dict[str, Any] = Depends(get_current_active_user),
     db=Depends(get_db_transaction)
 ) -> UserResponse:
@@ -93,7 +94,7 @@ async def update_user_profile(
     Username changes are not allowed for security reasons.
     
     Args:
-        email: New email address (optional)
+        request: UpdateProfileRequest with new email address (optional)
         
     Returns:
         Updated UserResponse
@@ -101,24 +102,24 @@ async def update_user_profile(
     try:
         updates_made = False
         
-        if email and email != current_user.get('email'):
+        if request.email and request.email != current_user.get('email'):
             # Update email
             if hasattr(db, 'execute'):
                 # PostgreSQL
                 await db.execute(
                     "UPDATE users SET email = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
-                    email.lower(), current_user['id']
+                    request.email.lower(), current_user['id']
                 )
             else:
                 # SQLite
                 await db.execute(
                     "UPDATE users SET email = ?, updated_at = datetime('now') WHERE id = ?",
-                    (email.lower(), current_user['id'])
+                    (request.email.lower(), current_user['id'])
                 )
                 await db.commit()
             
             updates_made = True
-            current_user['email'] = email.lower()
+            current_user['email'] = request.email.lower()
             logger.info(f"Updated email for user {current_user['username']} (ID: {current_user['id']})")
         
         if not updates_made:
@@ -130,6 +131,8 @@ async def update_user_profile(
         # Return updated user info
         return await get_current_user_profile(current_user)
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to update user profile: {e}")
         raise HTTPException(
@@ -164,10 +167,32 @@ async def change_password(
         HTTPException: 401 if current password is incorrect, 400 if new password is weak
     """
     try:
+        # Fetch user's password hash from database
+        if hasattr(db, 'fetchval'):
+            # PostgreSQL
+            password_hash = await db.fetchval(
+                "SELECT password_hash FROM users WHERE id = $1",
+                current_user['id']
+            )
+        else:
+            # SQLite
+            cursor = await db.execute(
+                "SELECT password_hash FROM users WHERE id = ?",
+                (current_user['id'],)
+            )
+            row = await cursor.fetchone()
+            password_hash = row[0] if row else None
+        
+        if not password_hash:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
         # Verify current password
         is_valid, _ = password_service.verify_password(
             request.current_password, 
-            current_user['password_hash']
+            password_hash
         )
         if not is_valid:
             logger.warning(f"Failed password change attempt for user {current_user['username']}")
@@ -311,9 +336,11 @@ async def revoke_session(
         session_ids = [s['id'] for s in sessions]
         
         if session_id not in session_ids:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session not found or does not belong to current user"
+            # Return success for idempotency - session is already not active
+            logger.info(f"Session {session_id} not found for user {current_user['id']} - treating as already revoked")
+            return MessageResponse(
+                message="Session revoked successfully",
+                details={"session_id": session_id, "note": "Session was already inactive or did not exist"}
             )
         
         # Revoke the session
