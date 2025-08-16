@@ -28,7 +28,7 @@ share/python-wheels/
 MANIFEST
 tldw_server.egg-info/
 tldw-server.egg-info/
-
+embedding_models_data/
 
 
 # PyInstaller
