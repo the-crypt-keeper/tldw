@@ -22,6 +22,7 @@ from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User
 from tldw_Server_API.app.api.v1.endpoints.rag_v2 import rag_service_manager
+from tldw_Server_API.app.core.config import settings
 
 
 class TestRAGV2Endpoints:
@@ -30,6 +31,10 @@ class TestRAGV2Endpoints:
     @classmethod
     def setup_class(cls):
         """Set up test fixtures."""
+        # Disable CSRF for testing
+        cls.original_csrf = settings.get("CSRF_ENABLED", None)
+        settings["CSRF_ENABLED"] = False
+        
         cls.client = TestClient(app)
         cls.test_user = User(
             id=0,  # Using 0 for single-user mode
@@ -50,6 +55,12 @@ class TestRAGV2Endpoints:
     @classmethod
     def teardown_class(cls):
         """Clean up test fixtures."""
+        # Restore CSRF setting
+        if cls.original_csrf is not None:
+            settings["CSRF_ENABLED"] = cls.original_csrf
+        else:
+            settings.pop("CSRF_ENABLED", None)
+        
         # Clean up test directory
         shutil.rmtree(cls.test_dir, ignore_errors=True)
         

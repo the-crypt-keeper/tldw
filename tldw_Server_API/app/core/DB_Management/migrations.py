@@ -185,9 +185,9 @@ def create_evaluations_migrations() -> MigrationManager:
     
     def migration_001_initial_schema(conn: sqlite3.Connection):
         """Create initial evaluation tables."""
-        # Create evaluations table
+        # Create internal_evaluations table (separate from OpenAI evaluations)
         conn.execute("""
-            CREATE TABLE IF NOT EXISTS evaluations (
+            CREATE TABLE IF NOT EXISTS internal_evaluations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 evaluation_id TEXT UNIQUE NOT NULL,
                 evaluation_type TEXT NOT NULL,
@@ -199,8 +199,8 @@ def create_evaluations_migrations() -> MigrationManager:
         """)
         
         # Create indexes
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_type ON evaluations(evaluation_type)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON evaluations(created_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_type ON internal_evaluations(evaluation_type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON internal_evaluations(created_at)")
         
         # Create metrics table
         conn.execute("""
@@ -210,7 +210,7 @@ def create_evaluations_migrations() -> MigrationManager:
                 metric_name TEXT NOT NULL,
                 score REAL NOT NULL,
                 created_at TIMESTAMP NOT NULL,
-                FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id)
+                FOREIGN KEY (evaluation_id) REFERENCES internal_evaluations(evaluation_id)
             )
         """)
         
@@ -223,42 +223,42 @@ def create_evaluations_migrations() -> MigrationManager:
         """Add user_id column for multi-user support."""
         # Check if column already exists
         cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(evaluations)")
+        cursor.execute("PRAGMA table_info(internal_evaluations)")
         columns = [col[1] for col in cursor.fetchall()]
         
         if 'user_id' not in columns:
-            conn.execute("ALTER TABLE evaluations ADD COLUMN user_id TEXT")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_id ON evaluations(user_id)")
+            conn.execute("ALTER TABLE internal_evaluations ADD COLUMN user_id TEXT")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_user_id ON internal_evaluations(user_id)")
     
     def migration_003_add_status_tracking(conn: sqlite3.Connection):
         """Add status and error tracking columns."""
         cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(evaluations)")
+        cursor.execute("PRAGMA table_info(internal_evaluations)")
         columns = [col[1] for col in cursor.fetchall()]
         
         if 'status' not in columns:
-            conn.execute("ALTER TABLE evaluations ADD COLUMN status TEXT DEFAULT 'completed'")
+            conn.execute("ALTER TABLE internal_evaluations ADD COLUMN status TEXT DEFAULT 'completed'")
         
         if 'error_message' not in columns:
-            conn.execute("ALTER TABLE evaluations ADD COLUMN error_message TEXT")
+            conn.execute("ALTER TABLE internal_evaluations ADD COLUMN error_message TEXT")
         
         if 'completed_at' not in columns:
-            conn.execute("ALTER TABLE evaluations ADD COLUMN completed_at TIMESTAMP")
+            conn.execute("ALTER TABLE internal_evaluations ADD COLUMN completed_at TIMESTAMP")
         
         # Add index for status
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON evaluations(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON internal_evaluations(status)")
     
     def migration_004_add_embeddings_config(conn: sqlite3.Connection):
         """Add embeddings configuration to evaluations."""
         cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(evaluations)")
+        cursor.execute("PRAGMA table_info(internal_evaluations)")
         columns = [col[1] for col in cursor.fetchall()]
         
         if 'embedding_provider' not in columns:
-            conn.execute("ALTER TABLE evaluations ADD COLUMN embedding_provider TEXT")
+            conn.execute("ALTER TABLE internal_evaluations ADD COLUMN embedding_provider TEXT")
         
         if 'embedding_model' not in columns:
-            conn.execute("ALTER TABLE evaluations ADD COLUMN embedding_model TEXT")
+            conn.execute("ALTER TABLE internal_evaluations ADD COLUMN embedding_model TEXT")
     
     # Create manager and add migrations
     manager = MigrationManager(Path("Databases/evaluations.db"))

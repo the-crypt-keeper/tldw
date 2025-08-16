@@ -86,8 +86,9 @@ class EvaluationManager:
         """
         with sqlite3.connect(self.db_path) as conn:
             # Create basic tables if they don't exist
+            # Use internal_evaluations table to avoid conflict with OpenAI evaluations table
             conn.execute("""
-                CREATE TABLE IF NOT EXISTS evaluations (
+                CREATE TABLE IF NOT EXISTS internal_evaluations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     evaluation_id TEXT UNIQUE NOT NULL,
                     evaluation_type TEXT NOT NULL,
@@ -106,10 +107,10 @@ class EvaluationManager:
             
             # Create indexes
             for index_sql in [
-                "CREATE INDEX IF NOT EXISTS idx_type ON evaluations(evaluation_type)",
-                "CREATE INDEX IF NOT EXISTS idx_created ON evaluations(created_at)",
-                "CREATE INDEX IF NOT EXISTS idx_user_id ON evaluations(user_id)",
-                "CREATE INDEX IF NOT EXISTS idx_status ON evaluations(status)"
+                "CREATE INDEX IF NOT EXISTS idx_type ON internal_evaluations(evaluation_type)",
+                "CREATE INDEX IF NOT EXISTS idx_created ON internal_evaluations(created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_user_id ON internal_evaluations(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_status ON internal_evaluations(status)"
             ]:
                 try:
                     conn.execute(index_sql)
@@ -156,7 +157,7 @@ class EvaluationManager:
         # Store main evaluation record
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
-                INSERT INTO evaluations (
+                INSERT INTO internal_evaluations (
                     evaluation_id, evaluation_type, created_at,
                     input_data, results, metadata
                 ) VALUES (?, ?, ?, ?, ?, ?)
@@ -193,7 +194,7 @@ class EvaluationManager:
         offset: int = 0
     ) -> Dict[str, Any]:
         """Retrieve evaluation history with filtering"""
-        query = "SELECT * FROM evaluations WHERE 1=1"
+        query = "SELECT * FROM internal_evaluations WHERE 1=1"
         params = []
         
         if evaluation_type and evaluation_type != "all":
@@ -234,7 +235,7 @@ class EvaluationManager:
                 SELECT metric_name, AVG(score) as avg_score
                 FROM evaluation_metrics
                 WHERE evaluation_id IN (
-                    SELECT evaluation_id FROM evaluations WHERE 1=1
+                    SELECT evaluation_id FROM internal_evaluations WHERE 1=1
             """
             
             if evaluation_type and evaluation_type != "all":
@@ -269,7 +270,7 @@ class EvaluationManager:
             # Get evaluations
             placeholders = ",".join("?" * len(evaluation_ids))
             cursor = conn.execute(
-                f"SELECT * FROM evaluations WHERE evaluation_id IN ({placeholders})",
+                f"SELECT * FROM internal_evaluations WHERE evaluation_id IN ({placeholders})",
                 evaluation_ids
             )
             

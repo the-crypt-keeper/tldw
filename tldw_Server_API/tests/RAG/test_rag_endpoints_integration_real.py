@@ -26,6 +26,18 @@ from tldw_Server_API.app.core.config import settings
 from tldw_Server_API.app.api.v1.endpoints.rag_v2 import rag_service_manager
 
 
+@pytest.fixture(scope="module", autouse=True)
+def disable_csrf():
+    """Disable CSRF for testing."""
+    original_csrf = settings.get("CSRF_ENABLED", None)
+    settings["CSRF_ENABLED"] = False
+    yield
+    if original_csrf is not None:
+        settings["CSRF_ENABLED"] = original_csrf
+    else:
+        settings.pop("CSRF_ENABLED", None)
+
+
 @pytest.fixture(scope="function")
 async def setup_test_data():
     """Set up test data in the actual database locations the service expects."""

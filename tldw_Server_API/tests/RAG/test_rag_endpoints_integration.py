@@ -23,6 +23,19 @@ from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User
 from tldw_Server_API.app.api.v1.endpoints.rag_v2 import rag_service_manager
+from tldw_Server_API.app.core.config import settings
+
+
+@pytest.fixture(scope="module", autouse=True)
+def disable_csrf():
+    """Disable CSRF for testing."""
+    original_csrf = settings.get("CSRF_ENABLED", None)
+    settings["CSRF_ENABLED"] = False
+    yield
+    if original_csrf is not None:
+        settings["CSRF_ENABLED"] = original_csrf
+    else:
+        settings.pop("CSRF_ENABLED", None)
 
 
 @pytest.fixture(scope="module")

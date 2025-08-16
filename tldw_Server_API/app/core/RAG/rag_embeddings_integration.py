@@ -333,8 +333,14 @@ class EnhancedVectorRetriever:
             # Get a sample to determine embedding dimension
             if count > 0:
                 sample = self.collection.peek(1)
-                if sample and sample.get("embeddings"):
-                    dimension = len(sample["embeddings"][0])
+                if sample and sample.get("embeddings") is not None:
+                    embeddings = sample.get("embeddings")
+                    if isinstance(embeddings, list) and len(embeddings) > 0:
+                        dimension = len(embeddings[0])
+                    elif hasattr(embeddings, 'shape'):  # numpy array
+                        dimension = embeddings.shape[-1] if len(embeddings.shape) > 1 else len(embeddings)
+                    else:
+                        dimension = None
                 else:
                     dimension = None
             else:
@@ -434,7 +440,32 @@ class RAGEmbeddingsIntegration:
         Returns:
             Query embedding vector
         """
-        return await self.embeddings_service.create_embedding_async(query)
+        # Use the production embedding function directly
+        from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import create_embeddings_batch_async
+        
+        config = get_embedding_config()
+        # Use the model ID as-is for HuggingFace, prepend provider for others
+        if self.embedding_provider == "huggingface":
+            model_id = self.embedding_model
+        else:
+            model_id = f"{self.embedding_provider}/{self.embedding_model}" if self.embedding_provider else self.embedding_model
+        
+        if model_id:
+            config["embedding_config"]["default_model_id"] = model_id
+        
+        embeddings = await create_embeddings_batch_async(
+            texts=[query],
+            user_app_config=config,
+            model_id_override=model_id
+        )
+        
+        # Return first embedding (query is a single text)
+        if isinstance(embeddings, list) and len(embeddings) > 0:
+            return np.array(embeddings[0])
+        elif hasattr(embeddings, 'shape'):
+            return embeddings[0] if len(embeddings.shape) > 1 else embeddings
+        else:
+            return np.array(embeddings)
     
     async def embed_documents(self, documents: List[str]) -> np.ndarray:
         """
@@ -446,15 +477,71 @@ class RAGEmbeddingsIntegration:
         Returns:
             Document embeddings matrix
         """
-        return await self.embeddings_service.create_embeddings_async(documents)
+        # Use the production embedding function directly
+        from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import create_embeddings_batch_async
+        
+        config = get_embedding_config()
+        # Use the model ID as-is for HuggingFace, prepend provider for others
+        if self.embedding_provider == "huggingface":
+            model_id = self.embedding_model
+        else:
+            model_id = f"{self.embedding_provider}/{self.embedding_model}" if self.embedding_provider else self.embedding_model
+        
+        if model_id:
+            config["embedding_config"]["default_model_id"] = model_id
+        
+        embeddings = await create_embeddings_batch_async(
+            texts=documents,
+            user_app_config=config,
+            model_id_override=model_id
+        )
+        
+        # Convert to numpy array if needed
+        if not isinstance(embeddings, np.ndarray):
+            embeddings = np.array(embeddings)
+        
+        return embeddings
     
     def get_embedding_dimension(self) -> Optional[int]:
         """Get the dimension of embeddings produced by the current model."""
-        return self.embeddings_service.get_embedding_dimension()
+        # Try to get dimension by creating a test embedding
+        try:
+            from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import create_embeddings_batch
+            
+            config = get_embedding_config()
+            # Use the model ID as-is for HuggingFace, prepend provider for others
+            if self.embedding_provider == "huggingface":
+                model_id = self.embedding_model
+            else:
+                model_id = f"{self.embedding_provider}/{self.embedding_model}" if self.embedding_provider else self.embedding_model
+            
+            if model_id:
+                config["embedding_config"]["default_model_id"] = model_id
+            
+            test_embedding = create_embeddings_batch(
+                texts=["test"],
+                user_app_config=config,
+                model_id_override=model_id
+            )
+            
+            if isinstance(test_embedding, list) and len(test_embedding) > 0:
+                return len(test_embedding[0])
+            elif hasattr(test_embedding, 'shape'):
+                return test_embedding.shape[-1]
+            else:
+                return None
+        except Exception as e:
+            logger.warning(f"Could not determine embedding dimension: {e}")
+            return None
     
     def get_metrics(self) -> Dict[str, Any]:
         """Get metrics from the embeddings service."""
-        return self.embeddings_service.get_metrics()
+        # Return basic metrics since we're not using the wrapper
+        return {
+            "provider": self.embedding_provider,
+            "model": self.embedding_model,
+            "cached": self.cache_embeddings
+        }
     
     def close(self):
         """Clean up resources."""
