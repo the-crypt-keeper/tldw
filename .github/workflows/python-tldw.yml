@@ -137,13 +137,8 @@ jobs:
           
       - name: Run unit tests with coverage
         run: |
-          pytest -v -m "unit" \
-            --cov=tldw_Server_API \
-            --cov-report=xml \
-            --cov-report=html \
-            --cov-report=term-missing \
-            --junit-xml=test-results-${{ matrix.os }}-${{ matrix.python-version }}.xml \
-            --timeout=300
+          pytest -v -m "unit" --cov=tldw_Server_API --cov-report=xml --cov-report=html --cov-report=term-missing --junit-xml=test-results-${{ matrix.os }}-${{ matrix.python-version }}.xml --timeout=300
+        shell: bash
         continue-on-error: true
         
       - name: Upload test results
@@ -211,11 +206,8 @@ jobs:
           
       - name: Run integration tests
         run: |
-          pytest -v -m "integration" \
-            --cov=tldw_Server_API \
-            --cov-report=xml \
-            --junit-xml=test-results-integration.xml \
-            --timeout=600
+          pytest -v -m "integration" --cov=tldw_Server_API --cov-report=xml --junit-xml=test-results-integration.xml --timeout=600
+        shell: bash
         continue-on-error: true
         
       - name: Upload test results
@@ -265,9 +257,8 @@ jobs:
           
       - name: Run external API tests
         run: |
-          pytest -v -m "external_api" \
-            --junit-xml=test-results-external.xml \
-            --timeout=1200
+          pytest -v -m "external_api" --junit-xml=test-results-external.xml --timeout=1200
+        shell: bash
         continue-on-error: true
         
       - name: Upload test results

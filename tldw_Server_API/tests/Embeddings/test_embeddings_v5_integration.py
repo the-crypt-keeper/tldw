@@ -13,33 +13,40 @@ from tldw_Server_API.app.main import app
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User, get_request_user
 
 
+# Module-level setup fixture for integration tests
+@pytest.fixture
+def setup():
+    """Setup test environment fixture"""
+    class SetupData:
+        def __init__(self):
+            self.client = TestClient(app)
+            # Set CSRF token in both cookie and header
+            csrf_token = "test-csrf-token-12345"
+            self.client.cookies.set("csrf_token", csrf_token)
+            self.auth_headers = {
+                "Authorization": "Bearer test-api-key",
+                "X-CSRF-Token": csrf_token
+            }
+            
+            self.test_user = User(
+                id=1, 
+                username="testuser", 
+                email="test@example.com", 
+                is_active=True,
+                is_admin=False
+            )
+    
+    data = SetupData()
+    yield data
+    app.dependency_overrides.clear()
+
+
 @pytest.mark.integration
 class TestEmbeddingsIntegration:
     """Integration tests without mocking - requires actual services"""
     
-    @pytest.fixture(autouse=True)
-    async def setup(self):
-        """Setup test environment"""
-        self.client = TestClient(app)
-        self.auth_headers = {"Authorization": "Bearer test-api-key"}
-        
-        self.test_user = User(
-            id=1, 
-            username="testuser", 
-            email="test@example.com", 
-            is_active=True,
-            is_admin=False
-        )
-        
-        yield
-        app.dependency_overrides.clear()
-    
     @pytest.mark.integration
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        not os.getenv("RUN_INTEGRATION_TESTS"),
-        reason="Integration tests require RUN_INTEGRATION_TESTS=true and actual services"
-    )
     async def test_real_huggingface_embedding(self, setup):
         """Test actual HuggingFace embedding creation (no mocks)"""
         async def override_user():
@@ -121,10 +128,7 @@ class TestEmbeddingsIntegration:
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        not os.getenv("RUN_INTEGRATION_TESTS"),
-        reason="Integration tests require RUN_INTEGRATION_TESTS=true"
-    )
+    @pytest.mark.asyncio
     async def test_real_cache_persistence(self, setup):
         """Test cache persistence across requests (no mocks)"""
         async def override_user():
@@ -170,10 +174,6 @@ class TestEmbeddingsIntegration:
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        not os.getenv("RUN_INTEGRATION_TESTS"),
-        reason="Integration tests require RUN_INTEGRATION_TESTS=true"
-    )
     async def test_different_providers_produce_different_embeddings(self, setup):
         """Test that different providers produce different embeddings for same text"""
         async def override_user():
@@ -263,10 +263,6 @@ class TestEmbeddingsIntegration:
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        not os.getenv("RUN_INTEGRATION_TESTS"),
-        reason="Integration tests require RUN_INTEGRATION_TESTS=true"
-    )
     async def test_batch_processing(self, setup):
         """Test batch processing with real embeddings"""
         async def override_user():
@@ -311,10 +307,6 @@ class TestEmbeddingsIntegration:
     
     @pytest.mark.integration
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        not os.getenv("RUN_INTEGRATION_TESTS"),
-        reason="Integration tests require RUN_INTEGRATION_TESTS=true"
-    )
     async def test_health_check_with_real_service(self, setup):
         """Test health check endpoint with real service"""
         response = setup.client.get("/api/v1/embeddings/health")

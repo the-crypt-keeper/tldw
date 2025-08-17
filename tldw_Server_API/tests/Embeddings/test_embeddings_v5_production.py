@@ -670,10 +670,7 @@ class TestIntegration:
     """True integration tests without mocking - requires actual services"""
     
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        not os.getenv("RUN_INTEGRATION_TESTS"),
-        reason="Integration tests require RUN_INTEGRATION_TESTS=true and actual services"
-    )
+    @pytest.mark.integration
     async def test_real_huggingface_embedding(self, setup):
         """Test actual HuggingFace embedding creation (no mocks)"""
         async def override_user():
@@ -709,6 +706,7 @@ class TestIntegration:
             assert 0.95 < norm < 1.05  # Approximately unit length
     
     @pytest.mark.asyncio
+    @pytest.mark.integration
     @pytest.mark.skipif(
         not os.getenv("OPENAI_API_KEY"),
         reason="Integration test requires OPENAI_API_KEY"
@@ -745,10 +743,7 @@ class TestIntegration:
         assert data["usage"]["total_tokens"] > 0
     
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        not os.getenv("RUN_INTEGRATION_TESTS"),
-        reason="Integration tests require RUN_INTEGRATION_TESTS=true"
-    )
+    @pytest.mark.integration
     async def test_real_cache_persistence(self, setup):
         """Test cache persistence across requests (no mocks)"""
         async def override_user():
@@ -788,10 +783,8 @@ class TestIntegration:
             assert embedding1 == embedding2
     
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        not os.getenv("RUN_STRESS_TESTS"),
-        reason="Stress tests require RUN_STRESS_TESTS=true"
-    )
+    @pytest.mark.integration
+    @pytest.mark.slow
     async def test_real_concurrent_load(self, setup):
         """Test system under real concurrent load (no mocks)"""
         async def override_user():
