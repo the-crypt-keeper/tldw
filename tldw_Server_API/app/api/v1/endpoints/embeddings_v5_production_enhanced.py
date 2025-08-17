@@ -96,23 +96,70 @@ from prometheus_client import REGISTRY
 # Safely get or create metrics
 def get_or_create_counter(name, description, labelnames):
     """Get existing counter or create new one"""
-    if name in REGISTRY._names_to_collectors:
-        return REGISTRY._names_to_collectors[name]
-    return Counter(name, description, labelnames)
+    try:
+        # Check if metric already exists
+        if name in REGISTRY._names_to_collectors:
+            collector = REGISTRY._names_to_collectors[name]
+            # Verify it's a Counter with matching labels
+            if hasattr(collector, '_labelnames') and set(collector._labelnames) == set(labelnames):
+                return collector
+            # If labels don't match, unregister the old one
+            REGISTRY.unregister(collector)
+        return Counter(name, description, labelnames)
+    except Exception as e:
+        # Try to create new counter, handling any registration issues
+        try:
+            return Counter(name, description, labelnames)
+        except Exception:
+            # Return existing if we can't create new
+            if name in REGISTRY._names_to_collectors:
+                return REGISTRY._names_to_collectors[name]
+            raise
 
 def get_or_create_histogram(name, description, labelnames):
     """Get existing histogram or create new one"""
-    if name in REGISTRY._names_to_collectors:
-        return REGISTRY._names_to_collectors[name]
-    return Histogram(name, description, labelnames)
+    try:
+        if name in REGISTRY._names_to_collectors:
+            collector = REGISTRY._names_to_collectors[name]
+            # Verify it's a Histogram with matching labels
+            if hasattr(collector, '_labelnames') and set(collector._labelnames) == set(labelnames):
+                return collector
+            # If labels don't match, unregister the old one
+            REGISTRY.unregister(collector)
+        return Histogram(name, description, labelnames)
+    except Exception:
+        # Try to create new, or return existing
+        try:
+            return Histogram(name, description, labelnames)
+        except Exception:
+            if name in REGISTRY._names_to_collectors:
+                return REGISTRY._names_to_collectors[name]
+            raise
 
 def get_or_create_gauge(name, description, labelnames=None):
     """Get existing gauge or create new one"""
-    if name in REGISTRY._names_to_collectors:
-        return REGISTRY._names_to_collectors[name]
-    if labelnames:
-        return Gauge(name, description, labelnames)
-    return Gauge(name, description)
+    try:
+        if name in REGISTRY._names_to_collectors:
+            collector = REGISTRY._names_to_collectors[name]
+            expected_labels = set(labelnames) if labelnames else set()
+            existing_labels = set(collector._labelnames) if hasattr(collector, '_labelnames') else set()
+            if expected_labels == existing_labels:
+                return collector
+            # If labels don't match, unregister the old one
+            REGISTRY.unregister(collector)
+        if labelnames:
+            return Gauge(name, description, labelnames)
+        return Gauge(name, description)
+    except Exception:
+        # Try to create new, or return existing
+        try:
+            if labelnames:
+                return Gauge(name, description, labelnames)
+            return Gauge(name, description)
+        except Exception:
+            if name in REGISTRY._names_to_collectors:
+                return REGISTRY._names_to_collectors[name]
+            raise
 
 # Create metrics using safe getters
 embedding_requests_total = get_or_create_counter(
