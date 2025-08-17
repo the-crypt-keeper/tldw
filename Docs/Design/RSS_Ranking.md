@@ -47,5 +47,15 @@ https://towardsdatascience.com/techniques-for-chat-data-analytics-with-python-cf
 https://andregarzia.com/2025/04/rss-doesnt-necessarily-means-firehose.html
 https://github.com/mozilla-ai/byota
 https://levelup.gitconnected.com/recommendation-systems-an-architects-playbook-part-1-821809dfe8f9
+https://minifeed.net/welcome
+https://github.com/btrettel/specialized-bibs
+
+
+
+
+
+
+
+
 
 

@@ -16,7 +16,7 @@ https://github.com/Future-House/paper-qa
 https://www.lesswrong.com/posts/bT8yyJHpK64v3nh2N/ai-safety-chatbot
 https://github.com/tbroadley/ai-safety-conversational-agent
 https://github.com/yichuan-w/LEANN?tab=readme-ov-file
-
+https://medium.com/@bravekjh/rag-mcp-supercharging-ai-agents-with-retrieval-augmented-generation-and-model-context-protocol-775ff5a7206f
 
 
 

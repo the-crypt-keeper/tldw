@@ -67,6 +67,7 @@ https://ieeexplore.ieee.org/document/5387632
 https://www.growthmates.news/p/how-an-ai-powered-user-onboardin
 https://www.nngroup.com/articles/serial-task-switching/g
 https://x.com/dot_louis/status/1884990033775493505
+https://clig.dev/
 https://www.nngroup.com/articles/analyze-usability-data/
 https://github.com/koaning/tuilwindcss
 https://levelup.gitconnected.com/solving-6-types-of-hallucinations-in-small-llms-a-hands-on-guide-8d15c11650d3
@@ -77,6 +78,10 @@ https://artifactsbenchmark.github.io/
 https://arxiv.org/abs/2507.05791
 https://aurachat.io/learn/introduction#why-aura
 https://telcontar.net/Misc/GUI/RISCOS/
+https://www.smashingmagazine.com/2025/07/unmasking-magic-wizard-oz-method-ux-research/
+
+
+
 https://arxiv.org/abs/2507.13553
 https://16colo.rs/
 https://huggingface.co/Tesslate/UIGEN-X-32B-0727

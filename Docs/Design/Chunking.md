@@ -26,8 +26,8 @@ https://gleen.ai/blog/agentic-chunking-enhancing-rag-answers-for-completeness-an
 https://github.com/carlosplanchon/betterhtmlchunking
 https://github.com/segment-any-text/wtpsplit
 https://github.com/Unsiloed-AI/Unsiloed-chunker
-
-
+https://ai.gopubby.com/21-chunking-strategies-for-rag-f28e4382d399?gi=d29ab391014f
+https://www.ibm.com/think/topics/agentic-chunking
 https://www.reddit.com/r/Rag/comments/1ljhksy/best_chunking_strategy_for_the_medical_rag_system/
 https://arxiv.org/abs/2506.16035
 https://docs.llamaindex.ai/en/stable/examples/node_parsers/semantic_double_merging_chunking/

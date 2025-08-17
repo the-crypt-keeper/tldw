@@ -31,9 +31,9 @@ https://github.com/Kiln-AI/Kiln
 https://b-score.github.io/
 https://codeberg.org/jts2323/censorbench
 https://github.com/the-crypt-keeper/reasonscape/tree/main
-
-
-
+https://www.amazon.science/blog/falsereject-reducing-overcautiousness-in-llms-through-reasoning-aware-safety-evaluation
+https://arxiv.org/abs/2303.12528
+https://arxiv.org/abs/2508.03644
 
 
 
