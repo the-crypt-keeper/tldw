@@ -334,6 +334,24 @@
                 <button class="top-tab-button" data-toptab="notes" role="tab" aria-selected="false">
                     Notes
                 </button>
+                <button class="top-tab-button" data-toptab="evaluations" role="tab" aria-selected="false">
+                    Evaluations
+                </button>
+                <button class="top-tab-button" data-toptab="embeddings" role="tab" aria-selected="false">
+                    Embeddings
+                </button>
+                <button class="top-tab-button" data-toptab="research" role="tab" aria-selected="false">
+                    Research
+                </button>
+                <button class="top-tab-button" data-toptab="audio" role="tab" aria-selected="false">
+                    Audio
+                </button>
+                <button class="top-tab-button" data-toptab="admin" role="tab" aria-selected="false">
+                    Admin
+                </button>
+                <button class="top-tab-button" data-toptab="sync" role="tab" aria-selected="false">
+                    Sync
+                </button>
             </div>
         </nav>
 
@@ -415,6 +433,78 @@
                 </button>
                 <button class="sub-tab-button" data-content-id="tabNotesManage" data-load-group="notes" role="tab">
                     Manage
+                </button>
+                <button class="sub-tab-button" data-content-id="tabNotesKeywords" data-load-group="notes" role="tab">
+                    Keywords
+                </button>
+            </div>
+        </div>
+
+        <div id="evaluations-subtabs" class="sub-tab-row" role="navigation" aria-label="Evaluations sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabEvalsOpenAI" data-load-group="evaluations" role="tab">
+                    OpenAI Format
+                </button>
+                <button class="sub-tab-button" data-content-id="tabEvalsGEval" data-load-group="evaluations" role="tab">
+                    G-Eval
+                </button>
+                <button class="sub-tab-button" data-content-id="tabEvalsRAG" data-load-group="evaluations" role="tab">
+                    RAG Evaluation
+                </button>
+                <button class="sub-tab-button" data-content-id="tabEvalsDatasets" data-load-group="evaluations" role="tab">
+                    Datasets
+                </button>
+            </div>
+        </div>
+
+        <div id="embeddings-subtabs" class="sub-tab-row" role="navigation" aria-label="Embeddings sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabEmbeddingsCreate" data-load-group="embeddings" role="tab">
+                    Create Embeddings
+                </button>
+                <button class="sub-tab-button" data-content-id="tabEmbeddingsAdmin" data-load-group="embeddings" role="tab">
+                    Admin Tools
+                </button>
+            </div>
+        </div>
+
+        <div id="research-subtabs" class="sub-tab-row" role="navigation" aria-label="Research sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabResearchArxiv" data-load-group="research" role="tab">
+                    arXiv Search
+                </button>
+                <button class="sub-tab-button" data-content-id="tabResearchSemantic" data-load-group="research" role="tab">
+                    Semantic Scholar
+                </button>
+            </div>
+        </div>
+
+        <div id="audio-subtabs" class="sub-tab-row" role="navigation" aria-label="Audio sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabAudioTTS" data-load-group="audio" role="tab">
+                    Text to Speech
+                </button>
+            </div>
+        </div>
+
+        <div id="admin-subtabs" class="sub-tab-row" role="navigation" aria-label="Admin sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabAdminUsers" data-load-group="admin" role="tab">
+                    User Management
+                </button>
+                <button class="sub-tab-button" data-content-id="tabAdminSystem" data-load-group="admin" role="tab">
+                    System Status
+                </button>
+            </div>
+        </div>
+
+        <div id="sync-subtabs" class="sub-tab-row" role="navigation" aria-label="Sync sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabSyncSend" data-load-group="sync" role="tab">
+                    Send Changes
+                </button>
+                <button class="sub-tab-button" data-content-id="tabSyncReceive" data-load-group="sync" role="tab">
+                    Receive Changes
                 </button>
             </div>
         </div>

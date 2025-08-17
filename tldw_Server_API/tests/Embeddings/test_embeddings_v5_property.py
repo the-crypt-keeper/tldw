@@ -52,7 +52,7 @@ class TestCacheProperties:
     @pytest.mark.asyncio
     async def test_cache_never_exceeds_max_size(self, max_size, ttl_seconds, num_items):
         """Property: Cache size never exceeds max_size"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import TTLCache
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import TTLCache
         
         cache = TTLCache(max_size=max_size, ttl_seconds=ttl_seconds)
         
@@ -77,7 +77,7 @@ class TestCacheProperties:
     @pytest.mark.asyncio
     async def test_cache_get_returns_set_value(self, keys):
         """Property: Cache get returns exactly what was set"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import TTLCache
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import TTLCache
         
         cache = TTLCache(max_size=100, ttl_seconds=3600)
         
@@ -102,7 +102,7 @@ class TestCacheProperties:
     @pytest.mark.asyncio
     async def test_cache_ttl_expiration_property(self, ttl_seconds):
         """Property: Items expire after TTL"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import TTLCache
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import TTLCache
         
         cache = TTLCache(max_size=10, ttl_seconds=ttl_seconds)
         
@@ -221,7 +221,7 @@ class TestEmbeddingOutputProperties:
         async def mock_embeddings(*args, **kwargs):
             return [[1.0, 2.0, 3.0]] * len(texts)
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production.create_embeddings_batch_async', mock_embeddings):
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings):
             response = setup.client.post(
                 "/api/v1/embeddings",
                 headers=setup.auth_headers,
@@ -252,7 +252,7 @@ class TestEmbeddingOutputProperties:
         async def mock_embeddings(*args, **kwargs):
             return [[1.0, 2.0, 3.0]]
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production.create_embeddings_batch_async', mock_embeddings):
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings):
             request_data = {
                 "input": "test text",
                 "model": "text-embedding-3-small"
@@ -325,7 +325,7 @@ class EmbeddingStateMachine(RuleBasedStateMachine):
             # Return consistent embedding for same text
             return [[float(hash(text) % 100), 1.0, 2.0]]
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production.create_embeddings_batch_async', mock_embeddings):
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings):
             response = self.client.post(
                 "/api/v1/embeddings",
                 headers=self.auth_headers,

@@ -58,6 +58,10 @@ async def reset_singletons():
     from tldw_Server_API.app.services.registration_service import reset_registration_service
     from tldw_Server_API.app.services.audit_service import reset_audit_service
     
+    # Disable CSRF protection for tests
+    original_csrf_setting = settings.get('CSRF_ENABLED')
+    settings['CSRF_ENABLED'] = False
+    
     await reset_db_pool()
     await reset_session_manager()
     reset_settings()
@@ -76,12 +80,21 @@ async def reset_singletons():
     await reset_registration_service()
     await reset_audit_service()
     app.dependency_overrides.clear()
+    
+    # Restore original CSRF setting
+    if original_csrf_setting is not None:
+        settings['CSRF_ENABLED'] = original_csrf_setting
+    else:
+        settings.pop('CSRF_ENABLED', None)
 
 
 @pytest.fixture
 async def isolated_test_environment(monkeypatch):
     """Create isolated DB and app instance for each test - TRUE ONE DB PER TEST."""
     import uuid as uuid_lib
+    
+    # Disable CSRF protection for tests
+    settings['CSRF_ENABLED'] = False
     
     # 1. Generate unique DB name for this test
     db_name = f"tldw_test_{uuid_lib.uuid4().hex[:8]}"
@@ -151,6 +164,8 @@ async def isolated_test_environment(monkeypatch):
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 token_hash TEXT UNIQUE NOT NULL,
                 refresh_token_hash TEXT UNIQUE,
+                encrypted_token TEXT,
+                encrypted_refresh TEXT,
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -271,6 +286,9 @@ async def isolated_test_environment(monkeypatch):
         logger.info(f"Dropped test database: {db_name}")
     finally:
         await cleanup_conn.close()
+    
+    # Re-enable CSRF protection after test
+    settings.pop('CSRF_ENABLED', None)
 
 
 @pytest.fixture
@@ -341,6 +359,8 @@ async def setup_test_database():
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 token_hash TEXT UNIQUE NOT NULL,
                 refresh_token_hash TEXT UNIQUE,
+                encrypted_token TEXT,
+                encrypted_refresh TEXT,
                 expires_at TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

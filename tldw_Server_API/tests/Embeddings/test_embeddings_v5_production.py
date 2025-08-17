@@ -59,10 +59,10 @@ class TestCriticalSecurity:
     @pytest.mark.asyncio
     async def test_no_placeholder_embeddings(self):
         """Verify system fails properly when dependencies missing"""
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production.EMBEDDINGS_AVAILABLE', False):
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.EMBEDDINGS_AVAILABLE', False):
             # Should raise RuntimeError on import, not return fake embeddings
             with pytest.raises(RuntimeError, match="Embeddings service dependencies not available"):
-                from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import create_embeddings_batch
+                from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import create_embeddings_batch
     
     @pytest.mark.asyncio
     async def test_admin_authorization_required(self, setup):
@@ -103,7 +103,7 @@ class TestTTLCache:
     @pytest.mark.asyncio
     async def test_cache_ttl_expiration(self):
         """Test that cache entries expire after TTL"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import TTLCache
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import TTLCache
         
         cache = TTLCache(max_size=10, ttl_seconds=1)  # 1 second TTL for testing
         
@@ -124,7 +124,7 @@ class TestTTLCache:
     @pytest.mark.asyncio
     async def test_cache_lru_eviction(self):
         """Test LRU eviction when cache is full"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import TTLCache
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import TTLCache
         
         cache = TTLCache(max_size=3, ttl_seconds=3600)
         
@@ -150,7 +150,7 @@ class TestTTLCache:
     @pytest.mark.asyncio
     async def test_cache_cleanup_task(self):
         """Test background cleanup task removes expired entries"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import TTLCache
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import TTLCache
         
         cache = TTLCache(max_size=10, ttl_seconds=1)
         
@@ -182,7 +182,7 @@ class TestTTLCache:
     @pytest.mark.asyncio
     async def test_cache_thread_safety(self):
         """Test cache is thread-safe under concurrent access"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import TTLCache
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import TTLCache
         
         cache = TTLCache(max_size=100, ttl_seconds=3600)
         
@@ -215,7 +215,7 @@ class TestConnectionPooling:
     @pytest.mark.asyncio
     async def test_connection_pool_creation(self):
         """Test connection pools are created per provider"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import ConnectionPoolManager
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import ConnectionPoolManager
         
         manager = ConnectionPoolManager()
         
@@ -240,7 +240,7 @@ class TestConnectionPooling:
     @pytest.mark.asyncio
     async def test_connection_pool_cleanup(self):
         """Test connection pools are properly cleaned up"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import ConnectionPoolManager
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import ConnectionPoolManager
         
         manager = ConnectionPoolManager()
         
@@ -262,7 +262,7 @@ class TestRetryLogic:
     @pytest.mark.asyncio
     async def test_retry_on_connection_error(self):
         """Test that connection errors trigger retries"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import create_embeddings_with_retry
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import create_embeddings_with_circuit_breaker
         
         attempt_count = 0
         
@@ -275,11 +275,14 @@ class TestRetryLogic:
             
             return [[1.0, 2.0, 3.0]] * len(texts)
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production.create_embeddings_batch', mock_embeddings):
-            result = await create_embeddings_with_retry(
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch', mock_embeddings):
+            # Need to provide config argument
+            config = {"api_key": "test-key"}
+            result = await create_embeddings_with_circuit_breaker(
                 ["test text"],
-                {},
-                "test-model"
+                "openai",
+                "test-model",
+                config
             )
             
             assert attempt_count == 3  # Should retry twice
@@ -288,7 +291,7 @@ class TestRetryLogic:
     @pytest.mark.asyncio
     async def test_no_retry_on_value_error(self):
         """Test that value errors don't trigger retries"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import create_embeddings_with_retry
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import create_embeddings_with_circuit_breaker
         
         attempt_count = 0
         
@@ -297,12 +300,14 @@ class TestRetryLogic:
             attempt_count += 1
             raise ValueError("Invalid input")
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production.create_embeddings_batch', mock_embeddings):
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch', mock_embeddings):
             with pytest.raises(ValueError):
-                await create_embeddings_with_retry(
+                config = {"api_key": "test-key"}
+                await create_embeddings_with_circuit_breaker(
                     ["test text"],
-                    {},
-                    "test-model"
+                    "openai",
+                    "test-model",
+                    config
                 )
             
             assert attempt_count == 1  # Should not retry
@@ -388,7 +393,7 @@ class TestMonitoring:
         
         assert "status" in data
         assert "service" in data
-        assert data["service"] == "embeddings_v5_production"
+        assert data["service"] == "embeddings_v5_production_enhanced"
         assert "timestamp" in data
         assert "cache_stats" in data
         assert "active_requests" in data
@@ -443,7 +448,7 @@ class TestPerformance:
         async def mock_fast_embeddings(*args, **kwargs):
             return [[1.0, 2.0, 3.0]]
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production.create_embeddings_batch_async', mock_fast_embeddings):
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_fast_embeddings):
             
             async def make_request(client, idx):
                 async with AsyncClient(app=app, base_url="http://test") as ac:
@@ -471,7 +476,7 @@ class TestPerformance:
     @pytest.mark.asyncio
     async def test_cache_performance(self):
         """Test cache improves performance"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import TTLCache, get_cache_key
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import TTLCache, get_cache_key
         
         cache = TTLCache(max_size=1000, ttl_seconds=3600)
         
@@ -500,7 +505,7 @@ class TestPerformance:
     @pytest.mark.asyncio
     async def test_memory_usage_bounded(self):
         """Test that memory usage is bounded by cache size"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production import TTLCache
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import TTLCache
         
         cache = TTLCache(max_size=100, ttl_seconds=3600)
         
@@ -529,7 +534,7 @@ class TestUnitWithMocks:
             # Return different embeddings for different texts
             return [[float(i), float(i+1), float(i+2)] for i, _ in enumerate(texts)]
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production.create_embeddings_batch_async', mock_embeddings):
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings):
             
             response = setup.client.post(
                 "/api/v1/embeddings",
@@ -570,7 +575,7 @@ class TestUnitWithMocks:
             call_count += 1
             return [[1.0, 2.0, 3.0]] * len(texts)
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production.create_embeddings_with_retry', mock_embeddings):
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_with_circuit_breaker', mock_embeddings):
             
             # First request - should call API
             response1 = setup.client.post(

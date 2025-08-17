@@ -19,7 +19,13 @@ def setup():
     class SetupData:
         def __init__(self):
             self.client = TestClient(app)
-            self.auth_headers = {"Authorization": "Bearer test-api-key"}
+            # Set CSRF token in both cookie and header for double-submit pattern
+            csrf_token = "test-csrf-token-12345"
+            self.client.cookies.set("csrf_token", csrf_token)
+            self.auth_headers = {
+                "Authorization": "Bearer test-api-key",
+                "X-CSRF-Token": csrf_token
+            }
             
             self.regular_user = User(
                 id=1, 
@@ -190,7 +196,7 @@ class TestRetryLogic:
     @pytest.mark.asyncio
     async def test_retry_on_connection_error(self):
         """Test that connection errors trigger retries"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import create_embeddings_with_retry
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import create_embeddings_with_circuit_breaker
         
         attempt_count = 0
         
@@ -204,10 +210,13 @@ class TestRetryLogic:
             return [[1.0, 2.0, 3.0]] * len(texts)
         
         with patch('tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create.create_embeddings_batch', mock_embeddings):
-            result = await create_embeddings_with_retry(
+            # Need to provide config argument
+            config = {"api_key": "test-key"}
+            result = await create_embeddings_with_circuit_breaker(
                 ["test text"],
-                {},
-                "test-model"
+                "openai",
+                "test-model",
+                config
             )
             
             assert attempt_count == 3
@@ -217,7 +226,7 @@ class TestRetryLogic:
     @pytest.mark.asyncio
     async def test_no_retry_on_value_error(self):
         """Test that value errors don't trigger retries"""
-        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import create_embeddings_with_retry
+        from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import create_embeddings_with_circuit_breaker
         
         attempt_count = 0
         
@@ -231,10 +240,13 @@ class TestRetryLogic:
         with patch('tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create.create_embeddings_batch', mock_embeddings):
             # The function runs in an executor, so exceptions might be wrapped
             with pytest.raises(Exception) as exc_info:
-                await create_embeddings_with_retry(
+                # Need to provide config argument
+                config = {"api_key": "test-key"}
+                await create_embeddings_with_circuit_breaker(
                     ["test text"],
-                    {},
-                    "test-model"
+                    "openai",
+                    "test-model",
+                    config
                 )
             
             # Verify the error message is preserved

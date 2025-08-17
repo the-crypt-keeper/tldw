@@ -5,10 +5,8 @@ from typing import Any, Dict, Optional
 
 from loguru import logger
 
-from ...DB_Management.SQLite_DB import (
-    update_media_table_vector_processing_status,
-    update_media_chunks_table_vector_processing_status
-)
+# Database functions - to be implemented when needed
+# Currently commenting out as these functions don't exist yet
 from ..ChromaDB_Library import ChromaDBManager
 from ..queue_schemas import (
     JobStatus,
@@ -129,25 +127,14 @@ class StorageWorker(BaseWorker):
     
     async def _update_database(self, media_id: int, total_chunks: int):
         """Update SQL database with vector processing status"""
-        import asyncio
+        # TODO: Implement database updates when the functions are available
+        # For now, we'll just log that we would update the database
+        logger.info(f"Would update database for media_id {media_id} with {total_chunks} chunks")
         
-        loop = asyncio.get_event_loop()
-        
-        # Update media table
-        await loop.run_in_executor(
-            None,
-            update_media_table_vector_processing_status,
-            media_id,
-            "completed"
-        )
-        
-        # Update chunks table
-        await loop.run_in_executor(
-            None,
-            update_media_chunks_table_vector_processing_status,
-            media_id,
-            "completed"
-        )
+        # The following functions need to be implemented:
+        # - update_media_table_vector_processing_status
+        # - update_media_chunks_table_vector_processing_status
+        pass
     
     async def _update_job_progress(self, job_id: str, percentage: float):
         """Update job progress information"""

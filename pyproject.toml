@@ -322,7 +322,9 @@ markers = [
     "local_llm_service: marks tests that require local LLM service",
     "timeout: marks tests with custom timeout settings", 
     "benchmark: marks performance benchmark tests",
-    "slow: marks tests that take a long time to run"
+    "slow: marks tests that take a long time to run",
+    "load: marks load testing tests",
+    "property: marks property-based testing tests"
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

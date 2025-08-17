@@ -88,7 +88,7 @@ class ChunkingMessage(EmbeddingJobMessage):
 class EmbeddingMessage(EmbeddingJobMessage):
     """Message for embedding queue"""
     chunks: List[ChunkData] = Field(..., description="Chunks to be embedded")
-    model_config: Dict[str, Any] = Field(..., description="Embedding model configuration")
+    embedding_model_config: Dict[str, Any] = Field(..., description="Embedding model configuration")
     model_provider: str = Field(..., description="Provider type (huggingface, openai, etc)")
     batch_size: Optional[int] = Field(None, description="Override default batch size")
 
