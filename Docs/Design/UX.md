@@ -78,6 +78,10 @@ https://artifactsbenchmark.github.io/
 https://arxiv.org/abs/2507.05791
 https://aurachat.io/learn/introduction#why-aura
 https://telcontar.net/Misc/GUI/RISCOS/
+https://www.smashingmagazine.com/2025/07/unmasking-magic-wizard-oz-method-ux-research/
+
+
+
 https://arxiv.org/abs/2507.13553
 https://16colo.rs/
 https://huggingface.co/Tesslate/UIGEN-X-32B-0727

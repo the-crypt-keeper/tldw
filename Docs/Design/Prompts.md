@@ -12,7 +12,7 @@ https://gist.githubusercontent.com/transitive-bullshit/487c9cb52c75a9701d312334e
 https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools
 https://github.com/jamesponddotco/llm-prompts/tree/trunk
 
-
+https://ai-sdk.dev/elements/components/prompt-input
 https://dspy.ai/api/optimizers/MIPROv2/
 https://github.com/davidkimai/Context-Engineering
 https://arxiv.org/html/2502.18600v1

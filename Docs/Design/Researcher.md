@@ -195,6 +195,8 @@ https://github.com/HarshJ23/Deeper-Seeker
 https://miromind.ai/blog/miromind-open-deep-research
     https://github.com/MiroMindAI
     https://github.com/MiroMindAI/MiroFlow
+https://github.com/plageon/HierSearch
+https://arxiv.org/abs/2506.11060
 https://learning.google.com/experiments/learn-about/signup
 https://departmentofproduct.substack.com/p/how-to-use-perplexity-to-automate
 https://departmentofproduct.substack.com/p/deep-the-ux-of-search

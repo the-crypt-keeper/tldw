@@ -42,7 +42,7 @@ https://arxiv.org/abs/2504.00824
 https://arxiv.org/abs/2503.22216
 https://allenai.org/blog/olmotrace
 https://blog.quotientai.co/how-to-detect-hallucinations-in-retrieval-augmented-systems-a-primer/
-
+https://www.microsoft.com/en-us/research/blog/veritrail-detecting-hallucination-and-tracing-provenance-in-multi-step-ai-workflows/
 
 https://arxiv.org/abs/2504.18114
 https://arxiv.org/abs/2504.13079

@@ -17,9 +17,11 @@ https://maartengr.github.io/BERTopic/index.html
 https://docs.llamaindex.ai/en/stable/examples/finetuning/embeddings/finetune_embedding/
 https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
 https://github.com/beir-cellar/beir/wiki/Load-your-custom-dataset
-
-
-
+https://apple.github.io/embedding-atlas/overview.html
+https://arxiv.org/html/2508.01959v1#S6
+https://huggingface.co/SituatedEmbedding/SitEmb-v1.5-Qwen3  
+https://huggingface.co/spaces/hesamation/primer-llm-embedding?section=what_are_embeddings?
+https://sgnt.ai/p/embeddings-explainer/
 
 
 

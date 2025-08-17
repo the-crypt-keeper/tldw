@@ -113,6 +113,10 @@ https://www.reddit.com/r/LocalLLaMA/comments/1jcufi6/improvements_to_kokoro_tts_
 https://github.com/davidbrowne17/chatterbox-streaming
 https://webrtchacks.com/the-unofficial-guide-to-openai-realtime-webrtc-api/
 https://github.com/petermg/Chatterbox-TTS-Extended
+https://github.com/murtaza-nasir/speakr
+https://github.com/rhulha/EchoMate
+https://github.com/rhulha/EchoMate_ServerSide/
+
 https://github.com/canopyai/Orpheus-TTS
     https://github.com/canopyai/Orpheus-TTS
     https://github.com/isaiahbjork/orpheus-tts-local/
