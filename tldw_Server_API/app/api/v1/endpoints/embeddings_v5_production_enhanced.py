@@ -412,13 +412,16 @@ limiter = Limiter(key_func=get_remote_address)
 
 # Helper to conditionally apply rate limiting
 def apply_rate_limit(limit_string: str):
-    """Apply rate limiting unless we're in test mode"""
-    if os.getenv("TESTING", "").lower() == "true":
-        # In test mode, return a no-op decorator
-        return lambda f: f
-    else:
-        # In production, apply the actual rate limit
-        return limiter.limit(limit_string)
+    """Apply rate limiting unless we're in test mode - checks at runtime"""
+    def decorator(f):
+        # Check TESTING env var at runtime, not import time
+        if os.getenv("TESTING", "").lower() == "true":
+            # In test mode, return the function unchanged
+            return f
+        else:
+            # In production, apply the actual rate limit
+            return limiter.limit(limit_string)(f)
+    return decorator
 
 router = APIRouter(
     tags=["Embeddings"],
