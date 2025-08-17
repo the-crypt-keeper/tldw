@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from typing import List, Union, Optional, Dict, Any, Tuple
 from enum import Enum
 import numpy as np
-from functools import lru_cache
+from functools import lru_cache, wraps
 import atexit
 import os
 
@@ -410,13 +410,19 @@ limiter = Limiter(key_func=get_remote_address)
 def apply_rate_limit(limit_string: str):
     """Apply rate limiting unless we're in test mode - checks at runtime"""
     def decorator(f):
-        # Check TESTING env var at runtime, not import time
-        if os.getenv("TESTING", "").lower() == "true":
-            # In test mode, return the function unchanged
-            return f
-        else:
-            # In production, apply the actual rate limit
-            return limiter.limit(limit_string)(f)
+        # Create wrapper that checks env var at actual runtime
+        @wraps(f)
+        async def wrapper(*args, **kwargs):
+            # Check TESTING env var when the function is actually called
+            if os.getenv("TESTING", "").lower() == "true":
+                # In test mode, call function directly without rate limiting
+                return await f(*args, **kwargs)
+            else:
+                # In production, apply the rate limit
+                limited_func = limiter.limit(limit_string)(f)
+                return await limited_func(*args, **kwargs)
+        
+        return wrapper
     return decorator
 
 router = APIRouter(
