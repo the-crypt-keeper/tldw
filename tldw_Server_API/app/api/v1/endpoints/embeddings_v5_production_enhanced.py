@@ -58,10 +58,6 @@ from slowapi.util import get_remote_address
 
 # Monitoring
 from prometheus_client import Counter, Histogram, Gauge
-import structlog
-
-# Configure structured logging
-log = structlog.get_logger()
 
 # ============================================================================
 # CRITICAL: Embeddings Implementation Import with Explicit Failure
