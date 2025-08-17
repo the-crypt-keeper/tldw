@@ -92,48 +92,55 @@ except ImportError as e:
 
 from prometheus_client import REGISTRY
 
-try:
-    embedding_requests_total = Counter(
-        'embedding_requests_total',
-        'Total number of embedding requests',
-        ['provider', 'model', 'status']
-    )
-except ValueError:
-    embedding_requests_total = REGISTRY._names_to_collectors.get('embedding_requests_total')
+# Safely get or create metrics
+def get_or_create_counter(name, description, labelnames):
+    """Get existing counter or create new one"""
+    if name in REGISTRY._names_to_collectors:
+        return REGISTRY._names_to_collectors[name]
+    return Counter(name, description, labelnames)
 
-try:
-    embedding_request_duration = Histogram(
-        'embedding_request_duration_seconds',
-        'Duration of embedding requests',
-        ['provider', 'model']
-    )
-except ValueError:
-    embedding_request_duration = REGISTRY._names_to_collectors.get('embedding_request_duration_seconds')
+def get_or_create_histogram(name, description, labelnames):
+    """Get existing histogram or create new one"""
+    if name in REGISTRY._names_to_collectors:
+        return REGISTRY._names_to_collectors[name]
+    return Histogram(name, description, labelnames)
 
-try:
-    embedding_cache_hits = Counter(
-        'embedding_cache_hits_total',
-        'Number of cache hits',
-        ['provider', 'model']
-    )
-except ValueError:
-    embedding_cache_hits = REGISTRY._names_to_collectors.get('embedding_cache_hits_total')
+def get_or_create_gauge(name, description, labelnames=None):
+    """Get existing gauge or create new one"""
+    if name in REGISTRY._names_to_collectors:
+        return REGISTRY._names_to_collectors[name]
+    if labelnames:
+        return Gauge(name, description, labelnames)
+    return Gauge(name, description)
 
-try:
-    embedding_cache_size = Gauge(
-        'embedding_cache_size',
-        'Current size of embedding cache'
-    )
-except ValueError:
-    embedding_cache_size = REGISTRY._names_to_collectors.get('embedding_cache_size')
+# Create metrics using safe getters
+embedding_requests_total = get_or_create_counter(
+    'embedding_requests_total',
+    'Total number of embedding requests',
+    ['provider', 'model', 'status']
+)
 
-try:
-    active_embedding_requests = Gauge(
-        'active_embedding_requests',
-        'Number of active embedding requests'
-    )
-except ValueError:
-    active_embedding_requests = REGISTRY._names_to_collectors.get('active_embedding_requests')
+embedding_request_duration = get_or_create_histogram(
+    'embedding_request_duration_seconds',
+    'Duration of embedding requests',
+    ['provider', 'model']
+)
+
+embedding_cache_hits = get_or_create_counter(
+    'embedding_cache_hits_total',
+    'Number of cache hits',
+    ['provider', 'model']
+)
+
+embedding_cache_size = get_or_create_gauge(
+    'embedding_cache_size',
+    'Current size of embedding cache'
+)
+
+active_embedding_requests = get_or_create_gauge(
+    'active_embedding_requests',
+    'Number of active embedding requests'
+)
 
 # ============================================================================
 # Configuration and Constants

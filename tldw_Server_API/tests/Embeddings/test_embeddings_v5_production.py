@@ -276,14 +276,18 @@ class TestRetryLogic:
             return [[1.0, 2.0, 3.0]] * len(texts)
         
         with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch', mock_embeddings):
-            # Need to provide config argument
-            config = {"api_key": "test-key"}
-            result = await create_embeddings_with_circuit_breaker(
-                ["test text"],
-                "openai",
-                "test-model",
-                config
-            )
+            # Mock create_embeddings_batch to avoid config validation issues
+            with patch('tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create.create_embeddings_batch') as mock_batch:
+                mock_batch.side_effect = mock_embeddings
+                
+                # Need to provide config argument
+                config = {"api_key": "test-key"}
+                result = await create_embeddings_with_circuit_breaker(
+                    ["test text"],
+                    "openai",
+                    "test-model",
+                    config
+                )
             
             assert attempt_count == 3  # Should retry twice
             assert result == [[1.0, 2.0, 3.0]]
@@ -302,13 +306,17 @@ class TestRetryLogic:
         
         with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch', mock_embeddings):
             with pytest.raises(ValueError):
-                config = {"api_key": "test-key"}
-                await create_embeddings_with_circuit_breaker(
-                    ["test text"],
-                    "openai",
-                    "test-model",
-                    config
-                )
+                # Mock create_embeddings_batch to avoid config validation issues
+                with patch('tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create.create_embeddings_batch') as mock_batch:
+                    mock_batch.side_effect = mock_embeddings
+                    
+                    config = {"api_key": "test-key"}
+                    await create_embeddings_with_circuit_breaker(
+                        ["test text"],
+                        "openai",
+                        "test-model",
+                        config
+                    )
             
             assert attempt_count == 1  # Should not retry
 

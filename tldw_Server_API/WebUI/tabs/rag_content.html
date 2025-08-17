@@ -1,0 +1,248 @@
+<!-- RAG Search Tab -->
+<div id="tabRAGSearch" class="tab-content">
+    <div class="endpoint-section" id="ragSimpleSearch">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/rag/search - Simple RAG Search</span>
+        </h2>
+        <p>Perform a simple RAG search across content databases with hybrid/semantic/fulltext options.</p>
+        
+        <div class="form-group">
+            <label for="ragSimpleSearch_query">Query <span class="required">*</span>:</label>
+            <textarea id="ragSimpleSearch_query" rows="3" placeholder="Enter your search query...">What are the key features of the system?</textarea>
+        </div>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="ragSimpleSearch_search_type">Search Type:</label>
+                    <select id="ragSimpleSearch_search_type">
+                        <option value="hybrid" selected>Hybrid (BM25 + Vector)</option>
+                        <option value="semantic">Semantic (Vector Only)</option>
+                        <option value="fulltext">Full Text (BM25 Only)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ragSimpleSearch_limit">Limit:</label>
+                    <input type="number" id="ragSimpleSearch_limit" value="10" min="1" max="100">
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="form-group">
+                    <label for="ragSimpleSearch_collection_name">Collection Name:</label>
+                    <input type="text" id="ragSimpleSearch_collection_name" placeholder="media_db (optional)">
+                </div>
+                
+                <div class="form-group">
+                    <label for="ragSimpleSearch_threshold">Score Threshold:</label>
+                    <input type="number" id="ragSimpleSearch_threshold" value="0.5" step="0.1" min="0" max="1">
+                </div>
+            </div>
+        </div>
+
+        <button class="api-button" onclick="makeRequest('ragSimpleSearch', 'POST', '/api/v1/rag/search', 'json')">
+            Send Request
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="ragSimpleSearch_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="ragSimpleSearch_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="ragAdvancedSearch">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/rag/search/advanced - Advanced RAG Search</span>
+        </h2>
+        <p>Advanced search with full configuration control, filtering, and custom strategies.</p>
+        
+        <div class="form-group">
+            <label for="ragAdvancedSearch_payload">Request Payload (JSON):</label>
+            <textarea id="ragAdvancedSearch_payload" class="code-input" rows="15">{
+  "query": "Explain the architecture and design patterns",
+  "search_config": {
+    "search_type": "hybrid",
+    "limit": 20,
+    "threshold": 0.5,
+    "collection_name": "media_db"
+  },
+  "retrieval_strategy": {
+    "strategy_type": "multi_query",
+    "num_queries": 3
+  },
+  "reranking": {
+    "enabled": true,
+    "model": "cross-encoder/ms-marco-MiniLM-L-12-v2",
+    "top_k": 10
+  },
+  "filters": {
+    "media_type": ["document", "video"],
+    "date_range": {
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+    }
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('ragAdvancedSearch', 'POST', '/api/v1/rag/search/advanced', 'json')">
+            Send Request
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="ragAdvancedSearch_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="ragAdvancedSearch_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="ragAgent">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/rag/agent - Simple Q&A Agent</span>
+        </h2>
+        <p>Simple Q&A agent with automatic context retrieval and conversation memory.</p>
+        
+        <div class="form-group">
+            <label for="ragAgent_question">Question <span class="required">*</span>:</label>
+            <textarea id="ragAgent_question" rows="3" placeholder="Ask a question...">What are the main components of the system and how do they interact?</textarea>
+        </div>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="ragAgent_conversation_id">Conversation ID:</label>
+                    <input type="text" id="ragAgent_conversation_id" placeholder="Optional - for conversation continuity">
+                </div>
+                
+                <div class="form-group">
+                    <label for="ragAgent_api_provider">API Provider:</label>
+                    <select id="ragAgent_api_provider">
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="local">Local LLM</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="form-group">
+                    <label for="ragAgent_model">Model:</label>
+                    <input type="text" id="ragAgent_model" placeholder="gpt-4o-mini (optional)">
+                </div>
+                
+                <div class="form-group">
+                    <label for="ragAgent_temperature">Temperature:</label>
+                    <input type="number" id="ragAgent_temperature" value="0.7" step="0.1" min="0" max="2">
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="ragAgent_stream">
+                Stream Response
+            </label>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('ragAgent', 'POST', '/api/v1/rag/agent', 'json')">
+            Send Request
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="ragAgent_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="ragAgent_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="ragAgentAdvanced">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/rag/agent/advanced - Advanced Agent</span>
+        </h2>
+        <p>Advanced agent with research capabilities, tool usage, and streaming support.</p>
+        
+        <div class="form-group">
+            <label for="ragAgentAdvanced_payload">Request Payload (JSON):</label>
+            <textarea id="ragAgentAdvanced_payload" class="code-input" rows="20">{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Analyze the system architecture and provide recommendations for improvements"
+    }
+  ],
+  "conversation_id": null,
+  "rag_config": {
+    "enabled": true,
+    "search_type": "hybrid",
+    "limit": 15,
+    "threshold": 0.6,
+    "collection_name": "media_db"
+  },
+  "agent_config": {
+    "mode": "research",
+    "tools": ["search", "summarize", "extract"],
+    "max_iterations": 5,
+    "memory_enabled": true
+  },
+  "generation_config": {
+    "api_provider": "openai",
+    "model": "gpt-4o-mini",
+    "temperature": 0.7,
+    "max_tokens": 2000,
+    "stream": false
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('ragAgentAdvanced', 'POST', '/api/v1/rag/agent/advanced', 'json')">
+            Send Request
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="ragAgentAdvanced_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="ragAgentAdvanced_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="ragHealth">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/rag/health - RAG Service Health</span>
+        </h2>
+        <p>Check RAG service health and status information.</p>
+        
+        <button class="api-button" onclick="makeRequest('ragHealth', 'GET', '/api/v1/rag/health', 'none')">
+            Check Health
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="ragHealth_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="ragHealth_response">---</pre>
+    </div>
+</div>
+
+<!-- RAG Embeddings Tab -->
+<div id="tabRAGEmbeddings" class="tab-content">
+    <div class="endpoint-section">
+        <h2>RAG Embeddings Management</h2>
+        <p>The embeddings for RAG are managed through the dedicated Embeddings service. Please use the Embeddings tab for creating and managing embeddings.</p>
+        
+        <div class="form-group mt-3">
+            <h3>Quick Links</h3>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="webUI.activateTopTab(document.querySelector('[data-toptab=\"embeddings\"]'))">
+                    Go to Embeddings Tab
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -684,7 +684,7 @@ def create_embeddings_batch(
         # Pydantic will parse and validate. If it fails, it raises a ValidationError.
         embedding_service_config = EmbeddingConfigSchema(**user_app_config["embedding_config"])
     except Exception as e:  # Catch Pydantic ValidationError or other parsing issues
-        logging.error(f"Failed to parse embedding_config: {e}", exc_info=True)
+        logging.error(f"Failed to parse embedding_config: {str(e)}", exc_info=True)
         raise ValueError(f"Invalid embedding_config structure: {e}")
 
     model_id_to_use = model_id_override if model_id_override else embedding_service_config.default_model_id

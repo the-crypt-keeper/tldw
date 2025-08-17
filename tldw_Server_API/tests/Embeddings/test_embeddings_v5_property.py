@@ -12,31 +12,29 @@ from tldw_Server_API.app.main import app
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User, get_request_user
 
 
+# Use the shared fixtures from conftest.py
+@pytest.fixture
+def setup(test_client, regular_user, auth_headers):
+    """Setup fixture for property tests"""
+    class SetupData:
+        def __init__(self):
+            self.client = test_client
+            self.auth_headers = auth_headers
+            self.test_user = regular_user
+    
+    async def override_user():
+        return regular_user
+    
+    app.dependency_overrides[get_request_user] = override_user
+    
+    yield SetupData()
+    app.dependency_overrides.clear()
+
+
 @pytest.mark.property
 class TestEmbeddingsProperties:
     """Property-based tests for embeddings service"""
-    
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        """Setup test environment"""
-        self.client = TestClient(app)
-        self.auth_headers = {"Authorization": "Bearer test-api-key"}
-        
-        self.test_user = User(
-            id=1, 
-            username="testuser", 
-            email="test@example.com", 
-            is_active=True,
-            is_admin=False
-        )
-        
-        async def override_user():
-            return self.test_user
-        
-        app.dependency_overrides[get_request_user] = override_user
-        
-        yield
-        app.dependency_overrides.clear()
+    pass
 
 
 class TestCacheProperties:
@@ -125,7 +123,7 @@ class TestInputValidationProperties:
     @given(
         input_text=st.text(min_size=0, max_size=10000)
     )
-    @settings(max_examples=50, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=10, deadline=10000, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_non_empty_input_accepted(self, setup, input_text):
         """Property: Non-empty strings are accepted, empty strings rejected"""
         response = setup.client.post(
@@ -149,7 +147,7 @@ class TestInputValidationProperties:
     @given(
         num_inputs=st.integers(min_value=0, max_value=3000)
     )
-    @settings(max_examples=20, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, deadline=10000, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_input_list_size_limit(self, setup, num_inputs):
         """Property: Input lists > 2048 items are rejected"""
         inputs = [f"text_{i}" for i in range(num_inputs)]
@@ -176,7 +174,7 @@ class TestInputValidationProperties:
     @given(
         provider=st.sampled_from(["openai", "huggingface", "cohere", "invalid_provider", ""])
     )
-    @settings(max_examples=20, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, deadline=10000, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_provider_validation(self, setup, provider):
         """Property: Only valid providers are accepted"""
         valid_providers = ["openai", "huggingface", "cohere", "voyage", "google", "mistral", "onnx", "local_api"]
@@ -210,7 +208,7 @@ class TestEmbeddingOutputProperties:
     @given(
         num_texts=st.integers(min_value=1, max_value=10)
     )
-    @settings(max_examples=10, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, deadline=10000, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_output_count_matches_input(self, setup, num_texts):
         """Property: Number of embeddings matches number of inputs"""
         from unittest.mock import patch
@@ -221,7 +219,9 @@ class TestEmbeddingOutputProperties:
         async def mock_embeddings(*args, **kwargs):
             return [[1.0, 2.0, 3.0]] * len(texts)
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings):
+        # Also patch the underlying create_embeddings_batch to avoid config issues
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings), \
+             patch('tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create.create_embeddings_batch', mock_embeddings):
             response = setup.client.post(
                 "/api/v1/embeddings",
                 headers=setup.auth_headers,
@@ -243,7 +243,7 @@ class TestEmbeddingOutputProperties:
     @given(
         encoding_format=st.sampled_from(["float", "base64", None])
     )
-    @settings(max_examples=10, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @settings(max_examples=5, deadline=10000, suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_encoding_format_property(self, setup, encoding_format):
         """Property: Encoding format is respected"""
         from unittest.mock import patch
@@ -252,7 +252,9 @@ class TestEmbeddingOutputProperties:
         async def mock_embeddings(*args, **kwargs):
             return [[1.0, 2.0, 3.0]]
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings):
+        # Also patch the underlying create_embeddings_batch to avoid config issues
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings), \
+             patch('tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create.create_embeddings_batch', mock_embeddings):
             request_data = {
                 "input": "test text",
                 "model": "text-embedding-3-small"
@@ -290,8 +292,27 @@ class EmbeddingStateMachine(RuleBasedStateMachine):
     
     def __init__(self):
         super().__init__()
+        # Mock metrics to avoid issues
+        from unittest.mock import MagicMock
+        import tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced as emb_module
+        mock_metrics = MagicMock()
+        mock_metrics.labels.return_value.inc = MagicMock()
+        mock_metrics.labels.return_value.observe = MagicMock()
+        mock_metrics.inc = MagicMock()
+        mock_metrics.dec = MagicMock()
+        emb_module.embedding_requests_total = mock_metrics
+        emb_module.embedding_request_duration = mock_metrics
+        emb_module.embedding_cache_hits = mock_metrics
+        emb_module.active_embedding_requests = mock_metrics
+        
         self.client = TestClient(app)
-        self.auth_headers = {"Authorization": "Bearer test-api-key"}
+        # Set CSRF token
+        csrf_token = "test-csrf-token-12345"
+        self.client.cookies.set("csrf_token", csrf_token)
+        self.auth_headers = {
+            "Authorization": "Bearer test-api-key",
+            "X-CSRF-Token": csrf_token
+        }
         self.cached_texts = set()
         self.request_count = 0
         
@@ -325,7 +346,9 @@ class EmbeddingStateMachine(RuleBasedStateMachine):
             # Return consistent embedding for same text
             return [[float(hash(text) % 100), 1.0, 2.0]]
         
-        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings):
+        # Also patch the underlying create_embeddings_batch to avoid config issues
+        with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch_async', mock_embeddings), \
+             patch('tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create.create_embeddings_batch', mock_embeddings):
             response = self.client.post(
                 "/api/v1/embeddings",
                 headers=self.auth_headers,

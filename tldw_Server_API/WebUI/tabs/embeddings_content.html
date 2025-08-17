@@ -1,0 +1,97 @@
+<!-- Create Embeddings Tab -->
+<div id="tabEmbeddingsCreate" class="tab-content">
+    <div class="endpoint-section" id="embeddingsCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/embeddings - Create Embeddings</span>
+        </h2>
+        <p>Create embeddings with circuit breaker protection and caching.</p>
+        
+        <div class="form-group">
+            <label for="embeddingsCreate_input">Input Text <span class="required">*</span>:</label>
+            <textarea id="embeddingsCreate_input" rows="5" placeholder="Enter text to embed...">This is a sample text to create embeddings for semantic search and similarity matching.</textarea>
+        </div>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="embeddingsCreate_model">Model:</label>
+                    <select id="embeddingsCreate_model">
+                        <option value="text-embedding-ada-002">text-embedding-ada-002 (OpenAI)</option>
+                        <option value="text-embedding-3-small">text-embedding-3-small (OpenAI)</option>
+                        <option value="text-embedding-3-large">text-embedding-3-large (OpenAI)</option>
+                        <option value="all-MiniLM-L6-v2">all-MiniLM-L6-v2 (Local)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="form-group">
+                    <label for="embeddingsCreate_encoding_format">Encoding Format:</label>
+                    <select id="embeddingsCreate_encoding_format">
+                        <option value="float">Float</option>
+                        <option value="base64">Base64</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('embeddingsCreate', 'POST', '/api/v1/embeddings', 'json')">
+            Create Embeddings
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="embeddingsCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="embeddingsCreate_response">---</pre>
+    </div>
+</div>
+
+<!-- Admin Tools Tab -->
+<div id="tabEmbeddingsAdmin" class="tab-content">
+    <div class="endpoint-section" id="embeddingsHealth">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/embeddings/health - Health Check</span>
+        </h2>
+        <p>Check embeddings service health with circuit breaker status.</p>
+        
+        <button class="api-button" onclick="makeRequest('embeddingsHealth', 'GET', '/api/v1/embeddings/health', 'none')">
+            Check Health
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="embeddingsHealth_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="embeddingsCache">
+        <h2>
+            <span class="endpoint-method delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/embeddings/cache - Clear Cache</span>
+        </h2>
+        <p>Clear embedding cache (admin only).</p>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Clear embedding cache?')) makeRequest('embeddingsCache', 'DELETE', '/api/v1/embeddings/cache', 'none')">
+            Clear Cache
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="embeddingsCache_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="embeddingsMetrics">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/embeddings/metrics - Service Metrics</span>
+        </h2>
+        <p>Get service metrics (admin only).</p>
+        
+        <button class="api-button" onclick="makeRequest('embeddingsMetrics', 'GET', '/api/v1/embeddings/metrics', 'none')">
+            Get Metrics
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="embeddingsMetrics_response">---</pre>
+    </div>
+</div>

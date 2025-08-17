@@ -1,0 +1,113 @@
+<!-- Send Changes Tab -->
+<div id="tabSyncSend" class="tab-content">
+    <div class="endpoint-section" id="syncSend">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/sync/send - Send Changes</span>
+        </h2>
+        <p>Receive changes from a client and apply to server database.</p>
+        
+        <div class="form-group">
+            <label for="syncSend_payload">Sync Changes Payload (JSON):</label>
+            <textarea id="syncSend_payload" class="code-input" rows="15">{
+  "client_id": "client_device_123",
+  "changes": [
+    {
+      "table": "media",
+      "operation": "insert",
+      "data": {
+        "title": "New Document",
+        "content": "Document content here",
+        "type": "document"
+      }
+    },
+    {
+      "table": "notes",
+      "operation": "update",
+      "data": {
+        "id": 123,
+        "title": "Updated Note",
+        "content": "Updated content",
+        "version": 2
+      }
+    }
+  ],
+  "last_sync_timestamp": "2024-01-15T10:30:00Z"
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('syncSend', 'POST', '/api/v1/sync/send', 'json')">
+            Send Changes
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="syncSend_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="syncSend_response">---</pre>
+    </div>
+</div>
+
+<!-- Receive Changes Tab -->
+<div id="tabSyncReceive" class="tab-content">
+    <div class="endpoint-section" id="syncReceive">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/sync/get - Receive Changes</span>
+        </h2>
+        <p>Get changes from server with filtering to avoid echo.</p>
+        
+        <div class="form-group">
+            <label for="syncReceive_client_id">Client ID <span class="required">*</span>:</label>
+            <input type="text" id="syncReceive_client_id" placeholder="client_device_123">
+        </div>
+        
+        <div class="form-group">
+            <label for="syncReceive_since">Since Timestamp:</label>
+            <input type="text" id="syncReceive_since" placeholder="2024-01-15T10:30:00Z">
+        </div>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="syncReceive_tables">Tables (comma-separated):</label>
+                    <input type="text" id="syncReceive_tables" placeholder="media,notes,prompts">
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="form-group">
+                    <label for="syncReceive_limit">Limit:</label>
+                    <input type="number" id="syncReceive_limit" value="100" min="1" max="1000">
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('syncReceive', 'GET', '/api/v1/sync/get', 'query')">
+            Get Changes
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="syncReceive_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="syncReceive_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="syncStatus">
+        <h2>Sync Status</h2>
+        <p>View synchronization status and statistics.</p>
+        
+        <div class="form-group">
+            <label for="syncStatus_client_id">Client ID:</label>
+            <input type="text" id="syncStatus_client_id" placeholder="client_device_123">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('syncStatus', 'GET', '/api/v1/sync/status', 'query')">
+            Check Sync Status
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="syncStatus_response">---</pre>
+    </div>
+</div>

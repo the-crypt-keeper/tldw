@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash TEXT NOT NULL UNIQUE,
     refresh_token_hash TEXT UNIQUE,
+    encrypted_token TEXT,
+    encrypted_refresh TEXT,
     expires_at TEXT NOT NULL,  -- ISO format timestamp
     created_at TEXT DEFAULT (datetime('now')),
     ip_address TEXT,

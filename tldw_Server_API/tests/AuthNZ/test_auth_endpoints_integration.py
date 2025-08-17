@@ -26,42 +26,42 @@ class TestAuthEndpointsIntegration:
     """Integration tests for authentication endpoints."""
     
     @pytest.mark.asyncio
-    async def test_login_success(self, mock_db_pool, password_service, test_user):
-        """Test successful login."""
-        # Setup mock
-        test_user_copy = test_user.copy()
-        test_user_copy['password_hash'] = password_service.hash_password("Test@Pass#2024")
+    async def test_login_success(self, isolated_test_environment):
+        """Test successful login using real database."""
+        client, db_name = isolated_test_environment
         
-        mock_db_pool.fetchrow = AsyncMock(return_value=test_user_copy)
-        mock_db_pool.execute = AsyncMock()
+        # Register a test user first
+        register_response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "testuser",
+                "email": "test@example.com", 
+                "password": "Test@Pass#2024"
+            }
+        )
         
-        # Override dependency
-        from tldw_Server_API.app.api.v1.endpoints.auth import router
-        from tldw_Server_API.app.api.v1.API_Deps.auth_deps import get_db_transaction
+        # Check registration was successful
+        assert register_response.status_code == 200
         
-        app.dependency_overrides[get_db_transaction] = lambda: mock_db_pool
+        # Now try to login
+        login_response = client.post(
+            "/api/v1/auth/login",
+            data={
+                "username": "testuser",
+                "password": "Test@Pass#2024"
+            }
+        )
         
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test"
-        ) as client:
-            response = await client.post(
-                "/api/v1/auth/login",
-                data={
-                    "username": "testuser",
-                    "password": "Test@Pass#2024"
-                }
-            )
+        if login_response.status_code != 200:
+            print(f"Response status code: {login_response.status_code}")
+            print(f"Response content: {login_response.text}")
         
-        assert response.status_code == 200
-        data = response.json()
+        assert login_response.status_code == 200
+        data = login_response.json()
         assert "access_token" in data
         assert "refresh_token" in data
         assert data["token_type"] == "bearer"
         assert data["expires_in"] > 0
-        
-        # Cleanup
-        app.dependency_overrides.clear()
     
     @pytest.mark.asyncio
     async def test_login_invalid_credentials(self, mock_db_pool):
@@ -339,11 +339,11 @@ class TestAuthEndpointsProperty:
     
     @pytest.mark.asyncio
     @given(
-        username=st.text(min_size=3, max_size=50).filter(lambda x: x.strip() and x.isalnum()),
+        username=st.text(alphabet=st.characters(whitelist_categories=('Ll', 'Lu', 'Nd')), min_size=3, max_size=50),
         email=st.emails(),
-        password=st.text(min_size=8, max_size=100).filter(lambda x: not x.isspace())
+        password=st.text(min_size=8, max_size=100).filter(lambda x: len(x.strip()) >= 8)
     )
-    @hypothesis_settings(max_examples=10, deadline=5000, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    @hypothesis_settings(max_examples=10, deadline=5000, suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.filter_too_much])
     async def test_register_with_various_inputs(self, username, email, password, registration_service):
         """Test registration with various valid inputs."""
         registration_service.register_user = AsyncMock(return_value={
