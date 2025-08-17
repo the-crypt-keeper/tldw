@@ -28,37 +28,48 @@ def disable_rate_limiting():
         yield
 
 
+# Module-level setup fixture for all test classes
+@pytest.fixture
+def setup():
+    """Setup test environment fixture"""
+    class SetupData:
+        def __init__(self):
+            self.client = TestClient(app)
+            # Set CSRF token in both cookie and header for double-submit pattern
+            csrf_token = "test-csrf-token-12345"
+            self.client.cookies.set("csrf_token", csrf_token)
+            self.DEFAULT_API_KEY = "test-api-key"
+            self.auth_headers = {
+                "Authorization": f"Bearer {self.DEFAULT_API_KEY}",
+                "X-CSRF-Token": csrf_token
+            }
+            
+            # Create test users
+            self.regular_user = User(
+                id=1, 
+                username="testuser", 
+                email="test@example.com", 
+                is_active=True,
+                is_admin=False
+            )
+            
+            self.admin_user = User(
+                id=2,
+                username="admin",
+                email="admin@example.com", 
+                is_active=True,
+                is_admin=True
+            )
+    
+    data = SetupData()
+    yield data
+    # Cleanup
+    app.dependency_overrides.clear()
+
+
 class TestProductionEmbeddings:
     """Comprehensive test suite for production embeddings API"""
-    
-    @pytest.fixture(autouse=True)
-    async def setup(self):
-        """Setup test environment"""
-        self.client = TestClient(app)
-        self.DEFAULT_API_KEY = "test-api-key"
-        self.auth_headers = {"Authorization": f"Bearer {self.DEFAULT_API_KEY}"}
-        
-        # Create test users
-        self.regular_user = User(
-            id=1, 
-            username="testuser", 
-            email="test@example.com", 
-            is_active=True,
-            is_admin=False
-        )
-        
-        self.admin_user = User(
-            id=2,
-            username="admin",
-            email="admin@example.com", 
-            is_active=True,
-            is_admin=True
-        )
-        
-        yield
-        
-        # Cleanup
-        app.dependency_overrides.clear()
+    pass
 
 
 class TestCriticalSecurity:
