@@ -16,21 +16,34 @@ from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User, get_request_u
 @pytest.fixture(autouse=True)
 def disable_rate_limiting():
     """Disable rate limiting for all tests in this module"""
-    with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.limiter.limit', 
-               lambda *args, **kwargs: lambda f: f):
-        yield
+    import os
+    os.environ["TESTING"] = "true"
+    yield
+    # Clean up after tests
+    if "TESTING" in os.environ:
+        del os.environ["TESTING"]
 
 # Mock metrics for tests to avoid registry conflicts
 @pytest.fixture(autouse=True)
 def mock_metrics():
     """Mock Prometheus metrics to avoid registry conflicts"""
     mock_counter = MagicMock()
-    mock_counter.labels.return_value.inc = MagicMock()
+    mock_counter_instance = MagicMock()
+    mock_counter_instance.inc = MagicMock()
+    mock_counter_instance._value = MagicMock()
+    mock_counter_instance._value.get.return_value = 0
+    mock_counter.labels.return_value = mock_counter_instance
+    
     mock_histogram = MagicMock()
-    mock_histogram.labels.return_value.observe = MagicMock()
+    mock_histogram_instance = MagicMock()
+    mock_histogram_instance.observe = MagicMock()
+    mock_histogram.labels.return_value = mock_histogram_instance
+    
     mock_gauge = MagicMock()
     mock_gauge.inc = MagicMock()
     mock_gauge.dec = MagicMock()
+    mock_gauge._value = MagicMock()
+    mock_gauge._value.get.return_value = 0
     
     with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.embedding_requests_total', mock_counter), \
          patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.embedding_request_duration', mock_histogram), \
@@ -317,7 +330,7 @@ class TestErrorHandling:
     @pytest.mark.unit
     def test_empty_input_error(self, setup):
         """Test error on empty input"""
-        async def override_user():
+        def override_user():
             return setup.regular_user
         
         app.dependency_overrides[get_request_user] = override_user
@@ -337,7 +350,7 @@ class TestErrorHandling:
     @pytest.mark.unit
     def test_invalid_provider_error(self, setup):
         """Test error on invalid provider"""
-        async def override_user():
+        def override_user():
             return setup.regular_user
         
         app.dependency_overrides[get_request_user] = override_user
@@ -367,7 +380,7 @@ class TestMockedFlow:
     @pytest.mark.unit
     def test_end_to_end_flow_mocked(self, setup):
         """Test complete flow with mocked embeddings"""
-        async def override_user():
+        def override_user():
             return setup.regular_user
         
         app.dependency_overrides[get_request_user] = override_user
@@ -400,7 +413,7 @@ class TestMockedFlow:
     @pytest.mark.unit
     def test_caching_behavior_mocked(self, setup):
         """Test caching behavior with mocked API calls"""
-        async def override_user():
+        def override_user():
             return setup.regular_user
         
         app.dependency_overrides[get_request_user] = override_user

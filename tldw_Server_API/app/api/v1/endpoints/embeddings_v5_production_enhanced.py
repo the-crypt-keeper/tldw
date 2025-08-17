@@ -20,8 +20,9 @@ from enum import Enum
 import numpy as np
 from functools import lru_cache
 import atexit
+import os
 
-from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Request, Query
+from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Request, Query, Header
 from fastapi.responses import JSONResponse
 import tiktoken
 from loguru import logger
@@ -362,6 +363,16 @@ embedding_cache = TTLCache()
 connection_manager = ConnectionPoolManager()
 limiter = Limiter(key_func=get_remote_address)
 
+# Helper to conditionally apply rate limiting
+def apply_rate_limit(limit_string: str):
+    """Apply rate limiting unless we're in test mode"""
+    if os.getenv("TESTING", "").lower() == "true":
+        # In test mode, return a no-op decorator
+        return lambda f: f
+    else:
+        # In production, apply the actual rate limit
+        return limiter.limit(limit_string)
+
 router = APIRouter(
     tags=["Embeddings"],
     responses={
@@ -467,6 +478,41 @@ def build_provider_config(
             "trust_remote_code": False,
             "hf_cache_dir_subpath": "huggingface_cache",
         }
+    elif provider == EmbeddingProvider.COHERE:
+        return {
+            "provider": "cohere",
+            "model_name_or_path": model,
+            "api_key": api_key or settings.get("COHERE_API_KEY"),
+        }
+    elif provider == EmbeddingProvider.VOYAGE:
+        return {
+            "provider": "voyage",
+            "model_name_or_path": model,
+            "api_key": api_key or settings.get("VOYAGE_API_KEY"),
+        }
+    elif provider == EmbeddingProvider.GOOGLE:
+        return {
+            "provider": "google",
+            "model_name_or_path": model,
+            "api_key": api_key or settings.get("GOOGLE_API_KEY"),
+        }
+    elif provider == EmbeddingProvider.MISTRAL:
+        return {
+            "provider": "mistral",
+            "model_name_or_path": model,
+            "api_key": api_key or settings.get("MISTRAL_API_KEY"),
+        }
+    elif provider == EmbeddingProvider.ONNX:
+        return {
+            "provider": "onnx",
+            "model_name_or_path": model,
+        }
+    elif provider == EmbeddingProvider.LOCAL_API:
+        return {
+            "provider": "local_api",
+            "model_name_or_path": model,
+            "api_url": api_url or settings.get("LOCAL_API_URL"),
+        }
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
@@ -487,12 +533,33 @@ async def create_embeddings_with_circuit_breaker(
     try:
         # Use circuit breaker to protect the call
         async def _create():
-            # Wrap config in expected structure for core service
+            # Build proper ModelCfg based on provider
+            model_cfg = {
+                "provider": provider,
+                "model_name_or_path": config.get("model_name_or_path", model_id),
+            }
+            
+            # Add provider-specific fields
+            if provider == "huggingface":
+                model_cfg["trust_remote_code"] = config.get("trust_remote_code", False)
+                model_cfg["hf_cache_dir_subpath"] = config.get("hf_cache_dir_subpath", "huggingface_cache")
+                model_cfg["device"] = config.get("device", "cpu")
+            elif provider == "openai":
+                model_cfg["api_key"] = config.get("api_key")
+            elif provider == "onnx":
+                model_cfg["onnx_storage_dir_subpath"] = config.get("onnx_storage_dir_subpath", "onnx_models")
+            else:
+                # For other providers, just pass through config
+                model_cfg.update(config)
+            
+            # Wrap config in expected structure for create_embeddings_batch
             app_config = {
                 "embedding_config": {
-                    "provider": provider,
-                    "model": model_id,
-                    **config
+                    "default_model_id": model_id,
+                    "model_storage_base_dir": "./embedding_models_data/",
+                    "models": {
+                        model_id: model_cfg
+                    }
                 }
             }
             
@@ -546,8 +613,16 @@ async def create_embeddings_batch_async(
     
     # Process uncached texts
     if uncached_texts:
+        try:
+            provider_enum = EmbeddingProvider(provider)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown provider: {provider}"
+            )
+        
         config = build_provider_config(
-            EmbeddingProvider(provider),
+            provider_enum,
             model_id,
             api_key,
             api_url,
@@ -613,13 +688,13 @@ def require_admin(user: User) -> None:
     status_code=status.HTTP_200_OK,
     summary="Create embeddings (enhanced with circuit breaker)"
 )
-@limiter.limit("60/minute")
+@apply_rate_limit("60/minute")
 async def create_embedding_endpoint(
     request: Request,
     embedding_request: CreateEmbeddingRequest = Body(...),
     current_user: User = Depends(get_request_user),
     background_tasks: BackgroundTasks = BackgroundTasks(),
-    x_provider: Optional[str] = None
+    x_provider: Optional[str] = Header(None, alias="x-provider")
 ):
     """Create embeddings with circuit breaker protection and enhanced error recovery"""
     
@@ -803,7 +878,7 @@ async def health_check():
     
     health_status = {
         "status": "healthy" if EMBEDDINGS_AVAILABLE else "degraded",
-        "service": "embeddings_v5_enhanced",
+        "service": "embeddings_v5_production_enhanced",
         "timestamp": datetime.utcnow().isoformat(),
         "cache_stats": embedding_cache.stats(),
         "active_requests": active_embedding_requests._value.get(),

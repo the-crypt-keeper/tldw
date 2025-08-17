@@ -13,6 +13,16 @@ from tldw_Server_API.app.main import app
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User, get_request_user
 
 
+# Disable rate limiting for all tests
+@pytest.fixture(autouse=True)
+def disable_rate_limiting():
+    """Disable rate limiting for all tests in this module"""
+    os.environ["TESTING"] = "true"
+    yield
+    # Clean up after tests
+    if "TESTING" in os.environ:
+        del os.environ["TESTING"]
+
 # Module-level setup fixture for integration tests
 @pytest.fixture
 def setup():
@@ -233,6 +243,8 @@ class TestEmbeddingsIntegration:
         
         async def make_real_request(idx):
             async with AsyncClient(app=app, base_url="http://test") as ac:
+                # Set CSRF token in cookie
+                ac.cookies.set("csrf_token", "test-csrf-token-12345")
                 response = await ac.post(
                     "/api/v1/embeddings",
                     headers={**setup.auth_headers, "x-provider": "huggingface"},
@@ -316,7 +328,7 @@ class TestEmbeddingsIntegration:
         
         assert "status" in data
         assert "service" in data
-        assert data["service"] == "embeddings_v5_production"
+        assert data["service"] == "embeddings_v5_production_enhanced"
         assert "timestamp" in data
         assert "cache_stats" in data
         assert "active_requests" in data
