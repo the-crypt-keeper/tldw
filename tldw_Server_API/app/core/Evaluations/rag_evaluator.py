@@ -157,12 +157,12 @@ class RAGEvaluator:
             score_str = await llm_circuit_breaker.call_with_breaker(
                 api_name,
                 analyze,
-                query,
-                prompt,
-                api_name,
-                "",  # api_key
-                temp=0.1,
-                system_message="You are an evaluation expert. Provide only numeric scores."
+                api_name,  # First param to analyze
+                query,     # input_data
+                prompt,    # custom_prompt_arg
+                "",       # api_key
+                "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                0.1        # temp
             )
             
             score = float(score_str.strip()) / 5.0  # Normalize to 0-1
@@ -210,12 +210,12 @@ class RAGEvaluator:
         try:
             score_str = await asyncio.to_thread(
                 analyze,
-                response,
-                prompt,
-                api_name,
-                "",
-                temp=0.1,
-                system_message="You are an evaluation expert. Provide only numeric scores."
+                api_name,  # First param
+                response,  # input_data
+                prompt,    # custom_prompt_arg
+                "",       # api_key
+                "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                0.1        # temp
             )
             
             score = float(score_str.strip()) / 5.0
@@ -289,12 +289,12 @@ class RAGEvaluator:
         try:
             score_str = await asyncio.to_thread(
                 analyze,
-                response,
-                prompt,
-                "openai",  # Default to OpenAI for now
-                "",
-                temp=0.1,
-                system_message="You are an evaluation expert. Provide only numeric scores."
+                "openai",  # api_name - first param
+                response,  # input_data
+                prompt,    # custom_prompt_arg
+                "",       # api_key
+                "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                0.1        # temp
             )
             
             score = float(score_str.strip()) / 5.0
@@ -331,12 +331,12 @@ class RAGEvaluator:
             try:
                 score_str = await asyncio.to_thread(
                     analyze,
-                    context,
-                    prompt,
-                    api_name,
-                    "",
-                    temp=0.1,
-                    system_message="You are an evaluation expert. Provide only numeric scores."
+                    api_name,  # First param
+                    context,   # input_data
+                    prompt,    # custom_prompt_arg
+                    "",       # api_key
+                    "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                    0.1        # temp
                 )
                 
                 relevance_scores.append(float(score_str.strip()) / 5.0)
@@ -379,12 +379,12 @@ class RAGEvaluator:
         try:
             score_str = await asyncio.to_thread(
                 analyze,
-                combined_context,
-                prompt,
-                api_name,
-                "",
-                temp=0.1,
-                system_message="You are an evaluation expert. Provide only numeric scores."
+                api_name,  # First param
+                combined_context,  # input_data
+                prompt,    # custom_prompt_arg
+                "",       # api_key
+                "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                0.1        # temp
             )
             
             score = float(score_str.strip()) / 5.0

@@ -118,12 +118,12 @@ class ResponseQualityEvaluator:
         try:
             score_str = await asyncio.to_thread(
                 analyze,
-                response,
-                evaluation_prompt,
-                api_name,
-                "",
-                temp=0.1,
-                system_message="You are an evaluation expert. Provide only numeric scores."
+                api_name,  # First param
+                response,  # input_data
+                evaluation_prompt,  # custom_prompt_arg
+                "",       # api_key
+                "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                0.1        # temp
             )
             
             score = float(score_str.strip()) / 5.0
@@ -165,12 +165,12 @@ class ResponseQualityEvaluator:
         try:
             score_str = await asyncio.to_thread(
                 analyze,
-                response,
-                evaluation_prompt,
-                api_name,
-                "",
-                temp=0.1,
-                system_message="You are an evaluation expert. Provide only numeric scores."
+                api_name,  # First param
+                response,  # input_data
+                evaluation_prompt,  # custom_prompt_arg
+                "",       # api_key
+                "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                0.1        # temp
             )
             
             score = float(score_str.strip()) / 5.0
@@ -210,12 +210,12 @@ class ResponseQualityEvaluator:
         try:
             score_str = await asyncio.to_thread(
                 analyze,
-                response,
-                evaluation_prompt,
-                api_name,
-                "",
-                temp=0.1,
-                system_message="You are an evaluation expert. Provide only numeric scores."
+                api_name,  # First param
+                response,  # input_data
+                evaluation_prompt,  # custom_prompt_arg
+                "",       # api_key
+                "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                0.1        # temp
             )
             
             score = float(score_str.strip()) / 5.0
@@ -257,12 +257,12 @@ class ResponseQualityEvaluator:
         try:
             score_str = await asyncio.to_thread(
                 analyze,
-                response,
-                evaluation_prompt,
-                api_name,
-                "",
-                temp=0.1,
-                system_message="You are an evaluation expert. Provide only numeric scores."
+                api_name,  # First param
+                response,  # input_data
+                evaluation_prompt,  # custom_prompt_arg
+                "",       # api_key
+                "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                0.1        # temp
             )
             
             score = float(score_str.strip()) / 5.0
@@ -303,12 +303,12 @@ class ResponseQualityEvaluator:
         try:
             result = await asyncio.to_thread(
                 analyze,
-                response,
-                evaluation_prompt,
-                api_name,
-                "",
-                temp=0.1,
-                system_message="You are a format compliance checker. Be precise and systematic."
+                api_name,  # First param
+                response,  # input_data
+                evaluation_prompt,  # custom_prompt_arg
+                "",       # api_key
+                "You are a format compliance checker. Be precise and systematic.",  # system_message
+                0.1        # temp
             )
             
             # Parse result
@@ -358,12 +358,12 @@ class ResponseQualityEvaluator:
         try:
             score_str = await asyncio.to_thread(
                 analyze,
-                response,
-                evaluation_prompt,
-                api_name,
-                "",
-                temp=0.1,
-                system_message="You are an evaluation expert. Provide only numeric scores."
+                api_name,  # First param
+                response,  # input_data
+                evaluation_prompt,  # custom_prompt_arg
+                "",       # api_key
+                "You are an evaluation expert. Provide only numeric scores.",  # system_message
+                0.1        # temp
             )
             
             score = float(score_str.strip()) / 5.0

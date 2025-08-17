@@ -277,7 +277,8 @@ app.include_router(research_router, prefix=f"{API_V1_PREFIX}/research", tags=["r
 app.include_router(evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
 
 # Router for OpenAI-compatible Evaluation endpoint (NEW)
-app.include_router(openai_evals_router, prefix="/v1", tags=["evaluations"])
+# Routes already have /v1 prefix in their definitions
+app.include_router(openai_evals_router, tags=["evaluations"])
 
 
 # Router for Sync endpoint

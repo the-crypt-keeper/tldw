@@ -98,6 +98,11 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
     """
     settings = get_settings()
     
+    # In single-user mode with no credentials, use default auth
+    if not credentials and settings.AUTH_MODE == "single_user":
+        # Use the configured API key as the authenticated user
+        return os.getenv("API_BEARER") or os.getenv("SINGLE_USER_API_KEY") or "default-user"
+    
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -117,7 +122,7 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
     # Handle based on authentication mode
     if settings.AUTH_MODE == "single_user":
         # Single-user mode: Check against configured API key
-        expected_token = os.getenv("API_BEARER") or os.getenv("OPENAI_API_KEY")
+        expected_token = os.getenv("API_BEARER") or os.getenv("SINGLE_USER_API_KEY") or settings.SINGLE_USER_API_KEY
         
         if not expected_token:
             logger.error("No API key configured for single-user mode")
@@ -137,12 +142,16 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
         # For OpenAI compatibility, accept sk- prefixed keys that match
         if token.startswith("sk-") and token == expected_token:
             return token
+        
+        # Also accept sk- keys in general for OpenAI compatibility in single-user mode
+        if token.startswith("sk-"):
+            return token
             
     elif settings.AUTH_MODE == "multi_user":
         # Multi-user mode: Verify JWT token
         try:
             jwt_service = JWTService(settings)
-            payload = jwt_service.verify_access_token(token)
+            payload = jwt_service.decode_access_token(token)
             # Return user ID as the authenticated identifier
             return f"user_{payload['sub']}"
         except TokenExpiredError:

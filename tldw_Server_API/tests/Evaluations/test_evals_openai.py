@@ -19,6 +19,19 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient
 import time
 
+# Set auth mode to single_user for testing - MUST be done before ANY imports
+os.environ["AUTH_MODE"] = "single_user"
+os.environ["API_BEARER"] = "default-secret-key-for-single-user"
+os.environ["SINGLE_USER_API_KEY"] = "default-secret-key-for-single-user"
+
+# Disable CSRF for testing - MUST be done before importing app
+from tldw_Server_API.app.core.AuthNZ.csrf_protection import global_settings
+global_settings['CSRF_ENABLED'] = False
+
+# Reset settings to ensure proper auth mode
+from tldw_Server_API.app.core.AuthNZ.settings import reset_settings
+reset_settings()
+
 # Import the FastAPI app
 from tldw_Server_API.app.main import app
 from tldw_Server_API.app.api.v1.schemas.openai_eval_schemas import (
@@ -34,21 +47,8 @@ TEST_SK_KEY = "sk-test123456789"
 @pytest.fixture(scope="function")
 def client():
     """Create a test client"""
-    from tldw_Server_API.app.core.AuthNZ.csrf_protection import global_settings
-    
-    # Disable CSRF for testing
-    original_csrf = global_settings.get("CSRF_ENABLED")
-    global_settings["CSRF_ENABLED"] = False
-    
-    try:
-        with TestClient(app) as c:
-            yield c
-    finally:
-        # Restore original CSRF setting
-        if original_csrf is not None:
-            global_settings["CSRF_ENABLED"] = original_csrf
-        else:
-            global_settings.pop("CSRF_ENABLED", None)
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture(scope="function")
@@ -151,16 +151,14 @@ class TestAuthentication:
         """Test request with invalid authentication header"""
         headers = {"Authorization": "Bearer invalid-key-12345"}
         response = client.get("/v1/evals", headers=headers)
-        # In multi-user mode with invalid key, should get 401
-        # In single-user mode or with no auth required, may get 404 if no evals
-        assert response.status_code in [401, 404]
-        if response.status_code == 401:
-            data = response.json()
-            # Handle both error formats
-            if "error" in data:
-                assert data["error"]["code"] == "invalid_api_key"
-            elif "detail" in data and isinstance(data["detail"], dict) and "error" in data["detail"]:
-                assert data["detail"]["error"]["code"] == "invalid_api_key"
+        # Should get 401 with invalid key
+        assert response.status_code == 401
+        data = response.json()
+        # Handle both error formats
+        if "error" in data:
+            assert data["error"]["code"] in ["invalid_api_key", "invalid_credentials", "invalid_token"]
+        elif "detail" in data and isinstance(data["detail"], dict) and "error" in data["detail"]:
+            assert data["detail"]["error"]["code"] in ["invalid_api_key", "invalid_credentials", "invalid_token"]
     
     def test_valid_default_key(self, client, auth_headers):
         """Test request with valid default API key"""
