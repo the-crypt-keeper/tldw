@@ -44,6 +44,7 @@ scikit_learn
 scipy
 slowapi
 starlette
+structlog
 toml
 tomli
 tqdm

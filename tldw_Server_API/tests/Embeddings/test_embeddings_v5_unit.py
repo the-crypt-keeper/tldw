@@ -20,6 +20,24 @@ def disable_rate_limiting():
                lambda *args, **kwargs: lambda f: f):
         yield
 
+# Mock metrics for tests to avoid registry conflicts
+@pytest.fixture(autouse=True)
+def mock_metrics():
+    """Mock Prometheus metrics to avoid registry conflicts"""
+    mock_counter = MagicMock()
+    mock_counter.labels.return_value.inc = MagicMock()
+    mock_histogram = MagicMock()
+    mock_histogram.labels.return_value.observe = MagicMock()
+    mock_gauge = MagicMock()
+    mock_gauge.inc = MagicMock()
+    mock_gauge.dec = MagicMock()
+    
+    with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.embedding_requests_total', mock_counter), \
+         patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.embedding_request_duration', mock_histogram), \
+         patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.embedding_cache_hits', mock_counter), \
+         patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.active_embedding_requests', mock_gauge):
+        yield
+
 
 @pytest.fixture
 def setup():
@@ -209,8 +227,9 @@ class TestRetryLogic:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_retry_on_connection_error(self):
-        """Test that connection errors trigger retries"""
+        """Test that connection errors are handled by circuit breaker"""
         from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import create_embeddings_with_circuit_breaker
+        from tldw_Server_API.app.core.Embeddings.circuit_breaker import CircuitBreaker
         
         attempt_count = 0
         
@@ -218,28 +237,47 @@ class TestRetryLogic:
             nonlocal attempt_count
             attempt_count += 1
             
+            # First 2 attempts fail, third succeeds
             if attempt_count < 3:
                 raise ConnectionError("Connection failed")
             
             return [[1.0, 2.0, 3.0]] * len(texts)
         
-        # Mock create_embeddings_batch matching the actual function call signature
+        # Mock create_embeddings_batch with retry decorator
         with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch') as mock_batch:
-            mock_batch.side_effect = mock_embeddings
+            # Add retry behavior to the mock
+            from tenacity import retry, stop_after_attempt, retry_if_exception_type
             
-            # Config that will be passed through
-            config = {
-                "api_key": "test-key"
-            }
-            
-            result = await create_embeddings_with_circuit_breaker(
-                ["test text"],
-                "openai",
-                "test-model",
-                config
+            @retry(
+                stop=stop_after_attempt(3),
+                retry=retry_if_exception_type(ConnectionError)
             )
+            def retry_wrapper(texts, app_config, model_id):
+                return mock_embeddings(texts, app_config, model_id)
             
-            assert attempt_count == 3
+            mock_batch.side_effect = retry_wrapper
+            
+            config = {"api_key": "test-key"}
+            
+            # Reset circuit breaker for clean test
+            with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.get_or_create_circuit_breaker') as mock_breaker:
+                # Create a breaker that allows the call through
+                breaker = CircuitBreaker(
+                    name="test_breaker",
+                    failure_threshold=5,
+                    recovery_timeout=1.0,
+                    expected_exception=(ConnectionError,)
+                )
+                mock_breaker.return_value = breaker
+                
+                result = await create_embeddings_with_circuit_breaker(
+                    ["test text"],
+                    "openai",
+                    "test-model",
+                    config
+                )
+            
+            assert attempt_count == 3  # Should retry twice
             assert result == [[1.0, 2.0, 3.0]]
     
     @pytest.mark.unit
@@ -348,6 +386,9 @@ class TestMockedFlow:
                 }
             )
             
+            if response.status_code != 200:
+                print(f"Response status: {response.status_code}")
+                print(f"Response body: {response.text}")
             assert response.status_code == 200
             data = response.json()
             

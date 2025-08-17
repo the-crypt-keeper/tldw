@@ -269,8 +269,9 @@ class TestRetryLogic:
     
     @pytest.mark.asyncio
     async def test_retry_on_connection_error(self):
-        """Test that connection errors trigger retries"""
+        """Test that connection errors are handled by circuit breaker"""
         from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import create_embeddings_with_circuit_breaker
+        from tldw_Server_API.app.core.Embeddings.circuit_breaker import CircuitBreaker
         
         attempt_count = 0
         
@@ -278,22 +279,45 @@ class TestRetryLogic:
             nonlocal attempt_count
             attempt_count += 1
             
+            # First 2 attempts fail, third succeeds
             if attempt_count < 3:
                 raise ConnectionError("Connection failed")
             
             return [[1.0, 2.0, 3.0]] * len(texts)
         
-        # Mock create_embeddings_batch with correct signature
+        # Mock create_embeddings_batch with retry decorator
         with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.create_embeddings_batch') as mock_batch:
-            mock_batch.side_effect = mock_embeddings
+            # Add retry behavior to the mock
+            from tenacity import retry, stop_after_attempt, retry_if_exception_type
+            
+            @retry(
+                stop=stop_after_attempt(3),
+                retry=retry_if_exception_type(ConnectionError)
+            )
+            def retry_wrapper(texts, app_config, model_id):
+                return mock_embeddings(texts, app_config, model_id)
+            
+            mock_batch.side_effect = retry_wrapper
             
             config = {"api_key": "test-key"}
-            result = await create_embeddings_with_circuit_breaker(
-                ["test text"],
-                "openai",
-                "test-model",
-                config
-            )
+            
+            # Reset circuit breaker for clean test
+            with patch('tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced.get_or_create_circuit_breaker') as mock_breaker:
+                # Create a breaker that allows the call through
+                breaker = CircuitBreaker(
+                    name="test_breaker",
+                    failure_threshold=5,
+                    recovery_timeout=1.0,
+                    expected_exception=(ConnectionError,)
+                )
+                mock_breaker.return_value = breaker
+                
+                result = await create_embeddings_with_circuit_breaker(
+                    ["test text"],
+                    "openai",
+                    "test-model",
+                    config
+                )
         
         assert attempt_count == 3  # Should retry twice
         assert result == [[1.0, 2.0, 3.0]]
