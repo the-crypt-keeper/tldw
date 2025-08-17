@@ -3,632 +3,619 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tabbed API Frontend - Two Tier</title>
+    <meta name="description" content="TLDW Server API Testing Interface - Verify API functionality and test endpoints">
+    <title>TLDW API Testing Interface</title>
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- Additional styles for JSON syntax highlighting -->
     <style>
-        body { font-family: sans-serif; margin: 0; background-color: #f4f4f4; color: #333; }
-        .app-container { display: flex; flex-direction: column; min-height: 100vh; }
-        header { background-color: #007bff; color: white; padding: 15px 20px; text-align: center; }
-
-        /* Top Level Tabs */
-        .top-tab-container { width: 100%; background-color: #222; }
-        .top-tab-buttons { display: flex; justify-content: center; list-style-type: none; margin: 0; padding: 0; }
-        .top-tab-buttons button {
-            background-color: #444; color: white; border: none; padding: 14px 25px;
-            cursor: pointer; transition: background-color 0.3s ease; font-size: 1.1em;
-            border-right: 1px solid #333;
+        .json-key { color: #a31515; }
+        .json-string { color: #0451a5; }
+        .json-number { color: #098658; }
+        .json-boolean { color: #0000ff; }
+        .json-null { color: #808080; }
+        
+        /* Modal styles */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            animation: fadeIn 0.2s ease;
         }
-        .top-tab-buttons button:last-child { border-right: none; }
-        .top-tab-buttons button:hover { background-color: #666; }
-        .top-tab-buttons button.active { background-color: #0056b3; /* Darker blue for active top tab */ }
-
-        /* Sub Level Tabs */
-        .sub-tab-row { width: 100%; background-color: #333; display: none; /* Hidden by default */ }
-        .sub-tab-row.active { display: block; }
-        .sub-tab-buttons { display: flex; justify-content: center; list-style-type: none; margin: 0; padding: 0; overflow-x: auto; }
-        .sub-tab-buttons button {
-            background-color: #555; color: white; border: none; padding: 12px 20px;
-            cursor: pointer; transition: background-color 0.3s ease; font-size: 1em;
-            border-right: 1px solid #444; white-space: nowrap;
+        
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            z-index: 1000;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
         }
-        .sub-tab-buttons button:last-child { border-right: none; }
-        .sub-tab-buttons button:hover { background-color: #777; }
-        .sub-tab-buttons button.active { background-color: #007bff; }
-
-        .content-container { flex-grow: 1; padding: 20px; max-width: 1100px; margin: 20px auto; width: calc(100% - 40px); }
-        .tab-content { display: none; /* Hidden by default */ }
-        .tab-content.active { display: block; }
-
-        /* Styles for endpoint sections (generic) */
-        .endpoint-section { border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 5px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .endpoint-section h2 { margin-top: 0; color: #007bff; border-bottom: 1px solid #eee; padding-bottom: 10px; font-size: 1.4em; }
-        .endpoint-section h3 { margin-top: 15px; color: #555; font-size: 1.1em; }
-        label { display: block; margin-top: 10px; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"], input[type="number"], input[type="password"], textarea, select {
-            width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;
-            box-sizing: border-box; font-size: 0.95em;
+        
+        .modal-small { width: 400px; }
+        .modal-medium { width: 600px; }
+        .modal-large { width: 900px; }
+        .modal-full { width: 95%; height: 95vh; }
+        
+        .modal-header {
+            padding: var(--spacing-lg);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        input[type="file"] { /* Style file inputs slightly differently */
-            width: calc(100% - 22px); padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;
-            box-sizing: border-box; font-size: 0.9em;
+        
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
         }
-        textarea { min-height: 80px; resize: vertical; }
-        button.api-button { /* Differentiate API call buttons from tab buttons */
-            background-color: #28a745; color: white; padding: 10px 15px; border: none; border-radius: 4px;
-            cursor: pointer; font-size: 1em; transition: background-color 0.3s ease; margin-top: 10px;
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--color-text-muted);
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-md);
+            transition: var(--transition-fast);
         }
-        button.api-button:hover { background-color: #218838; }
-        pre { background-color: #e9e9e9; padding: 10px; border: 1px solid #ccc; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; font-size: 0.9em; max-height: 400px; overflow-y: auto;}
-        .form-group { margin-bottom: 15px; }
-        .checkbox-group label { display: inline-block; margin-right: 10px; font-weight: normal;}
-        .checkbox-group input[type="checkbox"] { margin-right: 5px; vertical-align: middle; width: auto; margin-bottom: 0;}
-        .columns { display: flex; flex-wrap: wrap; gap: 20px; }
-        .column { flex: 1; min-width: 300px; }
-        small { color: #666; display: block; margin-top: -5px; margin-bottom: 10px;}
-
-        /* Chat Completions Specific Styles */
-        textarea.raw-payload-textarea { min-height: 250px; font-family: monospace; }
-        .message-entry {
-            border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px;
-            background-color: #f9f9f9;
+        
+        .modal-close:hover {
+            background: var(--color-surface-alt);
+            color: var(--color-text);
         }
-        .message-entry label { font-size: 0.9em; }
-        .message-entry select, .message-entry textarea, .message-entry input[type="text"], .message-entry input[type="file"] {
-            margin-bottom: 5px; width: 100% !important; box-sizing: border-box;
+        
+        .modal-body {
+            padding: var(--spacing-lg);
         }
-        .message-image-upload {
-            margin-top: 8px;
-            padding: 8px;
-            border: 1px dashed #ccc;
-            border-radius: 3px;
+        
+        .modal-footer {
+            padding: var(--spacing-lg);
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--spacing-md);
         }
-        .message-image-upload label { font-size: 0.85em; margin-top: 0;}
-
-        .remove-message-btn, .remove-image-btn {
-            background-color: #dc3545; color: white; border: none; padding: 5px 10px;
-            border-radius: 4px; cursor: pointer; font-size: 0.9em; margin-top: 5px;
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
-        .remove-message-btn:hover, .remove-image-btn:hover { background-color: #c82333; }
-        .add-message-btn {
-            background-color: #17a2b8; /* Info blue */ color: white; border: none; padding: 8px 12px;
-            border-radius: 4px; cursor: pointer; font-size: 0.9em; margin-bottom: 15px;
+        
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, -40%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, -50%);
+                opacity: 1;
+            }
         }
-        .add-message-btn:hover { background-color: #138496; }
-        .optional-params { border-left: 3px solid #007bff; padding-left: 15px; margin-top: 10px; }
-
-        /* Ensure full width for inputs inside columns and optional params for Chat tab */
-        #chatCompletions_formFields .columns .column input[type="text"],
-        #chatCompletions_formFields .columns .column input[type="number"],
-        #chatCompletions_formFields .columns .column select,
-        #chatCompletions_formFields .optional-params input[type="text"],
-        #chatCompletions_formFields .optional-params input[type="number"],
-        #chatCompletions_formFields .optional-params select,
-        #chatCompletions_formFields .optional-params textarea {
-             width: 100% !important; /* Override generic width for chat form elements */
-             box-sizing: border-box;
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        
+        /* Loading content styles */
+        .loading-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+        
+        .loading-message {
+            color: var(--color-text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        /* History item styles */
+        .history-list {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            padding: var(--spacing-md);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+            transition: var(--transition-fast);
+        }
+        
+        .history-item:hover {
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .history-item.success {
+            border-left: 3px solid var(--color-success);
+        }
+        
+        .history-item.error {
+            border-left: 3px solid var(--color-error);
+        }
+        
+        .history-item-header {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-sm);
+        }
+        
+        .history-path {
+            font-family: var(--font-family-mono);
+            font-size: 0.9rem;
+            color: var(--color-text-secondary);
+            flex: 1;
+        }
+        
+        .history-status {
+            font-weight: 600;
+        }
+        
+        .history-item-details {
+            display: flex;
+            gap: var(--spacing-lg);
+            font-size: 0.85rem;
+            color: var(--color-text-muted);
+        }
+        
+        .history-error {
+            margin-top: var(--spacing-sm);
+            padding: var(--spacing-sm);
+            background: var(--color-surface-alt);
+            border-radius: var(--radius-sm);
+            color: var(--color-error);
+            font-size: 0.85rem;
+        }
+        
+        /* JSON Viewer styles */
+        .json-viewer {
+            font-family: var(--font-family-mono);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .json-viewer-toolbar {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--color-border);
+        }
+        
+        .json-viewer-content {
+            background: var(--color-surface-alt);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            overflow-x: auto;
+        }
+        
+        .json-toggle {
+            cursor: pointer;
+            user-select: none;
+            display: inline-block;
+            width: 1em;
+            text-align: center;
+            color: var(--color-text-muted);
+            transition: var(--transition-fast);
+        }
+        
+        .json-toggle:hover {
+            color: var(--color-primary);
+        }
+        
+        .json-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .json-content {
+            padding-left: var(--spacing-lg);
+        }
+        
+        .json-item {
+            margin: 2px 0;
+        }
+        
+        .json-bracket,
+        .json-comma,
+        .json-colon {
+            color: var(--color-text-secondary);
+        }
+        
+        /* Drag over styles */
+        .drag-over {
+            background: var(--color-primary-light) !important;
+            border-color: var(--color-primary) !important;
+        }
+        
+        /* Search box */
+        .search-container {
+            position: fixed;
+            top: var(--spacing-lg);
+            right: var(--spacing-lg);
+            z-index: 95;
+            display: none;
+        }
+        
+        .search-container.visible {
+            display: block;
+        }
+        
+        #endpoint-search {
+            width: 300px;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-pill);
+            border: 1px solid var(--color-border);
+            background: var(--color-surface);
+            color: var(--color-text);
+        }
+        
+        #no-search-results {
+            text-align: center;
+            padding: var(--spacing-xl);
+            color: var(--color-text-muted);
+            display: none;
         }
     </style>
 </head>
 <body>
+    <!-- Skip to main content link for accessibility -->
+    <a href="#main-content-area" class="skip-link">Skip to main content</a>
+    
     <div class="app-container">
         <header>
-            <h1>API Interaction Page</h1>
+            <h1>TLDW API Testing Interface</h1>
+            <div class="header-controls">
+                <div class="api-status" aria-live="polite">
+                    <span class="status-dot" aria-hidden="true"></span>
+                    <span class="api-status-text">Checking...</span>
+                </div>
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+                    🌙
+                </button>
+            </div>
         </header>
 
-        <!-- Top Level Tabs -->
-        <div class="top-tab-container">
-            <div class="top-tab-buttons">
-                <button class="top-tab-button" data-toptab="general">General</button>
-                <button class="top-tab-button" data-toptab="media">Media</button>
-                <button class="top-tab-button" data-toptab="chat" id="top-tab-chat">Chat</button>
-            </div>
+        <!-- Search Container -->
+        <div class="search-container">
+            <input 
+                type="search" 
+                id="endpoint-search" 
+                placeholder="Search endpoints... (Ctrl+K)"
+                aria-label="Search endpoints"
+            >
         </div>
+
+        <!-- Top Level Tabs -->
+        <nav class="top-tab-container" role="navigation" aria-label="Main navigation">
+            <div class="top-tab-buttons" role="tablist">
+                <button class="top-tab-button" data-toptab="general" role="tab" aria-selected="false">
+                    General
+                </button>
+                <button class="top-tab-button" data-toptab="media" role="tab" aria-selected="false">
+                    Media
+                </button>
+                <button class="top-tab-button" data-toptab="chat" id="top-tab-chat" role="tab" aria-selected="false">
+                    Chat
+                </button>
+                <button class="top-tab-button" data-toptab="rag" role="tab" aria-selected="false">
+                    RAG
+                </button>
+                <button class="top-tab-button" data-toptab="prompts" role="tab" aria-selected="false">
+                    Prompts
+                </button>
+                <button class="top-tab-button" data-toptab="notes" role="tab" aria-selected="false">
+                    Notes
+                </button>
+                <button class="top-tab-button" data-toptab="evaluations" role="tab" aria-selected="false">
+                    Evaluations
+                </button>
+                <button class="top-tab-button" data-toptab="embeddings" role="tab" aria-selected="false">
+                    Embeddings
+                </button>
+                <button class="top-tab-button" data-toptab="research" role="tab" aria-selected="false">
+                    Research
+                </button>
+                <button class="top-tab-button" data-toptab="audio" role="tab" aria-selected="false">
+                    Audio
+                </button>
+                <button class="top-tab-button" data-toptab="admin" role="tab" aria-selected="false">
+                    Admin
+                </button>
+                <button class="top-tab-button" data-toptab="sync" role="tab" aria-selected="false">
+                    Sync
+                </button>
+            </div>
+        </nav>
 
         <!-- Sub Level Tab Rows -->
-        <div id="general-subtabs" class="sub-tab-row">
-            <div class="sub-tab-buttons">
-                <button class="sub-tab-button" data-content-id="tabGlobalSettings">Global Settings</button>
-                <button class="sub-tab-button" data-content-id="tabDebug" data-load-group="general">Debug</button>
+        <div id="general-subtabs" class="sub-tab-row" role="navigation" aria-label="General sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabGlobalSettings" role="tab">
+                    Global Settings
+                </button>
+                <button class="sub-tab-button" data-content-id="tabDebug" data-load-group="general" role="tab">
+                    Debug
+                </button>
+                <button class="sub-tab-button" data-content-id="tabHistory" role="tab">
+                    Request History
+                </button>
             </div>
         </div>
 
-        <div id="media-subtabs" class="sub-tab-row">
-            <div class="sub-tab-buttons">
-                <button class="sub-tab-button" data-content-id="tabMediaManagement" data-load-group="media">Media Management</button>
-                <button class="sub-tab-button" data-content-id="tabMediaVersioning" data-load-group="media">Versioning</button>
-                <button class="sub-tab-button" data-content-id="tabMediaIngestionPersistence" data-load-group="media">Ingestion (DB)</button>
-                <button class="sub-tab-button" data-content-id="tabMediaProcessingNoDB" data-load-group="media">Processing (No DB)</button>
-                <button class="sub-tab-button" data-content-id="tabWebScraping" data-load-group="media">Web Scraping</button>
+        <div id="media-subtabs" class="sub-tab-row" role="navigation" aria-label="Media sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabMediaManagement" data-load-group="media" role="tab">
+                    Media Management
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMediaVersioning" data-load-group="media" role="tab">
+                    Versioning
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMediaIngestionPersistence" data-load-group="media" role="tab">
+                    Ingestion (DB)
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMediaProcessingNoDB" data-load-group="media" role="tab">
+                    Processing (No DB)
+                </button>
+                <button class="sub-tab-button" data-content-id="tabWebScraping" data-load-group="media" role="tab">
+                    Web Scraping
+                </button>
             </div>
         </div>
 
-        <div id="chat-subtabs" class="sub-tab-row">
-            <div class="sub-tab-buttons">
-                <button class="sub-tab-button" data-content-id="tabChatCompletions" data-load-group="chat">Chat Completions</button>
+        <div id="chat-subtabs" class="sub-tab-row" role="navigation" aria-label="Chat sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabChatCompletions" data-load-group="chat" role="tab">
+                    Chat Completions
+                </button>
+                <button class="sub-tab-button" data-content-id="tabCharacters" data-load-group="chat" role="tab">
+                    Characters
+                </button>
+                <button class="sub-tab-button" data-content-id="tabConversations" data-load-group="chat" role="tab">
+                    Conversations
+                </button>
+            </div>
+        </div>
+
+        <div id="rag-subtabs" class="sub-tab-row" role="navigation" aria-label="RAG sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabRAGSearch" data-load-group="rag" role="tab">
+                    Search
+                </button>
+                <button class="sub-tab-button" data-content-id="tabRAGEmbeddings" data-load-group="rag" role="tab">
+                    Embeddings
+                </button>
+            </div>
+        </div>
+
+        <div id="prompts-subtabs" class="sub-tab-row" role="navigation" aria-label="Prompts sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabPromptsList" data-load-group="prompts" role="tab">
+                    List Prompts
+                </button>
+                <button class="sub-tab-button" data-content-id="tabPromptsManage" data-load-group="prompts" role="tab">
+                    Manage
+                </button>
+            </div>
+        </div>
+
+        <div id="notes-subtabs" class="sub-tab-row" role="navigation" aria-label="Notes sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabNotesList" data-load-group="notes" role="tab">
+                    List Notes
+                </button>
+                <button class="sub-tab-button" data-content-id="tabNotesManage" data-load-group="notes" role="tab">
+                    Manage
+                </button>
+                <button class="sub-tab-button" data-content-id="tabNotesKeywords" data-load-group="notes" role="tab">
+                    Keywords
+                </button>
+            </div>
+        </div>
+
+        <div id="evaluations-subtabs" class="sub-tab-row" role="navigation" aria-label="Evaluations sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabEvalsOpenAI" data-load-group="evaluations" role="tab">
+                    OpenAI Format
+                </button>
+                <button class="sub-tab-button" data-content-id="tabEvalsGEval" data-load-group="evaluations" role="tab">
+                    G-Eval
+                </button>
+                <button class="sub-tab-button" data-content-id="tabEvalsRAG" data-load-group="evaluations" role="tab">
+                    RAG Evaluation
+                </button>
+                <button class="sub-tab-button" data-content-id="tabEvalsDatasets" data-load-group="evaluations" role="tab">
+                    Datasets
+                </button>
+            </div>
+        </div>
+
+        <div id="embeddings-subtabs" class="sub-tab-row" role="navigation" aria-label="Embeddings sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabEmbeddingsCreate" data-load-group="embeddings" role="tab">
+                    Create Embeddings
+                </button>
+                <button class="sub-tab-button" data-content-id="tabEmbeddingsAdmin" data-load-group="embeddings" role="tab">
+                    Admin Tools
+                </button>
+            </div>
+        </div>
+
+        <div id="research-subtabs" class="sub-tab-row" role="navigation" aria-label="Research sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabResearchArxiv" data-load-group="research" role="tab">
+                    arXiv Search
+                </button>
+                <button class="sub-tab-button" data-content-id="tabResearchSemantic" data-load-group="research" role="tab">
+                    Semantic Scholar
+                </button>
+            </div>
+        </div>
+
+        <div id="audio-subtabs" class="sub-tab-row" role="navigation" aria-label="Audio sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabAudioTTS" data-load-group="audio" role="tab">
+                    Text to Speech
+                </button>
+            </div>
+        </div>
+
+        <div id="admin-subtabs" class="sub-tab-row" role="navigation" aria-label="Admin sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabAdminUsers" data-load-group="admin" role="tab">
+                    User Management
+                </button>
+                <button class="sub-tab-button" data-content-id="tabAdminSystem" data-load-group="admin" role="tab">
+                    System Status
+                </button>
+            </div>
+        </div>
+
+        <div id="sync-subtabs" class="sub-tab-row" role="navigation" aria-label="Sync sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabSyncSend" data-load-group="sync" role="tab">
+                    Send Changes
+                </button>
+                <button class="sub-tab-button" data-content-id="tabSyncReceive" data-load-group="sync" role="tab">
+                    Receive Changes
+                </button>
             </div>
         </div>
 
         <!-- Main Content Area -->
-        <div class="content-container" id="main-content-area">
+        <main class="content-container" id="main-content-area" role="main">
             <!-- Global Settings Tab Content (always present) -->
-            <div id="tabGlobalSettings" class="tab-content">
+            <div id="tabGlobalSettings" class="tab-content" role="tabpanel">
                 <div class="endpoint-section">
-                    <h2>Global API Configuration</h2>
-                    <div class="form-group">
-                        <label for="baseUrl">API Base URL:</label>
-                        <input type="text" id="baseUrl" value="http://localhost:8000">
+                    <h2>
+                        <span class="endpoint-method get">CONFIG</span>
+                        <span class="endpoint-path">Global API Configuration</span>
+                    </h2>
+                    
+                    <div class="columns">
+                        <div class="column">
+                            <div class="form-group">
+                                <label for="baseUrl">API Base URL:</label>
+                                <input 
+                                    type="url" 
+                                    id="baseUrl" 
+                                    value="http://localhost:8000"
+                                    placeholder="http://localhost:8000"
+                                    aria-describedby="baseUrl-help"
+                                >
+                                <small id="baseUrl-help">The base URL for all API requests</small>
+                            </div>
+                        </div>
+                        
+                        <div class="column">
+                            <div class="form-group">
+                                <label for="apiKeyInput">API Token:</label>
+                                <input 
+                                    type="password" 
+                                    id="apiKeyInput" 
+                                    value="default-secret-key-for-single-user"
+                                    placeholder="Enter your API token"
+                                    aria-describedby="apiKey-help"
+                                >
+                                <small id="apiKey-help">Sent in the 'Token' header for authenticated requests</small>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="apiKeyInput">API Token (used in 'Token' header):</label>
-                        <input type="text" id="apiKeyInput" value="default-secret-key-for-single-user"><br>
-                        <small>This will be sent in the 'Token' header for authenticated requests.</small>
+
+                    <div class="form-group mt-3">
+                        <h3>Quick Actions</h3>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="webUI.checkApiStatus()">
+                                Test Connection
+                            </button>
+                            <button class="btn btn-secondary" onclick="webUI.showRequestHistory()">
+                                View History
+                            </button>
+                            <button class="btn btn-secondary" onclick="location.reload()">
+                                Refresh Page
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-3">
+                        <h3>Keyboard Shortcuts</h3>
+                        <div class="text-small text-muted">
+                            <p><kbd>Ctrl/Cmd + K</kbd> - Search endpoints</p>
+                            <p><kbd>Ctrl/Cmd + Shift + D</kbd> - Toggle dark mode</p>
+                            <p><kbd>Ctrl/Cmd + Shift + H</kbd> - Show request history</p>
+                            <p><kbd>Escape</kbd> - Close modals</p>
+                        </div>
                     </div>
                 </div>
             </div>
-            <!-- Other tab contents will be loaded here by JavaScript -->
-        </div> <!-- end content-container -->
-    </div> <!-- end app-container -->
 
+            <!-- Request History Tab -->
+            <div id="tabHistory" class="tab-content" role="tabpanel">
+                <div class="endpoint-section">
+                    <h2>Request History</h2>
+                    <div id="history-container">
+                        <p class="text-muted">Request history will appear here...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- No search results message -->
+            <div id="no-search-results">
+                <p>No endpoints match your search.</p>
+            </div>
+
+            <!-- Other tab contents will be loaded here dynamically -->
+        </main>
+    </div>
+
+    <!-- Load JavaScript files -->
+    <script src="js/utils.js"></script>
+    <script src="js/components.js"></script>
+    <script src="js/api-client.js"></script>
+    <script src="js/chat-ui.js"></script>
+    <script src="js/main.js"></script>
+
+    <!-- Legacy compatibility functions -->
     <script>
-        const loadedContentGroups = new Set();
-        const mainContentArea = document.getElementById('main-content-area');
-        let activeTopTabButton = null;
-        let activeSubTabButton = null;
-        let messageIdCounter = { chatCompletions: 0 }; // For dynamic message IDs
-
-        function initTabs() {
-            const topTabButtons = document.querySelectorAll('.top-tab-buttons button');
-            topTabButtons.forEach(btn => {
-                btn.addEventListener('click', () => activateTopTab(btn));
-            });
-
-            const subTabButtons = document.querySelectorAll('.sub-tab-buttons button');
-            subTabButtons.forEach(btn => {
-                btn.addEventListener('click', () => activateSubTab(btn));
-            });
-
-            const defaultTopTab = document.getElementById('top-tab-chat');
-            if (defaultTopTab) {
-                activateTopTab(defaultTopTab);
-            } else if (topTabButtons.length > 0) {
-                activateTopTab(topTabButtons[0]);
+        // These functions provide backward compatibility with existing tab content
+        
+        function removeChatMessage(prefix, id) {
+            if (typeof chatUI !== 'undefined') {
+                chatUI.removeMessage(prefix, id);
             }
         }
 
-        async function activateTopTab(topTabButtonToActivate) {
-            if (activeTopTabButton) {
-                activeTopTabButton.classList.remove('active');
+        function addChatMessage(prefix, role, content) {
+            if (typeof chatUI !== 'undefined') {
+                chatUI.addMessage(prefix, role, content);
             }
-            activeTopTabButton = topTabButtonToActivate;
-            activeTopTabButton.classList.add('active');
-
-            const topTabName = activeTopTabButton.dataset.toptab;
-            document.querySelectorAll('.sub-tab-row').forEach(row => row.classList.remove('active'));
-
-            const subTabRowToShow = document.getElementById(topTabName + '-subtabs');
-            if (subTabRowToShow) {
-                subTabRowToShow.classList.add('active');
-                const firstSubTabButton = subTabRowToShow.querySelector('.sub-tab-buttons button');
-                if (firstSubTabButton) {
-                    await activateSubTab(firstSubTabButton);
-                }
-            } else {
-                if (activeSubTabButton) {
-                    activeSubTabButton.classList.remove('active');
-                    activeSubTabButton = null;
-                }
-                mainContentArea.querySelectorAll('.tab-content').forEach(tc => {
-                    tc.classList.remove('active');
-                    tc.style.display = 'none';
-                });
-                if (topTabName === 'general') {
-                    const globalSettingsContent = document.getElementById('tabGlobalSettings');
-                    if (globalSettingsContent) {
-                        globalSettingsContent.classList.add('active');
-                        globalSettingsContent.style.display = 'block';
-                    }
-                }
-            }
-        }
-
-        async function activateSubTab(subTabButtonToActivate) {
-            const parentSubTabRow = subTabButtonToActivate.closest('.sub-tab-row');
-            if (!parentSubTabRow) return;
-
-            parentSubTabRow.querySelectorAll('.sub-tab-buttons button').forEach(btn => btn.classList.remove('active'));
-            activeSubTabButton = subTabButtonToActivate;
-            activeSubTabButton.classList.add('active');
-
-            const contentId = activeSubTabButton.dataset.contentId;
-            const loadGroup = activeSubTabButton.dataset.loadGroup;
-
-            if (loadGroup && !loadedContentGroups.has(loadGroup)) {
-                try {
-                    console.log(`Loading content for group: ${loadGroup}, target content ID: ${contentId}`);
-                    await loadContentGroup(loadGroup, contentId);
-                    loadedContentGroups.add(loadGroup);
-                } catch (error) {
-                    console.error(`Failed to load content for group ${loadGroup}:`, error);
-                    let errorDisplay = document.getElementById(contentId);
-                    if (!errorDisplay) {
-                        errorDisplay = document.createElement('div');
-                        errorDisplay.id = contentId;
-                        errorDisplay.classList.add('tab-content');
-                        mainContentArea.appendChild(errorDisplay);
-                    }
-                    errorDisplay.innerHTML = `<p>Error loading content for ${contentId}. Please check console.</p>`;
-                }
-            }
-
-            mainContentArea.querySelectorAll('.tab-content').forEach(tc => {
-                tc.classList.remove('active');
-                tc.style.display = 'none';
-            });
-
-            const contentToShow = document.getElementById(contentId);
-            if (contentToShow) {
-                contentToShow.classList.add('active');
-                contentToShow.style.display = 'block';
-                if (contentId === 'tabChatCompletions' && typeof initializeChatCompletionsTab === "function") {
-                    initializeChatCompletionsTab();
-                }
-            } else {
-                console.warn(`Content ID "${contentId}" not found after attempting to load group "${loadGroup}".`);
-                const placeholder = document.createElement('div');
-                placeholder.id = contentId;
-                placeholder.classList.add('tab-content', 'active');
-                placeholder.style.display = 'block';
-                placeholder.innerHTML = `<p>Content for ${contentId} is missing or failed to load.</p>`;
-                const existingPlaceholder = mainContentArea.querySelector(`#${contentId}`);
-                if (existingPlaceholder) existingPlaceholder.remove();
-                mainContentArea.appendChild(placeholder);
-            }
-        }
-
-        async function loadContentGroup(groupName, targetContentId) {
-            const response = await fetch(`tabs/${groupName}_content.html`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status} for tabs/${groupName}_content.html`);
-            }
-            const html = await response.text();
-            mainContentArea.insertAdjacentHTML('beforeend', html);
-
-            if (groupName === 'chat' && targetContentId === 'tabChatCompletions') {
-                if (typeof initializeChatCompletionsTab === "function") {
-                     initializeChatCompletionsTab();
-                } else {
-                    console.warn("initializeChatCompletionsTab function not found after loading chat content.");
-                }
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', initTabs);
-
-        // --- Chat Completions UI Specific Functions ---
-        function escapeCurlData(data) {
-            // More robust escaping for single quotes in JSON data for cURL
-            return data.replace(/'/g, "'\\''");
-        }
-
-        function addChatMessage(prefix, role = 'user', content = '') {
-            const container = document.getElementById(prefix + '_messagesContainer');
-            if (!container) {
-                console.error("Messages container not found for prefix:", prefix);
-                return;
-            }
-            const id = messageIdCounter[prefix]++;
-            const entryDiv = document.createElement('div');
-            entryDiv.className = 'message-entry';
-            entryDiv.id = `${prefix}_message_entry_${id}`;
-            entryDiv.innerHTML = `
-                <label for="${prefix}_message_role_${id}">Role:</label>
-                <select id="${prefix}_message_role_${id}" onchange="toggleToolFields('${prefix}', ${id}); toggleImageUploadUI('${prefix}', ${id})">
-                    <option value="system" ${role === 'system' ? 'selected' : ''}>System</option>
-                    <option value="user" ${role === 'user' ? 'selected' : ''}>User</option>
-                    <option value="assistant" ${role === 'assistant' ? 'selected' : ''}>Assistant</option>
-                    <option value="tool" ${role === 'tool' ? 'selected' : ''}>Tool</option>
-                </select>
-                <label for="${prefix}_message_content_${id}">Content (Text):</label>
-                <textarea id="${prefix}_message_content_${id}" rows="3" placeholder="Enter message text...">${content}</textarea>
-
-                <div class="form-group message-image-upload" id="${prefix}_message_image_upload_container_${id}">
-                    <label for="${prefix}_message_image_${id}">Image (Optional, for 'user' role):</label>
-                    <input type="file" id="${prefix}_message_image_${id}" accept="image/*" onchange="previewMessageImage('${prefix}', ${id})">
-                    <img id="${prefix}_message_image_preview_${id}" src="#" alt="Image Preview" style="max-width: 100px; max-height: 100px; display: none; margin-top: 5px;">
-                    <button type="button" class="remove-image-btn" id="${prefix}_message_image_clear_${id}" onclick="clearMessageImage('${prefix}', ${id})" style="display: none; font-size:0.8em; padding: 3px 6px;">Clear Image</button>
-                </div>
-
-                <label for="${prefix}_message_name_${id}">Name (Optional):</label>
-                <input type="text" id="${prefix}_message_name_${id}" placeholder="Participant name (e.g., function name for assistant tool_calls)">
-                <div id="${prefix}_message_tool_fields_${id}" style="display: ${role === 'tool' ? 'block' : 'none'};">
-                    <label for="${prefix}_message_tool_call_id_${id}">Tool Call ID (Required for 'tool' role):</label>
-                    <input type="text" id="${prefix}_message_tool_call_id_${id}" placeholder="ID of the tool call this message is responding to">
-                </div>
-                <button class="remove-message-btn" onclick="removeChatMessage('${prefix}', ${id})">Remove</button>
-            `;
-            container.appendChild(entryDiv);
-            toggleToolFields(prefix, id);
-            toggleImageUploadUI(prefix, id); // Call after appending to set initial state
-        }
-
-        function toggleToolFields(prefix, id) {
-            const roleSelect = document.getElementById(`${prefix}_message_role_${id}`);
-            const toolFieldsDiv = document.getElementById(`${prefix}_message_tool_fields_${id}`);
-            if (roleSelect && toolFieldsDiv) {
-                toolFieldsDiv.style.display = roleSelect.value === 'tool' ? 'block' : 'none';
-            }
-        }
-
-        function toggleImageUploadUI(prefix, id) {
-            const roleSelect = document.getElementById(`${prefix}_message_role_${id}`);
-            const imageUploadContainer = document.getElementById(`${prefix}_message_image_upload_container_${id}`);
-            if (roleSelect && imageUploadContainer) {
-                imageUploadContainer.style.display = roleSelect.value === 'user' ? 'block' : 'none';
-                if (roleSelect.value !== 'user') { // If role changed away from user, clear any selected image
-                    clearMessageImage(prefix, id);
-                }
-            }
-        }
-
-        function previewMessageImage(prefix, id) {
-            const fileInput = document.getElementById(`${prefix}_message_image_${id}`);
-            const previewImg = document.getElementById(`${prefix}_message_image_preview_${id}`);
-            const clearButton = document.getElementById(`${prefix}_message_image_clear_${id}`);
-
-            if (fileInput && previewImg && clearButton && fileInput.files && fileInput.files[0]) {
-                const file = fileInput.files[0];
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    previewImg.src = e.target.result;
-                    previewImg.style.display = 'block';
-                    clearButton.style.display = 'inline-block';
-                    // Store the data URL directly on a data attribute of the file input
-                    fileInput.dataset.imageDataUrl = e.target.result;
-                }
-                reader.readAsDataURL(file);
-            } else if (previewImg) { // No file selected or input not found
-                clearMessageImage(prefix, id); // Ensure UI is cleared
-            }
-        }
-
-        function clearMessageImage(prefix, id) {
-            const fileInput = document.getElementById(`${prefix}_message_image_${id}`);
-            const previewImg = document.getElementById(`${prefix}_message_image_preview_${id}`);
-            const clearButton = document.getElementById(`${prefix}_message_image_clear_${id}`);
-
-            if (fileInput) {
-                fileInput.value = null; // Clear the file input
-                delete fileInput.dataset.imageDataUrl; // Remove stored data
-            }
-            if (previewImg) {
-                previewImg.style.display = 'none';
-                previewImg.src = '#';
-            }
-            if (clearButton) {
-                clearButton.style.display = 'none';
-            }
-        }
-
-
-        function buildPayloadFromForm(prefix) {
-            const payload = {};
-
-            const apiProviderEl = document.getElementById(prefix + '_api_provider');
-            if (apiProviderEl && apiProviderEl.value) {
-                payload.api_provider = apiProviderEl.value;
-            }
-
-            const modelEl = document.getElementById(prefix + '_model');
-            if (modelEl && modelEl.value) {
-                payload.model = modelEl.value;
-            }
-
-            const messages = [];
-            const messagesContainer = document.getElementById(prefix + '_messagesContainer');
-            if (messagesContainer) {
-                Array.from(messagesContainer.children).forEach(entryDiv => {
-                    if (!entryDiv.id || !entryDiv.id.startsWith(prefix + '_message_entry_')) return;
-                    const entryId = entryDiv.id.split('_').pop();
-                    const role = document.getElementById(`${prefix}_message_role_${entryId}`).value;
-                    const textContent = document.getElementById(`${prefix}_message_content_${entryId}`).value;
-                    const nameEl = document.getElementById(`${prefix}_message_name_${entryId}`);
-                    const name = nameEl ? (nameEl.value.trim() || undefined) : undefined;
-
-                    const imageInput = document.getElementById(`${prefix}_message_image_${entryId}`);
-                    const imageDataUrl = imageInput ? imageInput.dataset.imageDataUrl : null;
-
-                    let messageContentParts = [];
-                    if (textContent.trim() !== "") {
-                        messageContentParts.push({ type: "text", text: textContent });
-                    }
-
-                    if (role === 'user' && imageDataUrl) { // Images only for user role typically
-                        messageContentParts.push({
-                            type: "image_url",
-                            image_url: { url: imageDataUrl }
-                        });
-                    }
-
-                    const message = { role };
-                    if (name) message.name = name;
-
-                    // Determine final content structure
-                    if (messageContentParts.length === 0 && role !== 'assistant') { // Assistant can have empty content if using tool_calls
-                        // If no text and no image (and not assistant potentially using tools), send empty text part for user/system/tool for some APIs
-                        // Or make it an error to submit an empty message for these roles unless raw JSON is used
-                        if (role === 'user' || role === 'system' || role === 'tool') {
-                             message.content = ""; // Or [{ type: "text", text: "" }] if API strictly wants array for user
-                        }
-                    } else if (messageContentParts.length === 1 && messageContentParts[0].type === "text") {
-                        message.content = messageContentParts[0].text; // Content as string
-                    } else if (messageContentParts.length > 0) {
-                        message.content = messageContentParts; // Content as array of parts
-                    } else if (role === 'assistant') {
-                        // Assistant message can have null content if tool_calls are present
-                        // This part will be handled by the later logic that adds tool_calls
-                        message.content = null;
-                    }
-
-
-                    if (role === 'tool') {
-                        const toolCallIdEl = document.getElementById(`${prefix}_message_tool_call_id_${entryId}`);
-                        const toolCallId = toolCallIdEl ? toolCallIdEl.value.trim() : "";
-                        if (!toolCallId) {
-                            alert(`Tool Call ID is required for message with role 'tool'. Please check message entry ${entryId}.`);
-                            throw new Error("Missing Tool Call ID for a tool message.");
-                        }
-                        message.tool_call_id = toolCallId;
-                    }
-                    messages.push(message);
-                });
-            }
-            payload.messages = messages;
-            if (messages.length === 0 && document.getElementById(prefix + '_useRawJson') && !document.getElementById(prefix + '_useRawJson').checked) {
-                 alert("At least one message is required for chat completions when not using Raw JSON.");
-                 throw new Error("No messages provided.");
-            }
-
-            const temperatureEl = document.getElementById(prefix + '_temperature');
-            if (temperatureEl && temperatureEl.value !== "") payload.temperature = parseFloat(temperatureEl.value);
-
-            const maxTokensEl = document.getElementById(prefix + '_max_tokens');
-            if (maxTokensEl && maxTokensEl.value !== "") payload.max_tokens = parseInt(maxTokensEl.value);
-
-            const streamEl = document.getElementById(prefix + '_stream');
-            if (streamEl) payload.stream = streamEl.checked;
-
-
-            const optionalFields = {
-                top_p: { type: 'float', elIdSuffix: '_top_p' },
-                frequency_penalty: { type: 'float', elIdSuffix: '_frequency_penalty' },
-                presence_penalty: { type: 'float', elIdSuffix: '_presence_penalty' },
-                minp: { type: 'float', elIdSuffix: '_minp', allowUndefined: true },
-                topk: { type: 'int', elIdSuffix: '_topk', allowUndefined: true },
-                seed: { type: 'int', elIdSuffix: '_seed', allowNull: true },
-                stop: { type: 'json_or_csv_list', elIdSuffix: '_stop', allowNull: true },
-                logprobs: { type: 'checkbox', elIdSuffix: '_logprobs' },
-                top_logprobs: { type: 'int', elIdSuffix: '_top_logprobs', dependsOn: 'logprobs', allowUndefined: true },
-                response_format: { type: 'select_object', elIdSuffix: '_response_format_type', key: 'type', allowNull: true },
-                tools: { type: 'json', elIdSuffix: '_tools', allowNull: true },
-                tool_choice: { type: 'json_or_string', elIdSuffix: '_tool_choice', allowUndefined: true, validStrings: ["auto", "none", "required"], defaultIfEmpty: "auto" },
-                logit_bias: { type: 'json', elIdSuffix: '_logit_bias', allowNull: true },
-                character_id: { type: 'string', elIdSuffix: '_character_id', allowNull: true },
-                conversation_id: { type: 'string', elIdSuffix: '_conversation_id', allowNull: true },
-                prompt_template_name: { type: 'string', elIdSuffix: '_prompt_template_name', allowNull: true },
-                n: { type: 'int', elIdSuffix: '_n', allowNull: true, min: 1, max: 128 },
-                user: { type: 'string', elIdSuffix: '_user', allowNull: true }
-            };
-
-            for (const key in optionalFields) {
-                const config = optionalFields[key];
-                const el = document.getElementById(prefix + config.elIdSuffix);
-                if (!el) continue;
-
-                if (config.dependsOn && !document.getElementById(prefix + '_' + config.dependsOn)?.checked) {
-                    if (config.allowNull) payload[key] = null;
-                    else if (config.allowUndefined) delete payload[key];
-                    continue;
-                }
-
-                let value;
-                switch (config.type) {
-                    case 'float':
-                        value = el.value !== "" ? parseFloat(el.value) : (config.allowUndefined ? undefined : (config.allowNull ? null : NaN));
-                        if (isNaN(value) && el.value !== "" && !config.allowNull && !config.allowUndefined) {
-                             alert(`Invalid float value for ${key}`); throw new Error(`Invalid float for ${key}`);
-                        }
-                        break;
-                    case 'int':
-                        value = el.value !== "" ? parseInt(el.value) : (config.allowUndefined ? undefined : (config.allowNull ? null : NaN));
-                        if (isNaN(value) && el.value !== "" && !config.allowNull && !config.allowUndefined) {
-                             alert(`Invalid integer value for ${key}`); throw new Error(`Invalid int for ${key}`);
-                        }
-                        if (config.min !== undefined && value < config.min) value = config.min;
-                        if (config.max !== undefined && value > config.max) value = config.max;
-                        break;
-                    case 'string':
-                        value = el.value.trim() !== "" ? el.value.trim() : (config.allowUndefined ? undefined : (config.allowNull ? null : ""));
-                        break;
-                    case 'checkbox': // General checkbox, sends true/false or null
-                        value = el.checked ? true : (config.allowNullIfFalse ? null : false);
-                         if (key === 'logprobs' && !el.checked) { // For logprobs, omit if false as per OpenAI
-                            value = undefined;
-                        }
-                        break;
-                    case 'json_or_csv_list':
-                        if (el.value.trim() !== "") {
-                            let parsed = false;
-                            if (el.value.trim().startsWith('[') && el.value.trim().endsWith(']')) {
-                                try { value = JSON.parse(el.value); parsed = true; }
-                                catch (e) { /* will try csv next if this fails */ }
-                            }
-                            if (!parsed) {
-                                value = el.value.split(',').map(s => s.trim()).filter(s => s);
-                                if (value.length === 0 && el.value.trim().includes(',')) {
-                                     value = config.allowNull ? null : (config.allowUndefined ? undefined : []);
-                                } else if (value.length === 0 && !el.value.trim().includes(',')) {
-                                    value = el.value.trim() || (config.allowNull ? null : (config.allowUndefined ? undefined : []));
-                                    if(value === "" && !config.allowNull && !config.allowUndefined && !Array.isArray(value)) value = [];
-                                } else if (value.length === 1 && !el.value.trim().includes(',')) {
-                                    value = el.value.trim();
-                                }
-                            }
-                        } else { value = config.allowNull ? null : (config.allowUndefined ? undefined : []); }
-                        break;
-                    case 'json':
-                        const trimmedJsonValue = el.value.trim();
-                        if (trimmedJsonValue !== "") {
-                            try {
-                                value = JSON.parse(trimmedJsonValue);
-                            } catch (e) {
-                                alert(`Invalid JSON for field '${key}' (element ID: ${el.id}). Attempted to parse: "${trimmedJsonValue}". Error: ${e.message}`);
-                                throw new Error(`Invalid JSON for ${key}`);
-                            }
-                        } else {
-                            value = config.allowNull ? null : (config.allowUndefined ? undefined : (key === 'tools' ? null : {}));
-                        }
-                        break;
-                    case 'select_object':
-                        value = el.value ? { [config.key]: el.value } : (config.allowNull ? null : (config.allowUndefined ? undefined : {}));
-                         if (el.value === "") value = config.allowNull ? null : undefined; // If empty, treat as null/undefined
-                        break;
-                    case 'json_or_string':
-                        if (el.value.trim() !== "") {
-                            if (config.validStrings && config.validStrings.includes(el.value.trim().toLowerCase())) {
-                                value = el.value.trim().toLowerCase();
-                            } else {
-                                try { value = JSON.parse(el.value); }
-                                catch (e) { alert(`Invalid value for ${key}. Must be one of ${config.validStrings.join(', ')} or a valid JSON object string.`); throw new Error(`Invalid value for ${key}`); }
-                            }
-                        } else { value = config.defaultIfEmpty !== undefined ? config.defaultIfEmpty : (config.allowUndefined ? undefined : (config.allowNull ? null : "auto")); }
-                        break;
-                }
-
-                if (value !== undefined && !(typeof value === 'number' && isNaN(value))) {
-                    payload[key] = value;
-                } else if (config.allowNull && value === null) {
-                    payload[key] = null;
-                } else if (config.allowUndefined && value === undefined) {
-                    delete payload[key];
-                }
-            }
-
-            for (const key in payload) { if (payload[key] === undefined) { delete payload[key]; } }
-            if (payload.response_format && Object.keys(payload.response_format).length === 0) delete payload.response_format;
-
-
-            // Assistant messages can have null content if tool_calls are present (not handled here, but server schema allows)
-            // Ensure that if a role=assistant message has no tool_calls (from form), and content is also null/empty, it might need cleanup
-            payload.messages = payload.messages.map(msg => {
-                if (msg.role === 'assistant' && msg.content === null) {
-                    // If backend requires content even if null, this is fine.
-                    // If backend prefers omitting content if null and no tool_calls, add logic here.
-                    // For now, keep as is. The ChatCompletionAssistantMessageParam schema has `content: Optional[str] = Field(None,...)`
-                }
-                return msg;
-            });
-
-
-            return payload;
         }
 
         function toggleRawJson(prefix) {
@@ -643,412 +630,111 @@
             if (formFieldsDiv) formFieldsDiv.style.display = useRawJson ? 'none' : 'block';
             if (rawJsonContainerDiv) rawJsonContainerDiv.style.display = useRawJson ? 'block' : 'none';
 
-            if (useRawJson && rawPayloadTextarea) {
+            if (useRawJson && rawPayloadTextarea && typeof chatUI !== 'undefined') {
                 try {
-                    const currentPayload = buildPayloadFromForm(prefix); // This is now synchronous
+                    const currentPayload = chatUI.buildPayload(prefix);
                     rawPayloadTextarea.value = JSON.stringify(currentPayload, null, 2);
                 } catch (e) {
                     console.warn("Could not build payload for raw view:", e.message);
-                    rawPayloadTextarea.value = JSON.stringify({"error_building_payload": e.message, "tip": "Fix form errors (like missing tool_call_id) or manually edit JSON."}, null, 2);
+                    rawPayloadTextarea.value = JSON.stringify({"error_building_payload": e.message}, null, 2);
                 }
             }
         }
 
-        function generateChatCompletionsCurl() {
-            const endpointId = 'createChatCompletion';
-            const prefix = 'chatCompletions';
-            const curlEl = document.getElementById(endpointId + '_curl');
-            if (!curlEl) return;
-
-            const token = document.getElementById('apiKeyInput').value || "YOUR_API_TOKEN_PLACEHOLDER";
-            const baseUrl = document.getElementById('baseUrl').value;
-            let payloadString;
-
-            const useRawJsonCheckbox = document.getElementById(prefix + '_useRawJson');
-            if (!useRawJsonCheckbox) { curlEl.textContent = "Error: Raw JSON toggle checkbox not found."; return; }
-
-            if (useRawJsonCheckbox.checked) {
-                const rawPayloadEl = document.getElementById(prefix + '_payload_raw');
-                if (rawPayloadEl && rawPayloadEl.value.trim() !== "") {
-                     try {
-                        JSON.parse(rawPayloadEl.value);
-                        payloadString = rawPayloadEl.value;
-                     }
-                     catch(e) { curlEl.textContent = "Error: Invalid Raw JSON for cURL generation. " + e.message; return; }
-                } else {
-                     curlEl.textContent = "Error: Raw JSON payload for cURL is empty."; return;
-                }
-            } else {
-                try {
-                    const payloadObject = buildPayloadFromForm(prefix); // Synchronous
-                    payloadString = JSON.stringify(payloadObject, null, 2);
-                } catch (e) {
-                     curlEl.textContent = "Error building payload from form for cURL: " + e.message;
-                     return;
-                }
+        function handleChatCompletionsRequest() {
+            if (typeof chatUI !== 'undefined') {
+                chatUI.sendChatRequest();
             }
-
-            // Escape single quotes in the payload string for the cURL command
-            const escapedPayloadString = payloadString.replace(/'/g, "'\\''");
-
-            const curlCommand = `curl -X POST "${baseUrl}/api/v1/chat/completions" \\
--H "accept: application/json" \\
--H "Content-Type: application/json" \\
--H "Token: ${token.replace(/"/g, '\\"')}" \\
--d '${escapedPayloadString}'`; // Use the escaped string
-            curlEl.textContent = curlCommand;
-        }
-
-        async function handleChatCompletionsRequest() {
-            const endpointId = 'createChatCompletion';
-            const prefix = 'chatCompletions';
-            const responseArea = document.getElementById(endpointId + '_response');
-            if (!responseArea) { console.error("Response area not found!"); return; }
-
-            responseArea.textContent = 'Sending...';
-            generateChatCompletionsCurl();
-
-            let payload;
-            const useRawJsonCheckbox = document.getElementById(prefix + '_useRawJson');
-             if (!useRawJsonCheckbox) { responseArea.textContent = "Error: Raw JSON toggle checkbox not found."; return; }
-
-            const baseUrl = document.getElementById('baseUrl').value;
-            const token = document.getElementById('apiKeyInput').value;
-
-            if (useRawJsonCheckbox.checked) {
-                const rawPayloadEl = document.getElementById(prefix + '_payload_raw');
-                if (!rawPayloadEl) { responseArea.textContent = "Error: Raw JSON textarea not found."; return; }
-                try {
-                    payload = JSON.parse(rawPayloadEl.value);
-                } catch (e) {
-                    responseArea.textContent = "Error: Invalid Raw JSON Payload.\n" + e.message;
-                    return;
-                }
-            } else {
-                 try {
-                    payload = buildPayloadFromForm(prefix); // Synchronous
-                } catch (e) {
-                    responseArea.textContent = "Error building payload from form: " + e.message;
-                    return;
-                }
-            }
-
-            const isStreaming = payload.stream;
-            if (isStreaming) {
-                responseArea.textContent = '';
-            }
-
-            try {
-                const fetchResponse = await fetch(`${baseUrl}/api/v1/chat/completions`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json, text/event-stream',
-                        'Token': token
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!fetchResponse.ok) {
-                    let errorDetail = fetchResponse.statusText;
-                    try {
-                        const errorData = await fetchResponse.json();
-                        errorDetail = errorData.detail || JSON.stringify(errorData);
-                    } catch (e) { /* ignore, use statusText */ }
-                    throw new Error(`HTTP error ${fetchResponse.status}: ${errorDetail}`);
-                }
-
-                const contentType = fetchResponse.headers.get("content-type");
-                if (isStreaming && contentType && contentType.includes("text/event-stream") && fetchResponse.body) {
-                    const reader = fetchResponse.body.getReader();
-                    const decoder = new TextDecoder();
-                    let buffer = "";
-                    let streamHadContent = false;
-
-                    // eslint-disable-next-line no-constant-condition
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) break;
-                        buffer += decoder.decode(value, { stream: true });
-
-                        let eventEndIndex;
-                        while ((eventEndIndex = buffer.indexOf('\n\n')) >= 0) {
-                            const eventString = buffer.substring(0, eventEndIndex);
-                            buffer = buffer.substring(eventEndIndex + 2);
-
-                            if (eventString.startsWith('data: ')) {
-                                streamHadContent = true;
-                                const dataStr = eventString.substring(6).trim();
-                                if (dataStr === '[DONE]') {
-                                    responseArea.textContent += "\nStream finished by [DONE] signal.\n";
-                                    return;
-                                }
-                                try {
-                                    const dataJson = JSON.parse(dataStr);
-                                    const contentChunk = dataJson.choices?.[0]?.delta?.content;
-                                    if (contentChunk) {
-                                        responseArea.textContent += contentChunk;
-                                    } else if (dataJson.choices?.[0]?.finish_reason) {
-                                         responseArea.textContent += `\n[Finish Reason: ${dataJson.choices[0].finish_reason}]\n`;
-                                    } else if (dataJson.error) {
-                                        responseArea.textContent += `\n[Stream Error: ${JSON.stringify(dataJson.error)}]\n`;
-                                    } else if (Object.keys(dataJson).length > 0) {
-                                         responseArea.textContent += `\n(Stream JSON: ${dataStr})\n`;
-                                    }
-                                } catch (e) {
-                                    if (dataStr) {
-                                        console.warn('Non-JSON stream data or parse error:', dataStr, e);
-                                        responseArea.textContent += `\n(Stream data: ${dataStr})\n`;
-                                    }
-                                }
-                            } else if (eventString.trim().startsWith('event: tldw_metadata')) { // Handle custom metadata event
-                                const dataLine = buffer.substring(eventString.length).split('\n').find(line => line.startsWith('data: '));
-                                if (dataLine) {
-                                    const metaDataStr = dataLine.substring(6).trim();
-                                    try {
-                                        const metaDataJson = JSON.parse(metaDataStr);
-                                        responseArea.textContent += `\n[TLDW Metadata: ${JSON.stringify(metaDataJson)}]\n`;
-                                        // Optionally update UI elements with conversation_id, etc.
-                                        if (metaDataJson.conversation_id) {
-                                            const convIdEl = document.getElementById(prefix + '_conversation_id');
-                                            if (convIdEl && !convIdEl.value) { // Only set if not already set by user
-                                                convIdEl.value = metaDataJson.conversation_id;
-                                                if (metaDataJson.conversation_created) {
-                                                    convIdEl.style.backgroundColor = "#e6ffe6"; // Light green for new
-                                                }
-                                            }
-                                        }
-                                    } catch (e) {
-                                        console.warn('Error parsing tldw_metadata JSON:', metaDataStr, e);
-                                        responseArea.textContent += `\n(Raw tldw_metadata: ${metaDataStr})\n`;
-                                    }
-                                }
-                            } else if (eventString.trim()) {
-                                console.log("Received non-data line in stream:", eventString);
-                            }
-                            responseArea.scrollTop = responseArea.scrollHeight;
-                        }
-                    }
-                    if (buffer.trim()) {
-                        if (buffer.startsWith('data: ')) {
-                            const finalDataStr = buffer.substring(6).trim();
-                            if (finalDataStr === '[DONE]') {
-                                responseArea.textContent += "\nStream finished by [DONE] signal (final buffer).\n";
-                            } else {
-                                responseArea.textContent += `\n(Final unprocessed stream data: ${finalDataStr})\n`;
-                            }
-                        } else {
-                             responseArea.textContent += `\n(Final unprocessed stream buffer: ${buffer.trim()})\n`;
-                        }
-                    }
-
-                    if (!responseArea.textContent.includes("[DONE]") && !responseArea.textContent.includes("Stream finished")) {
-                         responseArea.textContent += streamHadContent ? "\nStream ended.\n" : "Stream connected, but no data or [DONE] signal received.\n";
-                    }
-
-                } else {
-                    const responseData = await fetchResponse.json();
-                    responseArea.textContent = JSON.stringify(responseData, null, 2);
-                     // For non-streaming, check for tldw_conversation_id directly in response
-                    if (responseData.tldw_conversation_id) {
-                        const convIdEl = document.getElementById(prefix + '_conversation_id');
-                        if (convIdEl && !convIdEl.value) {
-                            convIdEl.value = responseData.tldw_conversation_id;
-                            if (responseData.tldw_conversation_created) {
-                                convIdEl.style.backgroundColor = "#e6ffe6";
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Error during chat completion:', error);
-                responseArea.textContent = 'Error: ' + error.message;
-            }
-        }
-
-        function initializeChatCompletionsTab() {
-            const prefix = 'chatCompletions';
-            console.log("Initializing Chat Completions Tab");
-            const container = document.getElementById(prefix + '_messagesContainer');
-            if (container) {
-                container.innerHTML = '';
-                messageIdCounter[prefix] = 0;
-
-                addChatMessage(prefix, 'system', 'You are a helpful assistant that provides concise answers.');
-                addChatMessage(prefix, 'user', 'What is the capital of France?');
-            } else {
-                console.warn("Messages container not found during chat completions tab initialization.");
-            }
-
-            const tempEl = document.getElementById(prefix + '_temperature');
-            if (tempEl && tempEl.value === "") tempEl.placeholder = "0.7";
-
-            const maxTokensEl = document.getElementById(prefix + '_max_tokens');
-            if (maxTokensEl && maxTokensEl.value === "") maxTokensEl.placeholder = "1024";
-
-            const topPEl = document.getElementById(prefix + '_top_p');
-            if (topPEl && topPEl.value === "") topPEl.placeholder = "1.0";
-
-            const nEl = document.getElementById(prefix + '_n');
-            if (nEl && nEl.value === "") nEl.placeholder = "1";
-
-
-            const useRawJsonCheckbox = document.getElementById(prefix + '_useRawJson');
-            if (useRawJsonCheckbox) {
-                 if (useRawJsonCheckbox.checked) {
-                    toggleRawJson(prefix);
-                } else {
-                    try {
-                        const initialPayload = buildPayloadFromForm(prefix);
-                        const rawPayloadTextarea = document.getElementById(prefix + '_payload_raw');
-                        if(rawPayloadTextarea) rawPayloadTextarea.value = JSON.stringify(initialPayload, null, 2);
-                    } catch(e) { console.warn("Initial raw payload build failed for chat completions during init:", e.message); }
-                }
-            } else {
-                console.warn("Raw JSON toggle not found during chat completions tab init.");
-            }
-            generateChatCompletionsCurl();
         }
 
         async function makeRequest(endpointId, method, path, bodyType = 'none', queryParams = {}) {
-            const curlEl = document.getElementById(endpointId + '_curl');
+            // This function maintains compatibility with existing endpoint definitions
             const responseArea = document.getElementById(endpointId + '_response');
-            if (!curlEl || !responseArea) {
-                console.error(`Missing cURL or response element for ${endpointId}`);
+            const curlEl = document.getElementById(endpointId + '_curl');
+            
+            if (!responseArea) {
+                console.error(`Response area not found for ${endpointId}`);
                 return;
             }
 
-            responseArea.textContent = 'Sending...';
-            const baseUrl = document.getElementById('baseUrl').value;
-            const token = document.getElementById('apiKeyInput').value;
-            let fullPath = path;
+            try {
+                Loading.show(responseArea.parentElement, 'Sending request...');
+                responseArea.textContent = '';
 
-            const pathParams = path.match(/{(\w+)}/g);
-            if (pathParams) {
-                pathParams.forEach(param => {
-                    const paramName = param.substring(1, param.length - 1);
-                    const inputEl = document.getElementById(endpointId + '_' + paramName);
-                    if (inputEl) {
-                        fullPath = fullPath.replace(param, inputEl.value);
-                    }
-                });
-            }
+                // Build the request based on bodyType
+                let body = null;
+                let query = {};
 
-            let url = `${baseUrl}${fullPath}`;
-            const fetchOptions = {
-                method: method,
-                headers: {
-                    'Accept': 'application/json',
-                    'Token': token
-                }
-            };
-
-            let payloadString = '';
-            let queryParamsString = '';
-
-            if (bodyType === 'query' || bodyType === 'json_with_query') {
-                const queryParts = [];
-                const formGroup = document.getElementById(endpointId);
-                 if (formGroup) {
-                    const inputs = formGroup.querySelectorAll('input[type="text"], input[type="number"], input[type="checkbox"], select');
-                    inputs.forEach(input => {
-                        if (input.id && input.id.startsWith(endpointId + '_')) {
-                            if (path.includes(`{${input.id.split('_').pop()}}`)) return;
-                            if (input.id.includes("_payload")) return;
-
-
-                            const paramName = input.id.substring((endpointId + '_').length);
-                            if (input.type === 'checkbox') {
-                                if (input.checked) queryParts.push(`${encodeURIComponent(paramName)}=true`);
-                            } else if (input.value && input.value.trim() !== '') { // Ensure value is not empty
-                                queryParts.push(`${encodeURIComponent(paramName)}=${encodeURIComponent(input.value)}`);
-                            }
-                        }
-                    });
-                }
-                if (queryParts.length > 0) {
-                    queryParamsString = '?' + queryParts.join('&');
-                    url += queryParamsString;
-                }
-            }
-
-
-            if (method === 'POST' || method === 'PUT') {
                 if (bodyType === 'json' || bodyType === 'json_with_query') {
                     const payloadEl = document.getElementById(endpointId + '_payload');
                     if (payloadEl) {
-                        try {
-                            JSON.parse(payloadEl.value);
-                            fetchOptions.body = payloadEl.value;
-                            payloadString = payloadEl.value;
-                        } catch (e) {
-                            responseArea.textContent = 'Error: Invalid JSON payload. ' + e.message;
-                            curlEl.textContent = 'Invalid JSON in payload field.';
-                            return;
-                        }
-                        fetchOptions.headers['Content-Type'] = 'application/json';
+                        body = JSON.parse(payloadEl.value);
                     }
-                } else if (bodyType === 'form') {
-                    const formData = new FormData();
+                }
+
+                if (bodyType === 'query' || bodyType === 'json_with_query') {
+                    const formGroup = document.getElementById(endpointId);
+                    if (formGroup) {
+                        const inputs = formGroup.querySelectorAll('input[type="text"], input[type="number"], input[type="checkbox"], select');
+                        inputs.forEach(input => {
+                            const paramName = input.id.replace(endpointId + '_', '');
+                            if (input.type === 'checkbox') {
+                                if (input.checked) query[paramName] = true;
+                            } else if (input.value) {
+                                query[paramName] = input.value;
+                            }
+                        });
+                    }
+                }
+
+                if (bodyType === 'form') {
+                    body = new FormData();
                     const formGroup = document.getElementById(endpointId);
                     if (formGroup) {
                         const inputs = formGroup.querySelectorAll('input, textarea, select');
                         inputs.forEach(input => {
-                            if (input.name || (input.id && input.id.startsWith(endpointId + '_'))) {
-                                const key = input.name || input.id.substring((endpointId + '_').length);
-                                if (path.includes(`{${key}}`)) return;
-
-                                if (input.type === 'file') {
-                                    if (input.files.length > 0) {
-                                         Array.from(input.files).forEach(file => formData.append(key, file));
-                                    }
-                                } else if (input.type === 'checkbox') {
-                                    // Send boolean as string for FormData, or just append if checked
-                                    if (input.checked) formData.append(key, 'true');
-                                    else formData.append(key, 'false'); // Explicitly send false
-                                } else if (input.value !== '' || input.tagName === 'TEXTAREA' || input.type === 'select-one') { // Include select-one
-                                     if (input.value !== null && input.value !== undefined) { // Ensure not sending nulls unless intended
-                                        formData.append(key, input.value);
-                                     }
-                                }
+                            const key = input.name || input.id.replace(endpointId + '_', '');
+                            if (input.type === 'file' && input.files.length > 0) {
+                                Array.from(input.files).forEach(file => body.append(key, file));
+                            } else if (input.type === 'checkbox') {
+                                body.append(key, input.checked);
+                            } else if (input.value) {
+                                body.append(key, input.value);
                             }
                         });
                     }
-                    fetchOptions.body = formData;
-                    // Content-Type for FormData is set automatically by fetch, do not set it manually
                 }
-            }
 
-            let curlCommand = `curl -X ${method} "${baseUrl}${fullPath}${queryParamsString}" \\\n-H "Accept: application/json" \\\n-H "Token: ${token}"`;
-            if (fetchOptions.headers['Content-Type']) {
-                curlCommand += ` \\\n-H "Content-Type: ${fetchOptions.headers['Content-Type']}"`;
-            }
-            if ((bodyType === 'json' || bodyType === 'json_with_query') && payloadString) {
-                curlCommand += ` \\\n-d '${escapeCurlData(payloadString)}'`;
-            } else if (bodyType === 'form' && fetchOptions.body instanceof FormData) {
-                for (let [key, value] of fetchOptions.body.entries()) {
-                    if (value instanceof File) {
-                        curlCommand += ` \\\n-F "${key}=@${value.name}"`;
-                    } else {
-                        curlCommand += ` \\\n-F "${key}=${value}"`;
-                    }
+                // Generate and display cURL command
+                const curlCommand = apiClient.generateCurl(method, path, { body, query });
+                if (curlEl) {
+                    curlEl.textContent = curlCommand;
                 }
-            }
-            curlEl.textContent = curlCommand;
 
-            try {
-                const res = await fetch(url, fetchOptions);
-                const data = await res.json();
-                responseArea.textContent = JSON.stringify(data, null, 2);
-                if (!res.ok) {
-                    console.warn(`API request to ${url} failed with status ${res.status}`, data);
+                // Make the request
+                const response = await apiClient.makeRequest(method, path, { body, query });
+
+                // Display response
+                if (typeof response === 'object') {
+                    const viewer = new JSONViewer(responseArea, response, {
+                        expanded: 2,
+                        theme: webUI.theme,
+                        enableCopy: true,
+                        enableCollapse: true
+                    });
+                } else {
+                    responseArea.textContent = response;
                 }
+
+                Toast.success('Request completed successfully');
             } catch (error) {
-                responseArea.textContent = 'Error: ' + error.message;
-                console.error('API request error:', error);
+                console.error('Request error:', error);
+                responseArea.textContent = `Error: ${error.message}`;
+                Toast.error(`Request failed: ${error.message}`);
+            } finally {
+                Loading.hide(responseArea.parentElement);
             }
         }
-
     </script>
 </body>
 </html>

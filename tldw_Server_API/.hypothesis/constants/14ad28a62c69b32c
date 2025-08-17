@@ -1,4 +1,0 @@
-# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/api/v1/endpoints/mcp_endpoint.py
-# hypothesis_version: 6.136.7
-
-[100, 400, 401, 404, 500, 86400, '/auth/clients', '/auth/me', '/auth/token', '/contexts', '/health', '/mcp', '/status', '/tools', '/tools/{tool_name}', '/ws', '0.1.0', 'Client not found', 'Filter tools by tag', 'Invalid credentials', 'MCP', 'allowed_tools', 'api_key', 'bearer', 'client', 'client_id', 'context_id', 'created_at', 'deleted', 'expires_at', 'format', 'healthy', 'id', 'length', 'media_id', 'name', 'permissions', 'rate_limit', 'role', 'running', 'search', 'server_running', 'size', 'status', 'summarization', 'summary', 'text', 'title', 'tldw', 'transcript', 'type', 'updated', 'updated_at', 'url', 'version', 'video']

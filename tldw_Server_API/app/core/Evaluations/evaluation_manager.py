@@ -18,49 +18,104 @@ from pathlib import Path
 import asyncio
 from loguru import logger
 import numpy as np
+from tldw_Server_API.app.core.DB_Management.migrations import migrate_evaluations_database
 
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
-from tldw_Server_API.app.core.config import load_and_log_configs
+from tldw_Server_API.app.core.config import load_comprehensive_config
+import os
 
 
 class EvaluationManager:
     """Manages evaluation operations and persistence"""
     
     def __init__(self):
-        self.config = load_and_log_configs()
+        self.config = load_comprehensive_config()
         self.db_path = self._get_db_path()
         self._init_database()
     
     def _get_db_path(self) -> Path:
         """Get evaluation database path"""
-        # FIXME: Update to use proper config structure once config API is standardized
-        database_config = self.config.get('database', {})
-        if isinstance(database_config, dict):
-            base_path = Path(database_config.get('evaluation_db_path', 'user_databases'))
+        # Use the same path as the OpenAI-compatible evaluations DB
+        if self.config and self.config.has_section("Database"):
+            db_path = self.config.get("Database", "evaluations_db_path", fallback="Databases/evaluations.db")
         else:
-            base_path = Path('user_databases')
-        db_file = base_path / "evaluations.db"
-        db_file.parent.mkdir(parents=True, exist_ok=True)
-        return db_file
+            db_path = "Databases/evaluations.db"
+        
+        # Make absolute if relative
+        if not os.path.isabs(db_path):
+            # Get the project root (4 levels up from this file)
+            project_root = Path(__file__).parent.parent.parent.parent
+            db_path = project_root / db_path
+        else:
+            db_path = Path(db_path)
+        
+        # Ensure directory exists
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return db_path
     
     def _init_database(self):
-        """Initialize evaluation database"""
+        """Initialize evaluation database using migration system"""
+        try:
+            # Apply all pending migrations
+            migrate_evaluations_database(self.db_path)
+            logger.info("Database migrations applied successfully")
+        except Exception as e:
+            # In production, database migration failures should be fatal
+            # This ensures consistency and prevents silent data corruption
+            error_msg = f"CRITICAL: Failed to apply database migrations to {self.db_path}: {e}"
+            logger.critical(error_msg)
+            
+            # Check if we're in a production environment
+            import os
+            env = os.getenv('ENVIRONMENT', 'development').lower()
+            
+            if env in ['production', 'staging']:
+                # Fail loudly in production/staging
+                raise RuntimeError(error_msg) from e
+            else:
+                # In development, log a warning but continue with fallback
+                logger.warning("Running in development mode - using fallback database initialization")
+                self._init_database_fallback()
+    
+    def _init_database_fallback(self):
+        """Fallback database initialization without migrations
+        
+        WARNING: This method should ONLY be used in development environments.
+        Production deployments must use the migration system to ensure
+        database schema consistency.
+        """
         with sqlite3.connect(self.db_path) as conn:
+            # Create basic tables if they don't exist
+            # Use internal_evaluations table to avoid conflict with OpenAI evaluations table
             conn.execute("""
-                CREATE TABLE IF NOT EXISTS evaluations (
+                CREATE TABLE IF NOT EXISTS internal_evaluations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     evaluation_id TEXT UNIQUE NOT NULL,
                     evaluation_type TEXT NOT NULL,
                     created_at TIMESTAMP NOT NULL,
                     input_data TEXT NOT NULL,
                     results TEXT NOT NULL,
-                    metadata TEXT
+                    metadata TEXT,
+                    user_id TEXT,
+                    status TEXT DEFAULT 'completed',
+                    error_message TEXT,
+                    completed_at TIMESTAMP,
+                    embedding_provider TEXT,
+                    embedding_model TEXT
                 )
             """)
             
-            # Create indexes separately in SQLite
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_type ON evaluations(evaluation_type)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON evaluations(created_at)")
+            # Create indexes
+            for index_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_type ON internal_evaluations(evaluation_type)",
+                "CREATE INDEX IF NOT EXISTS idx_created ON internal_evaluations(created_at)",
+                "CREATE INDEX IF NOT EXISTS idx_user_id ON internal_evaluations(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_status ON internal_evaluations(status)"
+            ]:
+                try:
+                    conn.execute(index_sql)
+                except sqlite3.OperationalError:
+                    pass  # Index might already exist
             
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS evaluation_metrics (
@@ -74,9 +129,15 @@ class EvaluationManager:
             """)
             
             # Create indexes for metrics table
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_eval_id ON evaluation_metrics(evaluation_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_metric ON evaluation_metrics(metric_name)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_metric_created ON evaluation_metrics(created_at)")
+            for index_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_eval_id ON evaluation_metrics(evaluation_id)",
+                "CREATE INDEX IF NOT EXISTS idx_metric ON evaluation_metrics(metric_name)",
+                "CREATE INDEX IF NOT EXISTS idx_metric_created ON evaluation_metrics(created_at)"
+            ]:
+                try:
+                    conn.execute(index_sql)
+                except sqlite3.OperationalError:
+                    pass
             
             conn.commit()
     
@@ -96,7 +157,7 @@ class EvaluationManager:
         # Store main evaluation record
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
-                INSERT INTO evaluations (
+                INSERT INTO internal_evaluations (
                     evaluation_id, evaluation_type, created_at,
                     input_data, results, metadata
                 ) VALUES (?, ?, ?, ?, ?, ?)
@@ -133,7 +194,7 @@ class EvaluationManager:
         offset: int = 0
     ) -> Dict[str, Any]:
         """Retrieve evaluation history with filtering"""
-        query = "SELECT * FROM evaluations WHERE 1=1"
+        query = "SELECT * FROM internal_evaluations WHERE 1=1"
         params = []
         
         if evaluation_type and evaluation_type != "all":
@@ -174,7 +235,7 @@ class EvaluationManager:
                 SELECT metric_name, AVG(score) as avg_score
                 FROM evaluation_metrics
                 WHERE evaluation_id IN (
-                    SELECT evaluation_id FROM evaluations WHERE 1=1
+                    SELECT evaluation_id FROM internal_evaluations WHERE 1=1
             """
             
             if evaluation_type and evaluation_type != "all":
@@ -209,7 +270,7 @@ class EvaluationManager:
             # Get evaluations
             placeholders = ",".join("?" * len(evaluation_ids))
             cursor = conn.execute(
-                f"SELECT * FROM evaluations WHERE evaluation_id IN ({placeholders})",
+                f"SELECT * FROM internal_evaluations WHERE evaluation_id IN ({placeholders})",
                 evaluation_ids
             )
             

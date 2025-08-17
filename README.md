@@ -2,7 +2,7 @@
 
 <h1>tldw Server - API-First Media Analysis & Research Platform</h1>
 
-[![License](https://img.shields.io/badge/license-AGPL3.0-green)](https://img.shields.io/badge/license-AGPL3.0-green)
+[![License](https://img.shields.io/badge/license-Apache%202-blue)](https://img.shields.io/badge/license-Apache%202-blue)
 [![madewithlove](https://img.shields.io/badge/made_with-%E2%9D%A4-red?style=for-the-badge&labelColor=orange)](https://github.com/rmusser01/tldw_server) 
 
 <h3>FastAPI-powered backend for media ingestion, analysis, and AI-powered research</h3>
@@ -22,26 +22,37 @@ cd tldw_server
 python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp config.txt.example config.txt  # Configure your API keys
+
+# Configure API providers
+cp config.txt.example config.txt  # Add your LLM API keys
+
+# Setup authentication (choose single or multi-user mode)
+cp .env.authnz.template .env
+# For single-user: Set AUTH_MODE=single_user and generate API key
+# For multi-user: Set AUTH_MODE=multi_user and generate JWT secret
+python -m tldw_Server_API.app.core.AuthNZ.initialize
+
+# Start server
 python -m uvicorn tldw_Server_API.app.main:app --reload
 # API docs: http://127.0.0.1:8000/docs
+# Your API key will be shown in console (single-user mode)
 ```
 
 <details>
 <summary>What is this? - Click-here</summary>
 
 ### What is tldw_server?
-**tldw_server** was originally a versatile tool designed to help you manage and interact with media content (videos, audio, documents, web articles, and books) via:
+**tldw_server** was originally `tldw`, a versatile tool designed to help you manage and interact with media content (videos, audio, documents, web articles, and books) via:
 1. **Ingesting**: Importing media from URLs or local files into an offline database.
 2. **Transcribing**: Automatically generating text transcripts from videos and audio using various whisper models using faster_whisper.
 3. **Analyzing(Not Just Summarizing)**: Using LLMs (local or API-based) to perform analyses of the ingested content.
 4. **Searching**: Full-text search across ingested content, including metadata like titles, authors, and keywords.
 5. **Chatting**: Interacting with ingested content using natural language queries through supported LLMs.
 
-All features are designed to run **locally** on your device, ensuring privacy and data ownership. The tool is open-source and free to use, with the goal of supporting research, learning, and personal knowledge management.
+All features were (are) designed to run **locally** on your device, ensuring privacy and data ownership. The tool was (is) open-source and free to use, with the goal of supporting research, learning, and personal knowledge management.
 
-It has now expanded slightly to  include additional features:
-- TBD
+It has now been rewritten as a FastAPI python Server application, in order to support larger deployments and multiple users. This includes:
+- FIXME
 
 </details>
 
@@ -65,6 +76,10 @@ See the [Migration Guide](#migration-guide) if upgrading from a previous version
 
 ## Core Features
 
+<summary>Core Features</summary>
+
+<details>
+
 ### Media Processing
 - **Multi-format Support**: Video, audio, PDF, EPUB, DOCX, HTML, Markdown, XML, MediaWiki dumps
 - **Transcription**: faster_whisper integration with model selection
@@ -79,11 +94,13 @@ See the [Migration Guide](#migration-guide) if upgrading from a previous version
 - **Flexible Analysis**: Multiple chunking strategies and prompt customization
 - **Evaluation System**: G-Eval, RAG evaluation, response quality metrics
 
-### Search & Retrieval
-- **Hybrid Search**: SQLite FTS5 + ChromaDB vector embeddings
-- **Advanced RAG**: Query expansion, re-ranking, and contextual retrieval
-- **Metadata Search**: By title, author, URL, tags, content
-- **Smart Caching**: Multi-level caching with semantic matching
+### Search & Retrieval (RAG v2)
+- **Production-Ready RAG**: 100% test coverage, fully async architecture
+- **Hybrid Search**: BM25 (SQLite FTS5) + vector embeddings (ChromaDB) with Reciprocal Rank Fusion
+- **Advanced Strategies**: Query Fusion, HyDE (Hypothetical Document Embeddings), vanilla search
+- **Multi-Source Retrieval**: Search across media, notes, characters, and chat history simultaneously
+- **Smart Caching**: LRU cache with semantic matching and TTL management
+- **Flexible Configuration**: Fine-tune semantic/fulltext weights, similarity thresholds, and reranking
 
 ### API Capabilities
 - **OpenAI Compatible**: `/chat/completions` endpoint for drop-in replacement
@@ -103,9 +120,15 @@ See the [Migration Guide](#migration-guide) if upgrading from a previous version
 - **Authentication**: JWT-based auth with RBAC for MCP connections
 - **Evaluation Tools**: Benchmark your configurations and LLM performance
 
+</details>
 ---
 
 ## Architecture
+
+<summary>Architecture</summary>
+<details>
+### Architecture Overview
+![Architecture Overview](https://github.com/rmusser01/tldw_server/blob/main/Docs/Architecture_Overview.png)
 
 tldw_server is built as a modern, scalable API service:
 
@@ -129,10 +152,15 @@ tldw_server/
 ├── Helper_Scripts/          # Utilities
 └── config.txt              # Configuration
 ```
+</details>
 
 ---
 
 ## Installation
+
+<summary>Installation</summary>
+
+<details>
 
 ### Requirements
 - Python 3.9+
@@ -157,6 +185,11 @@ pip install -r requirements.txt
 # Configure
 cp config.txt.example config.txt
 # Edit config.txt with your API keys
+
+# Setup Authentication (First Time Only)
+cp .env.authnz.template .env
+# Edit .env with secure values (see Authentication Setup below)
+python -m tldw_Server_API.app.core.AuthNZ.initialize
 
 # Run server
 python -m uvicorn tldw_Server_API.app.main:app --reload
@@ -192,11 +225,142 @@ sudo dnf install ffmpeg portaudio-devel gcc gcc-c++ python3-devel
 brew install ffmpeg portaudio
 ```
 
+</details>
+
+---
+
+## Authentication Setup
+
+<summary>Authentication Setup</summary>
+
+<details>
+
+The tldw_server uses the AuthNZ module for authentication, supporting both single-user (personal) and multi-user (team) deployments.
+
+### Quick Setup (Single-User Mode)
+
+For personal use, the simplest setup:
+
+```bash
+# 1. Copy the authentication template
+cp .env.authnz.template .env
+
+# 2. Generate a secure API key
+python -c "import secrets; print('SINGLE_USER_API_KEY=' + secrets.token_urlsafe(32))"
+
+# 3. Add the generated key to your .env file
+# Edit .env and replace SINGLE_USER_API_KEY value
+
+# 4. Set AUTH_MODE to single_user in .env
+AUTH_MODE=single_user
+
+# 5. Initialize the authentication system
+python -m tldw_Server_API.app.core.AuthNZ.initialize
+
+# 6. Start the server - your API key will be displayed in the console
+python -m uvicorn tldw_Server_API.app.main:app --reload
+```
+
+When the server starts, you'll see:
+```
+INFO: 🔑 Single-user mode active
+INFO: 📌 API Key: your-generated-api-key-here
+INFO: Use header 'X-API-KEY: your-key' for authentication
+```
+
+Use this API key in all requests:
+```bash
+curl -H "X-API-KEY: your-api-key" http://localhost:8000/api/v1/media/search
+```
+
+### Multi-User Setup (Team/Production)
+
+For team deployments with user management:
+
+```bash
+# 1. Copy and configure authentication
+cp .env.authnz.template .env
+
+# 2. Generate secure keys
+python -c "import secrets; print('JWT_SECRET_KEY=' + secrets.token_urlsafe(32))"
+python -c "from cryptography.fernet import Fernet; print('SESSION_ENCRYPTION_KEY=' + Fernet.generate_key().decode())"
+
+# 3. Edit .env file:
+#    - Set AUTH_MODE=multi_user
+#    - Add generated JWT_SECRET_KEY
+#    - Add generated SESSION_ENCRYPTION_KEY
+#    - Configure database settings
+
+# 4. Initialize and create admin user
+python -m tldw_Server_API.app.core.AuthNZ.initialize
+# You'll be prompted to create an admin user
+
+# 5. Start the server
+python -m uvicorn tldw_Server_API.app.main:app --reload
+```
+
+Login to get JWT token:
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "your-password"}'
+```
+
+Use the token in requests:
+```bash
+curl -H "Authorization: Bearer your-jwt-token" \
+  http://localhost:8000/api/v1/media/search
+```
+
+### Configuration Options
+
+Key settings in `.env`:
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `AUTH_MODE` | `single_user` or `multi_user` | `multi_user` |
+| `JWT_SECRET_KEY` | Secret for JWT signing (multi-user) | Required for multi-user |
+| `SINGLE_USER_API_KEY` | API key for single-user mode | Required for single-user |
+| `ENABLE_REGISTRATION` | Allow new user registration | `false` |
+| `DATABASE_URL` | User database location | `sqlite:///./Databases/users.db` |
+
+### Security Best Practices
+
+1. **Never commit `.env` to version control** - Add to `.gitignore`
+2. **Use strong, unique keys** - Generate with the provided commands
+3. **Enable HTTPS in production** - Required for secure cookies
+4. **Rotate keys periodically** - Use the API key rotation feature
+5. **Monitor authentication failures** - Check logs for attacks
+
+### Troubleshooting
+
+**"JWT_SECRET_KEY not set"**
+- Ensure JWT_SECRET_KEY is set in your .env file for multi-user mode
+
+**"API key not found"**
+- Check that X-API-KEY header is included in requests
+- Verify the API key matches what's in .env (single-user) or displayed at startup
+
+**"Rate limit exceeded"**
+- Default: 60 requests/minute for authenticated users
+- Adjust RATE_LIMIT_PER_MINUTE in .env if needed
+
+### Documentation
+
+- **[AuthNZ Developer Guide](Docs/Development/AuthNZ-Developer-Guide.md)** - Architecture and extending the authentication system
+- **[AuthNZ API Guide](Docs/API-related/AuthNZ-API-Guide.md)** - Complete API reference with examples
+
+</details>
+
 ---
 
 ## API Documentation
 
 Full API documentation is available at `http://localhost:8000/docs` when the server is running.
+
+<summary>API Documentation</summary>
+
+<details>
 
 ### Main Endpoints
 
@@ -210,6 +374,13 @@ Full API documentation is available at `http://localhost:8000/docs` when the ser
 - `POST /api/v1/chat/completions` - Chat completion (OpenAI format)
 - `GET /api/v1/chat/history` - Get chat history
 - `POST /api/v1/chat/characters` - Character chat
+
+#### RAG (Retrieval-Augmented Generation)
+- `POST /api/v1/rag/search` - Simple hybrid search across databases
+- `POST /api/v1/rag/search/advanced` - Advanced search with full configuration
+- `POST /api/v1/rag/agent` - Q&A agent with automatic context retrieval
+- `POST /api/v1/rag/agent/advanced` - Research agent with tools and streaming
+- `GET /api/v1/rag/health` - RAG service health status
 
 #### Content Management
 - `POST /api/v1/notes` - Create note
@@ -252,9 +423,46 @@ curl -X POST "http://localhost:8000/api/v1/chat/completions" \
 curl -X GET "http://localhost:8000/api/v1/media/search?query=machine+learning&limit=10"
 ```
 
+#### RAG Search & Q&A
+```bash
+# Hybrid search across your content
+curl -X POST "http://localhost:8000/api/v1/rag/search" \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key" \
+  -d '{
+    "query": "machine learning concepts",
+    "search_type": "hybrid",
+    "databases": ["media_db", "notes"]
+  }'
+
+# Q&A with automatic context retrieval
+curl -X POST "http://localhost:8000/api/v1/rag/agent" \
+  -H "Content-Type: application/json" \
+  -H "X-API-KEY: your-api-key" \
+  -d '{
+    "message": "Explain neural networks based on my notes",
+    "search_databases": ["media_db", "notes"]
+  }'
+```
+
+</details>
+
+---
+
+## RAG Documentation
+
+The RAG module has comprehensive documentation for both developers and API consumers:
+
+- **[RAG Developer Guide](Docs/Development/RAG-Developer-Guide.md)** - Architecture, components, testing, and extending the RAG module
+- **[RAG API Guide](Docs/API-related/RAG-API-Guide.md)** - Complete API reference with examples in JavaScript, Python, and cURL
+
 ---
 
 ## Configuration
+
+<summary>Configuration </summary>
+
+<details>
 
 ### config.txt
 The main configuration file contains API keys and settings:
@@ -284,9 +492,15 @@ Override config.txt with environment variables:
 - `ANTHROPIC_API_KEY`
 - `DATABASE_PATH`
 
+</details>
+
 ---
 
 ## Migration Guide
+
+<summary> Migration Guide </summary>
+
+<details>
 
 ### From Gradio Version (pre-0.1.0)
 
@@ -313,9 +527,15 @@ Override config.txt with environment variables:
    - Use API directly or wait for chatbook release
    - Build your own frontend using the API
 
+</details>
+
 ---
 
 ## Development
+
+<summary> Development </summary>
+
+<details>
 
 ### Running Tests
 ```bash
@@ -328,6 +548,8 @@ python -m pytest tests/Media_Ingestion_Modification/ -v
 # With coverage
 python -m pytest --cov=tldw_Server_API --cov-report=html
 ```
+</details>
+
 
 ### More Detailed explanation of this project (tldw_project)
 <details>
@@ -466,19 +688,7 @@ See [Project_Guidelines.md](Project_Guidelines.md) for development philosophy an
 
 ## License
 
-This project is dual-licensed:
-
-### GNU Affero General Public License (AGPL)
-If you use this project under the AGPL-3.0, you must:
-- Provide the source code of any modifications
-- Make your service's source code available to users
-
-For full details, see [LICENSE.txt](LICENSE.txt).
-
-### Commercial License
-For proprietary use without AGPL obligations, contact me @ the email in my profile.
-- No obligation to provide source code.
-- Priority supoprt and additional benefits.
+This project is Licensed under an Apache 2.0 License.
 
 ---
 

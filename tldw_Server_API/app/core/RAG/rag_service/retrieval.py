@@ -107,6 +107,20 @@ class MediaDBRetriever(BaseRetriever):
             if not cursor.fetchone():
                 logger.warning("media_fts table not found - it should be created by Media_DB_v2")
     
+    def _escape_fts_query(self, query: str) -> str:
+        """Escape special characters in FTS5 query."""
+        # FTS5 special characters that need escaping
+        special_chars = ['"', '?', '*', '(', ')', 'OR', 'AND', 'NOT']
+        escaped_query = query
+        for char in special_chars:
+            if char in ['OR', 'AND', 'NOT']:
+                # For operators, only escape if they appear as standalone words
+                escaped_query = escaped_query.replace(f' {char} ', f' "{char}" ')
+            else:
+                # For other special chars, wrap in quotes
+                escaped_query = escaped_query.replace(char, f'"{char}"')
+        return escaped_query
+
     async def retrieve(
         self,
         query: str,
@@ -116,6 +130,9 @@ class MediaDBRetriever(BaseRetriever):
         """Retrieve documents from media database using FTS5."""
         try:
             documents = []
+            
+            # Escape special characters in the query for FTS5
+            fts_query = self._escape_fts_query(query)
             
             with self._get_db() as conn:
                 # Build the query with filters using parameterized queries
@@ -134,7 +151,7 @@ class MediaDBRetriever(BaseRetriever):
                         AND m.deleted = 0
                         AND m.is_trash = 0
                 """
-                params = [query]
+                params = [fts_query]
                 
                 # Add filters with proper parameterization
                 if filters:

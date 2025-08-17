@@ -1,0 +1,191 @@
+<!-- Notes List Tab -->
+<div id="tabNotesList" class="tab-content">
+    <div class="endpoint-section" id="notesList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/notes - List Notes</span>
+        </h2>
+        <p>List all notes for current user with pagination.</p>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="notesList_limit">Limit:</label>
+                    <input type="number" id="notesList_limit" value="20" min="1" max="100">
+                </div>
+            </div>
+            <div class="column">
+                <div class="form-group">
+                    <label for="notesList_offset">Offset:</label>
+                    <input type="number" id="notesList_offset" value="0" min="0">
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('notesList', 'GET', '/api/v1/notes', 'query')">
+            List Notes
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="notesList_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="notesList_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="notesSearch">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/notes/search - Search Notes</span>
+        </h2>
+        <p>Search notes for current user.</p>
+        
+        <div class="form-group">
+            <label for="notesSearch_query">Search Query:</label>
+            <input type="text" id="notesSearch_query" placeholder="Enter search terms...">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('notesSearch', 'GET', '/api/v1/notes/search', 'query')">
+            Search Notes
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="notesSearch_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="notesSearch_response">---</pre>
+    </div>
+</div>
+
+<!-- Notes Manage Tab -->
+<div id="tabNotesManage" class="tab-content">
+    <div class="endpoint-section" id="notesCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/notes - Create Note</span>
+        </h2>
+        <p>Create a new note.</p>
+        
+        <div class="form-group">
+            <label for="notesCreate_title">Title <span class="required">*</span>:</label>
+            <input type="text" id="notesCreate_title" placeholder="Note Title">
+        </div>
+        
+        <div class="form-group">
+            <label for="notesCreate_content">Content <span class="required">*</span>:</label>
+            <textarea id="notesCreate_content" rows="8" placeholder="Note content..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="notesCreate_keywords">Keywords (comma-separated):</label>
+            <input type="text" id="notesCreate_keywords" placeholder="tag1, tag2, tag3">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('notesCreate', 'POST', '/api/v1/notes', 'json')">
+            Create Note
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="notesCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="notesCreate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="notesUpdate">
+        <h2>
+            <span class="endpoint-method put">PUT</span>
+            <span class="endpoint-path">/api/v1/notes/{note_id} - Update Note</span>
+        </h2>
+        <p>Update an existing note with optimistic locking.</p>
+        
+        <div class="form-group">
+            <label for="notesUpdate_id">Note ID <span class="required">*</span>:</label>
+            <input type="number" id="notesUpdate_id" placeholder="1">
+        </div>
+        
+        <div class="form-group">
+            <label for="notesUpdate_payload">Update Payload (JSON):</label>
+            <textarea id="notesUpdate_payload" class="code-input" rows="10">{
+  "title": "Updated Title",
+  "content": "Updated content",
+  "keywords": ["new", "keywords"],
+  "version": 1
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('notesUpdate', 'PUT', '/api/v1/notes/{id}', 'json')">
+            Update Note
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="notesUpdate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="notesUpdate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="notesDelete">
+        <h2>
+            <span class="endpoint-method delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/notes/{note_id} - Delete Note</span>
+        </h2>
+        <p>Soft-delete a note with optimistic locking.</p>
+        
+        <div class="form-group">
+            <label for="notesDelete_id">Note ID <span class="required">*</span>:</label>
+            <input type="number" id="notesDelete_id" placeholder="1">
+        </div>
+        
+        <div class="form-group">
+            <label for="notesDelete_version">Version (for optimistic locking):</label>
+            <input type="number" id="notesDelete_version" placeholder="1">
+        </div>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Delete this note?')) makeRequest('notesDelete', 'DELETE', '/api/v1/notes/{id}', 'query')">
+            Delete Note
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="notesDelete_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="notesDelete_response">---</pre>
+    </div>
+</div>
+
+<!-- Notes Keywords Tab -->
+<div id="tabNotesKeywords" class="tab-content">
+    <div class="endpoint-section" id="notesKeywords">
+        <h2>Notes Keywords Management</h2>
+        
+        <div class="form-group">
+            <h3>Create Keyword</h3>
+            <label for="notesKeyword_text">Keyword Text <span class="required">*</span>:</label>
+            <input type="text" id="notesKeyword_text" placeholder="Enter keyword">
+            <button class="api-button" onclick="makeRequest('notesKeywordCreate', 'POST', '/api/v1/notes/keywords', 'json')">
+                Create Keyword
+            </button>
+        </div>
+        
+        <div class="form-group mt-3">
+            <h3>Link Note to Keyword</h3>
+            <div class="columns">
+                <div class="column">
+                    <label for="notesLink_noteId">Note ID:</label>
+                    <input type="number" id="notesLink_noteId" placeholder="1">
+                </div>
+                <div class="column">
+                    <label for="notesLink_keywordId">Keyword ID:</label>
+                    <input type="number" id="notesLink_keywordId" placeholder="1">
+                </div>
+            </div>
+            <button class="api-button" onclick="makeRequest('notesLink', 'POST', '/api/v1/notes/{noteId}/keywords/{keywordId}', 'none')">
+                Link Note to Keyword
+            </button>
+        </div>
+        
+        <h3>Response:</h3>
+        <pre id="notesKeywords_response">---</pre>
+    </div>
+</div>

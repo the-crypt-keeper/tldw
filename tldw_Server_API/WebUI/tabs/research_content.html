@@ -1,0 +1,107 @@
+<!-- arXiv Search Tab -->
+<div id="tabResearchArxiv" class="tab-content">
+    <div class="endpoint-section" id="arxivSearch">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/research/arxiv-search - Search arXiv Papers</span>
+        </h2>
+        <p>Search arXiv papers with pagination and filtering.</p>
+        
+        <div class="form-group">
+            <label for="arxivSearch_query">Search Query <span class="required">*</span>:</label>
+            <input type="text" id="arxivSearch_query" placeholder="machine learning transformer architecture" value="transformer architecture">
+        </div>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="arxivSearch_max_results">Max Results:</label>
+                    <input type="number" id="arxivSearch_max_results" value="10" min="1" max="100">
+                </div>
+                
+                <div class="form-group">
+                    <label for="arxivSearch_sort_by">Sort By:</label>
+                    <select id="arxivSearch_sort_by">
+                        <option value="relevance">Relevance</option>
+                        <option value="lastUpdatedDate">Last Updated</option>
+                        <option value="submittedDate">Submitted Date</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="form-group">
+                    <label for="arxivSearch_category">Category Filter:</label>
+                    <input type="text" id="arxivSearch_category" placeholder="cs.AI, cs.LG (optional)">
+                </div>
+                
+                <div class="form-group">
+                    <label for="arxivSearch_start">Start Index:</label>
+                    <input type="number" id="arxivSearch_start" value="0" min="0">
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('arxivSearch', 'GET', '/api/v1/research/arxiv-search', 'query')">
+            Search arXiv
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="arxivSearch_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="arxivSearch_response">---</pre>
+    </div>
+</div>
+
+<!-- Semantic Scholar Tab -->
+<div id="tabResearchSemantic" class="tab-content">
+    <div class="endpoint-section" id="semanticSearch">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/research/semantic-scholar-search - Search Semantic Scholar</span>
+        </h2>
+        <p>Search Semantic Scholar database for papers.</p>
+        
+        <div class="form-group">
+            <label for="semanticSearch_query">Search Query <span class="required">*</span>:</label>
+            <input type="text" id="semanticSearch_query" placeholder="deep learning NLP" value="deep learning natural language processing">
+        </div>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="semanticSearch_limit">Limit:</label>
+                    <input type="number" id="semanticSearch_limit" value="10" min="1" max="100">
+                </div>
+                
+                <div class="form-group">
+                    <label for="semanticSearch_year">Year Filter:</label>
+                    <input type="text" id="semanticSearch_year" placeholder="2023 or 2020-2023">
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="form-group">
+                    <label for="semanticSearch_fields">Fields to Return:</label>
+                    <input type="text" id="semanticSearch_fields" placeholder="title,abstract,authors,year" value="title,abstract,authors,year,citationCount">
+                </div>
+                
+                <div class="form-group">
+                    <label for="semanticSearch_offset">Offset:</label>
+                    <input type="number" id="semanticSearch_offset" value="0" min="0">
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('semanticSearch', 'GET', '/api/v1/research/semantic-scholar-search', 'query')">
+            Search Semantic Scholar
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="semanticSearch_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="semanticSearch_response">---</pre>
+    </div>
+</div>

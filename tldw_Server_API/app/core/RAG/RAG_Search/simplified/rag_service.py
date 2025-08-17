@@ -46,8 +46,21 @@ def run_async(coro):
         # No event loop is running, so we can use asyncio.run() directly
         return asyncio.run(coro)
 from .data_models import IndexingResult
-from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
-from tldw_Server_API.app.core.Utils.path_validation import validate_path
+from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, timeit
+
+# Define log_gauge as log_counter if not available (for compatibility)
+def log_gauge(metric_name, value, labels=None):
+    """Compatibility wrapper for gauge metrics - uses counter as fallback"""
+    log_counter(metric_name, labels=labels, value=value)
+# Path validation - simple implementation since path_validation module doesn't exist
+def validate_path(path_str: str) -> Path:
+    """Validate and return a Path object"""
+    from pathlib import Path
+    path = Path(path_str)
+    # Basic validation
+    if not path.exists():
+        raise ValueError(f"Path does not exist: {path}")
+    return path
 from tldw_Server_API.app.core.config import load_settings
 
 
@@ -190,7 +203,7 @@ class RAGService:
     
     # === Indexing Methods ===
     
-    @timeit("rag_indexing_document")
+    @timeit
     async def index_document(self, 
                            doc_id: str, 
                            content: str,
@@ -477,7 +490,7 @@ class RAGService:
     
     # === Search Methods ===
     
-    @timeit("rag_search_operation")
+    @timeit
     async def search(self,
                     query: str,
                     top_k: Optional[int] = None,
@@ -835,7 +848,7 @@ class RAGService:
             logger.warning(f"Error getting embedding dimension: {e}, defaulting to {DEFAULT_EMBEDDING_DIM}")
             return DEFAULT_EMBEDDING_DIM
     
-    @timeit("rag_chunking_operation")
+    @timeit
     async def _chunk_document(self, 
                             content: str,
                             chunk_size: int,

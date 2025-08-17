@@ -10,8 +10,10 @@ Supports multiple evaluation types:
 """
 
 from typing import Dict, List, Optional, Any, Literal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from datetime import datetime
+import re
+import html
 
 
 class EvaluationMetric(BaseModel):
@@ -25,8 +27,18 @@ class EvaluationMetric(BaseModel):
 
 class GEvalRequest(BaseModel):
     """Request for G-Eval summarization evaluation"""
-    source_text: str = Field(..., description="Original source text")
-    summary: str = Field(..., description="Summary to evaluate")
+    source_text: str = Field(
+        ..., 
+        description="Original source text",
+        min_length=10,
+        max_length=100000  # ~100KB limit
+    )
+    summary: str = Field(
+        ..., 
+        description="Summary to evaluate",
+        min_length=10,
+        max_length=50000  # ~50KB limit
+    )
     metrics: Optional[List[Literal["fluency", "consistency", "relevance", "coherence"]]] = Field(
         default=["fluency", "consistency", "relevance", "coherence"],
         description="Metrics to evaluate"
@@ -34,6 +46,42 @@ class GEvalRequest(BaseModel):
     api_name: Optional[str] = Field("openai", description="LLM API to use for evaluation")
     api_key: Optional[str] = Field(None, description="API key (if not in config)")
     save_results: bool = Field(False, description="Save results to file")
+    
+    @field_validator('source_text', 'summary')
+    @classmethod
+    def sanitize_text(cls, v: str) -> str:
+        """Sanitize input text to prevent injection attacks"""
+        if not v:
+            raise ValueError("Text cannot be empty")
+        
+        # Remove any potential script tags or HTML
+        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
+        v = re.sub(r'<[^>]+>', '', v)  # Remove all HTML tags
+        
+        # Escape HTML entities
+        v = html.escape(v)
+        
+        # Remove null bytes and other control characters
+        v = v.replace('\x00', '').replace('\r', '\n')
+        v = ''.join(char for char in v if ord(char) >= 32 or char == '\n' or char == '\t')
+        
+        # Trim excessive whitespace
+        v = re.sub(r'\n{3,}', '\n\n', v)  # Max 2 consecutive newlines
+        v = re.sub(r' {2,}', ' ', v)  # Max 1 space
+        
+        return v.strip()
+    
+    @field_validator('api_name')
+    @classmethod
+    def validate_api_name(cls, v: str) -> str:
+        """Validate API name against allowed providers"""
+        allowed_providers = [
+            "openai", "anthropic", "google", "cohere", "mistral", 
+            "groq", "openrouter", "deepseek", "local-llm"
+        ]
+        if v and v.lower() not in allowed_providers:
+            raise ValueError(f"API provider '{v}' not supported. Must be one of: {', '.join(allowed_providers)}")
+        return v.lower() if v else "openai"
 
 
 class GEvalResponse(BaseModel):
@@ -47,15 +95,74 @@ class GEvalResponse(BaseModel):
 
 class RAGEvaluationRequest(BaseModel):
     """Request for RAG system evaluation"""
-    query: str = Field(..., description="User query")
-    retrieved_contexts: List[str] = Field(..., description="Retrieved context chunks")
-    generated_response: str = Field(..., description="Generated response")
-    ground_truth: Optional[str] = Field(None, description="Ground truth answer if available")
+    query: str = Field(
+        ...,
+        description="User query",
+        min_length=3,
+        max_length=5000
+    )
+    retrieved_contexts: List[str] = Field(
+        ...,
+        description="Retrieved context chunks",
+        min_items=1,
+        max_items=20  # Limit number of contexts
+    )
+    generated_response: str = Field(
+        ...,
+        description="Generated response",
+        min_length=1,
+        max_length=50000
+    )
+    ground_truth: Optional[str] = Field(
+        None,
+        description="Ground truth answer if available",
+        max_length=50000
+    )
     metrics: Optional[List[Literal["relevance", "faithfulness", "answer_similarity", "context_precision", "context_recall"]]] = Field(
         default=["relevance", "faithfulness", "answer_similarity"],
         description="Metrics to evaluate"
     )
     api_name: Optional[str] = Field("openai", description="LLM API to use for evaluation")
+    
+    @field_validator('query', 'generated_response', 'ground_truth')
+    @classmethod
+    def sanitize_text(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize input text"""
+        if v is None:
+            return None
+            
+        # Remove potential injection attempts
+        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
+        v = re.sub(r'<[^>]+>', '', v)
+        v = html.escape(v)
+        v = v.replace('\x00', '')
+        
+        return v.strip()
+    
+    @field_validator('retrieved_contexts')
+    @classmethod
+    def validate_contexts(cls, v: List[str]) -> List[str]:
+        """Validate and sanitize context chunks"""
+        if not v:
+            raise ValueError("At least one context is required")
+        
+        sanitized = []
+        for context in v:
+            if len(context) > 20000:  # 20KB per context limit
+                raise ValueError(f"Context too large: {len(context)} characters (max 20000)")
+            
+            # Sanitize each context
+            context = re.sub(r'<[^>]+>', '', context)
+            context = html.escape(context)
+            context = context.replace('\x00', '').strip()
+            
+            if context:  # Only add non-empty contexts
+                sanitized.append(context)
+        
+        if not sanitized:
+            raise ValueError("No valid contexts after sanitization")
+            
+        return sanitized
 
 
 class RAGEvaluationResponse(BaseModel):
@@ -70,14 +177,61 @@ class RAGEvaluationResponse(BaseModel):
 
 class ResponseQualityRequest(BaseModel):
     """Request for response quality evaluation"""
-    prompt: str = Field(..., description="Original prompt")
-    response: str = Field(..., description="Generated response")
-    expected_format: Optional[str] = Field(None, description="Expected response format")
+    prompt: str = Field(
+        ...,
+        description="Original prompt",
+        min_length=1,
+        max_length=10000
+    )
+    response: str = Field(
+        ...,
+        description="Generated response",
+        min_length=1,
+        max_length=50000
+    )
+    expected_format: Optional[str] = Field(
+        None,
+        description="Expected response format",
+        max_length=1000
+    )
     evaluation_criteria: Optional[Dict[str, str]] = Field(
         default_factory=dict,
         description="Custom evaluation criteria"
     )
     api_name: Optional[str] = Field("openai", description="LLM API to use for evaluation")
+    
+    @field_validator('prompt', 'response', 'expected_format')
+    @classmethod
+    def sanitize_text(cls, v: Optional[str]) -> Optional[str]:
+        """Sanitize input text"""
+        if v is None:
+            return None
+            
+        # Basic sanitization
+        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
+        v = re.sub(r'<[^>]+>', '', v)
+        v = html.escape(v)
+        v = v.replace('\x00', '').strip()
+        
+        return v
+    
+    @field_validator('evaluation_criteria')
+    @classmethod
+    def validate_criteria(cls, v: Dict[str, str]) -> Dict[str, str]:
+        """Validate evaluation criteria"""
+        if len(v) > 20:
+            raise ValueError("Too many evaluation criteria (max 20)")
+            
+        sanitized = {}
+        for key, value in v.items():
+            # Sanitize both keys and values
+            key = re.sub(r'[^a-zA-Z0-9_-]', '', key)[:50]  # Limit key length
+            value = html.escape(str(value))[:500]  # Limit value length
+            
+            if key and value:
+                sanitized[key] = value
+                
+        return sanitized
 
 
 class ResponseQualityResponse(BaseModel):
@@ -92,10 +246,31 @@ class ResponseQualityResponse(BaseModel):
 class BatchEvaluationRequest(BaseModel):
     """Request for batch evaluation"""
     evaluation_type: Literal["geval", "rag", "response_quality"] = Field(..., description="Type of evaluation")
-    items: List[Dict[str, Any]] = Field(..., description="Items to evaluate")
+    items: List[Dict[str, Any]] = Field(
+        ...,
+        description="Items to evaluate",
+        min_items=1,
+        max_items=100  # Limit batch size
+    )
     metrics: Optional[List[str]] = Field(None, description="Metrics to compute")
     api_name: Optional[str] = Field("openai", description="LLM API to use")
     parallel_workers: int = Field(4, ge=1, le=16, description="Number of parallel workers")
+    
+    @model_validator(mode='after')
+    def validate_batch_size(self) -> 'BatchEvaluationRequest':
+        """Validate total batch size doesn't exceed limits"""
+        # Calculate approximate total size
+        total_size = 0
+        for item in self.items:
+            # Estimate size of each item
+            item_str = str(item)
+            total_size += len(item_str)
+            
+        # 10MB total limit for batch
+        if total_size > 10 * 1024 * 1024:
+            raise ValueError(f"Batch too large: ~{total_size / (1024*1024):.1f}MB (max 10MB)")
+            
+        return self
 
 
 class BatchEvaluationResponse(BaseModel):

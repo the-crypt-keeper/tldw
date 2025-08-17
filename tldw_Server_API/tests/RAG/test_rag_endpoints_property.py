@@ -14,7 +14,7 @@ import hypothesis
 from hypothesis import given, strategies as st, assume, settings, note
 from hypothesis.stateful import RuleBasedStateMachine, rule, initialize, invariant
 
-from tldw_Server_API.app.api.v1.schemas.rag_schemas import (
+from tldw_Server_API.app.api.v1.schemas.rag_schemas_simple import (
     SearchApiRequest,
     SearchModeEnum,
     RetrievalAgentRequest,
@@ -160,18 +160,18 @@ class TestSearchEndpointProperties:
     def test_search_request_validation(self, query, mode, limit, offset):
         """Test that valid search requests are properly constructed."""
         request = SearchApiRequest(
-            querystring=query,
-            search_mode=mode,
-            limit=limit,
+            query=query,
+            mode=mode,
+            top_k=limit,
             offset=offset
         )
         
         # Properties that should always hold
-        assert request.querystring == query
-        assert request.search_mode == mode
-        assert request.limit == limit
+        assert request.query == query
+        assert request.mode == mode
+        assert request.top_k == limit
         assert request.offset == offset
-        assert request.limit > 0
+        assert request.top_k > 0
         assert request.offset >= 0
     
     @given(
@@ -187,8 +187,8 @@ class TestSearchEndpointProperties:
         start_date, end_date = dates
         
         request = SearchApiRequest(
-            querystring=query,
-            search_mode=SearchModeEnum.ADVANCED,
+            query=query,
+            mode=SearchModeEnum.ADVANCED,
             filters=filters,
             date_range_start=start_date.isoformat() if start_date else None,
             date_range_end=end_date.isoformat() if end_date else None,
@@ -206,10 +206,10 @@ class TestSearchEndpointProperties:
             # In practice, hybrid search would use both methods
         
         # Search mode consistency
-        if request.search_mode == SearchModeEnum.BASIC:
+        if request.mode == SearchModeEnum.BASIC:
             # Basic mode might ignore advanced settings
             pass
-        elif request.search_mode == SearchModeEnum.ADVANCED:
+        elif request.mode == SearchModeEnum.ADVANCED:
             # Advanced mode should respect all settings
             assert request.filters is not None or request.date_range_start is not None or use_semantic or use_hybrid
     
@@ -278,7 +278,7 @@ class TestAgentEndpointProperties:
             mode=AgentModeEnum.RAG,
             rag_generation_config=GenerationConfig(
                 temperature=temperature,
-                max_tokens_to_sample=max_tokens
+                max_tokens=max_tokens
             )
         )
         
@@ -296,7 +296,7 @@ class TestAgentEndpointProperties:
         
         # Generation config properties
         assert 0.0 <= request.rag_generation_config.temperature <= 2.0
-        assert request.rag_generation_config.max_tokens_to_sample > 0
+        assert request.rag_generation_config.max_tokens > 0
     
     @given(
         api_provider=st.sampled_from(["openai", "anthropic", "cohere", "local"]),

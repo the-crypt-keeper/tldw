@@ -26,7 +26,12 @@ import time
 import psutil
 
 from .citations import Citation, CitationType, SearchResultWithCitations
-from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
+from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, timeit
+
+# Define log_gauge as log_counter if not available (for compatibility)
+def log_gauge(metric_name, value, labels=None):
+    """Compatibility wrapper for gauge metrics - uses counter as fallback"""
+    log_counter(metric_name, labels=labels, value=value)
 
 
 # Import constants from rag_service
@@ -203,7 +208,7 @@ class ChromaVectorStore:
             logger.info(f"Using collection: {self.collection_name}")
         return self._collection
     
-    @timeit("vector_store_add_documents")
+    @timeit
     def add(self, 
             ids: List[str], 
             embeddings: Union[np.ndarray, List[List[float]]], 
@@ -315,7 +320,7 @@ class ChromaVectorStore:
             logger.error(f"Failed to add to ChromaDB: {e}", exc_info=True)
             raise
     
-    @timeit("vector_store_search")
+    @timeit
     def search(self, 
                query_embedding: Union[np.ndarray, List[float]], 
                top_k: int = 10) -> List[SearchResult]:
@@ -488,7 +493,7 @@ class ChromaVectorStore:
         except Exception as e:
             logger.error(f"Failed to clear collection: {e}")
     
-    @timeit("vector_store_get_stats")
+    @timeit
     def get_collection_stats(self) -> dict:
         """Get collection statistics."""
         try:

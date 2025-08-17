@@ -32,6 +32,9 @@ from tldw_Server_API.app.api.v1.schemas.openai_eval_schemas import (
 from tldw_Server_API.app.core.DB_Management.Evaluations_DB import EvaluationsDatabase
 from tldw_Server_API.app.core.Evaluations.eval_runner import EvaluationRunner
 from tldw_Server_API.app.core.config import load_comprehensive_config
+from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+from tldw_Server_API.app.core.AuthNZ.jwt_service import JWTService
+from tldw_Server_API.app.core.AuthNZ.exceptions import InvalidTokenError, TokenExpiredError
 
 # Create router
 router = APIRouter(tags=["Evaluations"])
@@ -39,13 +42,30 @@ router = APIRouter(tags=["Evaluations"])
 # Security
 security = HTTPBearer(auto_error=False)
 
-# Rate limiting
-limiter = Limiter(key_func=get_remote_address)
+# Rate limiting configuration from settings
+settings = get_settings()
 
-# Rate limit decorators for different operations
-create_limit = limiter.limit("10/minute")  # Create operations
-read_limit = limiter.limit("100/minute")   # Read operations
-run_limit = limiter.limit("5/minute")      # Run operations (resource intensive)
+# Configure rate limiter with user-specific or IP-based keys
+def get_rate_limit_key(request: Request) -> str:
+    """Get rate limit key based on authentication mode."""
+    # Try to get authenticated user from request state
+    if hasattr(request.state, "user_id"):
+        return f"user_{request.state.user_id}"
+    # Fall back to IP address
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=get_rate_limit_key)
+
+# Rate limit decorators based on configuration
+# Use settings if available, otherwise use sensible defaults
+rate_limit_per_minute = getattr(settings, 'RATE_LIMIT_PER_MINUTE', 60)
+burst_limit = getattr(settings, 'RATE_LIMIT_BURST', 10)
+
+# Different limits for different operation types
+create_limit = limiter.limit(f"{rate_limit_per_minute}/minute")  # Create operations
+read_limit = limiter.limit(f"{rate_limit_per_minute * 2}/minute")  # Read operations (allow more)
+run_limit = limiter.limit(f"{max(10, rate_limit_per_minute // 2)}/minute")  # Run operations (more restrictive)
+burst_limit_decorator = limiter.limit(f"{burst_limit}/second")  # Burst protection
 
 # Initialize database and runner
 # Get database path from config or use default
@@ -68,55 +88,100 @@ eval_runner = EvaluationRunner(db_path)
 # ============= Authentication =============
 
 async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)) -> str:
-    """Verify API key in OpenAI format"""
-    # Default API key for testing/development
-    DEFAULT_API_KEY = "default-secret-key-for-single-user"
+    """
+    Verify API key or JWT token based on authentication mode.
+    
+    Supports:
+    - Single-user mode: API key from environment or config
+    - Multi-user mode: JWT tokens
+    - OpenAI compatibility: sk- prefixed keys
+    """
+    settings = get_settings()
+    
+    # In single-user mode with no credentials, use default auth
+    if not credentials and settings.AUTH_MODE == "single_user":
+        # Use the configured API key as the authenticated user
+        return os.getenv("API_BEARER") or os.getenv("SINGLE_USER_API_KEY") or "default-user"
     
     if not credentials:
-        # Check if we're in development mode with default key
-        api_bearer = os.getenv("API_BEARER", DEFAULT_API_KEY)
-        if api_bearer == DEFAULT_API_KEY:
-            logger.warning("No credentials provided, using default API key for development")
-            return DEFAULT_API_KEY
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {
-                "message": "Missing API key",
+                "message": "Missing API key or token",
                 "type": "authentication_error",
-                "code": "missing_api_key"
+                "code": "missing_credentials"
             }}
         )
     
     token = credentials.credentials
     
-    # Accept both Bearer tokens and sk- prefixed keys for OpenAI compatibility
+    # Remove Bearer prefix if present
     if token.startswith("Bearer "):
-        token = token[7:]  # Remove "Bearer " prefix
+        token = token[7:]
     
-    # Check against configured API key or default
-    expected_token = os.getenv("API_BEARER", DEFAULT_API_KEY)
+    # Handle based on authentication mode
+    if settings.AUTH_MODE == "single_user":
+        # Single-user mode: Check against configured API key
+        expected_token = os.getenv("API_BEARER") or os.getenv("SINGLE_USER_API_KEY") or settings.SINGLE_USER_API_KEY
+        
+        if not expected_token:
+            logger.error("No API key configured for single-user mode")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": {
+                    "message": "Server authentication not configured",
+                    "type": "configuration_error",
+                    "code": "auth_not_configured"
+                }}
+            )
+        
+        # Check token matches expected
+        if token == expected_token:
+            return token
+        
+        # For OpenAI compatibility, accept sk- prefixed keys that match
+        if token.startswith("sk-") and token == expected_token:
+            return token
+        
+        # Also accept sk- keys in general for OpenAI compatibility in single-user mode
+        if token.startswith("sk-"):
+            return token
+            
+    elif settings.AUTH_MODE == "multi_user":
+        # Multi-user mode: Verify JWT token
+        try:
+            jwt_service = JWTService(settings)
+            payload = jwt_service.decode_access_token(token)
+            # Return user ID as the authenticated identifier
+            return f"user_{payload['sub']}"
+        except TokenExpiredError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": {
+                    "message": "Token has expired",
+                    "type": "authentication_error",
+                    "code": "token_expired"
+                }}
+            )
+        except InvalidTokenError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": {
+                    "message": str(e),
+                    "type": "authentication_error",
+                    "code": "invalid_token"
+                }}
+            )
     
-    # In development, accept the default key
-    if token == DEFAULT_API_KEY or token == expected_token:
-        return token
-    
-    # For OpenAI compatibility, also accept sk- prefixed keys
-    if token.startswith("sk-") and len(token) > 3:
-        # In production, validate against stored keys
-        # For now, accept any sk- key in development
-        logger.info(f"Accepted OpenAI-style key: sk-{'*' * 8}")
-        return token
-    
+    # If we get here, authentication failed
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail={"error": {
-            "message": "Invalid API key",
+            "message": "Invalid API key or token",
             "type": "authentication_error",
-            "code": "invalid_api_key"
+            "code": "invalid_credentials"
         }}
     )
-    
-    return token
 
 
 # ============= Error Handling =============
@@ -288,6 +353,11 @@ async def update_evaluation(
                 error_type="invalid_request_error"
             )
         
+        # Handle metadata - if it's a dict from EvaluationMetadata model, extract it
+        if "metadata" in updates and isinstance(updates["metadata"], dict):
+            # Already a dict, use as-is
+            pass
+        
         success = eval_db.update_evaluation(eval_id, updates)
         if not success:
             raise create_error_response(
@@ -311,7 +381,7 @@ async def update_evaluation(
         )
 
 
-@router.delete("/v1/evals/{eval_id}")
+@router.delete("/v1/evals/{eval_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_evaluation(
     eval_id: str,
     api_key: str = Depends(verify_api_key)
@@ -327,7 +397,8 @@ async def delete_evaluation(
                 status_code=status.HTTP_404_NOT_FOUND
             )
         
-        return {"deleted": True, "id": eval_id}
+        # Return nothing for 204 No Content
+        return
         
     except HTTPException:
         raise
@@ -344,6 +415,7 @@ async def delete_evaluation(
 
 @router.post("/v1/evals/{eval_id}/runs", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED)
 @run_limit
+@burst_limit_decorator
 async def create_run(
     eval_id: str,
     run_request: CreateRunRequest,
@@ -577,25 +649,28 @@ async def cancel_run(
 ):
     """Cancel a running evaluation"""
     try:
-        success = eval_runner.cancel_run(run_id)
-        if not success:
-            # Check if run exists
-            run = eval_db.get_run(run_id)
-            if not run:
-                raise create_error_response(
-                    message=f"Run {run_id} not found",
-                    error_type="not_found_error",
-                    param="run_id",
-                    status_code=status.HTTP_404_NOT_FOUND
-                )
-            else:
-                raise create_error_response(
-                    message=f"Run {run_id} is not currently running (status: {run['status']})",
-                    error_type="invalid_request_error",
-                    param="run_id"
-                )
+        # Check if run exists
+        run = eval_db.get_run(run_id)
+        if not run:
+            raise create_error_response(
+                message=f"Run {run_id} not found",
+                error_type="not_found_error",
+                param="run_id",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
         
-        return {"cancelled": True, "id": run_id}
+        # If already completed or cancelled, return success
+        if run['status'] in ['completed', 'failed', 'cancelled']:
+            return {"status": run['status'], "id": run_id}
+        
+        # Try to cancel the run
+        success = eval_runner.cancel_run(run_id)
+        if success:
+            return {"status": "cancelled", "id": run_id}
+        else:
+            # If not in running tasks, update status directly
+            eval_db.update_run_status(run_id, "cancelled")
+            return {"status": "cancelled", "id": run_id}
         
     except HTTPException:
         raise
@@ -694,7 +769,7 @@ async def stream_run_progress(
 
 # ============= Dataset Endpoints =============
 
-@router.post("/v1/datasets", response_model=DatasetResponse)
+@router.post("/v1/datasets", response_model=DatasetResponse, status_code=status.HTTP_201_CREATED)
 async def create_dataset(
     dataset_request: CreateDatasetRequest,
     api_key: str = Depends(verify_api_key)
@@ -786,7 +861,7 @@ async def get_dataset(
         )
 
 
-@router.delete("/v1/datasets/{dataset_id}")
+@router.delete("/v1/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_dataset(
     dataset_id: str,
     api_key: str = Depends(verify_api_key)
@@ -802,7 +877,8 @@ async def delete_dataset(
                 status_code=status.HTTP_404_NOT_FOUND
             )
         
-        return {"deleted": True, "id": dataset_id}
+        # Return nothing for 204 No Content
+        return
         
     except HTTPException:
         raise

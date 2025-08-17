@@ -16,7 +16,12 @@ from loguru import logger
 import sys
 import asyncio
 
-from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, log_gauge, timeit
+from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram, timeit
+
+# Define log_gauge as log_counter if not available (for compatibility)
+def log_gauge(metric_name, value, labels=None):
+    """Compatibility wrapper for gauge metrics - uses counter as fallback"""
+    log_counter(metric_name, labels=labels, value=value)
 
 
 
@@ -633,7 +638,7 @@ class SimpleRAGCache:
         
         return len(expired_keys)
     
-    @timeit("cache_prune_expired")
+    @timeit
     def prune_expired(self) -> int:
         """
         Remove expired entries.

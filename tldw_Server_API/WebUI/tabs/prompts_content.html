@@ -1,0 +1,258 @@
+<!-- Prompts List Tab -->
+<div id="tabPromptsList" class="tab-content">
+    <div class="endpoint-section" id="promptsList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/prompts - List All Prompts</span>
+        </h2>
+        <p>List all prompts with pagination support.</p>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="promptsList_limit">Limit:</label>
+                    <input type="number" id="promptsList_limit" value="20" min="1" max="100">
+                </div>
+            </div>
+            <div class="column">
+                <div class="form-group">
+                    <label for="promptsList_offset">Offset:</label>
+                    <input type="number" id="promptsList_offset" value="0" min="0">
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptsList', 'GET', '/api/v1/prompts', 'query')">
+            List Prompts
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptsList_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptsList_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptsSearch">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompts/search - Search Prompts</span>
+        </h2>
+        <p>Search prompts with filtering and pagination.</p>
+        
+        <div class="form-group">
+            <label for="promptsSearch_payload">Search Request (JSON):</label>
+            <textarea id="promptsSearch_payload" class="code-input" rows="10">{
+  "query": "summarization",
+  "filters": {
+    "keywords": ["summary", "tldr"],
+    "tags": ["analysis"]
+  },
+  "limit": 20,
+  "offset": 0,
+  "sort_by": "relevance",
+  "sort_order": "desc"
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptsSearch', 'POST', '/api/v1/prompts/search', 'json')">
+            Search Prompts
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptsSearch_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptsSearch_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptsExport">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/prompts/export - Export Prompts</span>
+        </h2>
+        <p>Export prompts to CSV or Markdown format (returns base64 content).</p>
+        
+        <div class="form-group">
+            <label for="promptsExport_format">Export Format:</label>
+            <select id="promptsExport_format">
+                <option value="csv">CSV</option>
+                <option value="markdown">Markdown</option>
+            </select>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptsExport', 'GET', '/api/v1/prompts/export', 'query')">
+            Export Prompts
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptsExport_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptsExport_response">---</pre>
+    </div>
+</div>
+
+<!-- Prompts Manage Tab -->
+<div id="tabPromptsManage" class="tab-content">
+    <div class="endpoint-section" id="promptsCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompts - Create Prompt</span>
+        </h2>
+        <p>Create a new prompt.</p>
+        
+        <div class="form-group">
+            <label for="promptsCreate_name">Name <span class="required">*</span>:</label>
+            <input type="text" id="promptsCreate_name" placeholder="My Custom Prompt">
+        </div>
+        
+        <div class="form-group">
+            <label for="promptsCreate_content">Content <span class="required">*</span>:</label>
+            <textarea id="promptsCreate_content" rows="5" placeholder="You are a helpful assistant that...">You are a helpful assistant that provides clear and concise summaries of technical documentation.</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="promptsCreate_description">Description:</label>
+            <textarea id="promptsCreate_description" rows="3" placeholder="Describe what this prompt does...">This prompt helps create summaries of technical content.</textarea>
+        </div>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="promptsCreate_author">Author:</label>
+                    <input type="text" id="promptsCreate_author" placeholder="Your name">
+                </div>
+            </div>
+            <div class="column">
+                <div class="form-group">
+                    <label for="promptsCreate_keywords">Keywords (comma-separated):</label>
+                    <input type="text" id="promptsCreate_keywords" placeholder="summary, technical, documentation">
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptsCreate', 'POST', '/api/v1/prompts', 'json')">
+            Create Prompt
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptsCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptsCreate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptsGet">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/prompts/{prompt_identifier} - Get Prompt</span>
+        </h2>
+        <p>Get a specific prompt by ID, UUID, or Name.</p>
+        
+        <div class="form-group">
+            <label for="promptsGet_identifier">Prompt Identifier (ID/UUID/Name) <span class="required">*</span>:</label>
+            <input type="text" id="promptsGet_identifier" placeholder="1 or uuid or prompt-name">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptsGet', 'GET', '/api/v1/prompts/{identifier}', 'none')">
+            Get Prompt
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptsGet_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptsGet_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptsUpdate">
+        <h2>
+            <span class="endpoint-method put">PUT</span>
+            <span class="endpoint-path">/api/v1/prompts/{prompt_identifier} - Update Prompt</span>
+        </h2>
+        <p>Update an existing prompt.</p>
+        
+        <div class="form-group">
+            <label for="promptsUpdate_identifier">Prompt Identifier <span class="required">*</span>:</label>
+            <input type="text" id="promptsUpdate_identifier" placeholder="1 or uuid or prompt-name">
+        </div>
+        
+        <div class="form-group">
+            <label for="promptsUpdate_payload">Update Payload (JSON):</label>
+            <textarea id="promptsUpdate_payload" class="code-input" rows="12">{
+  "name": "Updated Prompt Name",
+  "content": "You are an improved assistant that...",
+  "description": "Updated description",
+  "author": "Your Name",
+  "keywords": ["updated", "keywords"],
+  "version": 1
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptsUpdate', 'PUT', '/api/v1/prompts/{identifier}', 'json')">
+            Update Prompt
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptsUpdate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptsUpdate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptsDelete">
+        <h2>
+            <span class="endpoint-method delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/prompts/{prompt_identifier} - Delete Prompt</span>
+        </h2>
+        <p>Soft delete a prompt.</p>
+        
+        <div class="form-group">
+            <label for="promptsDelete_identifier">Prompt Identifier <span class="required">*</span>:</label>
+            <input type="text" id="promptsDelete_identifier" placeholder="1 or uuid or prompt-name">
+        </div>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Are you sure you want to delete this prompt?')) makeRequest('promptsDelete', 'DELETE', '/api/v1/prompts/{identifier}', 'none')">
+            Delete Prompt
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptsDelete_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptsDelete_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptsKeywords">
+        <h2>Keywords Management</h2>
+        
+        <div class="form-group">
+            <h3>Add Keyword</h3>
+            <label for="promptsKeyword_text">Keyword Text <span class="required">*</span>:</label>
+            <input type="text" id="promptsKeyword_text" placeholder="Enter keyword">
+            <button class="api-button" onclick="makeRequest('promptsKeywordAdd', 'POST', '/api/v1/prompts/keywords', 'json')">
+                Add Keyword
+            </button>
+        </div>
+        
+        <div class="form-group mt-3">
+            <h3>List Keywords</h3>
+            <button class="api-button" onclick="makeRequest('promptsKeywordsList', 'GET', '/api/v1/prompts/keywords', 'none')">
+                List All Keywords
+            </button>
+        </div>
+        
+        <div class="form-group mt-3">
+            <h3>Delete Keyword</h3>
+            <label for="promptsKeyword_delete">Keyword to Delete:</label>
+            <input type="text" id="promptsKeyword_delete" placeholder="keyword-text">
+            <button class="api-button btn-danger" onclick="if(confirm('Delete this keyword?')) makeRequest('promptsKeywordDelete', 'DELETE', '/api/v1/prompts/keywords/{text}', 'none')">
+                Delete Keyword
+            </button>
+        </div>
+        
+        <h3>Response:</h3>
+        <pre id="promptsKeywords_response">---</pre>
+    </div>
+</div>

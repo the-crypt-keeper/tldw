@@ -188,6 +188,16 @@ class EvaluationsDatabase:
         if not updates:
             return False
         
+        # Handle metadata merging
+        if "metadata" in updates:
+            # Get existing evaluation to merge metadata
+            existing = self.get_evaluation(eval_id)
+            if existing and existing.get("metadata"):
+                # Merge existing metadata with updates
+                merged_metadata = existing["metadata"].copy()
+                merged_metadata.update(updates["metadata"])
+                updates["metadata"] = merged_metadata
+        
         # JSON serialize complex fields
         if "eval_spec" in updates:
             updates["eval_spec"] = json.dumps(updates["eval_spec"])

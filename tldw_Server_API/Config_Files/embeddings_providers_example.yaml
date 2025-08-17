@@ -1,0 +1,174 @@
+# embeddings_providers_example.yaml
+# Example configuration for multi-provider embeddings support
+
+# Default provider configuration
+default:
+  provider: openai
+  model: text-embedding-3-small
+  
+# Provider-specific configurations
+providers:
+  openai:
+    enabled: true
+    api_key: ${OPENAI_API_KEY}  # Set via environment variable
+    models:
+      - text-embedding-ada-002
+      - text-embedding-3-small
+      - text-embedding-3-large
+    features:
+      dimensions_support: true
+      max_dimensions: 3072
+      token_input: true
+      
+  cohere:
+    enabled: true
+    api_key: ${COHERE_API_KEY}
+    models:
+      - embed-english-v3.0
+      - embed-multilingual-v3.0
+      - embed-english-light-v3.0
+      - embed-multilingual-light-v3.0
+    features:
+      dimensions_support: true
+      max_dimensions: 1024
+      
+  voyage:
+    enabled: false  # Enable when API key is available
+    api_key: ${VOYAGE_API_KEY}
+    models:
+      - voyage-2
+      - voyage-large-2
+      - voyage-code-2
+      - voyage-lite-02-instruct
+    features:
+      dimensions_support: false
+      
+  google:
+    enabled: false
+    api_key: ${GOOGLE_API_KEY}
+    project_id: ${GOOGLE_PROJECT_ID}
+    models:
+      - text-embedding-004
+      - textembedding-gecko@003
+      - textembedding-gecko-multilingual@001
+    features:
+      dimensions_support: false
+      
+  mistral:
+    enabled: false
+    api_key: ${MISTRAL_API_KEY}
+    models:
+      - mistral-embed
+    features:
+      dimensions_support: false
+      
+  huggingface:
+    enabled: true
+    # No API key needed for public models
+    models:
+      - sentence-transformers/all-MiniLM-L6-v2
+      - sentence-transformers/all-mpnet-base-v2
+      - BAAI/bge-large-en-v1.5
+      - intfloat/e5-large-v2
+      - jinaai/jina-embeddings-v2-base-en
+    cache_dir: ./embedding_models_data/huggingface_cache
+    features:
+      dimensions_support: false
+      local_execution: true
+      
+  onnx:
+    enabled: true
+    models:
+      - sentence-transformers/all-MiniLM-L6-v2
+      - BAAI/bge-base-en-v1.5
+    storage_dir: ./embedding_models_data/onnx_models
+    providers:
+      - CPUExecutionProvider
+      # - CUDAExecutionProvider  # Uncomment if CUDA is available
+    features:
+      dimensions_support: false
+      local_execution: true
+      optimized: true
+      
+  local_api:
+    enabled: false
+    # Configure for your local embedding server
+    api_url: http://localhost:11434/api/embeddings  # Example: Ollama
+    api_key: null  # Optional, depending on your setup
+    models:
+      - nomic-embed-text
+      - mxbai-embed-large
+      - all-minilm
+    features:
+      dimensions_support: false
+      local_execution: true
+
+# Rate limiting configuration
+rate_limiting:
+  requests_per_minute: 60
+  requests_per_hour: 1000
+  max_batch_size: 100
+  
+# Caching configuration
+caching:
+  enabled: true
+  max_entries: 10000
+  ttl_seconds: 3600
+  cache_dir: ./embedding_cache
+  
+# Performance tuning
+performance:
+  thread_pool_workers: 8
+  batch_size: 100
+  timeout_seconds: 30
+  max_retries: 3
+  retry_delay_seconds: 1
+  
+# Model loading configuration
+model_loading:
+  preload_models: false  # Set to true to preload models at startup
+  unload_timeout_seconds: 300  # Unload models after 5 minutes of inactivity
+  max_loaded_models: 3  # Maximum number of models to keep in memory
+  
+# Monitoring and logging
+monitoring:
+  log_level: INFO
+  log_requests: true
+  log_cache_hits: true
+  metrics_enabled: false  # Enable Prometheus metrics
+  metrics_port: 9090
+  
+# Security
+security:
+  require_authentication: true
+  allow_custom_api_keys: true  # Allow users to provide their own API keys
+  encrypt_api_keys: false  # Encrypt API keys in storage
+  allowed_providers:  # Leave empty to allow all
+    - openai
+    - huggingface
+    - onnx
+    - cohere
+    
+# Fallback configuration
+fallback:
+  enabled: true
+  primary_provider: openai
+  fallback_providers:
+    - huggingface
+    - onnx
+  on_error: use_fallback  # Options: use_fallback, return_error
+  
+# Provider-specific optimizations
+optimizations:
+  openai:
+    batch_size: 100
+    auto_retry: true
+    
+  huggingface:
+    use_gpu: false  # Set to true if GPU is available
+    batch_size: 32
+    max_sequence_length: 512
+    
+  onnx:
+    use_quantized: false  # Use quantized models for faster inference
+    num_threads: 4

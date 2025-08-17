@@ -14,9 +14,14 @@ soundfile
 #
 # API-Server
 aiofiles
+asyncpg
+aiosqlite
+apscheduler
 cachetools
 defusedxml
+email-validator
 fastapi
+hypothesis
 loguru
 lxml
 numpy
@@ -25,10 +30,14 @@ passlib
 psutil
 pydantic
 pydantic_core
+pydantic[email]
 pytest
 python-dotenv
+python-jose
 python_magic
 python-multipart
+prometheus-client
+pynvml
 PyYAML
 redis
 scikit_learn
@@ -36,6 +45,7 @@ scipy
 slowapi
 starlette
 toml
+tomli
 tqdm
 # API-Server AuthN/AuthZ/Security
 keyring
@@ -84,6 +94,7 @@ arxiv
 chromadb
 #
 #Web-Related
+argon2-cffi
 beautifulsoup4
 html2text
 httpx

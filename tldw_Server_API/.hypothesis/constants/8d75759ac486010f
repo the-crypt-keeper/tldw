@@ -1,4 +1,0 @@
-# file: /Users/appledev/Working/tldw_server/tldw_Server_API/app/main.py
-# hypothesis_version: 6.136.7
-
-['*', '/', '/favicon.ico', '/health', '/static', '0.0.1', 'DEBUG', 'MCP', 'audio', 'character, persona', 'chat', 'chunking', 'embedding', 'evaluations', 'favicon.ico', 'healthy', 'image/x-icon', 'media', 'message', 'notes', 'prompts', 'research', 'retrieval_agent', 'static', 'status', 'sync', 'tldw API', 'tools', 'uvicorn', 'uvicorn.access', 'uvicorn.error']

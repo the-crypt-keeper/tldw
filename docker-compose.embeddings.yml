@@ -1,0 +1,223 @@
+# docker-compose.embeddings.yml
+# Docker Compose configuration for the embeddings job infrastructure
+# This extends the main application with Redis and worker services
+
+version: '3.8'
+
+services:
+  # Redis for job queues and caching
+  redis:
+    image: redis:7-alpine
+    container_name: tldw-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tldw-network
+
+  # Redis Commander for monitoring (optional, development only)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: tldw-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - tldw-network
+    profiles:
+      - debug
+
+  # Chunking Worker Pool
+  chunking-workers:
+    build:
+      context: .
+      dockerfile: Helper_Scripts/Dockerfiles/Dockerfile.worker
+    container_name: tldw-chunking-workers
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - WORKER_TYPE=chunking
+      - NUM_WORKERS=2
+      - QUEUE_NAME=embeddings:chunking
+      - CONSUMER_GROUP=chunking-group
+      - LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./tldw_Server_API:/app
+      - ./Config_Files:/app/Config_Files
+      - ./Databases:/app/Databases
+    command: python -m tldw_Server_API.app.core.Embeddings.start_workers --type chunking
+    restart: unless-stopped
+    networks:
+      - tldw-network
+
+  # Embedding Worker Pool
+  embedding-workers:
+    build:
+      context: .
+      dockerfile: Helper_Scripts/Dockerfiles/Dockerfile.worker
+    container_name: tldw-embedding-workers
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - WORKER_TYPE=embedding
+      - NUM_WORKERS=2
+      - QUEUE_NAME=embeddings:embedding
+      - CONSUMER_GROUP=embedding-group
+      - LOG_LEVEL=INFO
+      - CUDA_VISIBLE_DEVICES=0  # For GPU support
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./tldw_Server_API:/app
+      - ./Config_Files:/app/Config_Files
+      - ./Databases:/app/Databases
+      - ./Models:/app/Models  # For model caching
+    command: python -m tldw_Server_API.app.core.Embeddings.start_workers --type embedding
+    restart: unless-stopped
+    networks:
+      - tldw-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Storage Worker Pool
+  storage-workers:
+    build:
+      context: .
+      dockerfile: Helper_Scripts/Dockerfiles/Dockerfile.worker
+    container_name: tldw-storage-workers
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - WORKER_TYPE=storage
+      - NUM_WORKERS=2
+      - QUEUE_NAME=embeddings:storage
+      - CONSUMER_GROUP=storage-group
+      - LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./tldw_Server_API:/app
+      - ./Config_Files:/app/Config_Files
+      - ./Databases:/app/Databases
+    command: python -m tldw_Server_API.app.core.Embeddings.start_workers --type storage
+    restart: unless-stopped
+    networks:
+      - tldw-network
+
+  # Worker Orchestrator
+  worker-orchestrator:
+    build:
+      context: .
+      dockerfile: Helper_Scripts/Dockerfiles/Dockerfile.worker
+    container_name: tldw-worker-orchestrator
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - CONFIG_FILE=/app/Config_Files/embeddings_config.yaml
+      - PROMETHEUS_PORT=9090
+      - LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./tldw_Server_API:/app
+      - ./Config_Files:/app/Config_Files
+      - ./Databases:/app/Databases
+    command: python -m tldw_Server_API.app.core.Embeddings.worker_orchestrator
+    restart: unless-stopped
+    ports:
+      - "9090:9090"  # Prometheus metrics
+    networks:
+      - tldw-network
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: tldw-prometheus
+    volumes:
+      - ./Config_Files/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9091:9090"
+    networks:
+      - tldw-network
+    profiles:
+      - monitoring
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tldw-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=redis-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./Config_Files/grafana:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - tldw-network
+    profiles:
+      - monitoring
+
+volumes:
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  tldw-network:
+    driver: bridge
+
+# Usage:
+# 
+# Start basic infrastructure (Redis + Workers):
+#   docker-compose -f docker-compose.embeddings.yml up -d
+#
+# Start with monitoring (includes Prometheus and Grafana):
+#   docker-compose -f docker-compose.embeddings.yml --profile monitoring up -d
+#
+# Start with debugging tools (includes Redis Commander):
+#   docker-compose -f docker-compose.embeddings.yml --profile debug up -d
+#
+# Scale workers:
+#   docker-compose -f docker-compose.embeddings.yml up -d --scale chunking-workers=3
+#
+# View logs:
+#   docker-compose -f docker-compose.embeddings.yml logs -f chunking-workers
+#
+# Stop all services:
+#   docker-compose -f docker-compose.embeddings.yml down
+#
+# Clean up (including volumes):
+#   docker-compose -f docker-compose.embeddings.yml down -v

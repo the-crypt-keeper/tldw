@@ -1,0 +1,192 @@
+<!-- OpenAI Format Evaluations Tab -->
+<div id="tabEvalsOpenAI" class="tab-content">
+    <div class="endpoint-section" id="evalsCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/evals - Create Evaluation</span>
+        </h2>
+        <p>Create a new evaluation (OpenAI format).</p>
+        
+        <div class="form-group">
+            <label for="evalsCreate_payload">Evaluation Configuration (JSON):</label>
+            <textarea id="evalsCreate_payload" class="code-input" rows="15">{
+  "name": "Math Problem Solving Eval",
+  "description": "Evaluate math problem solving capabilities",
+  "dataset_id": "dataset_123",
+  "config": {
+    "model": "gpt-4o-mini",
+    "temperature": 0.1,
+    "max_tokens": 1000,
+    "metrics": ["accuracy", "reasoning_quality"],
+    "eval_type": "classification"
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('evalsCreate', 'POST', '/api/v1/evals', 'json')">
+            Create Evaluation
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="evalsCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="evalsCreate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="evalsRun">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/evals/{eval_id}/runs - Start Evaluation Run</span>
+        </h2>
+        <p>Start a new evaluation run.</p>
+        
+        <div class="form-group">
+            <label for="evalsRun_id">Evaluation ID <span class="required">*</span>:</label>
+            <input type="text" id="evalsRun_id" placeholder="eval_123">
+        </div>
+        
+        <div class="form-group">
+            <label for="evalsRun_config">Run Configuration (JSON):</label>
+            <textarea id="evalsRun_config" class="code-input" rows="8">{
+  "batch_size": 10,
+  "parallel_workers": 4,
+  "timeout": 300,
+  "retry_failed": true
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('evalsRun', 'POST', '/api/v1/evals/{id}/runs', 'json')">
+            Start Run
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="evalsRun_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="evalsRun_response">---</pre>
+    </div>
+</div>
+
+<!-- G-Eval Tab -->
+<div id="tabEvalsGEval" class="tab-content">
+    <div class="endpoint-section" id="geval">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/evals/geval - G-Eval Evaluation</span>
+        </h2>
+        <p>Perform G-Eval evaluation on generated text.</p>
+        
+        <div class="form-group">
+            <label for="geval_payload">G-Eval Request (JSON):</label>
+            <textarea id="geval_payload" class="code-input" rows="15">{
+  "reference": "The capital of France is Paris. It is known for the Eiffel Tower.",
+  "candidate": "Paris is the capital city of France, famous for its Eiffel Tower landmark.",
+  "criteria": ["coherence", "consistency", "fluency", "relevance"],
+  "model": "gpt-4o-mini",
+  "temperature": 0.3
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('geval', 'POST', '/api/v1/evals/geval', 'json')">
+            Run G-Eval
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="geval_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="geval_response">---</pre>
+    </div>
+</div>
+
+<!-- RAG Evaluation Tab -->
+<div id="tabEvalsRAG" class="tab-content">
+    <div class="endpoint-section" id="ragEval">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/evals/rag - RAG Evaluation</span>
+        </h2>
+        <p>Evaluate RAG system performance.</p>
+        
+        <div class="form-group">
+            <label for="ragEval_payload">RAG Evaluation Request (JSON):</label>
+            <textarea id="ragEval_payload" class="code-input" rows="18">{
+  "query": "What are the main features of the system?",
+  "retrieved_contexts": [
+    "The system features include user authentication, data processing, and reporting.",
+    "Advanced analytics and real-time monitoring are key capabilities."
+  ],
+  "generated_answer": "The main features include authentication, data processing, reporting, analytics, and monitoring.",
+  "ground_truth": "The system offers authentication, processing, reporting, analytics, and real-time monitoring.",
+  "metrics": ["context_relevance", "answer_faithfulness", "answer_relevance"],
+  "model": "gpt-4o-mini"
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('ragEval', 'POST', '/api/v1/evals/rag', 'json')">
+            Run RAG Evaluation
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="ragEval_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="ragEval_response">---</pre>
+    </div>
+</div>
+
+<!-- Datasets Tab -->
+<div id="tabEvalsDatasets" class="tab-content">
+    <div class="endpoint-section" id="datasetsCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/datasets - Create Dataset</span>
+        </h2>
+        <p>Create a new evaluation dataset.</p>
+        
+        <div class="form-group">
+            <label for="datasetsCreate_payload">Dataset Configuration (JSON):</label>
+            <textarea id="datasetsCreate_payload" class="code-input" rows="12">{
+  "name": "QA Benchmark Dataset",
+  "description": "Question-answering benchmark for testing",
+  "type": "qa_pairs",
+  "data": [
+    {
+      "question": "What is the capital of France?",
+      "answer": "Paris",
+      "metadata": {"difficulty": "easy"}
+    }
+  ]
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('datasetsCreate', 'POST', '/api/v1/datasets', 'json')">
+            Create Dataset
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="datasetsCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="datasetsCreate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="datasetsList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/datasets - List Datasets</span>
+        </h2>
+        <p>List all evaluation datasets.</p>
+        
+        <button class="api-button" onclick="makeRequest('datasetsList', 'GET', '/api/v1/datasets', 'none')">
+            List Datasets
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="datasetsList_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="datasetsList_response">---</pre>
+    </div>
+</div>

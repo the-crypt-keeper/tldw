@@ -16,6 +16,9 @@ from starlette.staticfiles import StaticFiles
 #
 # Local Imports
 #
+# Auth Endpoint (NEW)
+from tldw_Server_API.app.api.v1.endpoints.auth import router as auth_router
+#
 # Audio Endpoint
 from tldw_Server_API.app.api.v1.endpoints.audio import router as audio_router
 #
@@ -28,8 +31,8 @@ from tldw_Server_API.app.api.v1.endpoints.characters_endpoint import router as c
 # Chunking Endpoint
 from tldw_Server_API.app.api.v1.endpoints.chunking import chunking_router as chunking_router
 #
-# Embedding Endpoint
-from tldw_Server_API.app.api.v1.endpoints.embeddings import router as embeddings_router
+# Embedding Endpoint (v5 enhanced version with circuit breaker)
+from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import router as embeddings_router
 #
 # Media Endpoint
 from tldw_Server_API.app.api.v1.endpoints.media import router as media_router
@@ -40,8 +43,10 @@ from tldw_Server_API.app.api.v1.endpoints.notes import router as notes_router
 # Prompt Management Endpoint
 from tldw_Server_API.app.api.v1.endpoints.prompts import router as prompt_router
 #
-# RAG Endpoint
-from tldw_Server_API.app.api.v1.endpoints.rag import router as retrieval_agent_router
+# RAG Endpoint (New simplified version)
+from tldw_Server_API.app.api.v1.endpoints.rag_v2 import router as rag_router
+# Legacy RAG Endpoint (To be removed)
+# from tldw_Server_API.app.api.v1.endpoints.rag import router as retrieval_agent_router
 #
 # Research Endpoint
 from tldw_Server_API.app.api.v1.endpoints.research import router as research_router
@@ -57,6 +62,9 @@ from tldw_Server_API.app.api.v1.endpoints.sync import router as sync_router
 #
 # Tools Endpoint
 from tldw_Server_API.app.api.v1.endpoints.tools import router as tools_router
+#
+# Users Endpoint (NEW)
+from tldw_Server_API.app.api.v1.endpoints.users import router as users_router
 ## Trash Endpoint
 #from tldw_Server_API.app.api.v1.endpoints.trash import router as trash_router
 #
@@ -117,11 +125,6 @@ logger.info("Loguru logger configured with SPECIFIC standard logging interceptio
 
 BASE_DIR     = Path(__file__).resolve().parent
 FAVICON_PATH = BASE_DIR / "static" / "favicon.ico"
-app = FastAPI(
-    title="tldw API",
-    version="0.0.1",
-    description="Version 0.0.1: Smooth Slide | FastAPI Backend for the tldw project"
-)
 
 ############################# TEST DB Handling #####################################
 # --- TEST DB Instance ---
@@ -129,18 +132,60 @@ test_db_instance_ref = None # Global or context variable to hold the test DB ins
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup code can go here
+    # Startup: Initialize auth services
+    logger.info("App Startup: Initializing authentication services...")
+    try:
+        # Initialize database pool for auth
+        from tldw_Server_API.app.core.AuthNZ.database import get_db_pool
+        db_pool = await get_db_pool()
+        logger.info("App Startup: Database pool initialized")
+        
+        # Initialize session manager
+        from tldw_Server_API.app.core.AuthNZ.session_manager import get_session_manager
+        session_manager = await get_session_manager()
+        logger.info("App Startup: Session manager initialized")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize auth services: {e}")
+        # Continue startup even if auth services fail (for backward compatibility)
+    
     yield
-    # Shutdown code
+    
+    # Shutdown: Clean up resources
+    logger.info("App Shutdown: Cleaning up resources...")
+    
+    # Close auth database pool
+    try:
+        if 'db_pool' in locals():
+            await db_pool.close()
+            logger.info("App Shutdown: Auth database pool closed")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error closing auth database pool: {e}")
+    
+    # Shutdown session manager
+    try:
+        if 'session_manager' in locals():
+            await session_manager.shutdown()
+            logger.info("App Shutdown: Session manager shutdown")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error shutting down session manager: {e}")
+    
+    # Original test DB cleanup
     global test_db_instance_ref
     if test_db_instance_ref and hasattr(test_db_instance_ref, 'close_all_connections'):
-        logger.info("App Shutdown: Closing DB connections")
+        logger.info("App Shutdown: Closing test DB connections")
         test_db_instance_ref.close_all_connections()
     else:
         logger.info("App Shutdown: No test DB instance found to close")
 #
 ############################# End of Test DB Handling###################
 
+# Create FastAPI app with lifespan
+app = FastAPI(
+    title="tldw API",
+    version="0.0.1",
+    description="Version 0.0.1: Smooth Slide | FastAPI Backend for the tldw project",
+    lifespan=lifespan
+)
 
 # --- FIX: Add CORS Middleware ---
 # Import from config
@@ -159,6 +204,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add CSRF Protection Middleware (NEW)
+from tldw_Server_API.app.core.AuthNZ.csrf_protection import add_csrf_protection
+add_csrf_protection(app)
+
 # Static files serving
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
@@ -170,6 +219,20 @@ async def favicon():
 @app.get("/")
 async def root():
     return {"message": "Welcome to the tldw API; If you're seeing this, the server is running!"}
+
+# Router for health monitoring endpoints (NEW)
+from tldw_Server_API.app.api.v1.endpoints.health import router as health_router
+app.include_router(health_router, prefix=f"{API_V1_PREFIX}", tags=["health"])
+
+# Router for authentication endpoints (NEW)
+app.include_router(auth_router, prefix=f"{API_V1_PREFIX}", tags=["authentication"])
+
+# Router for user management endpoints (NEW)
+app.include_router(users_router, prefix=f"{API_V1_PREFIX}", tags=["users"])
+
+# Router for admin endpoints (NEW)
+from tldw_Server_API.app.api.v1.endpoints.admin import router as admin_router
+app.include_router(admin_router, prefix=f"{API_V1_PREFIX}", tags=["admin"])
 
 # Router for media endpoints/media file handling
 app.include_router(media_router, prefix=f"{API_V1_PREFIX}/media", tags=["media"])
@@ -190,8 +253,8 @@ app.include_router(character_router, prefix=f"{API_V1_PREFIX}/characters", tags=
 app.include_router(chunking_router, prefix=f"{API_V1_PREFIX}/chunking", tags=["chunking"])
 
 
-# Router for Embedding Endpoint
-app.include_router(embeddings_router, prefix=f"{API_V1_PREFIX}/embedding", tags=["embedding"])
+# Router for Embedding Endpoint (OpenAI-compatible path)
+app.include_router(embeddings_router, prefix=f"{API_V1_PREFIX}", tags=["embeddings"])
 
 
 # Router for Note Management endpoints
@@ -202,18 +265,19 @@ app.include_router(notes_router, prefix=f"{API_V1_PREFIX}/notes", tags=["notes"]
 app.include_router(prompt_router, prefix=f"{API_V1_PREFIX}/prompts", tags=["prompts"])
 
 
-# Router for RAG endpoint
-app.include_router(retrieval_agent_router, prefix=f"{API_V1_PREFIX}/retrieval_agent", tags=["retrieval_agent"])
+# Router for RAG endpoint (New simplified version)
+app.include_router(rag_router, prefix=f"{API_V1_PREFIX}/rag", tags=["RAG"])
 
 
 # Router for Research endpoint
 app.include_router(research_router, prefix=f"{API_V1_PREFIX}/research", tags=["research"])
 
 
-# Router for Evaluation endpoint (OLD - will be removed)
-# app.include_router(evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
+# Router for Evaluation endpoint
+app.include_router(evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
 
 # Router for OpenAI-compatible Evaluation endpoint (NEW)
+# Routes already have /v1 prefix in their definitions
 app.include_router(openai_evals_router, tags=["evaluations"])
 
 
@@ -240,6 +304,23 @@ app.include_router(mcp_router, prefix=f"{API_V1_PREFIX}", tags=["MCP"])
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+#
+## Entry point for running the server
+########################################################################################################################
+def run_server():
+    """Run the FastAPI server using uvicorn."""
+    import uvicorn
+    uvicorn.run(
+        "tldw_Server_API.app.main:app",
+        host="127.0.0.1",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
+
+if __name__ == "__main__":
+    run_server()
 
 #
 ## End of main.py
