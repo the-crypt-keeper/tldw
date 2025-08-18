@@ -41,13 +41,13 @@ def disable_csrf():
 @pytest.fixture(scope="function")
 async def setup_test_data():
     """Set up test data in the actual database locations the service expects."""
-    # Get the user database directory (user 0 for single-user mode)
-    user_db_dir = Path(settings.get("USER_DB_BASE_DIR")) / "0"
+    # Get the user database directory (user 1 for single-user mode, from SINGLE_USER_FIXED_ID)
+    user_db_dir = Path(settings.get("USER_DB_BASE_DIR")) / "1"
     user_db_dir.mkdir(parents=True, exist_ok=True)
     
     # Create media database with test data
     media_db_path = user_db_dir / "user_media_library.sqlite"
-    media_db = MediaDatabase(str(media_db_path), client_id="0")
+    media_db = MediaDatabase(str(media_db_path), client_id="1")
     
     # Add sample media items
     sample_media = [
@@ -86,7 +86,7 @@ async def setup_test_data():
     chacha_db_dir = user_db_dir / "chachanotes_user_dbs"
     chacha_db_dir.mkdir(parents=True, exist_ok=True)
     chacha_db_path = chacha_db_dir / "user_chacha_notes_rag.sqlite"
-    chacha_db = CharactersRAGDB(str(chacha_db_path), client_id="0")
+    chacha_db = CharactersRAGDB(str(chacha_db_path), client_id="1")
     
     # Add sample notes
     note1_id = chacha_db.add_note(
@@ -321,9 +321,9 @@ class TestRAGServiceCachingReal:
         )
         assert response1.status_code == 200
         
-        # Check service was cached (user 0 for single-user mode)
-        assert 0 in rag_service_manager._cache
-        service1 = rag_service_manager._cache[0]['service']
+        # Check service was cached (user 1 for single-user mode, from SINGLE_USER_FIXED_ID)
+        assert 1 in rag_service_manager._cache
+        service1 = rag_service_manager._cache[1]['service']
         
         # Second request - should reuse service
         response2 = await async_client.post(
@@ -334,8 +334,8 @@ class TestRAGServiceCachingReal:
         assert response2.status_code == 200
         
         # Verify same service instance was used
-        assert 0 in rag_service_manager._cache
-        service2 = rag_service_manager._cache[0]['service']
+        assert 1 in rag_service_manager._cache
+        service2 = rag_service_manager._cache[1]['service']
         assert service2 is service1
 
 

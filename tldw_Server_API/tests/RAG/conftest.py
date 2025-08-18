@@ -402,13 +402,22 @@ def mock_agent_response():
 @pytest.fixture(autouse=True)
 def setup_test_environment(monkeypatch, temp_db_dir):
     """Set up test environment variables."""
+    # First, reset any cached settings to ensure clean state
+    from tldw_Server_API.app.core.AuthNZ.settings import reset_settings
+    reset_settings()
+    
     monkeypatch.setenv("USER_DB_BASE_DIR", str(temp_db_dir))
-    monkeypatch.setenv("APP_MODE", "multi")
-    monkeypatch.setenv("JWT_SECRET_KEY", "test_secret_key")
+    # Set up for single-user mode for testing
+    monkeypatch.setenv("AUTH_MODE", "single_user")
+    monkeypatch.setenv("SINGLE_USER_API_KEY", "default-secret-key-for-single-user")
+    # Don't set JWT_SECRET_KEY as it may trigger multi-user mode
     
     # Clear any cached services
     from tldw_Server_API.app.api.v1.endpoints.rag_v2 import rag_service_manager
     rag_service_manager.cleanup_expired()
+    
+    # Reset settings again after env vars are set to force reload
+    reset_settings()
 
 
 # Performance testing fixtures
