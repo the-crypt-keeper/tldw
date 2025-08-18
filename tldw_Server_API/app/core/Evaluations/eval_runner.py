@@ -648,7 +648,7 @@ class EvaluationRunner:
                     "eval_id": eval_id,
                     "status": status,
                     "completed_at": int(datetime.utcnow().timestamp()),
-                    "results_url": f"/v1/runs/{run_id}/results",
+                    "results_url": f"/api/v1/runs/{run_id}/results",
                     "summary": summary
                 }
                 

@@ -87,12 +87,59 @@ const Utils = {
     },
 
     /**
-     * Escape HTML to prevent XSS
+     * Escape HTML to prevent XSS - SECURE VERSION
      */
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        if (typeof text !== 'string') {
+            return '';
+        }
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#x27;',
+            '/': '&#x2F;'
+        };
+        return text.replace(/[&<>"'/]/g, (char) => map[char]);
+    },
+    
+    /**
+     * Safely set HTML content with proper escaping
+     */
+    safeSetHTML(element, html, isPreEscaped = false) {
+        if (!element) return;
+        if (isPreEscaped) {
+            // Only use innerHTML if content is already escaped/safe
+            element.innerHTML = html;
+        } else {
+            // Default to safe textContent
+            element.textContent = html;
+        }
+    },
+    
+    /**
+     * Create DOM elements safely from untrusted content
+     */
+    createSafeElement(tag, attrs = {}, textContent = '') {
+        const elem = document.createElement(tag);
+        
+        // Whitelist safe attributes
+        const safeAttrs = ['className', 'id', 'type', 'placeholder', 'aria-label', 'aria-describedby', 'role'];
+        for (const [key, value] of Object.entries(attrs)) {
+            if (safeAttrs.includes(key) || key.startsWith('data-')) {
+                if (key === 'className') {
+                    elem.className = value;
+                } else {
+                    elem.setAttribute(key, this.escapeHtml(String(value)));
+                }
+            }
+        }
+        
+        if (textContent) {
+            elem.textContent = textContent;
+        }
+        return elem;
     },
 
     /**

@@ -5,7 +5,7 @@
 class APIClient {
     constructor() {
         this.baseUrl = 'http://localhost:8000';
-        this.token = 'default-secret-key-for-single-user';
+        this.token = '';  // Token should be set by user, not hardcoded
         this.requestHistory = [];
         this.maxHistorySize = 50;
         this.init();
@@ -49,7 +49,8 @@ class APIClient {
             query = {},
             headers = {},
             streaming = false,
-            onProgress = null
+            onProgress = null,
+            timeout = 30000  // Default 30 second timeout
         } = options;
 
         // Build URL with query parameters
@@ -65,10 +66,14 @@ class APIClient {
             method,
             headers: {
                 'Accept': streaming ? 'text/event-stream' : 'application/json',
-                'Token': this.token,
                 ...headers
             }
         };
+        
+        // Only add Token header if we have a token
+        if (this.token) {
+            fetchOptions.headers['Token'] = this.token;
+        }
 
         // Add body if present
         if (body) {
@@ -84,7 +89,15 @@ class APIClient {
         const startTime = Date.now();
 
         try {
+            // Create abort controller for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            
+            fetchOptions.signal = controller.signal;
+            
             const response = await fetch(url.toString(), fetchOptions);
+            clearTimeout(timeoutId);
+            
             const duration = Date.now() - startTime;
 
             // Save to history
@@ -100,13 +113,29 @@ class APIClient {
 
             if (!response.ok) {
                 let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                let errorDetails = null;
+                
                 try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.detail || errorData.message || JSON.stringify(errorData);
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        errorDetails = await response.json();
+                        errorMessage = errorDetails.detail || errorDetails.message || errorMessage;
+                    } else {
+                        const errorText = await response.text();
+                        if (errorText) {
+                            errorMessage = `${errorMessage}: ${errorText}`;
+                        }
+                    }
                 } catch (e) {
-                    // If response is not JSON, use statusText
+                    // If response parsing fails, use original message
                 }
-                throw new Error(errorMessage);
+                
+                const error = new Error(errorMessage);
+                error.status = response.status;
+                error.statusText = response.statusText;
+                error.details = errorDetails;
+                error.response = response;
+                throw error;
             }
 
             // Handle streaming responses
@@ -122,16 +151,35 @@ class APIClient {
 
             return await response.text();
         } catch (error) {
-            // Record error in history
+            // Enhanced error handling
+            const duration = Date.now() - startTime;
+            
+            // Check if it's a timeout error
+            if (error.name === 'AbortError') {
+                error.message = `Request timeout after ${timeout}ms`;
+                error.isTimeout = true;
+            }
+            
+            // Record error in history with more details
             this.addToHistory({
                 method,
                 path,
                 url: url.toString(),
                 timestamp: startTime,
-                duration: Date.now() - startTime,
+                duration,
                 error: error.message,
+                errorStatus: error.status,
                 success: false
             });
+            
+            // Add request context to error
+            error.request = {
+                method,
+                path,
+                url: url.toString(),
+                duration
+            };
+            
             throw error;
         }
     }

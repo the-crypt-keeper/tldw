@@ -209,7 +209,7 @@ def create_error_response(
 
 # ============= Evaluation Endpoints =============
 
-@router.post("/v1/evals", response_model=EvaluationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/evals", response_model=EvaluationResponse, status_code=status.HTTP_201_CREATED)
 @create_limit
 async def create_evaluation(
     eval_request: CreateEvaluationRequest,
@@ -272,7 +272,7 @@ async def create_evaluation(
         )
 
 
-@router.get("/v1/evals", response_model=EvaluationListResponse)
+@router.get("/evals", response_model=EvaluationListResponse)
 @read_limit
 async def list_evaluations(
     request: Request,
@@ -309,7 +309,7 @@ async def list_evaluations(
         )
 
 
-@router.get("/v1/evals/{eval_id}", response_model=EvaluationResponse)
+@router.get("/evals/{eval_id}", response_model=EvaluationResponse)
 async def get_evaluation(
     eval_id: str,
     api_key: str = Depends(verify_api_key)
@@ -338,7 +338,7 @@ async def get_evaluation(
         )
 
 
-@router.patch("/v1/evals/{eval_id}", response_model=EvaluationResponse)
+@router.patch("/evals/{eval_id}", response_model=EvaluationResponse)
 async def update_evaluation(
     eval_id: str,
     update_request: UpdateEvaluationRequest,
@@ -381,7 +381,7 @@ async def update_evaluation(
         )
 
 
-@router.delete("/v1/evals/{eval_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/evals/{eval_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_evaluation(
     eval_id: str,
     api_key: str = Depends(verify_api_key)
@@ -413,7 +413,7 @@ async def delete_evaluation(
 
 # ============= Run Endpoints =============
 
-@router.post("/v1/evals/{eval_id}/runs", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/evals/{eval_id}/runs", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED)
 @run_limit
 @burst_limit_decorator
 async def create_run(
@@ -441,7 +441,7 @@ async def create_run(
     
     **Returns:** Run object with status "pending" and run ID for tracking
     
-    **Note:** Use `/v1/runs/{run_id}` to check status or `/v1/runs/{run_id}/stream` for real-time updates
+    **Note:** Use `/api/v1/runs/{run_id}` to check status or `/api/v1/runs/{run_id}/stream` for real-time updates
     """
     try:
         # Verify evaluation exists
@@ -496,7 +496,7 @@ async def create_run(
         )
 
 
-@router.get("/v1/evals/{eval_id}/runs", response_model=RunListResponse)
+@router.get("/evals/{eval_id}/runs", response_model=RunListResponse)
 async def list_runs(
     eval_id: str,
     limit: int = Query(20, ge=1, le=100),
@@ -545,7 +545,7 @@ async def list_runs(
         )
 
 
-@router.get("/v1/runs/{run_id}", response_model=RunResponse)
+@router.get("/runs/{run_id}", response_model=RunResponse)
 async def get_run(
     run_id: str,
     api_key: str = Depends(verify_api_key)
@@ -585,7 +585,7 @@ async def get_run(
         )
 
 
-@router.get("/v1/runs/{run_id}/results", response_model=RunResultsResponse)
+@router.get("/runs/{run_id}/results", response_model=RunResultsResponse)
 async def get_run_results(
     run_id: str,
     api_key: str = Depends(verify_api_key)
@@ -642,7 +642,7 @@ async def get_run_results(
         )
 
 
-@router.post("/v1/runs/{run_id}/cancel")
+@router.post("/runs/{run_id}/cancel")
 async def cancel_run(
     run_id: str,
     api_key: str = Depends(verify_api_key)
@@ -685,7 +685,7 @@ async def cancel_run(
 
 # ============= SSE Progress Tracking =============
 
-@router.get("/v1/runs/{run_id}/stream")
+@router.get("/runs/{run_id}/stream")
 async def stream_run_progress(
     run_id: str,
     api_key: str = Depends(verify_api_key)
@@ -705,7 +705,7 @@ async def stream_run_progress(
     
     **Example Usage:**
     ```javascript
-    const eventSource = new EventSource('/v1/runs/run_abc123/stream');
+    const eventSource = new EventSource('/api/v1/runs/run_abc123/stream');
     eventSource.addEventListener('progress', (e) => {
         const progress = JSON.parse(e.data);
         console.log(`Progress: ${progress.completed_samples}/${progress.total_samples}`);
@@ -769,7 +769,7 @@ async def stream_run_progress(
 
 # ============= Dataset Endpoints =============
 
-@router.post("/v1/datasets", response_model=DatasetResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/datasets", response_model=DatasetResponse, status_code=status.HTTP_201_CREATED)
 async def create_dataset(
     dataset_request: CreateDatasetRequest,
     api_key: str = Depends(verify_api_key)
@@ -799,7 +799,7 @@ async def create_dataset(
         )
 
 
-@router.get("/v1/datasets", response_model=DatasetListResponse)
+@router.get("/datasets", response_model=DatasetListResponse)
 async def list_datasets(
     limit: int = Query(20, ge=1, le=100),
     after: Optional[str] = Query(None),
@@ -832,7 +832,7 @@ async def list_datasets(
         )
 
 
-@router.get("/v1/datasets/{dataset_id}", response_model=DatasetResponse)
+@router.get("/datasets/{dataset_id}", response_model=DatasetResponse)
 async def get_dataset(
     dataset_id: str,
     api_key: str = Depends(verify_api_key)
@@ -861,7 +861,7 @@ async def get_dataset(
         )
 
 
-@router.delete("/v1/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_dataset(
     dataset_id: str,
     api_key: str = Depends(verify_api_key)

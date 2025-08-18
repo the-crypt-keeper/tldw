@@ -2,86 +2,110 @@
 
 ## Overview
 
-The Evaluations API provides comprehensive evaluation capabilities for assessing the quality of AI-generated content, including summaries, RAG responses, and general text generation. The API supports multiple evaluation frameworks and metrics, with built-in rate limiting, health monitoring, and metrics collection.
+The Evaluations API provides comprehensive capabilities for assessing the quality of AI-generated content. The system supports multiple evaluation types including summarization quality (G-Eval), RAG system evaluation, and various text matching strategies.
 
-**Base URL**: `http://localhost:8000/api/v1`  
+**Base URL**: `http://localhost:8000`  
 **API Version**: `v1`  
-**Authentication**: Bearer token in Authorization header (multi-user mode) or default key (single-user mode)
+**API Prefix**: `/api/v1`  
+**Authentication**: Bearer token required (see Authentication section)
 
 ## Authentication
 
-All requests must include an Authorization header:
+All API requests require authentication via Bearer token in the Authorization header.
+
+### Single-User Mode (Development)
 ```http
-Authorization: Bearer YOUR_API_KEY
+Authorization: Bearer default-secret-key-for-single-user
 ```
 
-In development mode, use: `default-secret-key-for-single-user`
+### Multi-User Mode (Production)
+```http
+Authorization: Bearer YOUR_PERSONAL_API_KEY
+```
+
+**Configuration**: Authentication mode is set in `tldw_Server_API/Config_Files/config.txt` or via environment variables:
+- `AUTH_MODE`: "single_user" or "multi_user"
+- `SINGLE_USER_API_KEY`: API key for single-user mode
+- `JWT_SECRET_KEY`: Secret for JWT tokens in multi-user mode
 
 ## Endpoints
 
 ### Evaluations
 
 #### Create Evaluation
-`POST /v1/evals`
+`POST /api/v1/evals`
 
 Creates a new evaluation definition.
 
 **Request Body:**
 ```json
 {
-  "name": "string",           // Required, unique name
+  "name": "string",           // Required, unique name for the evaluation
   "description": "string",    // Optional description
-  "eval_type": "string",      // Required: model_graded|exact_match|fuzzy_match|includes
+  "eval_type": "string",      // Required: "model_graded" | "exact_match" | "fuzzy_match" | "includes"
   "eval_spec": {              // Required, evaluation configuration
-    "sub_type": "string",     // For model_graded: summarization|rag|response_quality
-    "evaluator_model": "string", // LLM to use for evaluation
-    "metrics": ["string"],    // Metrics to evaluate
-    "threshold": 0.7,         // Pass/fail threshold (0-1)
+    // For model_graded evaluations:
+    "sub_type": "string",     // Required for model_graded: "summarization" | "rag" | "response_quality"
+    "evaluator_model": "string", // Model to use (default: "gpt-4")
+    "metrics": ["string"],    // Metrics to evaluate (type-specific)
+    "threshold": 0.7,         // Pass/fail threshold (0-1, default: 0.7)
+    "scoring_prompt": "string", // Optional custom scoring prompt
     "custom_criteria": {}     // Optional custom evaluation criteria
   },
-  "dataset": [                // Optional inline dataset
+  // Must provide EITHER dataset OR dataset_id, not both:
+  "dataset": [                // Option 1: Inline dataset
     {
       "input": {},            // Input data for evaluation
-      "expected": {}          // Expected output
+      "expected": {}          // Expected output (format varies by eval_type)
     }
   ],
-  "dataset_id": "string",     // Optional reference to existing dataset
-  "metadata": {}              // Optional metadata
+  "dataset_id": "string",     // Option 2: Reference to existing dataset
+  "metadata": {               // Optional metadata
+    "author": "string",
+    "tags": ["string"],
+    "version": "string",
+    "custom_fields": {}
+  }
 }
 ```
 
 **Response (201 Created):**
 ```json
 {
-  "id": "eval_xxxxxxxxxxxx",
+  "id": "eval_xxxxxxxxxxxx",  // Unique evaluation ID
   "object": "evaluation",
+  "created": 1234567890,       // Unix timestamp
   "name": "string",
   "description": "string",
   "eval_type": "string",
   "eval_spec": {},
   "dataset_id": "string",
-  "created_at": 1234567890,
-  "updated_at": 1234567890,
-  "created_by": "string",
   "metadata": {}
 }
 ```
 
 **Error Responses:**
-- `400 Bad Request` - Invalid request body
+- `400 Bad Request` - Invalid request body or missing required fields
 - `401 Unauthorized` - Missing or invalid API key
 - `409 Conflict` - Evaluation name already exists
+- `422 Unprocessable Entity` - Validation error (e.g., invalid eval_type)
+
+**Important Notes:**
+- You MUST provide either `dataset` (inline data) or `dataset_id` (reference), but not both
+- The `sub_type` field is REQUIRED when `eval_type` is "model_graded"
+- All scores and thresholds use a 0-1 scale where 1 is best
 
 ---
 
 #### List Evaluations
-`GET /v1/evals`
+`GET /api/v1/evals`
 
-Lists evaluations with pagination.
+Lists evaluations with pagination support.
 
 **Query Parameters:**
-- `limit` (integer, 1-100, default: 20) - Number of items to return
-- `after` (string) - Cursor for pagination
+- `limit` (integer, 1-100, default: 20) - Number of items per page
+- `after` (string) - Cursor for pagination (use `last_id` from previous response)
+- `order` (string, "asc" | "desc", default: "desc") - Sort order by creation time
 - `eval_type` (string) - Filter by evaluation type
 
 **Response (200 OK):**
@@ -92,53 +116,59 @@ Lists evaluations with pagination.
     {
       "id": "eval_xxxxxxxxxxxx",
       "object": "evaluation",
+      "created": 1234567890,
       "name": "string",
+      "description": "string",
       "eval_type": "string",
-      "created_at": 1234567890
+      "eval_spec": {},
+      "dataset_id": "string",
+      "metadata": {}
     }
   ],
-  "has_more": false,
+  "has_more": false,           // More results available
   "first_id": "eval_xxxxxxxxxxxx",
   "last_id": "eval_yyyyyyyyyyyy"
 }
 ```
 
+**Error Responses:**
+- `401 Unauthorized` - Invalid API key
+
 ---
 
 #### Get Evaluation
-`GET /v1/evals/{eval_id}`
+`GET /api/v1/evals/{eval_id}`
 
-Retrieves a specific evaluation.
+Retrieves a specific evaluation by ID.
 
 **Path Parameters:**
-- `eval_id` (string) - Evaluation ID
+- `eval_id` (string) - Evaluation ID (format: `eval_xxxxxxxxxxxx`)
 
 **Response (200 OK):**
 ```json
 {
   "id": "eval_xxxxxxxxxxxx",
   "object": "evaluation",
+  "created": 1234567890,
   "name": "string",
   "description": "string",
   "eval_type": "string",
   "eval_spec": {},
   "dataset_id": "string",
-  "created_at": 1234567890,
-  "updated_at": 1234567890,
-  "created_by": "string",
   "metadata": {}
 }
 ```
 
 **Error Responses:**
+- `401 Unauthorized` - Invalid API key
 - `404 Not Found` - Evaluation not found
 
 ---
 
 #### Update Evaluation
-`PATCH /v1/evals/{eval_id}`
+`PATCH /api/v1/evals/{eval_id}`
 
-Updates an evaluation definition.
+Updates an existing evaluation. Only provided fields are updated.
 
 **Path Parameters:**
 - `eval_id` (string) - Evaluation ID
@@ -146,31 +176,35 @@ Updates an evaluation definition.
 **Request Body:**
 ```json
 {
+  "name": "string",           // Optional
   "description": "string",    // Optional
-  "eval_spec": {},           // Optional
-  "metadata": {}             // Optional
+  "eval_spec": {},           // Optional, partial updates supported
+  "dataset_id": "string",    // Optional
+  "metadata": {}             // Optional, replaces entire metadata
 }
 ```
 
 **Response (200 OK):** Updated evaluation object
 
 **Error Responses:**
-- `404 Not Found` - Evaluation not found
 - `400 Bad Request` - Invalid update data
+- `401 Unauthorized` - Invalid API key
+- `404 Not Found` - Evaluation not found
 
 ---
 
 #### Delete Evaluation
-`DELETE /v1/evals/{eval_id}`
+`DELETE /api/v1/evals/{eval_id}`
 
-Soft deletes an evaluation.
+Soft deletes an evaluation (may be recoverable).
 
 **Path Parameters:**
 - `eval_id` (string) - Evaluation ID
 
-**Response (204 No Content):** Empty response
+**Response (204 No Content):** Empty response on success
 
 **Error Responses:**
+- `401 Unauthorized` - Invalid API key
 - `404 Not Found` - Evaluation not found
 
 ---
@@ -178,9 +212,9 @@ Soft deletes an evaluation.
 ### Evaluation Runs
 
 #### Create Run
-`POST /v1/evals/{eval_id}/runs`
+`POST /api/v1/evals/{eval_id}/runs`
 
-Starts an evaluation run.
+Starts an asynchronous evaluation run.
 
 **Path Parameters:**
 - `eval_id` (string) - Evaluation ID
@@ -188,17 +222,22 @@ Starts an evaluation run.
 **Request Body:**
 ```json
 {
-  "target_model": "string",    // Model being evaluated
-  "dataset_override": {        // Optional dataset override
-    "samples": []
+  "target_model": "string",    // Optional, model being evaluated
+  "dataset_override": {        // Optional, override evaluation's dataset
+    "samples": [
+      {
+        "input": {},
+        "expected": {}
+      }
+    ]
   },
   "config": {                  // Run configuration
-    "temperature": 0.0,        // LLM temperature
-    "max_workers": 4,          // Parallel workers
-    "timeout_seconds": 300,    // Timeout per sample
-    "batch_size": 10          // Batch size
+    "temperature": 0.0,        // LLM temperature (0-2, default: 0)
+    "max_workers": 4,          // Parallel workers (1-16, default: 4)
+    "timeout_seconds": 300,    // Timeout per sample (default: 300)
+    "batch_size": 10          // Batch size (1-100, default: 10)
   },
-  "webhook_url": "string"      // Optional webhook for completion
+  "webhook_url": "string"      // Optional webhook for completion notification
 }
 ```
 
@@ -207,81 +246,87 @@ Starts an evaluation run.
 {
   "id": "run_xxxxxxxxxxxx",
   "object": "evaluation.run",
+  "created": 1234567890,
   "eval_id": "eval_xxxxxxxxxxxx",
-  "status": "pending",         // pending|running|completed|failed|cancelled
+  "status": "pending",         // "pending" | "running" | "completed" | "failed" | "cancelled"
   "target_model": "string",
-  "config": {},
-  "created_at": 1234567890,
-  "started_at": null,
-  "completed_at": null,
   "progress": {
     "total_samples": 0,
     "completed_samples": 0,
-    "failed_samples": 0
-  }
+    "failed_samples": 0,
+    "current_batch": 0,
+    "percent_complete": 0.0
+  },
+  "estimated_completion": null,
+  "error_message": null,
+  "metadata": {}
 }
 ```
 
 **Error Responses:**
+- `401 Unauthorized` - Invalid API key
 - `404 Not Found` - Evaluation not found
-- `429 Too Many Requests` - Rate limit exceeded
+- `429 Too Many Requests` - Rate limit exceeded (50/minute default)
 
 ---
 
 #### List Runs
-`GET /v1/evals/{eval_id}/runs`
+`GET /api/v1/evals/{eval_id}/runs`
 
-Lists runs for an evaluation.
+Lists runs for a specific evaluation.
 
 **Path Parameters:**
 - `eval_id` (string) - Evaluation ID
 
 **Query Parameters:**
-- `limit` (integer, 1-100, default: 20)
+- `limit` (integer, 1-100, default: 20) - Results per page
 - `after` (string) - Cursor for pagination
-- `status` (string) - Filter by status
+- `status` (string) - Filter by status: "pending" | "running" | "completed" | "failed" | "cancelled"
 
 **Response (200 OK):** List of run objects
 
 ---
 
 #### Get Run Status
-`GET /v1/runs/{run_id}`
+`GET /api/v1/runs/{run_id}`
 
-Gets run status and progress.
+Gets current status and progress of a run.
 
 **Path Parameters:**
-- `run_id` (string) - Run ID
+- `run_id` (string) - Run ID (format: `run_xxxxxxxxxxxx`)
 
 **Response (200 OK):**
 ```json
 {
   "id": "run_xxxxxxxxxxxx",
   "object": "evaluation.run",
+  "created": 1234567890,
   "eval_id": "eval_xxxxxxxxxxxx",
   "status": "running",
   "target_model": "string",
-  "config": {},
   "progress": {
     "total_samples": 100,
     "completed_samples": 45,
     "failed_samples": 2,
-    "current_batch": 5
+    "current_batch": 5,
+    "percent_complete": 45.0
   },
-  "created_at": 1234567890,
-  "started_at": 1234567891,
-  "completed_at": null,
-  "estimated_completion": 1234567950,
-  "error_message": null
+  "estimated_completion": 1234567950,  // Unix timestamp
+  "error_message": null,
+  "metadata": {}
 }
 ```
+
+**Error Responses:**
+- `401 Unauthorized` - Invalid API key
+- `404 Not Found` - Run not found
 
 ---
 
 #### Get Run Results
-`GET /v1/runs/{run_id}/results`
+`GET /api/v1/runs/{run_id}/results`
 
-Gets results for a completed run.
+Gets complete results for a finished run.
 
 **Path Parameters:**
 - `run_id` (string) - Run ID
@@ -290,64 +335,69 @@ Gets results for a completed run.
 ```json
 {
   "id": "run_xxxxxxxxxxxx",
+  "object": "evaluation.run.result",
   "eval_id": "eval_xxxxxxxxxxxx",
   "status": "completed",
   "started_at": 1234567890,
   "completed_at": 1234567920,
   "results": {
     "aggregate": {
-      "mean_score": 0.85,
-      "std_dev": 0.12,
-      "min_score": 0.60,
-      "max_score": 0.98,
-      "pass_rate": 0.75,
+      "mean_score": 0.85,      // Average score (0-1)
+      "std_dev": 0.12,         // Standard deviation
+      "min_score": 0.60,       // Minimum score
+      "max_score": 0.98,       // Maximum score
+      "pass_rate": 0.75,       // Percentage passing threshold (0-1)
       "total_samples": 100,
-      "failed_samples": 5
+      "failed_samples": 25
     },
-    "by_metric": {
+    "by_metric": {             // Breakdown by metric (if applicable)
       "fluency": {
         "mean": 0.88,
         "std": 0.10,
         "min": 0.65,
-        "max": 0.98
+        "max": 0.98,
+        "median": 0.89
       },
       "relevance": {
         "mean": 0.82,
         "std": 0.15,
         "min": 0.55,
-        "max": 0.96
+        "max": 0.96,
+        "median": 0.84
       }
     },
-    "sample_results": [
+    "sample_results": [        // Individual sample results
       {
         "sample_id": "sample_0001",
         "scores": {
           "fluency": 0.85,
           "relevance": 0.90
         },
-        "passed": true,
-        "avg_score": 0.875
+        "passed": true,        // Met threshold
+        "error": null
       }
     ],
-    "failed_samples": []
+    "failed_samples": []       // Samples that failed to evaluate
   },
-  "usage": {
+  "usage": {                   // Token usage (for LLM evaluations)
     "total_tokens": 15000,
     "prompt_tokens": 10000,
-    "completion_tokens": 5000
+    "completion_tokens": 5000,
+    "cost_estimate": 0.45      // Estimated cost in USD
   },
   "duration_seconds": 30
 }
 ```
 
 **Error Responses:**
+- `400 Bad Request` - Run not completed yet
+- `401 Unauthorized` - Invalid API key
 - `404 Not Found` - Run not found
-- `400 Bad Request` - Run not completed
 
 ---
 
 #### Cancel Run
-`POST /v1/runs/{run_id}/cancel`
+`POST /api/v1/runs/{run_id}/cancel`
 
 Cancels a running evaluation.
 
@@ -358,38 +408,60 @@ Cancels a running evaluation.
 ```json
 {
   "id": "run_xxxxxxxxxxxx",
-  "status": "cancelled"
+  "status": "cancelled"        // or "cancelling" if still processing
 }
 ```
+
+**Error Responses:**
+- `400 Bad Request` - Run already completed or failed
+- `401 Unauthorized` - Invalid API key
+- `404 Not Found` - Run not found
 
 ---
 
 #### Stream Run Progress
-`GET /v1/runs/{run_id}/stream`
+`GET /api/v1/runs/{run_id}/stream`
 
-Streams run progress via Server-Sent Events.
+Streams real-time progress updates via Server-Sent Events (SSE).
 
 **Path Parameters:**
 - `run_id` (string) - Run ID
 
 **Response:** Server-Sent Events stream
 
-**Event Types:**
+**Event Format:**
 ```
 event: progress
-data: {"total_samples": 100, "completed_samples": 50}
+data: {"total_samples": 100, "completed_samples": 50, "percent_complete": 50.0}
 
 event: completed
-data: {"results": {...}}
+data: {"results": {...}, "duration_seconds": 30}
 
 event: failed
-data: {"error": "Error message"}
+data: {"error": "Error message", "failed_at": 1234567890}
 
 event: cancelled
-data: {"message": "Run was cancelled"}
+data: {"message": "Run was cancelled", "cancelled_at": 1234567890}
 
 event: heartbeat
-data: {"timestamp": "2024-01-01T00:00:00Z"}
+data: {"timestamp": 1234567890}
+```
+
+**Client Example (Python):**
+```python
+import sseclient  # pip install sseclient-py
+
+response = requests.get(
+    f"{BASE_URL}/api/v1/runs/{run_id}/stream",
+    headers={"Authorization": f"Bearer {API_KEY}"},
+    stream=True
+)
+
+client = sseclient.SSEClient(response)
+for event in client.events():
+    print(f"{event.event}: {event.data}")
+    if event.event in ["completed", "failed", "cancelled"]:
+        break
 ```
 
 ---
@@ -397,22 +469,22 @@ data: {"timestamp": "2024-01-01T00:00:00Z"}
 ### Datasets
 
 #### Create Dataset
-`POST /v1/datasets`
+`POST /api/v1/datasets`
 
-Creates a new dataset.
+Creates a reusable dataset for evaluations.
 
 **Request Body:**
 ```json
 {
-  "name": "string",
-  "description": "string",
-  "samples": [
+  "name": "string",            // Required, unique name
+  "description": "string",     // Optional description
+  "samples": [                 // Required, dataset samples
     {
-      "input": {},
-      "expected": {}
+      "input": {},            // Input data (format depends on eval_type)
+      "expected": {}          // Expected output
     }
   ],
-  "metadata": {}
+  "metadata": {}              // Optional metadata
 }
 ```
 
@@ -421,154 +493,214 @@ Creates a new dataset.
 {
   "id": "dataset_xxxxxxxxxxxx",
   "object": "dataset",
+  "created": 1234567890,
   "name": "string",
   "description": "string",
   "sample_count": 100,
-  "created_at": 1234567890,
-  "created_by": "string",
+  "samples": [...],           // Full sample data
   "metadata": {}
 }
 ```
 
+**Error Responses:**
+- `400 Bad Request` - Invalid dataset format
+- `401 Unauthorized` - Invalid API key
+- `409 Conflict` - Dataset name already exists
+
 ---
 
 #### List Datasets
-`GET /v1/datasets`
+`GET /api/v1/datasets`
 
-Lists datasets with pagination.
+Lists available datasets.
 
 **Query Parameters:**
 - `limit` (integer, 1-100, default: 20)
 - `after` (string) - Cursor for pagination
 
-**Response (200 OK):** List of dataset objects
+**Response (200 OK):**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "dataset_xxxxxxxxxxxx",
+      "object": "dataset",
+      "created": 1234567890,
+      "name": "string",
+      "description": "string",
+      "sample_count": 100,
+      "samples": null,        // Samples omitted in list view
+      "metadata": {}
+    }
+  ],
+  "has_more": false,
+  "first_id": "dataset_xxxxxxxxxxxx",
+  "last_id": "dataset_yyyyyyyyyyyy"
+}
+```
 
 ---
 
 #### Get Dataset
-`GET /v1/datasets/{dataset_id}`
+`GET /api/v1/datasets/{dataset_id}`
 
-Gets a specific dataset.
+Gets a specific dataset including all samples.
 
 **Path Parameters:**
 - `dataset_id` (string) - Dataset ID
 
-**Response (200 OK):**
-```json
-{
-  "id": "dataset_xxxxxxxxxxxx",
-  "object": "dataset",
-  "name": "string",
-  "description": "string",
-  "samples": [
-    {
-      "input": {},
-      "expected": {}
-    }
-  ],
-  "sample_count": 100,
-  "created_at": 1234567890,
-  "created_by": "string",
-  "metadata": {}
-}
-```
+**Response (200 OK):** Full dataset object with samples
+
+**Error Responses:**
+- `401 Unauthorized` - Invalid API key
+- `404 Not Found` - Dataset not found
 
 ---
 
 #### Delete Dataset
-`DELETE /v1/datasets/{dataset_id}`
+`DELETE /api/v1/datasets/{dataset_id}`
 
-Deletes a dataset.
+Permanently deletes a dataset.
 
 **Path Parameters:**
 - `dataset_id` (string) - Dataset ID
 
-**Response (204 No Content):** Empty response
+**Response (204 No Content):** Empty response on success
+
+**Error Responses:**
+- `401 Unauthorized` - Invalid API key
+- `404 Not Found` - Dataset not found
 
 ---
 
-## Evaluation Types
+## Evaluation Types & Formats
 
 ### model_graded
-Uses an LLM to evaluate outputs. Subtypes:
+Uses an LLM to evaluate outputs. Requires `sub_type` specification.
 
-#### summarization
-Evaluates text summaries using G-Eval metrics.
+#### summarization (G-Eval)
+Evaluates text summarization quality.
 
-**Required in eval_spec:**
-- `sub_type`: "summarization"
-- `evaluator_model`: LLM model name
-- `metrics`: Array of ["fluency", "consistency", "relevance", "coherence"]
+**eval_spec:**
+```json
+{
+  "sub_type": "summarization",
+  "evaluator_model": "gpt-4",  // or "anthropic", "groq", etc.
+  "metrics": ["fluency", "consistency", "relevance", "coherence"],
+  "threshold": 0.7
+}
+```
 
-**Sample format:**
+**Sample Format:**
 ```json
 {
   "input": {
-    "source_text": "Original document",
-    "summary": "Summary to evaluate"
+    "source_text": "Original document text to be summarized",
+    "summary": "The summary to evaluate"
   }
 }
 ```
 
+**Metrics:**
+- `fluency`: Grammar and readability (0-1)
+- `consistency`: Factual alignment with source (0-1)
+- `relevance`: Information selection quality (0-1)
+- `coherence`: Logical flow and structure (0-1)
+
 #### rag
-Evaluates RAG system outputs.
+Evaluates Retrieval-Augmented Generation systems.
 
-**Required in eval_spec:**
-- `sub_type`: "rag"
-- `evaluator_model`: LLM model name
-- `metrics`: Array of ["relevance", "faithfulness", "answer_similarity", "context_precision", "context_recall"]
+**eval_spec:**
+```json
+{
+  "sub_type": "rag",
+  "evaluator_model": "gpt-4",
+  "metrics": ["relevance", "faithfulness", "answer_similarity", "context_precision", "context_recall"],
+  "threshold": 0.75
+}
+```
 
-**Sample format:**
+**Sample Format:**
 ```json
 {
   "input": {
-    "query": "User question",
+    "query": "User's question",
     "contexts": ["Retrieved context 1", "Retrieved context 2"],
     "response": "Generated response"
   },
   "expected": {
-    "answer": "Ground truth answer"
+    "answer": "Ground truth answer (optional)"
   }
 }
 ```
 
+**Metrics:**
+- `relevance`: Response relevance to query (0-1)
+- `faithfulness`: Grounding in provided contexts (0-1)
+- `answer_similarity`: Similarity to ground truth (0-1)
+- `context_precision`: Precision of retrieved contexts (0-1)
+- `context_recall`: Recall of relevant information (0-1)
+
 #### response_quality
-Evaluates general response quality.
+General response quality evaluation with custom criteria.
 
-**Required in eval_spec:**
-- `sub_type`: "response_quality"
-- `evaluator_model`: LLM model name
-- `custom_criteria`: Dictionary of criteria
+**eval_spec:**
+```json
+{
+  "sub_type": "response_quality",
+  "evaluator_model": "gpt-4",
+  "custom_criteria": {
+    "helpfulness": "How helpful is the response?",
+    "accuracy": "Is the information accurate?",
+    "completeness": "Does it fully address the prompt?"
+  },
+  "threshold": 0.8
+}
+```
 
-**Sample format:**
+**Sample Format:**
 ```json
 {
   "input": {
-    "prompt": "User prompt",
+    "prompt": "User's prompt",
     "response": "Generated response",
-    "expected_format": "Optional format specification"
+    "expected_format": "Expected response format (optional)"
   }
 }
 ```
 
 ### exact_match
-Checks exact string match (case-insensitive).
+Checks for exact string match (case-insensitive).
 
-**Sample format:**
+**eval_spec:**
 ```json
 {
-  "input": {"output": "Generated text"},
-  "expected": {"output": "Expected text"}
+  "threshold": 1.0  // Usually 1.0 for exact match
 }
 ```
 
+**Sample Format:**
+```json
+{
+  "input": {"output": "Generated text"},
+  "expected": {"output": "Expected exact text"}
+}
+```
+
+**Scoring:** 1.0 if exact match (case-insensitive), 0.0 otherwise
+
 ### fuzzy_match
-Uses string similarity scoring.
+Uses string similarity algorithms (e.g., Levenshtein distance).
 
-**Required in eval_spec:**
-- `threshold`: Similarity threshold (0-1)
+**eval_spec:**
+```json
+{
+  "threshold": 0.85  // Similarity threshold (0-1)
+}
+```
 
-**Sample format:**
+**Sample Format:**
 ```json
 {
   "input": {"output": "Generated text"},
@@ -576,82 +708,121 @@ Uses string similarity scoring.
 }
 ```
 
-### includes
-Checks if output contains expected items.
+**Scoring:** Similarity score from 0 (completely different) to 1 (identical)
 
-**Sample format:**
+### includes
+Checks if output contains all expected items.
+
+**eval_spec:**
 ```json
 {
-  "input": {"output": "Generated text"},
-  "expected": {"includes": ["keyword1", "keyword2"]}
+  "threshold": 0.8  // Percentage of items that must be present (0-1)
 }
 ```
 
-## Error Responses
+**Sample Format:**
+```json
+{
+  "input": {"output": "The generated text to check"},
+  "expected": {"includes": ["keyword1", "keyword2", "phrase to find"]}
+}
+```
 
-All error responses follow this format:
+**Scoring:** Percentage of expected items found in output (0-1)
+
+## Error Response Format
+
+All error responses follow a consistent format:
 
 ```json
 {
   "error": {
-    "message": "Human-readable error message",
-    "type": "error_type",
-    "param": "parameter_name",
-    "code": "error_code"
+    "message": "Human-readable error description",
+    "type": "error_type",     // See error types below
+    "param": "parameter_name", // Optional, which parameter caused the error
+    "code": "error_code"       // Optional, specific error code
+  }
+}
+```
+
+**Note:** Some error responses may wrap the error object in a `detail` field:
+```json
+{
+  "detail": {
+    "error": {
+      "message": "...",
+      "type": "...",
+      "code": "..."
+    }
   }
 }
 ```
 
 **Error Types:**
+- `invalid_request_error` - Invalid request parameters or body
 - `authentication_error` - Invalid or missing API key
-- `invalid_request_error` - Invalid request parameters
+- `permission_error` - Insufficient permissions
 - `not_found_error` - Resource not found
-- `server_error` - Internal server error
 - `rate_limit_error` - Rate limit exceeded
+- `server_error` - Internal server error
 
 **HTTP Status Codes:**
-- `200 OK` - Successful GET request
-- `201 Created` - Successful POST creating resource
+- `200 OK` - Successful GET/PATCH request
+- `201 Created` - Successful POST creating new resource
 - `202 Accepted` - Request accepted for async processing
 - `204 No Content` - Successful DELETE
-- `400 Bad Request` - Invalid request
-- `401 Unauthorized` - Authentication required
+- `400 Bad Request` - Invalid request format or parameters
+- `401 Unauthorized` - Authentication required or failed
 - `404 Not Found` - Resource not found
+- `409 Conflict` - Resource already exists
+- `422 Unprocessable Entity` - Validation error
 - `429 Too Many Requests` - Rate limit exceeded
 - `500 Internal Server Error` - Server error
 
 ## Rate Limits
 
-Default rate limits:
-- Create operations: 100/minute
-- Read operations: 100/minute
-- Run operations: 50/minute
+Default rate limits per API key:
+- **Create operations** (POST): 100 requests/minute
+- **Read operations** (GET): 100 requests/minute
+- **Run operations** (POST runs): 50 requests/minute
+- **Delete operations**: 20 requests/minute
 
-Rate limit headers:
+Rate limit information is included in response headers:
 ```http
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1234567890
+X-RateLimit-Limit: 100        # Maximum requests allowed
+X-RateLimit-Remaining: 95     # Requests remaining
+X-RateLimit-Reset: 1234567890 # Unix timestamp when limit resets
 ```
+
+**Note:** Rate limits are disabled when `TESTING=true` environment variable is set.
 
 ## Webhooks
 
-When a `webhook_url` is provided for a run, the following payload is sent on completion:
+When `webhook_url` is provided in a run request, the following payload is sent upon completion:
 
 ```json
 {
-  "event": "run.completed",  // or run.failed
+  "event": "run.completed",    // or "run.failed" | "run.cancelled"
   "run_id": "run_xxxxxxxxxxxx",
   "eval_id": "eval_xxxxxxxxxxxx",
   "status": "completed",
   "completed_at": 1234567890,
-  "results_url": "/v1/runs/run_xxxxxxxxxxxx/results",
+  "results_url": "/api/v1/runs/run_xxxxxxxxxxxx/results",
   "summary": {
     "mean_score": 0.85,
-    "pass_rate": 0.75
-  }
+    "pass_rate": 0.75,
+    "total_samples": 100,
+    "duration_seconds": 30
+  },
+  "error": null                // Error message if failed
 }
 ```
+
+**Webhook Requirements:**
+- Must accept POST requests
+- Should respond with 2xx status code
+- Timeout: 10 seconds
+- Retries: 3 attempts with exponential backoff
 
 ## Code Examples
 
@@ -659,73 +830,88 @@ When a `webhook_url` is provided for a run, the following payload is sent on com
 ```python
 import requests
 
-API_KEY = "your-api-key"
+# Configuration
+API_KEY = "default-secret-key-for-single-user"
 BASE_URL = "http://localhost:8000"
+headers = {"Authorization": f"Bearer {API_KEY}"}
 
 # Create evaluation
+eval_request = {
+    "name": "my_evaluation",
+    "eval_type": "exact_match",
+    "eval_spec": {"threshold": 1.0},
+    "dataset": [
+        {"input": {"output": "test"}, "expected": {"output": "test"}}
+    ]
+}
+
 response = requests.post(
-    f"{BASE_URL}/v1/evals",
-    json={
-        "name": "my_eval",
-        "eval_type": "exact_match",
-        "eval_spec": {"threshold": 1.0},
-        "dataset": [
-            {"input": {"output": "test"}, "expected": {"output": "test"}}
-        ]
-    },
-    headers={"Authorization": f"Bearer {API_KEY}"}
+    f"{BASE_URL}/api/v1/evals",
+    json=eval_request,
+    headers=headers
 )
 eval_id = response.json()["id"]
 
 # Run evaluation
+run_request = {"config": {"temperature": 0}}
 response = requests.post(
-    f"{BASE_URL}/v1/evals/{eval_id}/runs",
-    json={"target_model": "test", "config": {"temperature": 0}},
-    headers={"Authorization": f"Bearer {API_KEY}"}
+    f"{BASE_URL}/api/v1/evals/{eval_id}/runs",
+    json=run_request,
+    headers=headers
 )
 run_id = response.json()["id"]
 
 # Get results
 response = requests.get(
-    f"{BASE_URL}/v1/runs/{run_id}/results",
-    headers={"Authorization": f"Bearer {API_KEY}"}
+    f"{BASE_URL}/api/v1/runs/{run_id}/results",
+    headers=headers
 )
 print(response.json())
 ```
 
 ### cURL
 ```bash
+# Set API key
+export API_KEY="default-secret-key-for-single-user"
+
 # Create evaluation
-curl -X POST http://localhost:8000/v1/evals \
+curl -X POST http://localhost:8000/api/v1/evals \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"name": "test", "eval_type": "exact_match", "eval_spec": {"threshold": 1.0}}'
+  -d '{
+    "name": "test_eval",
+    "eval_type": "exact_match",
+    "eval_spec": {"threshold": 1.0},
+    "dataset": [
+      {"input": {"output": "test"}, "expected": {"output": "test"}}
+    ]
+  }'
 
 # Run evaluation
-curl -X POST http://localhost:8000/v1/evals/eval_xxx/runs \
+curl -X POST http://localhost:8000/api/v1/evals/eval_xxx/runs \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"target_model": "test", "config": {}}'
+  -d '{"config": {"temperature": 0}}'
 
 # Get results
-curl http://localhost:8000/v1/runs/run_xxx/results \
+curl http://localhost:8000/api/v1/runs/run_xxx/results \
   -H "Authorization: Bearer $API_KEY"
 ```
 
-### JavaScript
+### JavaScript/TypeScript
 ```javascript
-const API_KEY = 'your-api-key';
+const API_KEY = 'default-secret-key-for-single-user';
 const BASE_URL = 'http://localhost:8000';
 
 // Create evaluation
-const evalResponse = await fetch(`${BASE_URL}/v1/evals`, {
+const evalResponse = await fetch(`${BASE_URL}/api/v1/evals`, {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${API_KEY}`,
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    name: 'my_eval',
+    name: 'js_eval',
     eval_type: 'exact_match',
     eval_spec: { threshold: 1.0 },
     dataset: [
@@ -736,23 +922,86 @@ const evalResponse = await fetch(`${BASE_URL}/v1/evals`, {
 const { id: evalId } = await evalResponse.json();
 
 // Run evaluation
-const runResponse = await fetch(`${BASE_URL}/v1/evals/${evalId}/runs`, {
+const runResponse = await fetch(`${BASE_URL}/api/v1/evals/${evalId}/runs`, {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${API_KEY}`,
     'Content-Type': 'application/json'
   },
-  body: JSON.stringify({
-    target_model: 'test',
-    config: { temperature: 0 }
-  })
+  body: JSON.stringify({ config: { temperature: 0 } })
 });
 const { id: runId } = await runResponse.json();
+
+// Get results (after waiting)
+const resultsResponse = await fetch(`${BASE_URL}/api/v1/runs/${runId}/results`, {
+  headers: { 'Authorization': `Bearer ${API_KEY}` }
+});
+const results = await resultsResponse.json();
+console.log(results);
 ```
 
-## OpenAPI Specification
+## API Specification
 
-The complete OpenAPI specification is available at:
-- JSON: `http://localhost:8000/openapi.json`
-- Interactive docs: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+The complete OpenAPI 3.0 specification is available at:
+- **JSON**: `http://localhost:8000/openapi.json`
+- **Interactive Docs (Swagger UI)**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+
+## Configuration
+
+### LLM Provider Configuration
+
+Configure LLM providers in `tldw_Server_API/Config_Files/config.txt`:
+
+```ini
+[API]
+# OpenAI
+openai_api_key = sk-...
+openai_model = gpt-4
+
+# Anthropic
+anthropic_api_key = sk-ant-...
+anthropic_model = claude-3-sonnet-20240229
+
+# Google
+google_api_key = ...
+google_model = gemini-pro
+
+# Groq
+groq_api_key = gsk_...
+groq_model = mixtral-8x7b-32768
+
+# Other providers...
+```
+
+### Supported LLM Providers
+- OpenAI (GPT-3.5, GPT-4, etc.)
+- Anthropic (Claude models)
+- Google (Gemini models)
+- Groq (Mixtral, Llama, etc.)
+- Cohere
+- Mistral
+- DeepSeek
+- HuggingFace
+- OpenRouter
+- Local models (via Ollama, llama.cpp, etc.)
+
+## Important Notes
+
+1. **Dataset Requirement**: Every evaluation MUST have either an inline `dataset` or reference a `dataset_id`. The API will return a 422 error if neither is provided.
+
+2. **Score Interpretation**: All scores use a 0-1 scale where 1 is best. The `threshold` determines pass/fail.
+
+3. **Async Processing**: Evaluation runs are processed asynchronously. Use polling or SSE streaming to monitor progress.
+
+4. **Rate Limiting**: Default rate limits apply unless `TESTING=true` is set. Plan accordingly for large evaluations.
+
+5. **Error Handling**: Always check for both `error` and `detail.error` formats when handling error responses.
+
+6. **API Path**: All endpoints use the `/api/v1/` prefix. Using `/v1/` alone will result in 404 errors.
+
+## Support
+
+- **Documentation**: See Quick Start Guide and User Guide
+- **Issues**: Report at https://github.com/rmusser01/tldw_server/issues
+- **API Status**: Check `/health` endpoint

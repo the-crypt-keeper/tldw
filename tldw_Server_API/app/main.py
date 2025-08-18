@@ -277,9 +277,11 @@ app.include_router(research_router, prefix=f"{API_V1_PREFIX}/research", tags=["r
 app.include_router(evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
 
 # Router for OpenAI-compatible Evaluation endpoint (NEW)
-# Routes already have /v1 prefix in their definitions
-app.include_router(openai_evals_router, tags=["evaluations"])
+app.include_router(openai_evals_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
 
+# Router for Configuration Info endpoint (for documentation)
+from tldw_Server_API.app.api.v1.endpoints.config_info import router as config_info_router
+app.include_router(config_info_router, prefix=f"{API_V1_PREFIX}", tags=["config"])
 
 # Router for Sync endpoint
 app.include_router(sync_router, prefix=f"{API_V1_PREFIX}/sync", tags=["sync"])

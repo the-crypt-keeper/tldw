@@ -1,0 +1,242 @@
+<!-- Web Scraping Management Tab -->
+<div id="tabWebScrapingStatus" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/web-scraping/status</span>
+        </h2>
+        <p>Get web scraping service status and active jobs</p>
+        
+        <button class="api-button" onclick="makeRequest('webScrapingStatus', 'GET', '/api/v1/web-scraping/status', 'none')">
+            Check Status
+        </button>
+        
+        <pre id="webScrapingStatus_response"></pre>
+    </div>
+</div>
+
+<div id="tabWebScrapingJobs" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/web-scraping/job/{job_id}</span>
+        </h2>
+        <p>Get specific job details</p>
+        
+        <div class="form-group">
+            <label for="webScrapingJobGet_job_id">Job ID <span class="required">*</span>:</label>
+            <input type="text" id="webScrapingJobGet_job_id" placeholder="Enter job ID">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('webScrapingJobGet', 'GET', '/api/v1/web-scraping/job/{job_id}', 'none')">
+            Get Job Details
+        </button>
+        
+        <pre id="webScrapingJobGet_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/web-scraping/job/{job_id}</span>
+        </h2>
+        <p>Cancel or delete a scraping job</p>
+        
+        <div class="form-group">
+            <label for="webScrapingJobDelete_job_id">Job ID <span class="required">*</span>:</label>
+            <input type="text" id="webScrapingJobDelete_job_id" placeholder="Enter job ID">
+        </div>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Cancel this job?')) makeRequest('webScrapingJobDelete', 'DELETE', '/api/v1/web-scraping/job/{job_id}', 'none')">
+            Cancel Job
+        </button>
+        
+        <pre id="webScrapingJobDelete_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/web-scraping/progress/{task_id}</span>
+        </h2>
+        <p>Get task progress information</p>
+        
+        <div class="form-group">
+            <label for="webScrapingProgress_task_id">Task ID <span class="required">*</span>:</label>
+            <input type="text" id="webScrapingProgress_task_id" placeholder="Enter task ID">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('webScrapingProgress', 'GET', '/api/v1/web-scraping/progress/{task_id}', 'none')">
+            Check Progress
+        </button>
+        
+        <pre id="webScrapingProgress_response"></pre>
+    </div>
+</div>
+
+<div id="tabWebScrapingService" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/web-scraping/service/initialize</span>
+        </h2>
+        <p>Initialize the web scraping service</p>
+        
+        <div class="form-group">
+            <label for="webScrapingInit_headless">
+                <input type="checkbox" id="webScrapingInit_headless" checked>
+                Run in Headless Mode
+            </label>
+        </div>
+        
+        <div class="form-group">
+            <label for="webScrapingInit_max_workers">Max Workers:</label>
+            <input type="number" id="webScrapingInit_max_workers" value="5" min="1" max="20">
+            <small>Maximum concurrent scraping workers</small>
+        </div>
+        
+        <button class="api-button" onclick="handleWebScrapingInit()">
+            Initialize Service
+        </button>
+        
+        <pre id="webScrapingInit_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/web-scraping/service/shutdown</span>
+        </h2>
+        <p>Shutdown the web scraping service</p>
+        
+        <div class="form-group">
+            <label for="webScrapingShutdown_force">
+                <input type="checkbox" id="webScrapingShutdown_force">
+                Force Shutdown
+            </label>
+            <small>Force shutdown even if jobs are running</small>
+        </div>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Shutdown web scraping service?')) handleWebScrapingShutdown()">
+            Shutdown Service
+        </button>
+        
+        <pre id="webScrapingShutdown_response"></pre>
+    </div>
+</div>
+
+<div id="tabWebScrapingCookies" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/web-scraping/cookies/{domain}</span>
+        </h2>
+        <p>Get cookies for a specific domain</p>
+        
+        <div class="form-group">
+            <label for="webScrapingCookiesGet_domain">Domain <span class="required">*</span>:</label>
+            <input type="text" id="webScrapingCookiesGet_domain" placeholder="example.com">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('webScrapingCookiesGet', 'GET', '/api/v1/web-scraping/cookies/{domain}', 'none')">
+            Get Cookies
+        </button>
+        
+        <pre id="webScrapingCookiesGet_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/web-scraping/cookies/{domain}</span>
+        </h2>
+        <p>Set cookies for a specific domain</p>
+        
+        <div class="form-group">
+            <label for="webScrapingCookiesSet_domain">Domain <span class="required">*</span>:</label>
+            <input type="text" id="webScrapingCookiesSet_domain" placeholder="example.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="webScrapingCookiesSet_payload">Cookies (JSON):</label>
+            <textarea id="webScrapingCookiesSet_payload" rows="8" placeholder='[{"name": "session", "value": "abc123", "domain": ".example.com"}]'>[
+  {
+    "name": "session_id",
+    "value": "your_session_value",
+    "domain": ".example.com",
+    "path": "/",
+    "secure": true,
+    "httpOnly": true
+  }
+]</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('webScrapingCookiesSet', 'POST', '/api/v1/web-scraping/cookies/{domain}', 'json')">
+            Set Cookies
+        </button>
+        
+        <pre id="webScrapingCookiesSet_response"></pre>
+    </div>
+</div>
+
+<div id="tabWebScrapingDuplicates" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/web-scraping/duplicates/check</span>
+        </h2>
+        <p>Check for duplicate URLs in the database</p>
+        
+        <div class="form-group">
+            <label for="webScrapingDuplicates_url">URL to Check:</label>
+            <input type="text" id="webScrapingDuplicates_url" placeholder="https://example.com/page" data-query="true">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('webScrapingDuplicates', 'GET', '/api/v1/web-scraping/duplicates/check', 'query')">
+            Check Duplicates
+        </button>
+        
+        <pre id="webScrapingDuplicates_response"></pre>
+    </div>
+</div>
+
+<script>
+// Helper for web scraping initialization
+function handleWebScrapingInit() {
+    const payload = {
+        headless: document.getElementById('webScrapingInit_headless').checked,
+        max_workers: parseInt(document.getElementById('webScrapingInit_max_workers').value || 5)
+    };
+    
+    // Store payload for makeRequest
+    const hiddenPayload = document.createElement('textarea');
+    hiddenPayload.id = 'webScrapingInit_payload';
+    hiddenPayload.style.display = 'none';
+    hiddenPayload.value = JSON.stringify(payload);
+    document.body.appendChild(hiddenPayload);
+    
+    makeRequest('webScrapingInit', 'POST', '/api/v1/web-scraping/service/initialize', 'json');
+    
+    // Clean up
+    document.body.removeChild(hiddenPayload);
+}
+
+// Helper for web scraping shutdown
+function handleWebScrapingShutdown() {
+    const payload = {
+        force: document.getElementById('webScrapingShutdown_force').checked
+    };
+    
+    // Store payload for makeRequest
+    const hiddenPayload = document.createElement('textarea');
+    hiddenPayload.id = 'webScrapingShutdown_payload';
+    hiddenPayload.style.display = 'none';
+    hiddenPayload.value = JSON.stringify(payload);
+    document.body.appendChild(hiddenPayload);
+    
+    makeRequest('webScrapingShutdown', 'POST', '/api/v1/web-scraping/service/shutdown', 'json');
+    
+    // Clean up
+    document.body.removeChild(hiddenPayload);
+}
+</script>
