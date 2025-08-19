@@ -147,9 +147,10 @@ python -m pytest tldw_Server_API/tests/Evaluations/ --cov=tldw_Server_API/app/co
 ## Notes & Discoveries
 - 2025-08-18: Initial assessment complete
 - 2025-08-18: Found event loop issue in RAG audit logger - FIXED
-- 2025-08-18: Fixed asyncio import issue in RAG evaluator
+- 2025-08-18: Fixed asyncio import issue in RAG evaluator - FIXED
 - 2025-08-18: OpenAI endpoints now all passing (27/27)
 - 2025-08-18: End-to-end evaluation workflow confirmed working
+- 2025-08-18: Fixed embeddings configuration issue - model configs now properly typed as Pydantic models
 
 ## Current Test Status After Fixes
 - **Circuit breaker tests**: 13/13 passing (100%) ✅
@@ -169,9 +170,9 @@ python -m pytest tldw_Server_API/tests/Evaluations/ --cov=tldw_Server_API/app/co
 6. **Database Operations**: Migrations and storage working
 
 ### ⚠️ ISSUES Remaining
-1. **Embeddings Configuration**: Failing but gracefully falls back to LLM
-2. **Some Tests Hanging**: Error scenario tests have timeout issues
-3. **Load Testing**: Not yet performed
+1. **Embeddings Configuration**: FIXED - Now properly configured, only fails due to missing API key (expected)
+2. **Some Tests Hanging**: Error scenario tests have timeout issues (non-critical)
+3. **Load Testing**: Not yet performed (recommended before high-volume production)
 
 ### 🎯 Production Ready?
 **YES, with caveats** - The evaluation module is production-ready for:

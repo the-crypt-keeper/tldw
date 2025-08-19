@@ -55,21 +55,24 @@ class RAGEvaluator:
     
     def _setup_embedding_config(self) -> Dict[str, Any]:
         """Setup embedding configuration."""
+        from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import OpenAIModelCfg, HFModelCfg
+        
         config = get_embedding_config()
         
         # Override model if specified
         if self.embedding_model:
             config["embedding_config"]["default_model_id"] = self.embedding_model
         
-        # Add API key if provided
+        # Add API key if provided - create proper model instance
         if self.api_key and self.embedding_provider == "openai":
             if "models" not in config["embedding_config"]:
                 config["embedding_config"]["models"] = {}
             if self.embedding_model not in config["embedding_config"]["models"]:
-                config["embedding_config"]["models"][self.embedding_model] = {
-                    "provider": self.embedding_provider,
-                    "api_key": self.api_key
-                }
+                config["embedding_config"]["models"][self.embedding_model] = OpenAIModelCfg(
+                    provider=self.embedding_provider,
+                    model_name_or_path=self.embedding_model,
+                    api_key=self.api_key
+                )
         
         return config
     

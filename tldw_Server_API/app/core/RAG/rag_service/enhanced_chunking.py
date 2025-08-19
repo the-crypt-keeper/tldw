@@ -6,6 +6,7 @@ This module provides advanced chunking capabilities including:
 - PDF artifact cleaning
 - Smart boundary detection
 - Code block and table preservation
+- Advanced table serialization for improved semantic understanding
 """
 
 import re
@@ -14,6 +15,9 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
 from loguru import logger
+
+# Import table serialization functionality
+from .table_serialization import TableProcessor, TableFormat
 
 
 @dataclass
@@ -77,7 +81,11 @@ class EnhancedChunkingService:
         self.min_chunk_size = self.config.get('min_chunk_size', 100)
         self.max_chunk_size = self.config.get('max_chunk_size', 1000)
         
-        logger.info("Initialized EnhancedChunkingService")
+        # Table serialization configuration
+        self.table_serialize_method = self.config.get('table_serialize_method', 'hybrid')
+        self.table_processor = TableProcessor(self.table_serialize_method)
+        
+        logger.info(f"Initialized EnhancedChunkingService with table serialization: {self.table_serialize_method}")
     
     def chunk_text(
         self,
@@ -193,48 +201,78 @@ class EnhancedChunkingService:
     
     def _extract_tables(self, text: str) -> Tuple[str, List[Dict[str, Any]]]:
         """
-        Extract tables from text.
+        Extract and serialize tables from text.
         
         Args:
             text: Text containing tables
             
         Returns:
-            Tuple of (text with placeholders, list of tables)
+            Tuple of (text with placeholders and serialization, list of tables)
         """
         tables = []
         
-        # Simple markdown table detection
-        lines = text.split('\n')
-        i = 0
-        while i < len(lines):
-            if i < len(lines) - 1 and '|' in lines[i] and '|' in lines[i + 1]:
-                # Potential table start
-                if re.match(r'\s*\|[\s\-:]+\|', lines[i + 1]):
-                    # Found table separator
-                    table_lines = [lines[i]]
-                    j = i + 1
-                    while j < len(lines) and '|' in lines[j]:
-                        table_lines.append(lines[j])
-                        j += 1
-                    
-                    table_id = f"__TABLE_{len(tables)}__"
-                    tables.append({
-                        'id': table_id,
-                        'content': '\n'.join(table_lines),
-                        'start_line': i,
-                        'end_line': j
-                    })
-                    
-                    # Replace with placeholder
-                    lines[i] = table_id
-                    for k in range(i + 1, j):
-                        lines[k] = ''
-                    
-                    i = j
-                    continue
-            i += 1
+        # Use advanced table detection
+        table_pattern = re.compile(
+            r'((?:^\|[^\n]+\|$\n)+)', 
+            re.MULTILINE
+        )
         
-        return '\n'.join(lines), tables
+        processed_text = text
+        offset = 0
+        
+        for match in table_pattern.finditer(text):
+            try:
+                table_text = match.group(0)
+                
+                # Process table with advanced serialization
+                serialized_data = self.table_processor.process_table(table_text, TableFormat.MARKDOWN)
+                
+                # Create placeholder and serialized content
+                table_id = f"__TABLE_{len(tables)}__"
+                
+                # Build replacement text with both placeholder and serialization
+                replacement_parts = [table_id]
+                
+                # Add serialized search text for better retrieval
+                if 'search_text' in serialized_data:
+                    replacement_parts.append(f"\n[Table Content: {serialized_data['search_text'][:200]}...]")
+                
+                replacement_text = '\n'.join(replacement_parts)
+                
+                # Calculate positions
+                start = match.start() + offset
+                end = match.end() + offset
+                
+                # Store table information
+                tables.append({
+                    'id': table_id,
+                    'content': table_text,
+                    'serialized': serialized_data,
+                    'start_pos': start,
+                    'end_pos': end
+                })
+                
+                # Replace in text
+                processed_text = processed_text[:start] + replacement_text + processed_text[end:]
+                offset += len(replacement_text) - len(table_text)
+                
+                logger.debug(f"Extracted and serialized table with {serialized_data.get('metadata', {}).get('num_rows', 0)} rows")
+                
+            except Exception as e:
+                logger.warning(f"Failed to process table: {e}")
+                # Fallback to simple extraction
+                table_id = f"__TABLE_{len(tables)}__"
+                tables.append({
+                    'id': table_id,
+                    'content': match.group(0),
+                    'serialized': None,
+                    'start_pos': match.start(),
+                    'end_pos': match.end()
+                })
+                processed_text = processed_text[:match.start() + offset] + table_id + processed_text[match.end() + offset:]
+                offset += len(table_id) - len(match.group(0))
+        
+        return processed_text, tables
     
     def _structure_aware_chunking(
         self,
@@ -549,18 +587,54 @@ class EnhancedChunkingService:
         tables: List[Dict[str, Any]],
         start_index: int
     ) -> List[Chunk]:
-        """Create chunks for tables."""
+        """Create chunks for tables with advanced serialization."""
         chunks = []
         
         for i, table in enumerate(tables):
+            # Create content that includes both original and serialized versions
+            content_parts = [table['content']]
+            
+            # Add serialized representations if available
+            if table.get('serialized'):
+                serialized = table['serialized']
+                
+                # Add entity blocks if present
+                if 'entity_blocks' in serialized:
+                    content_parts.append("\n[Table as structured data:]")
+                    for block in serialized['entity_blocks'][:5]:  # Limit to first 5 rows for chunk
+                        content_parts.append(f"- {block['information_block']}")
+                
+                # Add sentences if present
+                if 'sentences' in serialized:
+                    content_parts.append("\n[Table description:]")
+                    content_parts.extend(serialized['sentences'][:3])  # First 3 sentences
+            
+            full_content = '\n'.join(content_parts)
+            
+            # Create metadata including serialization info
+            metadata = {
+                'original_id': table['id'],
+                'table_format': 'markdown',
+                'has_serialization': table.get('serialized') is not None
+            }
+            
+            if table.get('serialized') and 'metadata' in table['serialized']:
+                metadata.update({
+                    'num_rows': table['serialized']['metadata'].get('num_rows', 0),
+                    'num_columns': table['serialized']['metadata'].get('num_columns', 0),
+                    'headers': table['serialized']['metadata'].get('headers', [])
+                })
+            
             chunks.append(Chunk(
                 id=f"chunk_{start_index + i}",
-                content=table['content'],
-                start_char=0,  # Would need proper tracking
-                end_char=len(table['content']),
+                content=full_content,
+                start_char=table.get('start_pos', 0),
+                end_char=table.get('end_pos', len(table['content'])),
                 chunk_index=start_index + i,
-                metadata={'original_id': table['id']},
+                metadata=metadata,
                 chunk_type='table'
             ))
+            
+            logger.debug(f"Created table chunk with {len(full_content)} characters")
         
         return chunks

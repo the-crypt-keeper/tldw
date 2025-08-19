@@ -2,19 +2,39 @@
 Query expansion strategies for improved retrieval.
 
 This module provides various query expansion techniques to improve
-search recall and precision.
+search recall and precision, including:
+- Synonym expansion
+- Multi-query generation
+- Acronym expansion and contraction
+- Entity recognition and expansion
+- Domain-specific term expansion
+- Semantic similarity-based expansion
 """
 
 import re
 import asyncio
 from typing import List, Dict, Any, Optional, Set, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
+from enum import Enum
+from functools import lru_cache
 import json
 
 from loguru import logger
 
 from .types import RetrieverStrategy, SearchResult, Document, DataSource
+
+
+class ExpansionStrategy(Enum):
+    """Available query expansion strategies."""
+    SYNONYM = "synonym"           # Basic synonym expansion
+    MULTI_QUERY = "multi_query"   # Generate query variations
+    SEMANTIC = "semantic"         # Use embeddings for semantic similarity
+    LINGUISTIC = "linguistic"     # Advanced linguistic processing
+    ENTITY = "entity"            # Named entity recognition
+    ACRONYM = "acronym"          # Expand/contract acronyms
+    DOMAIN = "domain"            # Domain-specific expansions
+    HYBRID = "hybrid"            # Combine multiple strategies
 
 
 @dataclass
@@ -25,7 +45,9 @@ class ExpandedQuery:
     synonyms: Dict[str, List[str]]
     keywords: List[str]
     entities: List[str]
-    metadata: Dict[str, Any]
+    acronym_expansions: Dict[str, List[str]] = field(default_factory=dict)
+    domain_terms: Dict[str, List[str]] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class QueryExpansionStrategy(ABC):
@@ -244,6 +266,248 @@ class MultiQueryGeneration(QueryExpansionStrategy):
         return entities
 
 
+class AcronymExpansion(QueryExpansionStrategy):
+    """
+    Expands or contracts acronyms in queries.
+    """
+    
+    # Common acronyms and their expansions
+    ACRONYM_DB = {
+        "ai": ["artificial intelligence"],
+        "ml": ["machine learning"],
+        "nlp": ["natural language processing"],
+        "llm": ["large language model"],
+        "rag": ["retrieval augmented generation"],
+        "api": ["application programming interface"],
+        "db": ["database"],
+        "ui": ["user interface"],
+        "ux": ["user experience"],
+        "cli": ["command line interface"],
+        "gpu": ["graphics processing unit"],
+        "cpu": ["central processing unit"],
+        "ram": ["random access memory"],
+        "ssd": ["solid state drive"],
+        "hdd": ["hard disk drive"],
+        "os": ["operating system"],
+        "vm": ["virtual machine"],
+        "ci": ["continuous integration"],
+        "cd": ["continuous deployment", "continuous delivery"],
+        "sdk": ["software development kit"],
+        "ide": ["integrated development environment"],
+        "json": ["javascript object notation"],
+        "xml": ["extensible markup language"],
+        "html": ["hypertext markup language"],
+        "css": ["cascading style sheets"],
+        "sql": ["structured query language"],
+        "http": ["hypertext transfer protocol"],
+        "https": ["hypertext transfer protocol secure"],
+        "rest": ["representational state transfer"],
+        "crud": ["create read update delete"],
+        "mvc": ["model view controller"],
+        "mvp": ["model view presenter", "minimum viable product"],
+        "tdd": ["test driven development"],
+        "bdd": ["behavior driven development"],
+        "poc": ["proof of concept"],
+        "roi": ["return on investment"],
+        "kpi": ["key performance indicator"],
+        "saas": ["software as a service"],
+        "paas": ["platform as a service"],
+        "iaas": ["infrastructure as a service"],
+    }
+    
+    def __init__(self, custom_acronyms: Optional[Dict[str, List[str]]] = None):
+        """
+        Initialize acronym expansion.
+        
+        Args:
+            custom_acronyms: Additional acronyms to add
+        """
+        self.acronyms = self.ACRONYM_DB.copy()
+        if custom_acronyms:
+            self.acronyms.update(custom_acronyms)
+        
+        # Build reverse mapping for contraction
+        self.reverse_acronyms = {}
+        for acronym, expansions in self.acronyms.items():
+            for expansion in expansions:
+                self.reverse_acronyms[expansion] = acronym
+    
+    async def expand(self, query: str) -> ExpandedQuery:
+        """
+        Expand or contract acronyms in the query.
+        
+        Args:
+            query: Original query string
+            
+        Returns:
+            ExpandedQuery with acronym variations
+        """
+        variations = []
+        acronym_expansions = {}
+        words = query.lower().split()
+        
+        # Check each word for acronym expansion
+        for i, word in enumerate(words):
+            if word in self.acronyms:
+                # Expand acronym
+                acronym_expansions[word] = self.acronyms[word]
+                for expansion in self.acronyms[word]:
+                    new_words = words.copy()
+                    new_words[i] = expansion
+                    variations.append(" ".join(new_words))
+        
+        # Check for contractable phrases
+        query_lower = query.lower()
+        for full_form, acronym in self.reverse_acronyms.items():
+            if full_form in query_lower:
+                contracted = query_lower.replace(full_form, acronym)
+                if contracted != query_lower:
+                    variations.append(contracted)
+                    if acronym not in acronym_expansions:
+                        acronym_expansions[acronym] = [full_form]
+        
+        return ExpandedQuery(
+            original_query=query,
+            variations=variations[:5],
+            synonyms={},
+            keywords=words,
+            entities=[],
+            acronym_expansions=acronym_expansions,
+            metadata={"strategy": "acronym_expansion"}
+        )
+
+
+class DomainExpansion(QueryExpansionStrategy):
+    """
+    Expands queries using domain-specific vocabulary.
+    """
+    
+    # Domain-specific term relationships
+    DOMAIN_TERMS = {
+        "transcription": ["speech to text", "audio to text", "voice recognition"],
+        "summarization": ["summary", "abstract", "synopsis", "digest"],
+        "embedding": ["vector", "representation", "encoding", "feature vector"],
+        "chunking": ["segmentation", "splitting", "partitioning"],
+        "retrieval": ["search", "lookup", "query", "fetch"],
+        "generation": ["creation", "synthesis", "production"],
+        "model": ["algorithm", "network", "architecture"],
+        "training": ["learning", "fitting", "optimization"],
+        "inference": ["prediction", "generation", "output"],
+        "context": ["background", "setting", "environment"],
+        "prompt": ["input", "query", "instruction"],
+        "token": ["word", "subword", "piece"],
+        "attention": ["focus", "weight", "importance"],
+        "transformer": ["model", "architecture", "network"],
+        "fine-tuning": ["adaptation", "customization", "specialization"],
+    }
+    
+    def __init__(self, custom_terms: Optional[Dict[str, List[str]]] = None):
+        """
+        Initialize domain expansion.
+        
+        Args:
+            custom_terms: Additional domain-specific terms
+        """
+        self.domain_terms = self.DOMAIN_TERMS.copy()
+        if custom_terms:
+            self.domain_terms.update(custom_terms)
+    
+    async def expand(self, query: str) -> ExpandedQuery:
+        """
+        Expand query using domain-specific terms.
+        
+        Args:
+            query: Original query string
+            
+        Returns:
+            ExpandedQuery with domain variations
+        """
+        variations = []
+        found_domain_terms = {}
+        query_lower = query.lower()
+        
+        # Check for domain terms in query
+        for term, related_terms in self.domain_terms.items():
+            if term in query_lower:
+                found_domain_terms[term] = related_terms
+                for related in related_terms[:2]:  # Limit related terms
+                    expanded = query_lower.replace(term, related)
+                    if expanded != query_lower:
+                        variations.append(expanded)
+        
+        return ExpandedQuery(
+            original_query=query,
+            variations=variations[:5],
+            synonyms={},
+            keywords=query_lower.split(),
+            entities=[],
+            domain_terms=found_domain_terms,
+            metadata={"strategy": "domain_expansion"}
+        )
+
+
+class EntityExpansion(QueryExpansionStrategy):
+    """
+    Expands queries based on recognized entities.
+    """
+    
+    def __init__(self):
+        """Initialize entity expansion."""
+        # Entity patterns for recognition
+        self.patterns = {
+            "date": r'\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b',
+            "time": r'\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM|am|pm)?\b',
+            "email": r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+            "url": r'https?://[^\s]+',
+            "number": r'\b\d+\.?\d*\b',
+            "version": r'\bv?\d+\.\d+(?:\.\d+)?\b',
+        }
+    
+    async def expand(self, query: str) -> ExpandedQuery:
+        """
+        Expand query based on recognized entities.
+        
+        Args:
+            query: Original query string
+            
+        Returns:
+            ExpandedQuery with entity-based variations
+        """
+        variations = []
+        entities = []
+        
+        # Check for entities and create targeted expansions
+        for entity_type, pattern in self.patterns.items():
+            matches = re.findall(pattern, query)
+            if matches:
+                entities.extend(matches)
+                
+                if entity_type == "date":
+                    variations.append(query + " events")
+                    variations.append(query + " timeline")
+                elif entity_type == "version":
+                    variations.append(query + " changelog")
+                    variations.append(query + " release notes")
+                elif entity_type == "email":
+                    variations.append(query + " sender")
+                    variations.append(query + " conversation")
+        
+        # Look for capitalized words (potential named entities)
+        words = query.split()
+        for word in words:
+            if len(word) > 2 and word[0].isupper() and word not in ["What", "How", "Why", "When", "Where", "Who"]:
+                entities.append(word)
+        
+        return ExpandedQuery(
+            original_query=query,
+            variations=variations[:5],
+            synonyms={},
+            keywords=query.split(),
+            entities=entities,
+            metadata={"strategy": "entity_expansion"}
+        )
+
+
 class HybridQueryExpansion(QueryExpansionStrategy):
     """
     Combines multiple expansion strategies for comprehensive query expansion.
@@ -258,7 +522,10 @@ class HybridQueryExpansion(QueryExpansionStrategy):
         """
         self.strategies = strategies or [
             SynonymExpansion(),
-            MultiQueryGeneration()
+            MultiQueryGeneration(),
+            AcronymExpansion(),
+            DomainExpansion(),
+            EntityExpansion()
         ]
     
     async def expand(self, query: str) -> ExpandedQuery:
@@ -295,12 +562,24 @@ class HybridQueryExpansion(QueryExpansionStrategy):
                 seen.add(v)
                 unique_variations.append(v)
         
+        # Merge additional fields
+        all_acronyms = {}
+        all_domain_terms = {}
+        
+        for expansion in expansions:
+            if hasattr(expansion, 'acronym_expansions'):
+                all_acronyms.update(expansion.acronym_expansions)
+            if hasattr(expansion, 'domain_terms'):
+                all_domain_terms.update(expansion.domain_terms)
+        
         return ExpandedQuery(
             original_query=query,
             variations=unique_variations[:10],  # Limit total variations
             synonyms=all_synonyms,
             keywords=list(set(all_keywords))[:20],
             entities=list(set(all_entities)),
+            acronym_expansions=all_acronyms,
+            domain_terms=all_domain_terms,
             metadata={
                 "strategy": "hybrid",
                 "strategies_used": [type(s).__name__ for s in self.strategies]

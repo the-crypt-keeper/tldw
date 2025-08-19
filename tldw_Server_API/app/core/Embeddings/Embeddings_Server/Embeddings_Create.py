@@ -936,27 +936,27 @@ def get_embedding_config() -> Dict[str, Any]:
     provider = embedding_settings.get('embedding_provider', 'openai')
     model = embedding_settings.get('embedding_model', 'text-embedding-3-small')
     
-    # Add default configurations for common models
+    # Add default configurations for common models - create proper instances
     if provider == 'openai':
-        config["embedding_config"]["models"][model] = {
-            "provider": "openai",
-            "model_name_or_path": model,
-            "api_key": embedding_settings.get('embedding_api_key', settings.get("OPENAI_API_KEY", ""))
-        }
+        config["embedding_config"]["models"][model] = OpenAIModelCfg(
+            provider="openai",
+            model_name_or_path=model,
+            api_key=embedding_settings.get('embedding_api_key', settings.get("OPENAI_API_KEY", ""))
+        )
     elif provider == 'huggingface':
-        config["embedding_config"]["models"][model] = {
-            "provider": "huggingface",
-            "model_name_or_path": model,
-            "trust_remote_code": False,
-            "hf_cache_dir_subpath": "huggingface_cache"
-        }
+        config["embedding_config"]["models"][model] = HFModelCfg(
+            provider="huggingface",
+            model_name_or_path=model,
+            trust_remote_code=False,
+            hf_cache_dir_subpath="huggingface_cache"
+        )
     elif provider == 'local_api':
-        config["embedding_config"]["models"][model] = {
-            "provider": "local_api",
-            "model_name_or_path": model,
-            "api_url": embedding_settings.get('embedding_api_url', 'http://localhost:8080/v1/embeddings'),
-            "api_key": embedding_settings.get('embedding_api_key', '')
-        }
+        config["embedding_config"]["models"][model] = LocalAPICfg(
+            provider="local_api",
+            model_name_or_path=model,
+            api_url=embedding_settings.get('embedding_api_url', 'http://localhost:8080/v1/embeddings'),
+            api_key=embedding_settings.get('embedding_api_key', '')
+        )
     
     # Add common HuggingFace models that might be requested
     common_hf_models = [
@@ -966,12 +966,12 @@ def get_embedding_config() -> Dict[str, Any]:
     
     for hf_model in common_hf_models:
         if hf_model not in config["embedding_config"]["models"]:
-            config["embedding_config"]["models"][hf_model] = {
-                "provider": "huggingface",
-                "model_name_or_path": hf_model,
-                "trust_remote_code": False,
-                "hf_cache_dir_subpath": "huggingface_cache"
-            }
+            config["embedding_config"]["models"][hf_model] = HFModelCfg(
+                provider="huggingface",
+                model_name_or_path=hf_model,
+                trust_remote_code=False,
+                hf_cache_dir_subpath="huggingface_cache"
+            )
     
     return config
 
