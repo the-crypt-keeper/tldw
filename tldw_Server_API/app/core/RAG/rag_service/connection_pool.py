@@ -9,7 +9,7 @@ import sqlite3
 import asyncio
 from typing import Dict, Any, Optional, List
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import threading
 from queue import Queue, Empty, Full

@@ -267,7 +267,6 @@ class RAGEvaluator:
         if self.embedding_available:
             try:
                 # Get embeddings for both texts (create_embedding is synchronous, so run in executor)
-                import asyncio
                 loop = asyncio.get_event_loop()
                 response_embedding = await loop.run_in_executor(
                     None, create_embedding, response, self.embedding_config, self.embedding_model

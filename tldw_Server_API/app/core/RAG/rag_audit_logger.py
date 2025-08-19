@@ -120,7 +120,7 @@ class RAGAuditLogger:
         
         self.db_path = str(db_path)
         self._init_database()
-        self._write_queue = asyncio.Queue()
+        self._write_queue = None  # Will be created when started
         self._writer_task = None
         logger.info(f"RAG audit logger initialized at {self.db_path}")
     
@@ -219,14 +219,25 @@ class RAGAuditLogger:
     async def start(self):
         """Start the async writer task"""
         if self.enabled and not self._writer_task:
+            # Create queue in the current event loop
+            if self._write_queue is None:
+                self._write_queue = asyncio.Queue()
             self._writer_task = asyncio.create_task(self._writer_loop())
     
     async def stop(self):
         """Stop the async writer task"""
-        if self._writer_task:
-            await self._write_queue.put(None)  # Sentinel
-            await self._writer_task
-            self._writer_task = None
+        if self._writer_task and self._write_queue:
+            try:
+                await self._write_queue.put(None)  # Sentinel
+                await asyncio.wait_for(self._writer_task, timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning("Audit logger writer task did not stop gracefully")
+                self._writer_task.cancel()
+            except Exception as e:
+                logger.error(f"Error stopping audit logger: {e}")
+            finally:
+                self._writer_task = None
+                self._write_queue = None
     
     async def _writer_loop(self):
         """Async loop for batch writing audit entries"""
@@ -365,6 +376,10 @@ class RAGAuditLogger:
         """Log an audit entry asynchronously"""
         if not self.enabled:
             return
+        
+        if self._write_queue is None:
+            # Queue not yet initialized, create it
+            self._write_queue = asyncio.Queue()
         
         await self._write_queue.put(entry)
     
