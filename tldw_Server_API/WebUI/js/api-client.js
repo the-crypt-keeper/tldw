@@ -8,15 +8,40 @@ class APIClient {
         this.token = '';  // Token should be set by user, not hardcoded
         this.requestHistory = [];
         this.maxHistorySize = 50;
+        this.configLoaded = false;
         this.init();
     }
 
-    init() {
-        // Load saved configuration
+    async init() {
+        // First, try to load configuration from webui-config.json
+        try {
+            const response = await fetch('/webui-config.json');
+            if (response.ok) {
+                const config = await response.json();
+                if (config.apiUrl) {
+                    this.baseUrl = config.apiUrl;
+                }
+                if (config.apiKey && config.apiKey !== '') {
+                    this.token = config.apiKey;
+                    this.configLoaded = true;
+                    console.log('Loaded API configuration from webui-config.json');
+                }
+            }
+        } catch (error) {
+            // Config file not found or error reading it, that's okay
+            console.log('No webui-config.json found, using defaults');
+        }
+
+        // Then load any saved configuration (user overrides)
         const savedConfig = Utils.getFromStorage('api-config');
         if (savedConfig) {
-            this.baseUrl = savedConfig.baseUrl || this.baseUrl;
-            this.token = savedConfig.token || this.token;
+            // Only override if user has explicitly saved settings
+            if (savedConfig.baseUrl) {
+                this.baseUrl = savedConfig.baseUrl;
+            }
+            if (savedConfig.token) {
+                this.token = savedConfig.token;
+            }
         }
 
         // Load request history

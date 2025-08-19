@@ -68,8 +68,11 @@ from tldw_Server_API.app.api.v1.endpoints.users import router as users_router
 ## Trash Endpoint
 #from tldw_Server_API.app.api.v1.endpoints.trash import router as trash_router
 #
-# MCP Endpoint
+# MCP Endpoint (Original)
 from tldw_Server_API.app.api.v1.endpoints.mcp_endpoint import router as mcp_router
+#
+# MCP v2 Endpoint (New Modular Version)
+from tldw_Server_API.app.api.v1.endpoints.mcp_v2_endpoint import router as mcp_v2_router
 #
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 #
@@ -148,6 +151,17 @@ async def lifespan(app: FastAPI):
         logger.error(f"App Startup: Failed to initialize auth services: {e}")
         # Continue startup even if auth services fail (for backward compatibility)
     
+    # Initialize MCP v2 Server
+    logger.info("App Startup: Initializing MCP v2 server...")
+    try:
+        from tldw_Server_API.app.core.MCP_v2 import get_mcp_server
+        mcp_server = get_mcp_server()
+        await mcp_server.initialize()
+        logger.info("App Startup: MCP v2 server initialized successfully")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize MCP v2 server: {e}")
+        # Continue startup even if MCP v2 fails (for backward compatibility)
+    
     yield
     
     # Shutdown: Clean up resources
@@ -168,6 +182,14 @@ async def lifespan(app: FastAPI):
             logger.info("App Shutdown: Session manager shutdown")
     except Exception as e:
         logger.error(f"App Shutdown: Error shutting down session manager: {e}")
+    
+    # Shutdown MCP v2 server
+    try:
+        if 'mcp_server' in locals():
+            await mcp_server.shutdown()
+            logger.info("App Shutdown: MCP v2 server shutdown")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error shutting down MCP v2 server: {e}")
     
     # Original test DB cleanup
     global test_db_instance_ref
@@ -293,6 +315,8 @@ app.include_router(tools_router, prefix=f"{API_V1_PREFIX}/tools", tags=["tools"]
 
 # Router for MCP (Model Context Protocol) endpoint
 app.include_router(mcp_router, prefix=f"{API_V1_PREFIX}", tags=["MCP"])
+# Router for MCP v2 (New Modular Version)
+app.include_router(mcp_v2_router, prefix=f"{API_V1_PREFIX}", tags=["MCP v2"])
 
 
 # Router for trash endpoints - deletion of media items / trash file handling (FIXME: Secure delete vs lag on delete?)

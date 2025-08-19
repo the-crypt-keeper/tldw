@@ -17,9 +17,9 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
-from tldw_Server_API.app.core.RAG.rag_embeddings_integration import (
-    RAGEmbeddingsIntegration,
-    create_rag_embeddings_integration
+from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import (
+    create_embedding, 
+    get_embedding_config
 )
 from tldw_Server_API.app.core.Evaluations.circuit_breaker import (
     llm_circuit_breaker,
@@ -39,21 +39,49 @@ class RAGEvaluator:
             embedding_model: Model to use for embeddings
             api_key: Optional API key for the embedding provider
         """
-        self.embedding_available = False
-        self.embeddings_integration = None
+        self.embedding_provider = embedding_provider
+        self.embedding_model = embedding_model
+        self.api_key = api_key
         
-        try:
-            # Initialize production embeddings integration
-            self.embeddings_integration = create_rag_embeddings_integration(
-                provider=embedding_provider,
-                model=embedding_model,
-                api_key=api_key
-            )
-            self.embedding_available = True
+        # Get embedding configuration
+        self.embedding_config = self._setup_embedding_config()
+        
+        # Check if embeddings are available by attempting a test embedding
+        self.embedding_available = self._test_embeddings()
+        if self.embedding_available:
             logger.info(f"Initialized RAG evaluator with {embedding_provider}/{embedding_model} embeddings")
+        else:
+            logger.warning(f"Embeddings not available for {embedding_provider}/{embedding_model}. Using LLM-based fallback.")
+    
+    def _setup_embedding_config(self) -> Dict[str, Any]:
+        """Setup embedding configuration."""
+        config = get_embedding_config()
+        
+        # Override model if specified
+        if self.embedding_model:
+            config["embedding_config"]["default_model_id"] = self.embedding_model
+        
+        # Add API key if provided
+        if self.api_key and self.embedding_provider == "openai":
+            if "models" not in config["embedding_config"]:
+                config["embedding_config"]["models"] = {}
+            if self.embedding_model not in config["embedding_config"]["models"]:
+                config["embedding_config"]["models"][self.embedding_model] = {
+                    "provider": self.embedding_provider,
+                    "api_key": self.api_key
+                }
+        
+        return config
+    
+    def _test_embeddings(self) -> bool:
+        """Test if embeddings are available."""
+        try:
+            # Try to get a test embedding
+            result = create_embedding("test", self.embedding_config, model_id_override=self.embedding_model)
+            return result is not None and len(result) > 0
         except Exception as e:
-            logger.warning(f"Failed to initialize embeddings integration: {e}. Using LLM-based fallback.")
-            self.embedding_available = False
+            logger.debug(f"Embeddings test failed: {e}")
+            return False
         
     async def evaluate(
         self,
@@ -236,13 +264,22 @@ class RAGEvaluator:
         """Evaluate similarity between response and ground truth"""
         
         # Use embedding-based similarity if available
-        if self.embedding_available and self.embeddings_integration:
+        if self.embedding_available:
             try:
-                # Get embeddings for both texts
-                response_embedding = await self.embeddings_integration.embed_query(response)
-                ground_truth_embedding = await self.embeddings_integration.embed_query(ground_truth)
+                # Get embeddings for both texts (create_embedding is synchronous, so run in executor)
+                import asyncio
+                loop = asyncio.get_event_loop()
+                response_embedding = await loop.run_in_executor(
+                    None, create_embedding, response, self.embedding_config, self.embedding_model
+                )
+                ground_truth_embedding = await loop.run_in_executor(
+                    None, create_embedding, ground_truth, self.embedding_config, self.embedding_model
+                )
                 
-                # Calculate cosine similarity
+                # Convert to numpy arrays and calculate cosine similarity
+                response_embedding = np.array(response_embedding)
+                ground_truth_embedding = np.array(ground_truth_embedding)
+                
                 # Reshape for sklearn if needed
                 if response_embedding.ndim == 1:
                     response_embedding = response_embedding.reshape(1, -1)
@@ -428,9 +465,6 @@ class RAGEvaluator:
         return suggestions
     
     def close(self):
-        """Clean up resources including embeddings integration."""
-        if self.embeddings_integration:
-            try:
-                self.embeddings_integration.close()
-            except Exception as e:
-                logger.warning(f"Error closing embeddings integration: {e}")
+        """Clean up resources."""
+        # No resources to clean up with direct embeddings API
+        pass

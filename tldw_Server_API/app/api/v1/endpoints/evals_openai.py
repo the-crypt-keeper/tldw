@@ -98,11 +98,7 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
     """
     settings = get_settings()
     
-    # In single-user mode with no credentials, use default auth
-    if not credentials and settings.AUTH_MODE == "single_user":
-        # Use the configured API key as the authenticated user
-        return os.getenv("API_BEARER") or os.getenv("SINGLE_USER_API_KEY") or "default-user"
-    
+    # Always require credentials for production security
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -135,16 +131,12 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
                 }}
             )
         
-        # Check token matches expected
+        # Check token matches expected (including sk- prefixed keys)
         if token == expected_token:
             return token
         
-        # For OpenAI compatibility, accept sk- prefixed keys that match
+        # For OpenAI compatibility, accept sk- prefixed keys that match expected token
         if token.startswith("sk-") and token == expected_token:
-            return token
-        
-        # Also accept sk- keys in general for OpenAI compatibility in single-user mode
-        if token.startswith("sk-"):
             return token
             
     elif settings.AUTH_MODE == "multi_user":

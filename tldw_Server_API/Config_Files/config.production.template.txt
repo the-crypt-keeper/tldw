@@ -1,0 +1,229 @@
+# PRODUCTION CONFIGURATION TEMPLATE FOR TLDW_SERVER
+# 
+# CRITICAL: This is a template. Copy to config.txt and update all values before deployment.
+# Never commit actual API keys or sensitive data to version control.
+#
+# Security Checklist:
+# [ ] Replace all default API keys
+# [ ] Set strong JWT secret key
+# [ ] Configure proper CORS origins
+# [ ] Enable HTTPS only
+# [ ] Set appropriate rate limits
+# [ ] Configure secure database paths
+# [ ] Enable audit logging
+
+[Settings]
+# Authentication mode: single_user or multi_user
+auth_mode = multi_user
+
+# CRITICAL: Replace with strong random key (use: openssl rand -hex 32)
+jwt_secret_key = REPLACE_WITH_STRONG_RANDOM_KEY_NEVER_USE_DEFAULT
+
+# Session configuration
+session_timeout_minutes = 1440
+refresh_token_days = 30
+
+# CORS Configuration - Set to your actual domain(s)
+cors_origins = https://yourdomain.com,https://api.yourdomain.com
+cors_allow_credentials = true
+
+# Force HTTPS in production
+force_https = true
+
+# Server binding
+host = 0.0.0.0
+port = 8000
+
+[Database]
+# Production database paths - ensure proper permissions (chmod 600)
+media_db_path = /var/lib/tldw/databases/media_db_v2.db
+chacha_notes_db_path = /var/lib/tldw/databases/chacha_notes.db
+prompts_db_path = /var/lib/tldw/databases/prompts.db
+evaluations_db_path = /var/lib/tldw/databases/evaluations.db
+
+# Database connection pooling
+db_pool_size = 20
+db_max_overflow = 10
+db_pool_timeout = 30
+
+# Backup configuration
+backup_enabled = true
+backup_path = /var/backups/tldw
+backup_retention_days = 30
+
+[API]
+# LLM Provider API Keys - NEVER use defaults in production
+openai_api_key = sk-REPLACE_WITH_YOUR_OPENAI_KEY
+anthropic_api_key = sk-ant-REPLACE_WITH_YOUR_ANTHROPIC_KEY
+google_api_key = REPLACE_WITH_YOUR_GOOGLE_KEY
+cohere_api_key = REPLACE_WITH_YOUR_COHERE_KEY
+groq_api_key = REPLACE_WITH_YOUR_GROQ_KEY
+deepseek_api_key = REPLACE_WITH_YOUR_DEEPSEEK_KEY
+mistral_api_key = REPLACE_WITH_YOUR_MISTRAL_KEY
+openrouter_api_key = REPLACE_WITH_YOUR_OPENROUTER_KEY
+
+# Default LLM settings
+default_llm_provider = openai
+default_llm_model = gpt-3.5-turbo
+temperature = 0.7
+max_tokens = 2048
+
+[Embeddings]
+# Embedding provider configuration
+embedding_provider = openai
+embedding_model = text-embedding-3-small
+embedding_api_key = ${openai_api_key}  # Can reference API key from above
+
+# Embedding performance
+embedding_batch_size = 100
+embedding_max_retries = 3
+embedding_timeout = 30
+
+[RAG]
+# RAG Service Configuration
+rag_cache_ttl = 3600  # 1 hour
+rag_max_search_results = 20
+rag_hybrid_alpha = 0.5  # Balance between semantic and keyword search
+rag_reranking_enabled = true
+rag_citation_enabled = true
+rag_parent_retrieval_enabled = false
+rag_query_expansion_enabled = false
+
+# Connection pooling for RAG
+rag_connection_pool_enabled = true
+rag_pool_min_connections = 2
+rag_pool_max_connections = 10
+
+[RateLimiting]
+# Rate limiting configuration (per minute unless specified)
+rate_limit_enabled = true
+
+# Search endpoints
+search_requests_per_minute = 60
+search_burst_size = 10
+
+# Agent endpoints (more expensive)
+agent_requests_per_minute = 30
+agent_burst_size = 5
+
+# Advanced/Research mode (most expensive)
+research_requests_per_minute = 10
+research_burst_size = 2
+
+# Token limits (per day)
+free_tier_tokens_per_day = 100000
+basic_tier_tokens_per_day = 1000000
+premium_tier_tokens_per_day = 10000000
+
+# Cost limits (USD per day)
+free_tier_cost_per_day = 1.0
+basic_tier_cost_per_day = 10.0
+premium_tier_cost_per_day = 100.0
+
+[Monitoring]
+# Metrics and monitoring
+metrics_enabled = true
+metrics_port = 9090
+metrics_path = /metrics
+
+# Health checks
+health_check_enabled = true
+health_check_path = /health
+health_check_interval = 60
+
+# Audit logging
+audit_logging_enabled = true
+audit_log_path = /var/log/tldw/audit.log
+audit_log_retention_days = 90
+
+[Logging]
+# Application logging
+log_level = WARNING  # Use INFO for debugging, WARNING for production
+log_file = /var/log/tldw/application.log
+log_rotation = 1 day
+log_retention = 30 days
+log_format = json  # Use json for structured logging
+
+# Sensitive data masking
+mask_api_keys = true
+mask_user_data = true
+
+[Security]
+# Security headers
+x_frame_options = DENY
+x_content_type_options = nosniff
+x_xss_protection = 1; mode=block
+strict_transport_security = max-age=31536000; includeSubDomains
+
+# Request limits
+max_request_size_mb = 100
+max_file_upload_size_mb = 500
+allowed_file_extensions = .txt,.pdf,.epub,.docx,.html,.md,.xml,.json
+
+# API key validation
+require_api_key_for_endpoints = true
+api_key_header = X-API-Key
+api_key_min_length = 32
+
+[Performance]
+# Worker configuration
+num_workers = 4  # Adjust based on CPU cores
+worker_class = uvicorn.workers.UvicornWorker
+worker_timeout = 120
+graceful_timeout = 30
+
+# Async configuration
+async_max_workers = 10
+async_queue_size = 100
+
+# Caching
+cache_enabled = true
+cache_backend = redis  # or memory for single instance
+redis_url = redis://localhost:6379/0
+cache_ttl = 3600
+
+[MediaProcessing]
+# Media processing limits
+max_video_duration_minutes = 180
+max_audio_duration_minutes = 360
+max_pdf_pages = 1000
+max_document_size_mb = 100
+
+# Transcription settings
+transcription_model = whisper-large-v3
+transcription_language = auto
+transcription_device = cuda  # or cpu
+
+# Chunking configuration
+chunk_size = 1000
+chunk_overlap = 200
+max_chunks_per_document = 10000
+
+[Deployment]
+# Deployment environment
+environment = production
+deployment_id = REPLACE_WITH_UNIQUE_ID
+region = us-east-1
+
+# Feature flags
+enable_evaluations = true
+enable_webhooks = true
+enable_custom_metrics = true
+enable_research_mode = false  # Experimental feature
+
+# Maintenance mode
+maintenance_mode = false
+maintenance_message = "System under maintenance. Please try again later."
+
+# IMPORTANT NOTES:
+# 1. This template contains placeholder values that MUST be replaced
+# 2. Never commit actual API keys or secrets to version control
+# 3. Use environment variables for sensitive values in containerized deployments
+# 4. Regularly rotate API keys and secrets
+# 5. Monitor rate limits and adjust based on usage patterns
+# 6. Enable audit logging for compliance requirements
+# 7. Test configuration in staging before production deployment
+# 8. Keep this template updated with new configuration options
+
+# Validation command:
+# python -m tldw_Server_API.app.core.Evaluations.config_validator --config /path/to/config.txt

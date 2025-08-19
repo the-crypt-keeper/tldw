@@ -74,40 +74,50 @@ class WebUI {
     }
 
     async activateTopTab(tabButton) {
-        // Remove active class from previous tab
-        if (this.activeTopTabButton) {
-            this.activeTopTabButton.classList.remove('active');
-        }
-
-        // Set new active tab
-        this.activeTopTabButton = tabButton;
-        this.activeTopTabButton.classList.add('active');
-
-        // Get tab name
-        const topTabName = tabButton.dataset.toptab;
-
-        // Hide all sub-tab rows
-        document.querySelectorAll('.sub-tab-row').forEach(row => {
-            row.classList.remove('active');
-        });
-
-        // Show corresponding sub-tab row
-        const subTabRow = document.getElementById(`${topTabName}-subtabs`);
-        if (subTabRow) {
-            subTabRow.classList.add('active');
-
-            // Activate first sub-tab
-            const firstSubTab = subTabRow.querySelector('.sub-tab-button');
-            if (firstSubTab) {
-                await this.activateSubTab(firstSubTab);
+        try {
+            // Remove active class from previous tab
+            if (this.activeTopTabButton) {
+                this.activeTopTabButton.classList.remove('active');
             }
-        } else {
-            // Handle tabs without sub-tabs (like Global Settings)
-            this.showContent(topTabName);
-        }
 
-        // Save active tab to storage
-        Utils.saveToStorage('active-top-tab', topTabName);
+            // Set new active tab
+            this.activeTopTabButton = tabButton;
+            this.activeTopTabButton.classList.add('active');
+
+            // Get tab name
+            const topTabName = tabButton.dataset.toptab;
+
+            // Hide all sub-tab rows
+            document.querySelectorAll('.sub-tab-row').forEach(row => {
+                row.classList.remove('active');
+            });
+
+            // Show corresponding sub-tab row
+            const subTabRow = document.getElementById(`${topTabName}-subtabs`);
+            if (subTabRow) {
+                subTabRow.classList.add('active');
+
+                // Activate first sub-tab
+                const firstSubTab = subTabRow.querySelector('.sub-tab-button');
+                if (firstSubTab) {
+                    await this.activateSubTab(firstSubTab);
+                }
+            } else {
+                // Handle tabs without sub-tabs (like Global Settings)
+                this.showContent(topTabName);
+            }
+
+            // Save active tab to storage
+            Utils.saveToStorage('active-top-tab', topTabName);
+        } catch (error) {
+            console.error('Error activating top tab:', error);
+            // Try to show Global Settings as fallback
+            const globalSettings = document.getElementById('tabGlobalSettings');
+            if (globalSettings) {
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                globalSettings.classList.add('active');
+            }
+        }
     }
 
     async activateSubTab(tabButton) {
@@ -130,14 +140,23 @@ class WebUI {
         // Load content if not already loaded
         if (loadGroup && !this.loadedContentGroups.has(loadGroup)) {
             try {
-                Loading.show(document.querySelector('.content-container'), 'Loading content...');
+                if (typeof Loading !== 'undefined' && Loading) {
+                    Loading.show(document.querySelector('.content-container'), 'Loading content...');
+                }
                 await this.loadContentGroup(loadGroup, contentId);
                 this.loadedContentGroups.add(loadGroup);
             } catch (error) {
                 console.error(`Failed to load content group ${loadGroup}:`, error);
-                Toast.error(`Failed to load content: ${error.message}`);
+                if (typeof Toast !== 'undefined' && Toast) {
+                    Toast.error(`Failed to load content: ${error.message}`);
+                } else {
+                    // Fallback alert if Toast not available
+                    alert(`Failed to load content: ${error.message}`);
+                }
             } finally {
-                Loading.hide(document.querySelector('.content-container'));
+                if (typeof Loading !== 'undefined' && Loading) {
+                    Loading.hide(document.querySelector('.content-container'));
+                }
             }
         }
 
@@ -193,8 +212,8 @@ class WebUI {
             }
         }
 
-        // Default to Chat tab
-        const defaultTab = document.getElementById('top-tab-chat');
+        // Default to General tab (which has Global Settings)
+        const defaultTab = document.querySelector('.top-tab-button[data-toptab="general"]');
         if (defaultTab) {
             this.activateTopTab(defaultTab);
         } else {
@@ -204,9 +223,27 @@ class WebUI {
                 this.activateTopTab(firstTab);
             }
         }
+        
+        // Ensure at least one content tab is visible
+        setTimeout(() => {
+            const activeTabs = document.querySelectorAll('.tab-content.active');
+            if (activeTabs.length === 0) {
+                // Force show Global Settings as fallback
+                const globalSettings = document.getElementById('tabGlobalSettings');
+                if (globalSettings) {
+                    globalSettings.classList.add('active');
+                    console.log('Forced Global Settings tab to be visible');
+                }
+            }
+        }, 100);
     }
 
-    initGlobalSettings() {
+    async initGlobalSettings() {
+        // Wait for API client to load configuration
+        if (apiClient.init) {
+            await apiClient.init();
+        }
+        
         // Load saved API configuration
         const baseUrlInput = document.getElementById('baseUrl');
         const apiKeyInput = document.getElementById('apiKeyInput');
@@ -215,16 +252,31 @@ class WebUI {
             baseUrlInput.value = apiClient.baseUrl;
             baseUrlInput.addEventListener('change', (e) => {
                 apiClient.setBaseUrl(e.target.value);
-                Toast.success('API base URL updated');
+                if (typeof Toast !== 'undefined' && Toast) {
+                    Toast.success('API base URL updated');
+                }
                 this.checkApiStatus();
             });
         }
 
         if (apiKeyInput) {
             apiKeyInput.value = apiClient.token;
+            
+            // Show indicator if config was auto-loaded
+            if (apiClient.configLoaded && apiClient.token) {
+                apiKeyInput.placeholder = 'Auto-configured from server';
+                // Add visual indicator
+                const label = apiKeyInput.previousElementSibling;
+                if (label && label.tagName === 'LABEL') {
+                    label.innerHTML = 'API Token: <span style="color: green;">✓ Auto-configured</span>';
+                }
+            }
+            
             apiKeyInput.addEventListener('change', (e) => {
                 apiClient.setToken(e.target.value);
-                Toast.success('API token updated');
+                if (typeof Toast !== 'undefined' && Toast) {
+                    Toast.success('API token updated');
+                }
             });
         }
 
@@ -240,28 +292,54 @@ class WebUI {
         const statusText = document.querySelector('.api-status-text');
 
         try {
+            const startTime = Date.now();
             const health = await apiClient.checkHealth();
+            const responseTime = Date.now() - startTime;
+            
             if (health.online) {
                 if (statusDot) {
                     statusDot.classList.remove('offline');
+                    statusDot.classList.remove('slow');
+                    // Add slow indicator if response is slow
+                    if (responseTime > 1000) {
+                        statusDot.classList.add('slow');
+                    }
                 }
                 if (statusText) {
-                    statusText.textContent = 'Connected';
+                    if (responseTime > 1000) {
+                        statusText.textContent = `Connected (${responseTime}ms)`;
+                    } else {
+                        statusText.textContent = 'Connected';
+                    }
+                    statusText.title = `API: ${apiClient.baseUrl}\nResponse time: ${responseTime}ms`;
                 }
             } else {
                 if (statusDot) {
                     statusDot.classList.add('offline');
+                    statusDot.classList.remove('slow');
                 }
                 if (statusText) {
-                    statusText.textContent = 'Offline';
+                    statusText.textContent = 'API Offline';
+                    statusText.title = `Cannot reach API at ${apiClient.baseUrl}`;
                 }
             }
         } catch (error) {
             if (statusDot) {
                 statusDot.classList.add('offline');
+                statusDot.classList.remove('slow');
             }
             if (statusText) {
-                statusText.textContent = 'Error';
+                // More descriptive error messages
+                if (error.message.includes('Failed to fetch')) {
+                    statusText.textContent = 'API Unreachable';
+                    statusText.title = `Cannot connect to ${apiClient.baseUrl}\nCheck if the API server is running`;
+                } else if (error.status === 401) {
+                    statusText.textContent = 'Auth Failed';
+                    statusText.title = 'Authentication failed - check your API token';
+                } else {
+                    statusText.textContent = `Error (${error.status || 'Network'})`;
+                    statusText.title = error.message;
+                }
             }
         }
     }
@@ -352,7 +430,11 @@ class WebUI {
         const history = apiClient.getHistory();
         
         if (history.length === 0) {
-            Toast.info('No request history available');
+            if (typeof Toast !== 'undefined' && Toast) {
+                Toast.info('No request history available');
+            } else {
+                alert('No request history available');
+            }
             return;
         }
 
@@ -400,7 +482,9 @@ class WebUI {
 
     clearHistory() {
         apiClient.clearHistory();
-        Toast.success('Request history cleared');
+        if (typeof Toast !== 'undefined' && Toast) {
+            Toast.success('Request history cleared');
+        }
         // Close any open modals
         document.querySelectorAll('.modal').forEach(modal => {
             modal.remove();

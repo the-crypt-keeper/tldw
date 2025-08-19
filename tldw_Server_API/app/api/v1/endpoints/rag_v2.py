@@ -46,6 +46,17 @@ from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, U
 from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 
+# Rate limiting
+from tldw_Server_API.app.core.Evaluations.user_rate_limiter import user_rate_limiter, UserTier
+
+# Audit logging
+from tldw_Server_API.app.core.RAG.rag_audit_logger import (
+    get_rag_audit_logger, 
+    audit_context, 
+    RAGEventType,
+    RAGAuditEntry
+)
+
 # RAG Service
 from tldw_Server_API.app.core.RAG.rag_service.integration import RAGService
 from tldw_Server_API.app.core.RAG.rag_service.types import DataSource
@@ -63,6 +74,22 @@ router = APIRouter(
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     }
 )
+
+# ============= Lifecycle Management =============
+
+@router.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    audit_logger = get_rag_audit_logger()
+    await audit_logger.start()
+    logger.info("RAG audit logger started")
+
+@router.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    audit_logger = get_rag_audit_logger()
+    await audit_logger.stop()
+    logger.info("RAG audit logger stopped")
 
 # ============= Database Mapping =============
 
@@ -296,33 +323,68 @@ async def simple_search(
     """Execute a simple search request"""
     logger.info(f"User {current_user.id}: Simple search for '{request.query[:50]}...'")
     
-    try:
-        # Create search configuration
-        search_config = create_search_config(request)
-        
-        # Execute search
-        logger.debug(f"Search config: {search_config}")
-        raw_results = await rag_service.search(
-            query=request.query,
-            **search_config
-        )
-        
-        # Format results
-        results = format_search_results(raw_results, request.search_type)
-        
-        return SimpleSearchResponse(
-            results=results,
-            total_results=len(results),
-            query_id=str(uuid4()),
-            search_type_used=request.search_type
-        )
-        
-    except Exception as e:
-        logger.error(f"Search failed for user {current_user.id}: {e}")
+    # Check rate limits
+    allowed, rate_metadata = await user_rate_limiter.check_rate_limit(
+        user_id=str(current_user.id),
+        endpoint="/api/v1/rag/search",
+        tokens_requested=len(request.query) * 10,  # Estimate tokens for search
+        estimated_cost=0.001  # Low cost for search operations
+    )
+    
+    if not allowed:
+        logger.warning(f"Rate limit exceeded for user {current_user.id}: {rate_metadata}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Search operation failed: {str(e)}"
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded: {rate_metadata.get('reason', 'Too many requests')}"
         )
+    
+    # Generate request ID for tracking
+    request_id = str(uuid4())
+    
+    # Audit logging context
+    async with audit_context(
+        event_type=RAGEventType.SEARCH_REQUEST,
+        user_id=str(current_user.id),
+        request_id=request_id,
+        endpoint="/api/v1/rag/search",
+        operation="simple_search",
+        query=request.query,
+        databases_searched=request.databases,
+        search_type=request.search_type.value
+    ) as audit_entry:
+        try:
+            # Create search configuration
+            search_config = create_search_config(request)
+            
+            # Execute search
+            logger.debug(f"Search config: {search_config}")
+            raw_results = await rag_service.search(
+                query=request.query,
+                **search_config
+            )
+            
+            # Format results
+            results = format_search_results(raw_results, request.search_type)
+            
+            # Update audit entry with results
+            audit_entry.result_count = len(results)
+            audit_entry.tokens_used = len(request.query) * 10  # Estimate
+            audit_entry.estimated_cost = 0.001
+            
+            return SimpleSearchResponse(
+                results=results,
+                total_results=len(results),
+                query_id=request_id,
+                search_type_used=request.search_type
+            )
+            
+        except Exception as e:
+            logger.error(f"Search failed for user {current_user.id}: {e}")
+            audit_entry.error_message = str(e)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Search operation failed: {str(e)}"
+            )
 
 # ============= Advanced Search Endpoint =============
 
@@ -393,6 +455,21 @@ async def advanced_search(
 ) -> AdvancedSearchResponse:
     """Execute an advanced search request with full configuration"""
     logger.info(f"User {current_user.id}: Advanced search for '{request.query[:50]}...'")
+    
+    # Check rate limits (slightly higher cost for advanced search)
+    allowed, rate_metadata = await user_rate_limiter.check_rate_limit(
+        user_id=str(current_user.id),
+        endpoint="/api/v1/rag/search/advanced",
+        tokens_requested=len(request.query) * 20,  # More tokens for advanced features
+        estimated_cost=0.002  # Slightly higher cost for advanced search
+    )
+    
+    if not allowed:
+        logger.warning(f"Rate limit exceeded for user {current_user.id}: {rate_metadata}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded: {rate_metadata.get('reason', 'Too many requests')}"
+        )
     
     try:
         # Build comprehensive search configuration
@@ -537,6 +614,21 @@ async def simple_agent(
 ) -> SimpleAgentResponse:
     """Simple agent endpoint for Q&A with retrieval"""
     logger.info(f"User {current_user.id}: Agent request - '{request.message[:50]}...'")
+    
+    # Check rate limits (higher cost for LLM generation)
+    allowed, rate_metadata = await user_rate_limiter.check_rate_limit(
+        user_id=str(current_user.id),
+        endpoint="/api/v1/rag/agent",
+        tokens_requested=len(request.message) * 50,  # Estimate for retrieval + generation
+        estimated_cost=0.01  # Higher cost for LLM generation
+    )
+    
+    if not allowed:
+        logger.warning(f"Rate limit exceeded for user {current_user.id}: {rate_metadata}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded: {rate_metadata.get('reason', 'Too many requests')}"
+        )
     
     try:
         # Load conversation context if provided
@@ -723,6 +815,24 @@ async def advanced_agent(
 ) -> AdvancedAgentResponse:
     """Advanced agent with research capabilities"""
     logger.info(f"User {current_user.id}: Advanced agent in {request.mode} mode")
+    
+    # Check rate limits (highest cost for research mode)
+    estimated_tokens = len(request.message) * 100  # Higher estimate for research mode
+    estimated_cost = 0.02 if request.mode == AgentMode.RAG else 0.05  # Research mode costs more
+    
+    allowed, rate_metadata = await user_rate_limiter.check_rate_limit(
+        user_id=str(current_user.id),
+        endpoint="/api/v1/rag/agent/advanced",
+        tokens_requested=estimated_tokens,
+        estimated_cost=estimated_cost
+    )
+    
+    if not allowed:
+        logger.warning(f"Rate limit exceeded for user {current_user.id}: {rate_metadata}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded: {rate_metadata.get('reason', 'Too many requests')}"
+        )
     
     try:
         # Load conversation context

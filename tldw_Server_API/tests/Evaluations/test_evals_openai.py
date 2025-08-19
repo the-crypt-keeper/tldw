@@ -19,18 +19,14 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient
 import time
 
-# Set auth mode to single_user for testing - MUST be done before ANY imports
-os.environ["AUTH_MODE"] = "single_user"
-os.environ["API_BEARER"] = "default-secret-key-for-single-user"
-os.environ["SINGLE_USER_API_KEY"] = "default-secret-key-for-single-user"
+# Import centralized test configuration
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from test_config import test_config
 
-# Disable CSRF for testing - MUST be done before importing app
-from tldw_Server_API.app.core.AuthNZ.csrf_protection import global_settings
-global_settings['CSRF_ENABLED'] = False
-
-# Reset settings to ensure proper auth mode
-from tldw_Server_API.app.core.AuthNZ.settings import reset_settings
-reset_settings()
+# Set up test environment before any app imports
+test_config.setup_test_environment()
+test_config.reset_settings()
 
 # Import the FastAPI app
 from tldw_Server_API.app.main import app
@@ -39,9 +35,9 @@ from tldw_Server_API.app.api.v1.schemas.openai_eval_schemas import (
     EvaluationSpec, EvaluationResponse, RunResponse
 )
 
-# Test configuration
-DEFAULT_API_KEY = "default-secret-key-for-single-user"
-TEST_SK_KEY = "sk-test123456789"
+# Use configuration from test_config
+DEFAULT_API_KEY = test_config.TEST_API_KEY
+TEST_SK_KEY = test_config.TEST_SK_KEY
 
 
 @pytest.fixture(scope="function")
@@ -62,13 +58,13 @@ async def async_client():
 @pytest.fixture
 def auth_headers():
     """Get authentication headers with default API key"""
-    return {"Authorization": f"Bearer {DEFAULT_API_KEY}"}
+    return test_config.get_auth_headers()
 
 
 @pytest.fixture
 def sk_auth_headers():
     """Get authentication headers with OpenAI-style sk- key"""
-    return {"Authorization": f"Bearer {TEST_SK_KEY}"}
+    return test_config.get_sk_auth_headers()
 
 
 @pytest.fixture
@@ -142,10 +138,12 @@ class TestAuthentication:
     
     def test_missing_auth_header(self, client):
         """Test request without authentication header"""
-        # In development mode, should accept missing auth
+        # Should always require authentication for security
         response = client.get("/api/v1/evals")
-        # Should work with default key in development
-        assert response.status_code in [200, 404]  # 404 if no evals exist yet
+        # Should get 401 without authentication
+        assert response.status_code == 401
+        data = response.json()
+        assert "error" in data or ("detail" in data and "error" in data["detail"])
     
     def test_invalid_auth_header(self, client):
         """Test request with invalid authentication header"""
@@ -165,10 +163,17 @@ class TestAuthentication:
         response = client.get("/api/v1/evals", headers=auth_headers)
         assert response.status_code in [200, 404]  # 404 if no evals exist yet
     
-    def test_valid_sk_key(self, client, sk_auth_headers):
-        """Test request with OpenAI-style sk- key"""
-        response = client.get("/api/v1/evals", headers=sk_auth_headers)
-        assert response.status_code in [200, 404]  # 404 if no evals exist yet
+    def test_valid_sk_key(self, client):
+        """Test request with OpenAI-style sk- key (only valid if it matches the configured key)"""
+        # For OpenAI compatibility, sk- keys are accepted but only if they match the expected key
+        # Using a random sk- key should fail
+        headers = {"Authorization": f"Bearer {TEST_SK_KEY}"}
+        response = client.get("/api/v1/evals", headers=headers)
+        # Should fail because this sk- key doesn't match the configured API key
+        assert response.status_code == 401
+        
+        # Test with sk- version of the actual API key would work if configured
+        # But for security, we don't accept arbitrary sk- keys
 
 
 class TestEvaluationCRUD:
