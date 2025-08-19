@@ -151,8 +151,8 @@ Screenshot of the Frontpage ![Screenshot](Docs/Screenshots/blank-front.png)
       * All into a shareable, single-file DB that is open source and extremely well documented. (The DB format, not this project :P) 
   - You should now have a web browser tab opened to `http://127.0.0.1:7860/` with the GUI for the app.
 - **Docker:**
-  - There's a docker build for GPU use(Needs Nvidia CUDA Controller(?): https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw-nvidia_amd64_Dockerfile 
-  - and plain CPU use: https://github.com/rmusser01/tldw/blob/main/Helper_Scripts/Dockerfiles/tldw_Debian_cpu-Dockerfile
+  - There's a docker build for GPU use(Needs Nvidia CUDA Controller(?): https://github.com/rmusser01/tldw/blob/main/tldw_Server_API/Dockerfiles/Dockerfile 
+  - and plain CPU use: https://github.com/rmusser01/tldw/blob/main/tldw_Server_API/Dockerfiles/Dockerfile.Ubuntu
   - the `Dockerfile` in the main directory is the Nvidia base-image-based one. So you can use your GPU if you want with it.
 </details>
 

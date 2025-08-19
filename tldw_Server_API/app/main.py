@@ -43,9 +43,11 @@ from tldw_Server_API.app.api.v1.endpoints.notes import router as notes_router
 # Prompt Management Endpoint
 from tldw_Server_API.app.api.v1.endpoints.prompts import router as prompt_router
 #
-# RAG Endpoint (New simplified version)
-from tldw_Server_API.app.api.v1.endpoints.rag_v2 import router as rag_router
-# Legacy RAG Endpoint (To be removed)
+# RAG Endpoints
+from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_api_router  # Production API (simple + complex)
+from tldw_Server_API.app.api.v1.endpoints.rag_v2 import router as rag_router  # v2 - for backward compatibility
+from tldw_Server_API.app.api.v1.endpoints.rag_v3_functional import router as rag_v3_router  # v3 - functional pipeline (development)
+# Legacy RAG Endpoint (Deprecated)
 # from tldw_Server_API.app.api.v1.endpoints.rag import router as retrieval_agent_router
 #
 # Research Endpoint
@@ -288,7 +290,8 @@ app.include_router(prompt_router, prefix=f"{API_V1_PREFIX}/prompts", tags=["prom
 
 
 # Router for RAG endpoint (New simplified version)
-app.include_router(rag_router, prefix=f"{API_V1_PREFIX}/rag", tags=["RAG"])
+app.include_router(rag_router, prefix=f"{API_V1_PREFIX}/rag", tags=["RAG v2"])
+app.include_router(rag_v3_router, prefix=f"{API_V1_PREFIX}", tags=["RAG v3"])
 
 
 # Router for Research endpoint
