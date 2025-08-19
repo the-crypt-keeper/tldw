@@ -95,7 +95,7 @@ class DatabasePool:
     
     async def _create_postgresql_schema(self):
         """Create PostgreSQL schema if it doesn't exist"""
-        schema_file = Path(__file__).parent.parent.parent.parent / "schema" / "postgresql_users.sql"
+        schema_file = Path(__file__).parent.parent.parent.parent / "Databases" / "Postgres" / "Schema" / "postgresql_users.sql"
         
         if not schema_file.exists():
             logger.warning(f"PostgreSQL schema file not found: {schema_file}")
@@ -122,7 +122,7 @@ class DatabasePool:
     
     async def _create_sqlite_schema(self):
         """Create SQLite schema if it doesn't exist"""
-        schema_file = Path(__file__).parent.parent.parent.parent / "schema" / "sqlite_users.sql"
+        schema_file = Path(__file__).parent.parent.parent.parent / "Databases" / "SQLite" / "Schema" / "sqlite_users.sql"
         
         if not schema_file.exists():
             logger.warning(f"SQLite schema file not found: {schema_file}")

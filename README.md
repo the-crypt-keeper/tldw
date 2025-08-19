@@ -199,11 +199,11 @@ python -m uvicorn tldw_Server_API.app.main:app --reload
 
 ```bash
 # CPU only
-docker build -f Helper_Scripts/Dockerfiles/tldw_cpu_Dockerfile -t tldw-cpu .
+docker build -f tldw_Server_API/Dockerfiles/Dockerfile -t tldw-cpu .
 docker run -p 8000:8000 tldw-cpu
 
 # With GPU support
-docker build -f Helper_Scripts/Dockerfiles/tldw_nvidia_Dockerfile -t tldw-gpu .
+docker build -f tldw_Server_API/Dockerfiles/Dockerfile -t tldw-gpu .
 docker run --gpus all -p 8000:8000 tldw-gpu
 ```
 

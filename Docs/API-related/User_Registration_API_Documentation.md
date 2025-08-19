@@ -836,7 +836,7 @@ GRANT ALL PRIVILEGES ON DATABASE tldw_multiuser TO tldw_user;
 
 3. **Run Schema**:
 ```bash
-psql -U tldw_user -d tldw_multiuser -f schema/postgresql_users.sql
+psql -U tldw_user -d tldw_multiuser -f tldw_Server_API/Databases/Postgres/Schema/postgresql_users.sql
 ```
 
 4. **Update Environment**:

@@ -42,7 +42,7 @@ services:
   chunking-workers:
     build:
       context: .
-      dockerfile: Helper_Scripts/Dockerfiles/Dockerfile.worker
+      dockerfile: tldw_Server_API/Dockerfiles/Dockerfile.worker
     container_name: tldw-chunking-workers
     environment:
       - REDIS_URL=redis://redis:6379
@@ -67,7 +67,7 @@ services:
   embedding-workers:
     build:
       context: .
-      dockerfile: Helper_Scripts/Dockerfiles/Dockerfile.worker
+      dockerfile: tldw_Server_API/Dockerfiles/Dockerfile.worker
     container_name: tldw-embedding-workers
     environment:
       - REDIS_URL=redis://redis:6379
@@ -101,7 +101,7 @@ services:
   storage-workers:
     build:
       context: .
-      dockerfile: Helper_Scripts/Dockerfiles/Dockerfile.worker
+      dockerfile: tldw_Server_API/Dockerfiles/Dockerfile.worker
     container_name: tldw-storage-workers
     environment:
       - REDIS_URL=redis://redis:6379
@@ -126,7 +126,7 @@ services:
   worker-orchestrator:
     build:
       context: .
-      dockerfile: Helper_Scripts/Dockerfiles/Dockerfile.worker
+      dockerfile: tldw_Server_API/Dockerfiles/Dockerfile.worker
     container_name: tldw-worker-orchestrator
     environment:
       - REDIS_URL=redis://redis:6379
