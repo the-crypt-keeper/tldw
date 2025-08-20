@@ -43,10 +43,15 @@ from tldw_Server_API.app.api.v1.endpoints.notes import router as notes_router
 # Prompt Management Endpoint
 from tldw_Server_API.app.api.v1.endpoints.prompts import router as prompt_router
 #
+# Prompt Studio Endpoints
+from tldw_Server_API.app.api.v1.endpoints.prompt_studio_projects import router as prompt_studio_projects_router
+from tldw_Server_API.app.api.v1.endpoints.prompt_studio_prompts import router as prompt_studio_prompts_router
+from tldw_Server_API.app.api.v1.endpoints.prompt_studio_test_cases import router as prompt_studio_test_cases_router
+from tldw_Server_API.app.api.v1.endpoints.prompt_studio_optimization import router as prompt_studio_optimization_router
+from tldw_Server_API.app.api.v1.endpoints.prompt_studio_websocket import router as prompt_studio_websocket_router
+#
 # RAG Endpoints
-from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_api_router  # Production API (simple + complex)
-from tldw_Server_API.app.api.v1.endpoints.rag_v2 import router as rag_router  # v2 - for backward compatibility
-from tldw_Server_API.app.api.v1.endpoints.rag_v3_functional import router as rag_v3_router  # v3 - functional pipeline (development)
+from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_api_router  # Production RAG API using functional pipeline
 # Legacy RAG Endpoint (Deprecated)
 # from tldw_Server_API.app.api.v1.endpoints.rag import router as retrieval_agent_router
 #
@@ -75,6 +80,15 @@ from tldw_Server_API.app.api.v1.endpoints.mcp_endpoint import router as mcp_rout
 #
 # MCP v2 Endpoint (New Modular Version)
 from tldw_Server_API.app.api.v1.endpoints.mcp_v2_endpoint import router as mcp_v2_router
+#
+# Metrics and Telemetry
+from tldw_Server_API.app.core.Metrics import (
+    initialize_telemetry,
+    shutdown_telemetry,
+    get_metrics_registry,
+    track_metrics,
+    OTEL_AVAILABLE
+)
 #
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 #
@@ -137,6 +151,17 @@ test_db_instance_ref = None # Global or context variable to hold the test DB ins
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup: Initialize telemetry and metrics
+    logger.info("App Startup: Initializing telemetry and metrics...")
+    try:
+        telemetry_manager = initialize_telemetry()
+        if OTEL_AVAILABLE:
+            logger.info(f"App Startup: OpenTelemetry initialized for service: {telemetry_manager.config.service_name}")
+        else:
+            logger.warning("App Startup: OpenTelemetry not available, using fallback metrics")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize telemetry: {e}")
+    
     # Startup: Initialize auth services
     logger.info("App Startup: Initializing authentication services...")
     try:
@@ -193,6 +218,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"App Shutdown: Error shutting down MCP v2 server: {e}")
     
+    # Shutdown telemetry
+    try:
+        shutdown_telemetry()
+        logger.info("App Shutdown: Telemetry shutdown")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error shutting down telemetry: {e}")
+    
     # Original test DB cleanup
     global test_db_instance_ref
     if test_db_instance_ref and hasattr(test_db_instance_ref, 'close_all_connections'):
@@ -244,6 +276,25 @@ async def favicon():
 async def root():
     return {"message": "Welcome to the tldw API; If you're seeing this, the server is running!"}
 
+# Metrics endpoint for Prometheus scraping
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    """Prometheus metrics endpoint."""
+    from fastapi.responses import PlainTextResponse
+    
+    registry = get_metrics_registry()
+    metrics_text = registry.export_prometheus_format()
+    
+    return PlainTextResponse(metrics_text, media_type="text/plain; version=0.0.4")
+
+# OpenTelemetry metrics endpoint (if using OTLP)
+@app.get("/api/v1/metrics", tags=["monitoring"])
+@track_metrics(labels={"endpoint": "metrics"})
+async def api_metrics():
+    """Get current metrics in JSON format."""
+    registry = get_metrics_registry()
+    return registry.get_all_metrics()
+
 # Router for health monitoring endpoints (NEW)
 from tldw_Server_API.app.api.v1.endpoints.health import router as health_router
 app.include_router(health_router, prefix=f"{API_V1_PREFIX}", tags=["health"])
@@ -289,9 +340,17 @@ app.include_router(notes_router, prefix=f"{API_V1_PREFIX}/notes", tags=["notes"]
 app.include_router(prompt_router, prefix=f"{API_V1_PREFIX}/prompts", tags=["prompts"])
 
 
-# Router for RAG endpoint (New simplified version)
-app.include_router(rag_router, prefix=f"{API_V1_PREFIX}/rag", tags=["RAG v2"])
-app.include_router(rag_v3_router, prefix=f"{API_V1_PREFIX}", tags=["RAG v3"])
+# Router for Prompt Studio endpoints
+app.include_router(prompt_studio_projects_router, tags=["Prompt Studio"])
+app.include_router(prompt_studio_prompts_router, tags=["Prompt Studio"])
+app.include_router(prompt_studio_test_cases_router, tags=["Prompt Studio"])
+app.include_router(prompt_studio_optimization_router, tags=["Prompt Studio"])
+app.include_router(prompt_studio_websocket_router, tags=["Prompt Studio"])
+
+
+# Router for RAG endpoints
+# RAG API - Production API using functional pipeline
+app.include_router(rag_api_router, tags=["RAG"])
 
 
 # Router for Research endpoint

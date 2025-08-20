@@ -21,6 +21,19 @@ from loguru import logger
 from .types import Document, SearchResult, DataSource
 from .config import RAGConfig
 
+# Import enhanced chunking functions
+try:
+    from .enhanced_chunking_integration import (
+        enhanced_chunk_documents,
+        filter_chunks_by_type,
+        expand_with_parent_context,
+        prioritize_by_chunk_type
+    )
+    ENHANCED_CHUNKING_AVAILABLE = True
+except ImportError:
+    ENHANCED_CHUNKING_AVAILABLE = False
+    logger.warning("Enhanced chunking not available - module not found")
+
 # Pipeline context that flows through all functions
 @dataclass
 class RAGPipelineContext:
@@ -33,6 +46,8 @@ class RAGPipelineContext:
     cache_hit: bool = False
     timings: Dict[str, float] = field(default_factory=dict)
     errors: List[Dict[str, Any]] = field(default_factory=list)
+    resilience_enabled: bool = field(default=False)
+    circuit_breaker_configs: Dict[str, Any] = field(default_factory=dict)
 
 
 def timer(func_name: Optional[str] = None):
@@ -55,36 +70,127 @@ def timer(func_name: Optional[str] = None):
     return decorator
 
 
+def with_resilience(func_name: str, fallback_func: Optional[Callable] = None):
+    """
+    Decorator to add resilience features (retry, circuit breaker) to pipeline functions.
+    
+    Args:
+        func_name: Name of the function for tracking
+        fallback_func: Optional fallback function to call on failure
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(context: RAGPipelineContext, *args, **kwargs):
+            # Check if resilience is enabled
+            if not context.config.get("enable_resilience", False):
+                return await func(context, *args, **kwargs)
+            
+            # Import resilience features
+            try:
+                from .resilience import with_circuit_breaker, with_retry, CircuitBreakerConfig, RetryConfig
+            except ImportError:
+                logger.warning(f"Resilience module not available for {func_name}")
+                return await func(context, *args, **kwargs)
+            
+            # Get configuration
+            resilience_config = context.config.get("resilience", {})
+            retry_config = resilience_config.get("retry", {})
+            circuit_config = resilience_config.get("circuit_breaker", {})
+            
+            # Apply retry if configured
+            if retry_config.get("enabled", True):
+                max_attempts = retry_config.get("max_attempts", 3)
+                initial_delay = retry_config.get("initial_delay", 0.5)
+                
+                retry_conf = RetryConfig(
+                    max_attempts=max_attempts,
+                    initial_delay=initial_delay,
+                    exponential_base=2.0,
+                    jitter=True
+                )
+                
+                async def with_retry_wrapper():
+                    return await with_retry(
+                        lambda: func(context, *args, **kwargs),
+                        config=retry_conf
+                    )
+                exec_func = with_retry_wrapper
+            else:
+                exec_func = lambda: func(context, *args, **kwargs)
+            
+            # Apply circuit breaker if configured
+            if circuit_config.get("enabled", True):
+                failure_threshold = circuit_config.get("failure_threshold", 5)
+                timeout = circuit_config.get("timeout", 60)
+                
+                cb_conf = CircuitBreakerConfig(
+                    failure_threshold=failure_threshold,
+                    timeout=timeout
+                )
+                
+                # Use fallback if provided
+                if fallback_func:
+                    fb = lambda: fallback_func(context, *args, **kwargs)
+                else:
+                    fb = None
+                
+                return await with_circuit_breaker(
+                    func_name,
+                    exec_func,
+                    config=cb_conf,
+                    fallback=fb
+                )
+            else:
+                return await exec_func()
+        return wrapper
+    return decorator
+
+
 # Query Expansion Functions
 
+async def expand_query_fallback(context: RAGPipelineContext, **kwargs) -> RAGPipelineContext:
+    """Fallback for query expansion - return original query."""
+    logger.warning("Query expansion failed, using original query")
+    context.metadata["expansion_failed"] = True
+    context.metadata["expanded_queries"] = []
+    return context
+
+
 @timer("query_expansion")
+@with_resilience("query_expansion", expand_query_fallback)
 async def expand_query(context: RAGPipelineContext, 
                        strategies: List[str] = None) -> RAGPipelineContext:
     """Expand query using multiple strategies."""
     from .query_expansion import (
-        HybridQueryExpansion, AcronymExpansion, SemanticExpansion,
+        HybridQueryExpansion, AcronymExpansion, SynonymExpansion,
         DomainExpansion, EntityExpansion
     )
     
-    strategies = strategies or context.config.get("expansion_strategies", ["acronym", "semantic"])
+    strategies = strategies or context.config.get("expansion_strategies", ["acronym", "synonym"])
     
-    expander = HybridQueryExpansion()
-    
-    # Add requested strategies
+    # Build list of strategy objects based on requested strategies
+    strategy_objects = []
     if "acronym" in strategies:
-        expander.add_strategy(AcronymExpansion())
-    if "semantic" in strategies:
-        expander.add_strategy(SemanticExpansion())
+        strategy_objects.append(AcronymExpansion())
+    if "synonym" in strategies or "semantic" in strategies:  # Support both names
+        strategy_objects.append(SynonymExpansion())
     if "domain" in strategies:
-        expander.add_strategy(DomainExpansion())
+        strategy_objects.append(DomainExpansion())
     if "entity" in strategies:
-        expander.add_strategy(EntityExpansion())
+        strategy_objects.append(EntityExpansion())
+    
+    # Create expander with selected strategies
+    expander = HybridQueryExpansion(strategies=strategy_objects if strategy_objects else None)
     
     expanded = await expander.expand(context.query)
     
-    context.metadata["expanded_queries"] = expanded
+    # Store the expanded query object and its variations
+    context.metadata["expanded_query"] = expanded
+    context.metadata["expanded_queries"] = expanded.variations if hasattr(expanded, 'variations') else []
     context.metadata["expansion_strategies"] = strategies
-    logger.debug(f"Expanded query to {len(expanded)} variants")
+    
+    num_variations = len(expanded.variations) if hasattr(expanded, 'variations') else 0
+    logger.debug(f"Expanded query to {num_variations} variants")
     
     return context
 
@@ -143,7 +249,16 @@ async def store_in_cache(context: RAGPipelineContext) -> RAGPipelineContext:
 
 # Retrieval Functions
 
+async def retrieve_documents_fallback(context: RAGPipelineContext, **kwargs) -> RAGPipelineContext:
+    """Fallback for document retrieval - return empty documents."""
+    logger.warning("Document retrieval failed, returning empty results")
+    context.documents = []
+    context.metadata["retrieval_failed"] = True
+    return context
+
+
 @timer("retrieval")
+@with_resilience("document_retrieval", retrieve_documents_fallback)
 async def retrieve_documents(context: RAGPipelineContext,
                             sources: List[DataSource] = None) -> RAGPipelineContext:
     """Retrieve documents from configured sources."""
@@ -151,11 +266,47 @@ async def retrieve_documents(context: RAGPipelineContext,
         logger.debug("Skipping retrieval due to cache hit")
         return context
     
+    from .database_retrievers import MultiDatabaseRetriever, RetrievalConfig
+    
     sources = sources or context.config.get("sources", [DataSource.MEDIA_DB])
     
-    # This would integrate with actual retrieval
-    # For now, placeholder
-    context.metadata["sources_searched"] = [s.value for s in sources]
+    # Initialize retriever with database paths from config
+    db_config = context.config.get("databases", {})
+    db_paths = {
+        "media_db": db_config.get("media_db_path"),
+        "notes_db": db_config.get("notes_db_path"),
+        "prompts_db": db_config.get("prompts_db_path"),
+        "character_cards_db": db_config.get("character_cards_db_path")
+    }
+    # Remove None values
+    db_paths = {k: v for k, v in db_paths.items() if v is not None}
+    
+    retriever = MultiDatabaseRetriever(db_paths)
+    
+    # Create retrieval config
+    retrieval_config = RetrievalConfig(
+        max_results=context.config.get("top_k", 10),
+        min_score=context.config.get("min_score", 0.0),
+        use_fts=context.config.get("use_fts", True),
+        use_vector=context.config.get("use_vector", False),
+        include_metadata=True
+    )
+    
+    # Retrieve documents
+    try:
+        documents = await retriever.retrieve(
+            query=context.query,
+            sources=sources,
+            config=retrieval_config
+        )
+        context.documents = documents
+        context.metadata["sources_searched"] = [s.value for s in sources]
+        context.metadata["documents_retrieved"] = len(documents)
+        logger.debug(f"Retrieved {len(documents)} documents from {sources}")
+    except Exception as e:
+        logger.error(f"Error retrieving documents: {e}")
+        context.errors.append({"function": "retrieve_documents", "error": str(e)})
+        context.documents = []
     
     return context
 
@@ -370,6 +521,61 @@ async def quality_pipeline(query: str, config: Dict[str, Any] = None) -> RAGPipe
     return context
 
 
+async def enhanced_pipeline(query: str, config: Dict[str, Any] = None) -> RAGPipelineContext:
+    """
+    Enhanced pipeline with advanced chunking capabilities.
+    
+    Features:
+    - PDF artifact cleaning
+    - Code block and table preservation
+    - Structure-aware chunking
+    - Chunk type filtering and prioritization
+    - Parent context expansion
+    """
+    if not ENHANCED_CHUNKING_AVAILABLE:
+        logger.warning("Enhanced chunking not available, falling back to quality pipeline")
+        return await quality_pipeline(query, config)
+    
+    context = RAGPipelineContext(query=query, original_query=query, config=config or {})
+    
+    # Standard processing
+    context = await expand_query(context, strategies=["acronym", "semantic", "domain", "entity"])
+    context = await check_cache(context)
+    
+    if not context.cache_hit:
+        # Retrieve documents
+        context = await optimize_chromadb_search(context)
+        context = await retrieve_documents(context)
+        
+        # Apply enhanced chunking
+        context = await enhanced_chunk_documents(context)
+        
+        # Filter or prioritize by chunk type if specified
+        if context.config.get("chunk_type_filter"):
+            context = await filter_chunks_by_type(
+                context,
+                include_types=context.config.get("include_chunk_types"),
+                exclude_types=context.config.get("exclude_chunk_types")
+            )
+        
+        # Prioritize by chunk type if weights provided
+        if context.config.get("chunk_type_priorities"):
+            context = await prioritize_by_chunk_type(context)
+        
+        # Expand with parent context if requested
+        if context.config.get("expand_parent_context", False):
+            context = await expand_with_parent_context(context)
+        
+        # Process tables and rerank
+        context = await process_tables(context)
+        context = await rerank_documents(context, strategy="hybrid")
+        context = await store_in_cache(context)
+    
+    context = await analyze_performance(context)
+    
+    return context
+
+
 async def custom_pipeline(query: str, 
                          functions: List[Callable],
                          config: Dict[str, Any] = None) -> RAGPipelineContext:
@@ -497,6 +703,7 @@ PIPELINES = {
     "minimal": minimal_pipeline,
     "standard": standard_pipeline,
     "quality": quality_pipeline,
+    "enhanced": enhanced_pipeline,  # New enhanced pipeline with chunking
 }
 
 

@@ -53,9 +53,9 @@ from tldw_Server_API.app.core.RAG.rag_service.types import DataSource
 class SearchRequest(BaseModel):
     """Search request with pipeline selection."""
     query: str = Field(..., description="Search query", min_length=1, max_length=1000)
-    pipeline: Literal["minimal", "standard", "quality", "custom"] = Field(
+    pipeline: Literal["minimal", "standard", "quality", "enhanced", "custom"] = Field(
         "standard",
-        description="Pipeline to use: minimal (fast), standard (balanced), quality (best), custom"
+        description="Pipeline to use: minimal (fast), standard (balanced), quality (best), enhanced (with chunking), custom"
     )
     databases: List[str] = Field(
         default=["media_db"],
@@ -230,6 +230,24 @@ def format_context_results(context: RAGPipelineContext) -> List[SearchResult]:
 
 # ============= Available Functions Registry =============
 
+# Import enhanced chunking functions if available
+try:
+    from tldw_Server_API.app.core.RAG.rag_service.enhanced_chunking_integration import (
+        enhanced_chunk_documents,
+        filter_chunks_by_type,
+        expand_with_parent_context,
+        prioritize_by_chunk_type
+    )
+    ENHANCED_CHUNKING_FUNCS = {
+        "enhanced_chunk_documents": enhanced_chunk_documents,
+        "filter_chunks_by_type": filter_chunks_by_type,
+        "expand_with_parent_context": expand_with_parent_context,
+        "prioritize_by_chunk_type": prioritize_by_chunk_type,
+    }
+except ImportError:
+    ENHANCED_CHUNKING_FUNCS = {}
+    logger.warning("Enhanced chunking functions not available")
+
 AVAILABLE_FUNCTIONS = {
     "expand_query": expand_query,
     "check_cache": check_cache,
@@ -239,6 +257,7 @@ AVAILABLE_FUNCTIONS = {
     "rerank_documents": rerank_documents,
     "store_in_cache": store_in_cache,
     "analyze_performance": analyze_performance,
+    **ENHANCED_CHUNKING_FUNCS  # Add enhanced chunking functions if available
 }
 
 
@@ -307,6 +326,12 @@ async def search(
         elif request.pipeline == "quality":
             context = await quality_pipeline(request.query, config)
             pipeline_used = "quality"
+            
+        elif request.pipeline == "enhanced":
+            # Import enhanced pipeline
+            from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import enhanced_pipeline
+            context = await enhanced_pipeline(request.query, config)
+            pipeline_used = "enhanced"
             
         elif request.pipeline == "custom":
             if not request.custom_functions:
@@ -377,7 +402,7 @@ async def get_pipeline_info() -> PipelineInfoResponse:
     """Get information about available pipelines and functions."""
     
     return PipelineInfoResponse(
-        available_pipelines=["minimal", "standard", "quality", "custom"],
+        available_pipelines=["minimal", "standard", "quality", "enhanced", "custom"],
         available_functions=list(AVAILABLE_FUNCTIONS.keys()),
         recommended_configs={
             "minimal": {
@@ -400,6 +425,22 @@ async def get_pipeline_info() -> PipelineInfoResponse:
                 "hybrid_alpha": 0.7,
                 "cache_threshold": 0.9,
                 "table_serialize_method": "hybrid",
+                "top_k": 20
+            },
+            "enhanced": {
+                "enable_cache": True,
+                "expansion_strategies": ["acronym", "semantic", "domain", "entity"],
+                "reranking_strategy": "hybrid",
+                "enable_hybrid_search": True,
+                "clean_pdf_artifacts": True,
+                "preserve_code_blocks": True,
+                "preserve_tables": True,
+                "structure_aware": True,
+                "track_positions": True,
+                "chunk_type_filter": False,
+                "expand_parent_context": False,
+                "chunk_size": 512,
+                "chunk_overlap": 128,
                 "top_k": 20
             },
             "custom_example": {

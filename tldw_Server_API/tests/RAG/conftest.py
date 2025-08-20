@@ -413,8 +413,9 @@ def setup_test_environment(monkeypatch, temp_db_dir):
     # Don't set JWT_SECRET_KEY as it may trigger multi-user mode
     
     # Clear any cached services
-    from tldw_Server_API.app.api.v1.endpoints.rag_v2 import rag_service_manager
-    rag_service_manager.cleanup_expired()
+    # Note: rag_v2 has been removed in favor of functional pipeline
+    # from tldw_Server_API.app.api.v1.endpoints.rag_v2 import rag_service_manager
+    # rag_service_manager.cleanup_expired()
     
     # Reset settings again after env vars are set to force reload
     reset_settings()

@@ -1,729 +1,645 @@
 # RAG API Documentation
 
-**Version**: 2.0  
-**Last Updated**: 2025-08-18  
+**Version**: 3.0  
+**Last Updated**: 2025-08-19  
 **Status**: Production Ready
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Authentication](#authentication)
-3. [Rate Limiting](#rate-limiting)
+2. [Architecture](#architecture)
+3. [Authentication](#authentication)
 4. [Endpoints](#endpoints)
-   - [Search Endpoints](#search-endpoints)
-   - [Agent Endpoints](#agent-endpoints)
+   - [Simple Search](#simple-search)
+   - [Complex Search](#complex-search)
+   - [Health Check](#health-check)
 5. [Data Models](#data-models)
-6. [Error Handling](#error-handling)
-7. [Performance](#performance)
-8. [Examples](#examples)
-9. [SDKs and Client Libraries](#sdks-and-client-libraries)
-10. [Monitoring and Metrics](#monitoring-and-metrics)
+6. [Configuration](#configuration)
+7. [Error Handling](#error-handling)
+8. [Performance](#performance)
+9. [Examples](#examples)
+10. [Migration Guide](#migration-guide)
 
 ## Overview
 
-The RAG (Retrieval-Augmented Generation) API provides powerful search and AI-powered question-answering capabilities across your indexed content. It combines traditional search with semantic understanding and LLM-based generation to deliver accurate, contextual responses.
+The RAG (Retrieval-Augmented Generation) API provides powerful search and AI-powered question-answering capabilities across your indexed content. It uses a **functional pipeline architecture** where composable functions are chained together to create custom retrieval workflows.
 
 ### Key Features
 
-- **Hybrid Search**: Combines keyword and semantic search for optimal results
-- **Multi-Database Support**: Search across media, notes, characters, and chat history
-- **Intelligent Agents**: AI-powered assistants that retrieve context and generate responses
-- **Streaming Support**: Real-time streaming for long-form responses
-- **Audit Logging**: Complete audit trail of all operations
-- **Rate Limiting**: Tiered rate limits based on user subscription
-- **Custom Metrics**: Advanced evaluation metrics for quality monitoring
+- **Functional Pipeline**: Composable pure functions for flexible workflows
+- **Hybrid Search**: Combines keyword (FTS5) and semantic search for optimal results
+- **Multi-Database Support**: Search across media, notes, prompts, and character cards
+- **Query Expansion**: Automatic enhancement with synonyms, acronyms, and domain terms
+- **Smart Caching**: Semantic cache with adaptive thresholds
+- **Document Reranking**: Multiple strategies for relevance optimization
+- **Resilience**: Optional circuit breakers and retry logic for production
+- **Performance Monitoring**: Built-in metrics and timing analysis
 
 ### Base URL
 
 ```
-https://api.yourdomain.com/api/v1/rag
+http://localhost:8000/api/v1/rag
 ```
+
+## Architecture
+
+The RAG API uses a functional pipeline architecture:
+
+```
+Query → [Expand] → [Cache Check] → [Retrieve] → [Rerank] → [Cache Store] → Response
+           ↓           ↓              ↓            ↓            ↓
+      (optional)  (optional)    (required)   (optional)   (optional)
+```
+
+Pre-built pipelines:
+- **minimal**: Retrieve → Rerank (fastest)
+- **standard**: Expand → Cache → Retrieve → Rerank → Store (balanced)
+- **quality**: All features enabled (most accurate)
 
 ## Authentication
 
-All endpoints require authentication using Bearer tokens in the Authorization header.
+In single-user mode (default), use the API key from config:
+
+```http
+X-API-Key: default-secret-key-for-single-user
+```
+
+In multi-user mode, use JWT Bearer tokens:
 
 ```http
 Authorization: Bearer <your-jwt-token>
 ```
 
-### Obtaining a Token
-
-```http
-POST /api/v1/auth/login
-Content-Type: application/json
-
-{
-  "username": "your_username",
-  "password": "your_password"
-}
-```
-
-Response:
-```json
-{
-  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-  "token_type": "bearer",
-  "expires_in": 86400
-}
-```
-
-## Rate Limiting
-
-Rate limits are enforced per user based on subscription tier:
-
-| Tier | Search/min | Agent/min | Tokens/day | Cost/day |
-|------|------------|-----------|------------|----------|
-| Free | 60 | 30 | 100,000 | $1.00 |
-| Basic | 180 | 90 | 1,000,000 | $10.00 |
-| Premium | 600 | 300 | 10,000,000 | $100.00 |
-| Enterprise | Custom | Custom | Custom | Custom |
-
-Rate limit headers are included in all responses:
-```http
-X-RateLimit-Limit: 60
-X-RateLimit-Remaining: 45
-X-RateLimit-Reset: 1629823200
-```
-
 ## Endpoints
 
-### Search Endpoints
+### Simple Search
 
-#### Simple Search
+**POST** `/api/v1/rag/search/simple`
 
-**POST** `/search`
+Simplified search interface with essential parameters.
 
-Performs a search across specified databases with minimal configuration.
+#### Request Body
 
-**Request Body:**
 ```json
 {
-  "query": "machine learning basics",
-  "search_type": "hybrid",
-  "limit": 10,
-  "databases": ["media_db", "notes"],
-  "keywords": ["AI", "ML"]
+  "query": "What is machine learning?",
+  "databases": ["media", "notes"],
+  "max_context_size": 4000,
+  "top_k": 10,
+  "enable_reranking": true,
+  "enable_citations": false,
+  "keywords": ["python", "tensorflow"]
 }
 ```
 
-**Parameters:**
-- `query` (string, required): Search query text (1-1000 chars)
-- `search_type` (enum): `hybrid`, `semantic`, or `fulltext` (default: `hybrid`)
-- `limit` (integer): Max results to return, 1-100 (default: 10)
-- `databases` (array): Databases to search (default: `["media_db"]`)
-- `keywords` (array, optional): Keywords to filter results
+#### Parameters
 
-**Response:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| query | string | required | Search query (1-1000 chars) |
+| databases | array | ["media"] | Databases to search: media, notes, characters, chats |
+| max_context_size | integer | 4000 | Maximum total size of returned content |
+| top_k | integer | 10 | Number of top results (1-100) |
+| enable_reranking | boolean | true | Enable document reranking |
+| enable_citations | boolean | false | Include source citations |
+| keywords | array | null | Filter results by keywords |
+
+#### Response
+
+```json
+{
+  "results": [
+    {
+      "content": "Machine learning is a subset of artificial intelligence...",
+      "source": "media",
+      "metadata": {
+        "title": "Introduction to ML",
+        "media_id": 123,
+        "timestamp": "2024-01-15T10:30:00Z"
+      },
+      "score": 0.95,
+      "citation": "Introduction to ML, timestamp: 10:30"
+    }
+  ],
+  "total_results": 42,
+  "processing_time": 0.234,
+  "cache_hit": false,
+  "query_expanded": ["machine learning", "ML", "artificial intelligence"]
+}
+```
+
+### Complex Search
+
+**POST** `/api/v1/rag/search/complex`
+
+Advanced search with full configuration options.
+
+#### Request Body
+
+```json
+{
+  "query": "machine learning applications",
+  "config": {
+    "pipeline": "quality",
+    "databases": {
+      "media_db_path": "/path/to/media.db",
+      "notes_db_path": "/path/to/notes.db"
+    },
+    "sources": ["media_db", "notes"],
+    "retrieval": {
+      "top_k": 20,
+      "min_score": 0.5,
+      "use_fts": true,
+      "use_vector": true,
+      "hybrid_alpha": 0.7
+    },
+    "expansion": {
+      "enabled": true,
+      "strategies": ["acronym", "synonym", "domain", "entity"],
+      "max_expansions": 5
+    },
+    "caching": {
+      "enabled": true,
+      "threshold": 0.85,
+      "adaptive": true,
+      "ttl": 3600
+    },
+    "reranking": {
+      "enabled": true,
+      "strategy": "hybrid",
+      "top_k": 10,
+      "diversity": 0.3
+    },
+    "processing": {
+      "chunk_size": 512,
+      "overlap": 50,
+      "process_tables": true,
+      "extract_metadata": true
+    },
+    "resilience": {
+      "enable_resilience": true,
+      "retry": {
+        "enabled": true,
+        "max_attempts": 3,
+        "initial_delay": 0.5
+      },
+      "circuit_breaker": {
+        "enabled": true,
+        "failure_threshold": 5,
+        "timeout": 60
+      }
+    },
+    "monitoring": {
+      "enable_monitoring": true,
+      "enable_tracing": false,
+      "log_level": "INFO"
+    }
+  }
+}
+```
+
+#### Configuration Options
+
+##### Pipeline Selection
+- `minimal` - Basic retrieval and reranking
+- `standard` - Includes caching and query expansion
+- `quality` - All features enabled
+- `enhanced` - Advanced chunking and parent retrieval
+- `custom` - Build your own (specify functions)
+
+##### Custom Pipeline
+```json
+{
+  "pipeline": "custom",
+  "custom_functions": [
+    "expand_query",
+    "check_cache",
+    "retrieve_documents",
+    "process_tables",
+    "rerank_documents",
+    "store_in_cache"
+  ]
+}
+```
+
+#### Response
+
 ```json
 {
   "results": [
     {
       "id": "doc_123",
-      "title": "Introduction to Machine Learning",
-      "content": "Machine learning is a subset of artificial intelligence...",
-      "score": 0.95,
+      "content": "Full document content...",
       "source": "media_db",
       "metadata": {
+        "title": "ML Applications",
         "author": "John Doe",
         "date": "2024-01-15",
-        "tags": ["ML", "AI", "tutorial"]
+        "media_type": "video",
+        "duration": 3600,
+        "tags": ["ml", "ai", "tutorial"]
+      },
+      "score": 0.92,
+      "relevance_scores": {
+        "bm25": 0.88,
+        "vector": 0.94,
+        "rerank": 0.95
+      },
+      "chunk_info": {
+        "chunk_id": 5,
+        "total_chunks": 10,
+        "chunk_type": "paragraph"
       }
     }
   ],
-  "total_results": 42,
-  "query_id": "550e8400-e29b-41d4-a716-446655440000",
-  "search_type_used": "hybrid"
-}
-```
-
-**Status Codes:**
-- `200 OK`: Successful search
-- `400 Bad Request`: Invalid parameters
-- `401 Unauthorized`: Invalid or missing token
-- `429 Too Many Requests`: Rate limit exceeded
-- `500 Internal Server Error`: Server error
-
-**Performance:**
-- Average latency: < 500ms
-- P95 latency: < 2000ms
-- Max results: 100
-
----
-
-#### Advanced Search
-
-**POST** `/search/advanced`
-
-Performs an advanced search with full configuration options.
-
-**Request Body:**
-```json
-{
-  "query": "transformer architecture in deep learning",
-  "search_config": {
-    "search_type": "hybrid",
-    "limit": 20,
-    "offset": 0,
-    "databases": ["media_db", "notes"],
-    "keywords": ["transformer", "attention"],
-    "date_range": {
-      "start": "2024-01-01",
-      "end": "2024-12-31"
-    },
-    "metadata_filters": {
-      "author": "Vaswani",
-      "type": "paper"
-    },
-    "include_scores": true,
-    "include_full_content": false
+  "total_results": 15,
+  "metadata": {
+    "pipeline_used": "quality",
+    "cache_hit": false,
+    "query_expanded": true,
+    "expansion_count": 3,
+    "databases_searched": ["media_db", "notes"],
+    "reranking_applied": true,
+    "processing_time": 0.456,
+    "component_timings": {
+      "query_expansion": 0.023,
+      "cache_lookup": 0.012,
+      "retrieval": 0.234,
+      "reranking": 0.089,
+      "total": 0.456
+    }
   },
-  "hybrid_config": {
-    "semantic_weight": 0.7,
-    "fulltext_weight": 0.3,
-    "rrf_k": 60
-  },
-  "semantic_config": {
-    "similarity_threshold": 0.7,
-    "rerank": true,
-    "embedding_model": "text-embedding-3-small"
-  },
-  "strategy": "query_fusion"
-}
-```
-
-**Parameters:**
-
-*search_config:*
-- `search_type`: Type of search (`hybrid`, `semantic`, `fulltext`)
-- `limit`: Results per page (1-1000)
-- `offset`: Pagination offset
-- `databases`: List of databases to search
-- `keywords`: Keyword filters
-- `date_range`: Date filtering with ISO format dates
-- `metadata_filters`: Complex metadata filtering
-- `include_scores`: Include relevance scores
-- `include_full_content`: Return full document content
-
-*hybrid_config:*
-- `semantic_weight`: Weight for semantic search (0-1)
-- `fulltext_weight`: Weight for keyword search (0-1)
-- `rrf_k`: Reciprocal rank fusion parameter
-
-*semantic_config:*
-- `similarity_threshold`: Minimum similarity score (0-1)
-- `rerank`: Enable result reranking
-- `embedding_model`: Specific embedding model to use
-
-*strategy:*
-- `vanilla`: Standard search
-- `query_fusion`: Multiple query generation and fusion
-- `hyde`: Hypothetical document embeddings
-
-**Response:**
-```json
-{
-  "results": [...],
-  "total_results": 156,
-  "query_id": "550e8400-e29b-41d4-a716-446655440000",
-  "search_type_used": "hybrid",
-  "strategy_used": "query_fusion",
-  "search_config": {...},
   "debug_info": {
-    "query_expansion": ["transformer model", "attention mechanism"],
-    "databases_searched": 2,
-    "time_ms": 342
-  }
-}
-```
-
-### Agent Endpoints
-
-#### Simple Agent
-
-**POST** `/agent`
-
-AI agent for question answering with automatic context retrieval.
-
-**Request Body:**
-```json
-{
-  "message": "What are the key concepts in deep learning?",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "search_databases": ["media_db", "notes"],
-  "model": "gpt-4"
-}
-```
-
-**Parameters:**
-- `message` (string, required): User's question or message (1-4000 chars)
-- `conversation_id` (string, optional): ID to maintain conversation context
-- `search_databases` (array): Databases to search for context (default: `["media_db"]`)
-- `model` (string, optional): LLM model override
-
-**Response:**
-```json
-{
-  "response": "Deep learning involves several key concepts:\n\n1. **Neural Networks**: ...",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "sources": [
-    {
-      "title": "Deep Learning Fundamentals",
-      "snippet": "Neural networks are the foundation...",
-      "relevance": 0.92,
-      "metadata": {
-        "page": 42,
-        "author": "Ian Goodfellow"
-      }
+    "original_query": "machine learning applications",
+    "expanded_queries": [
+      "machine learning applications",
+      "ML apps",
+      "artificial intelligence applications"
+    ],
+    "search_stats": {
+      "documents_retrieved": 50,
+      "documents_after_filtering": 30,
+      "documents_after_reranking": 15
     }
-  ],
-  "tokens_used": 850,
-  "model_used": "gpt-4"
-}
-```
-
-**Streaming Response:**
-
-Add `Accept: text/event-stream` header for streaming:
-
-```
-data: {"chunk": "Deep learning involves", "index": 0}
-data: {"chunk": " several key concepts:", "index": 1}
-data: {"done": true, "sources": [...]}
-```
-
----
-
-#### Advanced Agent
-
-**POST** `/agent/advanced`
-
-Advanced agent with research capabilities and tool usage.
-
-**Request Body:**
-```json
-{
-  "message": "Research the latest developments in quantum computing",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "mode": "research",
-  "generation_config": {
-    "model": "gpt-4",
-    "temperature": 0.7,
-    "max_tokens": 2048,
-    "top_p": 0.9,
-    "frequency_penalty": 0.0,
-    "presence_penalty": 0.0,
-    "stop_sequences": ["\\n\\n"]
-  },
-  "search_config": {
-    "search_type": "hybrid",
-    "databases": ["media_db", "notes"],
-    "keywords": ["quantum", "computing"],
-    "limit": 20
-  },
-  "tools": ["web_search", "reasoning"],
-  "system_prompt": "You are an expert researcher in quantum computing."
-}
-```
-
-**Parameters:**
-
-*Core:*
-- `message`: User's message (1-4000 chars)
-- `conversation_id`: Conversation tracking
-- `mode`: `rag` (Q&A) or `research` (multi-step)
-
-*generation_config:*
-- `model`: LLM model to use
-- `temperature`: Randomness (0-2)
-- `max_tokens`: Max response length
-- `top_p`: Nucleus sampling
-- `frequency_penalty`: Reduce repetition
-- `presence_penalty`: Encourage new topics
-- `stop_sequences`: Stop generation triggers
-
-*search_config:*
-- Similar to simple search parameters
-
-*tools:*
-- `web_search`: Search the web
-- `web_scrape`: Extract web content
-- `reasoning`: Multi-step reasoning
-- `python_executor`: Execute Python code
-
-**Response:**
-```json
-{
-  "response": "Based on my research...",
-  "conversation_id": "550e8400-e29b-41d4-a716-446655440000",
-  "sources": [...],
-  "mode_used": "research",
-  "tools_used": ["web_search", "reasoning"],
-  "search_stats": {
-    "documents_retrieved": 20,
-    "documents_used": 5,
-    "search_time_ms": 450
-  },
-  "generation_stats": {
-    "tokens_prompt": 1200,
-    "tokens_completion": 850,
-    "time_ms": 3400,
-    "model": "gpt-4"
   }
+}
+```
+
+### Health Check
+
+**GET** `/api/v1/rag/health`
+
+Check the health status of the RAG service.
+
+#### Response
+
+```json
+{
+  "status": "healthy",
+  "components": {
+    "database": "healthy",
+    "cache": "healthy",
+    "vector_store": "healthy",
+    "llm_connection": "healthy"
+  },
+  "metrics": {
+    "queries_processed": 1234,
+    "average_latency_ms": 234,
+    "cache_hit_rate": 0.45,
+    "error_rate": 0.002
+  },
+  "version": "3.0.0",
+  "uptime_seconds": 3600
 }
 ```
 
 ## Data Models
 
+### SimpleSearchRequest
+```python
+{
+  "query": str,                    # Required, 1-1000 chars
+  "databases": List[str],          # Default: ["media"]
+  "max_context_size": int,         # Default: 4000
+  "top_k": int,                    # Default: 10, range: 1-100
+  "enable_reranking": bool,        # Default: true
+  "enable_citations": bool,        # Default: false
+  "keywords": Optional[List[str]]  # Optional keyword filters
+}
+```
+
+### ComplexSearchRequest
+```python
+{
+  "query": str,                    # Required
+  "config": Dict[str, Any]         # Full configuration object
+}
+```
+
 ### SearchResult
-```typescript
-interface SearchResult {
-  id: string;
-  title: string;
-  content: string;
-  score: number;
-  source: string;
-  metadata: Record<string, any>;
+```python
+{
+  "id": str,                       # Document ID
+  "content": str,                  # Document content
+  "source": str,                   # Source database
+  "metadata": Dict[str, Any],      # Document metadata
+  "score": float,                  # Relevance score (0-1)
+  "citation": Optional[str]        # Citation if enabled
 }
 ```
 
-### Source
-```typescript
-interface Source {
-  title: string;
-  snippet: string;
-  relevance: number;
-  metadata?: Record<string, any>;
-}
+## Configuration
+
+### Environment Variables
+
+```bash
+# API Configuration
+TLDW_API_HOST=0.0.0.0
+TLDW_API_PORT=8000
+
+# Database Paths
+MEDIA_DB_PATH=/path/to/media.db
+NOTES_DB_PATH=/path/to/notes.db
+
+# Cache Settings
+ENABLE_CACHE=true
+CACHE_TTL=3600
+CACHE_SIZE=1000
+
+# Performance
+MAX_WORKERS=4
+BATCH_SIZE=32
+
+# Resilience
+ENABLE_RESILIENCE=true
+CIRCUIT_BREAKER_THRESHOLD=5
+RETRY_MAX_ATTEMPTS=3
 ```
 
-### ErrorResponse
-```typescript
-interface ErrorResponse {
-  error: string;
-  detail?: string;
-  code?: string;
-}
+### Configuration File (config.toml)
+
+```toml
+[rag]
+default_pipeline = "standard"
+enable_monitoring = true
+
+[rag.retrieval]
+default_top_k = 10
+min_score = 0.0
+use_fts = true
+use_vector = false
+
+[rag.expansion]
+enabled = true
+strategies = ["acronym", "synonym"]
+max_expansions = 5
+
+[rag.cache]
+enabled = true
+threshold = 0.85
+adaptive = true
+ttl = 3600
+
+[rag.reranking]
+enabled = true
+strategy = "hybrid"
+diversity = 0.3
+
+[rag.resilience]
+enabled = false
+retry_attempts = 3
+circuit_breaker_threshold = 5
 ```
 
 ## Error Handling
 
-All errors follow a consistent format:
+### HTTP Status Codes
+
+| Code | Description |
+|------|-------------|
+| 200 | Success |
+| 400 | Bad Request - Invalid parameters |
+| 401 | Unauthorized - Invalid authentication |
+| 404 | Not Found - Resource not found |
+| 429 | Too Many Requests - Rate limit exceeded |
+| 500 | Internal Server Error |
+| 503 | Service Unavailable - Circuit breaker open |
+
+### Error Response Format
 
 ```json
 {
-  "error": "Invalid search type",
-  "detail": "Search type 'invalid' is not supported. Use: hybrid, semantic, or fulltext",
-  "code": "INVALID_SEARCH_TYPE"
+  "error": {
+    "code": "INVALID_QUERY",
+    "message": "Query must be between 1 and 1000 characters",
+    "details": {
+      "field": "query",
+      "provided_length": 1500,
+      "max_length": 1000
+    }
+  },
+  "request_id": "req_123456",
+  "timestamp": "2024-01-15T10:30:00Z"
 }
 ```
 
 ### Common Error Codes
 
-| Code | Description | Resolution |
-|------|-------------|------------|
-| `INVALID_SEARCH_TYPE` | Invalid search type specified | Use valid type: hybrid, semantic, fulltext |
-| `RATE_LIMIT_EXCEEDED` | Too many requests | Wait for rate limit reset |
-| `INVALID_DATABASE` | Unknown database specified | Check available databases |
-| `QUERY_TOO_LONG` | Query exceeds max length | Limit query to 1000 characters |
-| `INSUFFICIENT_CREDITS` | Out of tokens/credits | Upgrade subscription or wait for reset |
-| `MODEL_UNAVAILABLE` | Requested model offline | Use different model or retry |
-| `CONTEXT_TOO_LARGE` | Retrieved context too large | Reduce search limit or refine query |
+- `INVALID_QUERY` - Query validation failed
+- `DATABASE_ERROR` - Database connection or query failed
+- `CACHE_ERROR` - Cache operation failed
+- `RERANKING_ERROR` - Reranking failed
+- `CIRCUIT_BREAKER_OPEN` - Service temporarily unavailable
+- `RATE_LIMIT_EXCEEDED` - Too many requests
 
 ## Performance
 
-### Latency Targets
+### Typical Response Times
 
-| Endpoint | P50 | P95 | P99 |
-|----------|-----|-----|-----|
-| Simple Search | 200ms | 500ms | 1s |
-| Advanced Search | 300ms | 800ms | 2s |
-| Simple Agent | 2s | 5s | 10s |
-| Advanced Agent | 3s | 8s | 15s |
-
-### Throughput
-
-- Search endpoints: 1000+ req/s
-- Agent endpoints: 100+ req/s
-- Concurrent users: 1000+
+| Pipeline | Cache Hit | Cache Miss |
+|----------|-----------|------------|
+| minimal | 20-30ms | 50-100ms |
+| standard | 20-30ms | 200-300ms |
+| quality | 30-40ms | 500-800ms |
+| enhanced | 40-50ms | 800-1200ms |
 
 ### Optimization Tips
 
-1. **Use appropriate search types**: Fulltext for keywords, semantic for concepts
-2. **Limit result counts**: Only request what you need
-3. **Cache frequently used queries**: Implement client-side caching
-4. **Use streaming for long responses**: Reduces perceived latency
-5. **Batch related queries**: Combine multiple searches when possible
+1. **Enable Caching**: Dramatically improves response time for repeated queries
+2. **Use Minimal Pipeline**: For simple lookups where speed is critical
+3. **Batch Requests**: Use batch endpoints for multiple queries
+4. **Configure Limits**: Set appropriate `top_k` values
+5. **Enable Monitoring**: Track performance metrics
 
 ## Examples
 
-### Python
+### Python Client
 
 ```python
 import httpx
 import asyncio
 
-class RAGClient:
-    def __init__(self, api_key: str, base_url: str = "https://api.yourdomain.com"):
-        self.api_key = api_key
-        self.base_url = base_url
-        self.headers = {"Authorization": f"Bearer {api_key}"}
-    
-    async def search(self, query: str, **kwargs):
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/api/v1/rag/search",
-                json={"query": query, **kwargs},
-                headers=self.headers
-            )
-            response.raise_for_status()
-            return response.json()
-    
-    async def ask_agent(self, message: str, conversation_id: str = None):
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/api/v1/rag/agent",
-                json={
-                    "message": message,
-                    "conversation_id": conversation_id
-                },
-                headers=self.headers
-            )
-            response.raise_for_status()
-            return response.json()
+async def search(query: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:8000/api/v1/rag/search/simple",
+            json={"query": query},
+            headers={"X-API-Key": "your-api-key"}
+        )
+        return response.json()
 
-# Usage
-async def main():
-    client = RAGClient("your-api-key")
-    
-    # Search
-    results = await client.search(
-        "machine learning",
-        search_type="hybrid",
-        limit=5
-    )
-    
-    # Agent
-    response = await client.ask_agent(
-        "Explain machine learning in simple terms"
-    )
-    print(response["response"])
+# Simple search
+results = asyncio.run(search("What is RAG?"))
 
-asyncio.run(main())
+# Complex search with custom config
+async def complex_search(query: str):
+    config = {
+        "pipeline": "quality",
+        "expansion": {"strategies": ["acronym", "synonym"]},
+        "reranking": {"strategy": "cross_encoder"}
+    }
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:8000/api/v1/rag/search/complex",
+            json={"query": query, "config": config},
+            headers={"X-API-Key": "your-api-key"}
+        )
+        return response.json()
+```
+
+### cURL Examples
+
+```bash
+# Simple search
+curl -X POST http://localhost:8000/api/v1/rag/search/simple \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"query": "machine learning"}'
+
+# Complex search with quality pipeline
+curl -X POST http://localhost:8000/api/v1/rag/search/complex \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "query": "deep learning vs machine learning",
+    "config": {
+      "pipeline": "quality",
+      "retrieval": {"top_k": 20},
+      "reranking": {"strategy": "cross_encoder", "top_k": 5}
+    }
+  }'
+
+# Health check
+curl http://localhost:8000/api/v1/rag/health \
+  -H "X-API-Key: your-api-key"
 ```
 
 ### JavaScript/TypeScript
 
 ```typescript
-class RAGClient {
-  private apiKey: string;
-  private baseUrl: string;
+interface SearchRequest {
+  query: string;
+  databases?: string[];
+  top_k?: number;
+}
 
-  constructor(apiKey: string, baseUrl = "https://api.yourdomain.com") {
-    this.apiKey = apiKey;
-    this.baseUrl = baseUrl;
-  }
-
-  async search(query: string, options = {}) {
-    const response = await fetch(`${this.baseUrl}/api/v1/rag/search`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ query, ...options })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Search failed: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async askAgent(message: string, conversationId?: string) {
-    const response = await fetch(`${this.baseUrl}/api/v1/rag/agent`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message,
-        conversation_id: conversationId
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Agent request failed: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  // Streaming support
-  async *streamAgent(message: string) {
-    const response = await fetch(`${this.baseUrl}/api/v1/rag/agent`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream'
-      },
-      body: JSON.stringify({ message })
-    });
-
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader!.read();
-      if (done) break;
-      
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = JSON.parse(line.slice(6));
-          yield data;
-        }
-      }
-    }
-  }
+async function search(request: SearchRequest): Promise<any> {
+  const response = await fetch('http://localhost:8000/api/v1/rag/search/simple', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': 'your-api-key'
+    },
+    body: JSON.stringify(request)
+  });
+  
+  return response.json();
 }
 
 // Usage
-const client = new RAGClient('your-api-key');
-
-// Search
-const results = await client.search('machine learning', {
-  searchType: 'hybrid',
-  limit: 5
+const results = await search({
+  query: 'machine learning',
+  databases: ['media', 'notes'],
+  top_k: 5
 });
-
-// Streaming agent
-for await (const chunk of client.streamAgent('Explain quantum computing')) {
-  if (chunk.chunk) {
-    process.stdout.write(chunk.chunk);
-  }
-}
 ```
 
-### cURL
+## Migration Guide
 
-```bash
-# Simple search
-curl -X POST https://api.yourdomain.com/api/v1/rag/search \
-  -H "Authorization: Bearer your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "machine learning",
-    "search_type": "hybrid",
-    "limit": 10
-  }'
+### From v2 to v3
 
-# Agent with streaming
-curl -X POST https://api.yourdomain.com/api/v1/rag/agent \
-  -H "Authorization: Bearer your-api-key" \
-  -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{
-    "message": "What is artificial intelligence?"
-  }'
-```
+The v3 API uses a functional pipeline architecture. Key changes:
 
-## SDKs and Client Libraries
+1. **Endpoint Consolidation**
+   - Old: `/api/v1/rag/v2/search`, `/api/v1/rag/v3/search`
+   - New: `/api/v1/rag/search/simple`, `/api/v1/rag/search/complex`
 
-### Official SDKs
+2. **Configuration Structure**
+   ```python
+   # Old (v2)
+   {
+     "query": "test",
+     "search_type": "hybrid",
+     "kwargs": {...}
+   }
+   
+   # New (v3)
+   {
+     "query": "test",
+     "config": {
+       "pipeline": "standard",
+       "retrieval": {...}
+     }
+   }
+   ```
 
-- **Python**: `pip install tldw-rag-client`
-- **JavaScript/TypeScript**: `npm install @tldw/rag-client`
-- **Go**: `go get github.com/tldw/rag-client-go`
-- **Ruby**: `gem install tldw-rag-client`
+3. **Pipeline Selection**
+   - v2: Fixed search types (simple, hybrid, semantic)
+   - v3: Flexible pipelines (minimal, standard, quality, custom)
 
-### Community SDKs
+4. **Response Format**
+   - More detailed metadata
+   - Component timings included
+   - Debug information available
 
-- **Rust**: `cargo add tldw-rag`
-- **Java**: Maven package `com.tldw:rag-client`
-- **PHP**: Composer package `tldw/rag-client`
+### Backward Compatibility
+
+For backward compatibility during migration:
+
+1. Use the simple search endpoint for basic queries
+2. Map old search types to new pipelines:
+   - `simple` → `minimal` pipeline
+   - `hybrid` → `standard` pipeline
+   - `semantic` → `quality` pipeline with vector search
 
 ## Monitoring and Metrics
 
 ### Available Metrics
 
-Metrics are exposed at `/api/v1/rag/metrics` in Prometheus format:
+- `rag_queries_total` - Total number of queries processed
+- `rag_query_duration_seconds` - Query processing time
+- `rag_cache_hits_total` - Cache hit count
+- `rag_cache_misses_total` - Cache miss count
+- `rag_errors_total` - Error count by type
+- `rag_documents_retrieved_total` - Documents retrieved
+- `rag_reranking_duration_seconds` - Reranking time
 
-```
-# Request latency
-rag_request_duration_seconds{endpoint="search",quantile="0.5"} 0.2
-rag_request_duration_seconds{endpoint="search",quantile="0.95"} 0.5
-rag_request_duration_seconds{endpoint="search",quantile="0.99"} 1.0
+### Logging
 
-# Request count
-rag_requests_total{endpoint="search",status="success"} 10543
-rag_requests_total{endpoint="search",status="error"} 23
+Structured logging with levels:
+- `DEBUG` - Detailed execution flow
+- `INFO` - Normal operations
+- `WARNING` - Performance issues, fallbacks
+- `ERROR` - Failures requiring attention
 
-# Token usage
-rag_tokens_used_total{user="user123",model="gpt-4"} 450230
+### Performance Dashboard
 
-# Cost tracking
-rag_estimated_cost_dollars{user="user123",endpoint="agent"} 12.45
-```
-
-### Audit Logs
-
-All operations are logged for compliance and debugging:
-
-```json
-{
-  "timestamp": "2024-08-18T10:30:45Z",
-  "event_type": "search_request",
-  "user_id": "user123",
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "endpoint": "/api/v1/rag/search",
-  "query": "machine learning",
-  "databases_searched": ["media_db"],
-  "result_count": 10,
-  "latency_ms": 234,
-  "tokens_used": 0,
-  "status": "success"
-}
-```
-
-### Health Checks
-
-```http
-GET /api/v1/rag/health
-```
-
-Response:
-```json
-{
-  "status": "healthy",
-  "version": "2.0.0",
-  "uptime_seconds": 86400,
-  "database_status": "connected",
-  "vector_store_status": "connected",
-  "llm_status": "available"
-}
-```
+Access metrics at: `http://localhost:8000/metrics`
 
 ## Support
 
-### Resources
-
-- **API Status**: https://status.yourdomain.com
-- **Support Portal**: https://support.yourdomain.com
-- **Community Forum**: https://forum.yourdomain.com
-- **GitHub Issues**: https://github.com/yourdomain/tldw-server/issues
-
-### Contact
-
-- **Email**: api-support@yourdomain.com
-- **Discord**: https://discord.gg/yourdomain
-- **Enterprise Support**: enterprise@yourdomain.com
-
----
-
-*This documentation is version-controlled and updated with each API release. For the latest version, visit https://docs.yourdomain.com/api/rag*
+For issues or questions:
+- GitHub Issues: [tldw_server/issues](https://github.com/your-org/tldw_server/issues)
+- Documentation: [Full Documentation](https://docs.tldw-server.com)
+- API Status: [status.tldw-server.com](https://status.tldw-server.com)
