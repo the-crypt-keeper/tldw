@@ -52,7 +52,7 @@ class JobManager:
     # Job Creation and Management
     
     def create_job(self, job_type: JobType, entity_id: int, payload: Dict[str, Any],
-                  priority: int = 5, max_retries: int = 3) -> Dict[str, Any]:
+                  project_id: Optional[int] = None, priority: int = 5, max_retries: int = 3) -> Dict[str, Any]:
         """
         Create a new job in the queue.
         
@@ -60,6 +60,7 @@ class JobManager:
             job_type: Type of job
             entity_id: ID of related entity (evaluation, optimization, etc.)
             payload: Job-specific data
+            project_id: Optional project ID
             priority: Job priority (1-10, higher = more priority)
             max_retries: Maximum retry attempts
             
@@ -74,11 +75,11 @@ class JobManager:
             
             cursor.execute("""
                 INSERT INTO prompt_studio_job_queue (
-                    uuid, job_type, entity_id, priority, status,
+                    uuid, job_type, entity_id, project_id, priority, status,
                     payload, max_retries, client_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                job_uuid, job_type, entity_id, priority, JobStatus.QUEUED.value,
+                job_uuid, job_type, entity_id, project_id, priority, JobStatus.QUEUED.value,
                 json.dumps(payload), max_retries, self.client_id
             ))
             

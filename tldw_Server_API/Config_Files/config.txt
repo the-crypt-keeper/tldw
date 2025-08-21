@@ -30,6 +30,24 @@ strategy = character_lore_first
 max_tokens = 1000
 default_rag_prompt = simplified_promptflow_RAG_system_prompt
 
+[Chat-Module]
+# Request size limits
+max_base64_image_size_mb = 3
+max_text_length_per_message = 400000
+max_messages_per_request = 1000
+max_images_per_request = 10
+max_request_size_bytes = 1000000
+# Streaming settings
+streaming_idle_timeout_seconds = 300
+streaming_heartbeat_interval_seconds = 30
+streaming_max_response_size_mb = 10
+# Transaction retry settings
+conversation_creation_max_retries = 3
+db_transaction_max_retries = 3
+# Rate limiting
+rate_limit_per_minute = 60
+rate_limit_per_conversation_per_minute = 20
+
 
 [Settings]
 chunk_duration = 30

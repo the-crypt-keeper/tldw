@@ -12,8 +12,20 @@ from loguru import logger
 
 from .prompt_executor import PromptExecutor
 from .test_runner import TestRunner
-from .evaluation_metrics import EvaluationMetrics, MetricType
+from .evaluation_metrics import EvaluationMetrics
 from tldw_Server_API.app.core.DB_Management.PromptStudioDatabase import PromptStudioDatabase
+
+########################################################################################################################
+# Metric Types
+
+class MetricType(str, Enum):
+    """Types of metrics for evaluation."""
+    ACCURACY = "accuracy"
+    F1_SCORE = "f1_score"
+    PRECISION = "precision"
+    RECALL = "recall"
+    EXACT_MATCH = "exact_match"
+    SIMILARITY = "similarity"
 
 ########################################################################################################################
 # Optimization Strategies

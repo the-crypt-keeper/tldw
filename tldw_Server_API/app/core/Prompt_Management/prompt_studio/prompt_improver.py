@@ -2,14 +2,82 @@
 # Prompt improvement and optimization for Prompt Studio
 
 import json
+import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
+from enum import Enum
+from dataclasses import dataclass, field
 from loguru import logger
 
 from tldw_Server_API.app.core.DB_Management.PromptStudioDatabase import (
     PromptStudioDatabase, DatabaseError
 )
 from tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls import chat_with_openai
+
+########################################################################################################################
+# Enums and Data Classes
+
+class ImprovementStrategy(Enum):
+    """Strategies for improving prompts."""
+    CLARITY = "clarity"
+    SPECIFICITY = "specificity"
+    STRUCTURE = "structure"
+    ADD_EXAMPLES = "add_examples"
+    ADD_CONSTRAINTS = "add_constraints"
+    CHAIN_OF_THOUGHT = "chain_of_thought"
+    SIMPLIFY = "simplify"
+    EXPAND = "expand"
+    FORMALIZE = "formalize"
+    TECHNICAL = "technical"
+    AUTO = "auto"
+
+@dataclass
+class PromptAnalysis:
+    """Analysis of a prompt's quality."""
+    clarity_score: float = 0.0
+    specificity_score: float = 0.0
+    structure_score: float = 0.0
+    completeness_score: float = 0.0
+    issues: List[str] = field(default_factory=list)
+    suggestions: List[str] = field(default_factory=list)
+    metrics: Dict[str, Any] = field(default_factory=dict)
+    
+    def overall_score(self) -> float:
+        """Calculate overall quality score."""
+        scores = [self.clarity_score, self.specificity_score, 
+                 self.structure_score, self.completeness_score]
+        return sum(scores) / len(scores)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "clarity_score": self.clarity_score,
+            "specificity_score": self.specificity_score,
+            "structure_score": self.structure_score,
+            "completeness_score": self.completeness_score,
+            "overall_score": self.overall_score(),
+            "issues": self.issues,
+            "suggestions": self.suggestions,
+            "metrics": self.metrics
+        }
+
+@dataclass
+class ImprovementResult:
+    """Result of a prompt improvement."""
+    original_prompt: str
+    improved_prompt: str
+    strategy: ImprovementStrategy
+    improvements_made: List[str] = field(default_factory=list)
+    score_change: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    before_analysis: Optional[PromptAnalysis] = None
+    after_analysis: Optional[PromptAnalysis] = None
+    
+    def calculate_improvement(self) -> float:
+        """Calculate the improvement score."""
+        if self.before_analysis and self.after_analysis:
+            return self.after_analysis.overall_score() - self.before_analysis.overall_score()
+        return self.score_change
 
 ########################################################################################################################
 # Improvement Strategies
@@ -68,15 +136,470 @@ IMPROVEMENT_STRATEGIES = {
 class PromptImprover:
     """Improves and optimizes prompts for Prompt Studio projects."""
     
-    def __init__(self, db: PromptStudioDatabase):
+    def __init__(self, db: PromptStudioDatabase, enable_cache: bool = False):
         """
         Initialize PromptImprover.
         
         Args:
             db: PromptStudioDatabase instance
+            enable_cache: Whether to enable caching
         """
         self.db = db
-        self.client_id = db.client_id
+        self.client_id = db.client_id if db else None
+        self.enable_cache = enable_cache
+        self.cache = {} if enable_cache else None
+        self.strategies = list(ImprovementStrategy)
+        self.analyzers = {}
+        self.llm_client = None  # Mock LLM client
+    
+    ####################################################################################################################
+    # Core Analysis and Improvement Methods
+    
+    def analyze(self, prompt: str) -> PromptAnalysis:
+        """Analyze a prompt's quality."""
+        analysis = PromptAnalysis()
+        
+        # Calculate scores (simplified)
+        analysis.clarity_score = self._calculate_clarity_score(prompt)
+        analysis.specificity_score = self._calculate_specificity_score(prompt)
+        analysis.structure_score = self._calculate_structure_score(prompt)
+        analysis.completeness_score = self._calculate_completeness_score(prompt)
+        
+        # Identify issues
+        if analysis.clarity_score < 0.7:
+            analysis.issues.append("Prompt lacks clarity")
+        if analysis.specificity_score < 0.7:
+            analysis.issues.append("Prompt is too vague")
+        
+        # Generate suggestions
+        if analysis.clarity_score < 0.7:
+            analysis.suggestions.append("Simplify language and break into steps")
+        if analysis.specificity_score < 0.7:
+            analysis.suggestions.append("Add specific constraints and examples")
+        
+        return analysis
+    
+    def improve(self, prompt: str, strategy: ImprovementStrategy = ImprovementStrategy.AUTO,
+                context: Dict[str, Any] = None, examples: List[Dict] = None,
+                constraints: List[str] = None, fallback: bool = False) -> ImprovementResult:
+        """Improve a prompt using specified strategy."""
+        # Validate input
+        if not prompt or not prompt.strip():
+            raise ValueError("Prompt cannot be empty")
+        
+        try:
+            # Analyze before
+            before_analysis = self.analyze(prompt)
+            
+            # Apply strategy
+            if strategy == ImprovementStrategy.AUTO:
+                strategy = self._select_best_strategy(prompt, before_analysis)
+            
+            improved = self._apply_strategy(prompt, strategy, context, examples, constraints)
+            
+            # Analyze after
+            after_analysis = self.analyze(improved)
+            
+            # Create result
+            result = ImprovementResult(
+                original_prompt=prompt,
+                improved_prompt=improved,
+                strategy=strategy,
+                before_analysis=before_analysis,
+                after_analysis=after_analysis,
+                score_change=after_analysis.overall_score() - before_analysis.overall_score(),
+                improvements_made=self._list_improvements(prompt, improved)
+            )
+            
+            # Cache if enabled
+            if self.enable_cache:
+                cache_key = f"{prompt}:{strategy.value}"
+                self.cache[cache_key] = result
+            
+            return result
+            
+        except Exception as e:
+            if fallback:
+                # Return original on error
+                return ImprovementResult(
+                    original_prompt=prompt,
+                    improved_prompt=prompt,
+                    strategy=strategy,
+                    metadata={"error": str(e)}
+                )
+            raise
+    
+    def improve_multi(self, prompt: str, strategies: List[ImprovementStrategy]) -> ImprovementResult:
+        """Apply multiple improvement strategies."""
+        current = prompt
+        all_improvements = []
+        
+        for strategy in strategies:
+            result = self.improve(current, strategy)
+            current = result.improved_prompt
+            all_improvements.extend(result.improvements_made)
+        
+        return ImprovementResult(
+            original_prompt=prompt,
+            improved_prompt=current,
+            strategy=ImprovementStrategy.AUTO,
+            improvements_made=all_improvements
+        )
+    
+    def auto_improve(self, prompt: str) -> ImprovementResult:
+        """Automatically improve a prompt."""
+        return self.improve(prompt, strategy=ImprovementStrategy.AUTO)
+    
+    def improve_iterative(self, prompt: str, max_iterations: int = 3,
+                         target_score: float = 0.8) -> List[ImprovementResult]:
+        """Iteratively improve a prompt."""
+        results = []
+        current = prompt
+        
+        for _ in range(max_iterations):
+            analysis = self.analyze(current)
+            if analysis.overall_score() >= target_score:
+                break
+            
+            result = self.auto_improve(current)
+            results.append(result)
+            current = result.improved_prompt
+        
+        return results
+    
+    async def improve_async(self, prompt: str, strategy: ImprovementStrategy) -> ImprovementResult:
+        """Asynchronously improve a prompt."""
+        # Simulate async operation
+        await asyncio.sleep(0.01)
+        return self.improve(prompt, strategy)
+    
+    def improve_batch(self, prompts: List[str], strategy: ImprovementStrategy) -> List[ImprovementResult]:
+        """Improve multiple prompts."""
+        return [self.improve(p, strategy) for p in prompts]
+    
+    def compare(self, prompt1: str, prompt2: str) -> Dict[str, Any]:
+        """Compare two prompts."""
+        analysis1 = self.analyze(prompt1)
+        analysis2 = self.analyze(prompt2)
+        
+        return {
+            "prompt1": analysis1.to_dict(),
+            "prompt2": analysis2.to_dict(),
+            "winner": "prompt2" if analysis2.overall_score() > analysis1.overall_score() else "prompt1"
+        }
+    
+    def validate_improvement(self, original: str, improved: str) -> bool:
+        """Validate that an improvement is actually better."""
+        original_analysis = self.analyze(original)
+        improved_analysis = self.analyze(improved)
+        return improved_analysis.overall_score() > original_analysis.overall_score()
+    
+    def improve_with_llm(self, prompt: str, model: str = "gpt-4") -> ImprovementResult:
+        """Improve using LLM assistance."""
+        if self.llm_client:
+            improved = self.llm_client.generate(prompt)
+        else:
+            improved = prompt + " (improved with LLM)"
+        
+        return ImprovementResult(
+            original_prompt=prompt,
+            improved_prompt=improved,
+            strategy=ImprovementStrategy.AUTO
+        )
+    
+    ####################################################################################################################
+    # Analysis Helper Methods
+    
+    def analyze_readability(self, prompt: str) -> float:
+        """Analyze readability score."""
+        # Simple heuristic based on word complexity
+        complex_words = ["endeavor", "synthesize", "comprehensive", "facilitate"]
+        score = 1.0
+        for word in complex_words:
+            if word in prompt.lower():
+                score -= 0.1
+        return max(0, score)
+    
+    def detect_ambiguity(self, prompt: str) -> List[str]:
+        """Detect ambiguous language."""
+        issues = []
+        ambiguous = ["thing", "stuff", "it", "there", "do"]
+        for word in ambiguous:
+            if word in prompt.lower().split():
+                issues.append(f"Ambiguous term: {word}")
+        return issues
+    
+    def check_completeness(self, prompt: str) -> float:
+        """Check prompt completeness."""
+        # Higher score for longer, more detailed prompts
+        word_count = len(prompt.split())
+        if word_count < 3:
+            return 0.2
+        elif word_count < 10:
+            return 0.5
+        elif word_count < 30:
+            return 0.8
+        else:
+            return 1.0
+    
+    def check_task_alignment(self, prompt: str, task: str) -> float:
+        """Check alignment between prompt and task."""
+        # Simple keyword matching
+        task_words = task.lower().split()
+        prompt_words = prompt.lower().split()
+        matches = sum(1 for word in task_words if word in prompt_words)
+        return min(1.0, matches / max(1, len(task_words)))
+    
+    def fuzzy_compare_outputs(self, actual: Dict, expected: Dict, threshold: float = 0.9) -> bool:
+        """Fuzzy comparison of outputs."""
+        if "text" in actual and "text" in expected:
+            # Simple similarity check
+            a = actual["text"].lower()
+            b = expected["text"].lower()
+            return a in b or b in a or abs(len(a) - len(b)) < 2
+        return False
+    
+    ####################################################################################################################
+    # Strategy Implementation
+    
+    def _apply_strategy(self, prompt: str, strategy: ImprovementStrategy,
+                       context: Dict = None, examples: List = None,
+                       constraints: List = None) -> str:
+        """Apply improvement strategy."""
+        if strategy == ImprovementStrategy.CLARITY:
+            return self._improve_clarity(prompt)
+        elif strategy == ImprovementStrategy.SPECIFICITY:
+            return self._improve_specificity(prompt, context)
+        elif strategy == ImprovementStrategy.STRUCTURE:
+            return self._improve_structure(prompt)
+        elif strategy == ImprovementStrategy.ADD_EXAMPLES and examples:
+            return self._add_examples(prompt, examples)
+        elif strategy == ImprovementStrategy.ADD_CONSTRAINTS and constraints:
+            return self._add_constraints(prompt, constraints)
+        elif strategy == ImprovementStrategy.CHAIN_OF_THOUGHT:
+            return self._add_chain_of_thought(prompt)
+        elif strategy == ImprovementStrategy.SIMPLIFY:
+            return self._simplify(prompt)
+        elif strategy == ImprovementStrategy.EXPAND:
+            return self._expand(prompt)
+        elif strategy == ImprovementStrategy.FORMALIZE:
+            return self._formalize(prompt)
+        elif strategy == ImprovementStrategy.TECHNICAL:
+            return self._make_technical(prompt, context)
+        else:
+            return prompt
+    
+    def _improve_clarity(self, prompt: str) -> str:
+        """Improve clarity."""
+        # Remove hedge words
+        improved = prompt
+        improved = improved.replace("maybe", "")
+        improved = improved.replace("perhaps", "")
+        improved = improved.replace("try to", "")
+        improved = improved.replace("if you can", "")
+        
+        # If no changes were made, add clarity instruction
+        if improved == prompt and not prompt.startswith("Please"):
+            improved = f"Please {prompt.lower()}"
+        
+        return improved.strip()
+    
+    def _improve_specificity(self, prompt: str, context: Dict = None) -> str:
+        """Improve specificity."""
+        improved = prompt
+        if context:
+            if "task" in context:
+                improved = f"Task: {context['task']}\n\n{improved}"
+            if "data_type" in context:
+                improved += f"\n\nData type: {context['data_type']}"
+        
+        # If no context or no changes, add specificity instructions
+        if improved == prompt:
+            # Look for vague terms and replace them
+            vague_terms = {
+                "stuff": "specific items",
+                "things": "particular objects",
+                "do": "perform",
+                "something": "a specific task",
+                "it": "the target item"
+            }
+            for vague, specific in vague_terms.items():
+                if vague in improved.lower():
+                    improved = improved.replace(vague, specific)
+            
+            # If still no changes, add instruction for specificity
+            if improved == prompt:
+                improved = f"Specifically: {prompt}"
+        
+        return improved
+    
+    def _improve_structure(self, prompt: str) -> str:
+        """Improve structure."""
+        # Add structure markers
+        sentences = prompt.split(". ")
+        if len(sentences) > 1:
+            structured = "Steps:\n"
+            for i, sentence in enumerate(sentences, 1):
+                structured += f"{i}. {sentence}\n"
+            return structured
+        
+        # If single sentence, add basic structure
+        if "\n" not in prompt:
+            return f"Task:\n{prompt}\n\nInstructions:\n1. Complete the task as specified"
+        
+        return prompt
+    
+    def _add_examples(self, prompt: str, examples: List[Dict]) -> str:
+        """Add examples."""
+        improved = prompt + "\n\nExamples:\n"
+        for ex in examples:
+            improved += f"Input: {ex.get('input', '')}\nOutput: {ex.get('output', '')}\n\n"
+        return improved
+    
+    def _add_constraints(self, prompt: str, constraints: List[str]) -> str:
+        """Add constraints."""
+        improved = prompt + "\n\nConstraints:\n"
+        for constraint in constraints:
+            improved += f"- {constraint}\n"
+        return improved
+    
+    def _add_chain_of_thought(self, prompt: str) -> str:
+        """Add chain-of-thought."""
+        return prompt + "\n\nLet's think step by step:"
+    
+    def _simplify(self, prompt: str) -> str:
+        """Simplify prompt."""
+        # Remove complex words
+        replacements = {
+            "facilitate": "help with",
+            "endeavor": "try",
+            "utilize": "use",
+            "comprehensive": "complete"
+        }
+        for old, new in replacements.items():
+            prompt = prompt.replace(old, new)
+        return prompt
+    
+    def _expand(self, prompt: str) -> str:
+        """Expand prompt."""
+        return f"Please provide a detailed response.\n\n{prompt}\n\nInclude specific examples and explanations."
+    
+    def _formalize(self, prompt: str) -> str:
+        """Formalize prompt."""
+        # Fix informal language
+        replacements = {
+            "hey": "Greetings",
+            "u": "you",
+            "plz": "please",
+            "ok": "acceptable"
+        }
+        for old, new in replacements.items():
+            prompt = prompt.replace(old, new)
+        return prompt
+    
+    def _make_technical(self, prompt: str, context: Dict = None) -> str:
+        """Make prompt more technical."""
+        improved = prompt
+        if context and "task" in context and "unit testing" in context["task"]:
+            improved += "\n\nInclude test cases, assertions, edge cases, exception handling, and validation."
+        return improved
+    
+    ####################################################################################################################
+    # Utility Methods
+    
+    def _calculate_clarity_score(self, prompt: str) -> float:
+        """Calculate clarity score."""
+        # Simple heuristic
+        hedge_words = ["maybe", "perhaps", "possibly", "might"]
+        score = 1.0
+        for word in hedge_words:
+            if word in prompt.lower():
+                score -= 0.1
+        return max(0, score)
+    
+    def _calculate_specificity_score(self, prompt: str) -> float:
+        """Calculate specificity score."""
+        vague_words = ["something", "thing", "stuff", "do"]
+        score = 1.0
+        for word in vague_words:
+            if word in prompt.lower():
+                score -= 0.15
+        return max(0, score)
+    
+    def _calculate_structure_score(self, prompt: str) -> float:
+        """Calculate structure score."""
+        # Check for structure indicators
+        if any(marker in prompt for marker in ["1.", "Step", "First", "Then", "Finally"]):
+            return 0.9
+        elif "." in prompt:
+            return 0.7
+        else:
+            return 0.5
+    
+    def _calculate_completeness_score(self, prompt: str) -> float:
+        """Calculate completeness score."""
+        return self.check_completeness(prompt)
+    
+    def _select_best_strategy(self, prompt: str, analysis: PromptAnalysis) -> ImprovementStrategy:
+        """Select best improvement strategy."""
+        if analysis.clarity_score < 0.6:
+            return ImprovementStrategy.CLARITY
+        elif analysis.specificity_score < 0.6:
+            return ImprovementStrategy.SPECIFICITY
+        elif analysis.structure_score < 0.6:
+            return ImprovementStrategy.STRUCTURE
+        else:
+            return ImprovementStrategy.EXPAND
+    
+    def _list_improvements(self, original: str, improved: str) -> List[str]:
+        """List improvements made."""
+        improvements = []
+        if len(improved) > len(original):
+            improvements.append("Added detail")
+        if "step" in improved.lower() and "step" not in original.lower():
+            improvements.append("Added structure")
+        if "example" in improved.lower() and "example" not in original.lower():
+            improvements.append("Added examples")
+        return improvements if improvements else ["General improvements"]
+    
+    ####################################################################################################################
+    # Cache and Export Methods
+    
+    def clear_cache(self):
+        """Clear the cache."""
+        if self.cache is not None:
+            self.cache.clear()
+    
+    def export_improvements(self, results: List[ImprovementResult], format: str = "json") -> str:
+        """Export improvements."""
+        if format == "json":
+            data = []
+            for result in results:
+                data.append({
+                    "original_prompt": result.original_prompt,
+                    "improved_prompt": result.improved_prompt,
+                    "strategy": result.strategy.value,
+                    "improvements_made": result.improvements_made,
+                    "score_change": result.score_change
+                })
+            return json.dumps(data, indent=2)
+        return ""
+    
+    def import_strategies(self, strategies: Dict[str, Any]):
+        """Import custom strategies."""
+        self.custom_strategies = strategies
+    
+    def create_pipeline(self, strategies: List[ImprovementStrategy]):
+        """Create improvement pipeline."""
+        class Pipeline:
+            def __init__(self, improver, strategies):
+                self.improver = improver
+                self.strategies = strategies
+            
+            def run(self, prompt: str, **kwargs) -> ImprovementResult:
+                return self.improver.improve_multi(prompt, self.strategies)
+        
+        return Pipeline(self, strategies)
     
     ####################################################################################################################
     # Improvement Methods

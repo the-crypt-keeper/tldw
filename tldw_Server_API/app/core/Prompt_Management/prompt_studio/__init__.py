@@ -27,7 +27,8 @@ from .bootstrap_manager import BootstrapManager
 # Testing and evaluation
 from .test_runner import TestRunner
 from .prompt_executor import PromptExecutor
-from .evaluation_metrics import EvaluationMetrics, MetricType
+from .evaluation_metrics import EvaluationMetrics
+from .evaluation_manager import EvaluationManager
 from .evaluation_reports import EvaluationReportGenerator
 
 # Optimization
@@ -60,7 +61,7 @@ __all__ = [
     'TestRunner',
     'PromptExecutor',
     'EvaluationMetrics',
-    'MetricType',
+    'EvaluationManager',
     'EvaluationReportGenerator',
     
     # Optimization

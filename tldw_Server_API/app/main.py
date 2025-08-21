@@ -28,6 +28,9 @@ from tldw_Server_API.app.api.v1.endpoints.chat import router as chat_router
 # Character Endpoint
 from tldw_Server_API.app.api.v1.endpoints.characters_endpoint import router as character_router
 #
+# Metrics Endpoint
+from tldw_Server_API.app.api.v1.endpoints.metrics import router as metrics_router
+#
 # Chunking Endpoint
 from tldw_Server_API.app.api.v1.endpoints.chunking import chunking_router as chunking_router
 #
@@ -49,6 +52,7 @@ from tldw_Server_API.app.api.v1.endpoints.prompt_studio_prompts import router as
 from tldw_Server_API.app.api.v1.endpoints.prompt_studio_test_cases import router as prompt_studio_test_cases_router
 from tldw_Server_API.app.api.v1.endpoints.prompt_studio_optimization import router as prompt_studio_optimization_router
 from tldw_Server_API.app.api.v1.endpoints.prompt_studio_websocket import router as prompt_studio_websocket_router
+from tldw_Server_API.app.api.v1.endpoints.prompt_studio_evaluations import router as prompt_studio_evaluations_router
 #
 # RAG Endpoints
 from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_api_router  # Production RAG API using functional pipeline
@@ -80,6 +84,9 @@ from tldw_Server_API.app.api.v1.endpoints.mcp_endpoint import router as mcp_rout
 #
 # MCP v2 Endpoint (New Modular Version)
 from tldw_Server_API.app.api.v1.endpoints.mcp_v2_endpoint import router as mcp_v2_router
+#
+# Chatbooks Endpoint
+from tldw_Server_API.app.api.v1.endpoints.chatbooks import router as chatbooks_router
 #
 # Metrics and Telemetry
 from tldw_Server_API.app.core.Metrics import (
@@ -189,10 +196,79 @@ async def lifespan(app: FastAPI):
         logger.error(f"App Startup: Failed to initialize MCP v2 server: {e}")
         # Continue startup even if MCP v2 fails (for backward compatibility)
     
+    # Initialize Chat Module Components
+    logger.info("App Startup: Initializing Chat module components...")
+    
+    # Initialize Provider Manager
+    try:
+        from tldw_Server_API.app.core.Chat.provider_manager import initialize_provider_manager
+        from tldw_Server_API.app.core.Chat.Chat_Functions import API_CALL_HANDLERS
+        
+        # Get list of configured providers
+        providers = list(API_CALL_HANDLERS.keys())
+        provider_manager = initialize_provider_manager(providers, primary_provider=providers[0] if providers else None)
+        await provider_manager.start_health_checks()
+        logger.info(f"App Startup: Provider manager initialized with {len(providers)} providers")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize provider manager: {e}")
+    
+    # Initialize Request Queue
+    try:
+        from tldw_Server_API.app.core.Chat.request_queue import initialize_request_queue
+        from tldw_Server_API.app.core.config import load_comprehensive_config
+        
+        config = load_comprehensive_config()
+        chat_config = {}
+        if config and config.has_section('Chat-Module'):
+            chat_config = dict(config.items('Chat-Module'))
+        
+        request_queue = initialize_request_queue(
+            max_queue_size=int(chat_config.get('max_queue_size', 100)),
+            max_concurrent=int(chat_config.get('max_concurrent_requests', 10)),
+            global_rate_limit=int(chat_config.get('rate_limit_per_minute', 60)),
+            per_client_rate_limit=int(chat_config.get('rate_limit_per_conversation_per_minute', 20))
+        )
+        await request_queue.start(num_workers=4)
+        logger.info("App Startup: Request queue initialized with 4 workers")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize request queue: {e}")
+    
+    # Initialize Rate Limiter
+    try:
+        from tldw_Server_API.app.core.Chat.rate_limiter import initialize_rate_limiter, RateLimitConfig
+        
+        rate_config = RateLimitConfig(
+            global_rpm=int(chat_config.get('rate_limit_per_minute', 60)),
+            per_user_rpm=int(chat_config.get('rate_limit_per_user_per_minute', 20)),
+            per_conversation_rpm=int(chat_config.get('rate_limit_per_conversation_per_minute', 10)),
+            per_user_tokens_per_minute=int(chat_config.get('rate_limit_tokens_per_minute', 10000))
+        )
+        rate_limiter = initialize_rate_limiter(rate_config)
+        logger.info("App Startup: Rate limiter initialized")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize rate limiter: {e}")
+    
+    # Initialize Unified Audit Service
+    try:
+        from tldw_Server_API.app.core.Audit.unified_audit_service import get_unified_audit_service
+        
+        audit_service = await get_unified_audit_service()
+        logger.info("App Startup: Unified audit service initialized")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize audit service: {e}")
+    
     yield
     
     # Shutdown: Clean up resources
     logger.info("App Shutdown: Cleaning up resources...")
+    
+    # Shutdown unified audit service
+    try:
+        from tldw_Server_API.app.core.Audit.unified_audit_service import shutdown_audit_service
+        await shutdown_audit_service()
+        logger.info("App Shutdown: Audit service shutdown complete")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error shutting down audit service: {e}")
     
     # Close auth database pool
     try:
@@ -217,6 +293,41 @@ async def lifespan(app: FastAPI):
             logger.info("App Shutdown: MCP v2 server shutdown")
     except Exception as e:
         logger.error(f"App Shutdown: Error shutting down MCP v2 server: {e}")
+    
+    # Shutdown Chat Module Components
+    logger.info("App Shutdown: Cleaning up Chat module components...")
+    
+    # Shutdown Provider Manager
+    try:
+        if 'provider_manager' in locals():
+            await provider_manager.stop_health_checks()
+            logger.info("App Shutdown: Provider manager stopped")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error stopping provider manager: {e}")
+    
+    # Shutdown Request Queue
+    try:
+        if 'request_queue' in locals():
+            await request_queue.stop()
+            logger.info("App Shutdown: Request queue stopped")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error stopping request queue: {e}")
+    
+    # Shutdown Audit Logger
+    try:
+        if 'audit_logger' in locals():
+            await audit_logger.stop()
+            logger.info("App Shutdown: Audit logger stopped")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error stopping audit logger: {e}")
+    
+    # Cleanup CPU pools
+    try:
+        from tldw_Server_API.app.core.Utils.cpu_bound_handler import cleanup_pools
+        cleanup_pools()
+        logger.info("App Shutdown: CPU pools cleaned up")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error cleaning up CPU pools: {e}")
     
     # Shutdown telemetry
     try:
@@ -324,6 +435,10 @@ app.include_router(chat_router, prefix=f"{API_V1_PREFIX}/chat", tags=["chat"])
 app.include_router(character_router, prefix=f"{API_V1_PREFIX}/characters", tags=["character, persona"])
 
 
+# Router for metrics endpoints
+app.include_router(metrics_router, prefix=f"{API_V1_PREFIX}", tags=["metrics"])
+
+
 # Router for Chunking Endpoint
 app.include_router(chunking_router, prefix=f"{API_V1_PREFIX}/chunking", tags=["chunking"])
 
@@ -345,6 +460,7 @@ app.include_router(prompt_studio_projects_router, tags=["Prompt Studio"])
 app.include_router(prompt_studio_prompts_router, tags=["Prompt Studio"])
 app.include_router(prompt_studio_test_cases_router, tags=["Prompt Studio"])
 app.include_router(prompt_studio_optimization_router, tags=["Prompt Studio"])
+app.include_router(prompt_studio_evaluations_router, tags=["Prompt Studio"])
 app.include_router(prompt_studio_websocket_router, tags=["Prompt Studio"])
 
 
@@ -380,6 +496,8 @@ app.include_router(mcp_router, prefix=f"{API_V1_PREFIX}", tags=["MCP"])
 # Router for MCP v2 (New Modular Version)
 app.include_router(mcp_v2_router, prefix=f"{API_V1_PREFIX}", tags=["MCP v2"])
 
+# Router for Chatbooks - import/export functionality
+app.include_router(chatbooks_router, prefix=f"{API_V1_PREFIX}", tags=["chatbooks"])
 
 # Router for trash endpoints - deletion of media items / trash file handling (FIXME: Secure delete vs lag on delete?)
 #app.include_router(trash_router, prefix=f"{API_V1_PREFIX}/trash", tags=["trash"])

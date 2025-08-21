@@ -26,7 +26,7 @@ from tldw_Server_API.app.core.DB_Management.PromptStudioDatabase import Database
 # Router Setup
 
 router = APIRouter(
-    prefix="/api/v1/prompt_studio/optimizations",
+    prefix="/api/v1/prompt-studio/optimizations",
     tags=["Prompt Studio - Optimizations"],
     responses={
         401: {"description": "Unauthorized"},
@@ -488,7 +488,7 @@ async def compare_strategies(
                 f"Compare: {strategy}",
                 request.prompt_id,
                 json.dumps(request.test_case_ids),
-                json.dumps(request.model_config),
+                json.dumps(request.model_configuration),
                 strategy,
                 json.dumps({"strategy": strategy}),
                 10,  # Reduced iterations for comparison

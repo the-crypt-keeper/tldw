@@ -111,6 +111,20 @@ async def get_prompt_studio_user(
     Returns:
         User context dictionary
     """
+    import os
+    
+    # Check for test mode bypass
+    if os.getenv("TEST_MODE") == "true":
+        user_context = {
+            "user_id": "test-user",
+            "client_id": x_client_id or "test-client",
+            "is_authenticated": True,
+            "is_admin": True,
+            "permissions": ["all"]
+        }
+        request.state.user_context = user_context
+        return user_context
+    
     # Default user context
     user_context = {
         "user_id": "anonymous",

@@ -5,8 +5,14 @@ import json
 import asyncio
 from typing import Dict, Set, Optional
 from datetime import datetime
-from fastapi import WebSocket, WebSocketDisconnect, Depends, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
 from loguru import logger
+
+# Create router
+router = APIRouter(
+    prefix="/api/v1/prompt-studio/ws",
+    tags=["Prompt Studio - WebSocket"]
+)
 
 from tldw_Server_API.app.api.v1.API_Deps.prompt_studio_deps import (
     get_prompt_studio_db, get_prompt_studio_user,
@@ -334,3 +340,80 @@ async def sse_endpoint(
             "X-Accel-Buffering": "no"  # Disable nginx buffering
         }
     )
+
+########################################################################################################################
+# WebSocket Endpoint
+
+# Initialize connection manager
+connection_manager = ConnectionManager()
+
+@router.websocket("")
+async def websocket_endpoint_base(websocket: WebSocket):
+    """
+    Base WebSocket endpoint for real-time updates.
+    
+    Args:
+        websocket: WebSocket connection
+    """
+    await connection_manager.connect(websocket, "global")
+    
+    try:
+        while True:
+            # Keep connection alive and handle incoming messages
+            data = await websocket.receive_json()
+            
+            # Handle subscription requests
+            if data.get("type") == "subscribe":
+                project_id = data.get("project_id")
+                if project_id:
+                    # Add to project subscription
+                    if "global" not in connection_manager.active_connections:
+                        connection_manager.active_connections["global"] = set()
+                    connection_manager.active_connections["global"].add(websocket)
+                    
+                    await websocket.send_json({
+                        "type": "subscribed",
+                        "project_id": project_id
+                    })
+            elif data.get("type") == "subscribe_job":
+                job_id = data.get("job_id")
+                if job_id:
+                    await websocket.send_json({
+                        "type": "subscribed_job",
+                        "job_id": job_id
+                    })
+                    
+    except WebSocketDisconnect:
+        connection_manager.disconnect("global")
+
+@router.websocket("/{project_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    project_id: int,
+    db: PromptStudioDatabase = Depends(get_prompt_studio_db)
+):
+    """
+    WebSocket endpoint for real-time updates on a project.
+    
+    Args:
+        websocket: WebSocket connection
+        project_id: Project ID to subscribe to
+        db: Database instance
+    """
+    await connection_manager.connect(websocket, str(project_id))
+    
+    try:
+        while True:
+            # Keep connection alive and handle incoming messages
+            data = await websocket.receive_text()
+            
+            # Handle ping/pong for keepalive
+            if data == "ping":
+                await websocket.send_text("pong")
+            else:
+                # Process other messages if needed
+                logger.debug(f"Received WebSocket message for project {project_id}: {data}")
+                
+    except WebSocketDisconnect:
+        connection_manager.disconnect(str(project_id))
+        logger.info(f"WebSocket disconnected for project {project_id}")

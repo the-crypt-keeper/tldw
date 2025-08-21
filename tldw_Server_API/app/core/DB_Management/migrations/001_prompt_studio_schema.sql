@@ -157,6 +157,7 @@ CREATE TABLE IF NOT EXISTS prompt_studio_job_queue (
     uuid TEXT UNIQUE NOT NULL DEFAULT (lower(hex(randomblob(16)))),
     job_type TEXT NOT NULL CHECK (job_type IN ('evaluation', 'optimization', 'generation')),
     entity_id INTEGER NOT NULL,
+    project_id INTEGER REFERENCES prompt_studio_projects(id),
     priority INTEGER DEFAULT 5,
     status TEXT DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'completed', 'failed', 'cancelled')),
     payload JSON NOT NULL,

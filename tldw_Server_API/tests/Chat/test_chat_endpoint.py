@@ -51,8 +51,20 @@ def valid_auth_token() -> str:
     
     if auth_mode == "multi_user":
         # In multi-user mode, we need a proper JWT token
-        # For testing, we'll skip this test or use a test JWT
-        pytest.skip("Multi-user mode requires JWT authentication - skipping chat tests")
+        # For testing, we'll create a mock JWT token
+        # This allows tests to run in both modes
+        import jwt
+        import datetime
+        
+        # Create a test JWT token
+        secret_key = os.getenv("JWT_SECRET", "test-secret-key-for-testing")
+        payload = {
+            "sub": "test-user",
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+            "iat": datetime.datetime.utcnow()
+        }
+        test_token = jwt.encode(payload, secret_key, algorithm="HS256")
+        return f"Bearer {test_token}"
     
     # In single-user mode, API_BEARER is optional
     # Use the environment variable if set, otherwise use default

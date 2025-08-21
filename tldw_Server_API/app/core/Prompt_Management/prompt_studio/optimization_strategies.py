@@ -12,7 +12,7 @@ from loguru import logger
 
 from .prompt_executor import PromptExecutor
 from .test_runner import TestRunner
-from .evaluation_metrics import MetricType
+from .optimization_engine import MetricType
 from tldw_Server_API.app.core.DB_Management.PromptStudioDatabase import PromptStudioDatabase
 
 ########################################################################################################################

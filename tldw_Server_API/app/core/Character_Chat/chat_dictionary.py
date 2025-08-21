@@ -974,6 +974,213 @@ class ChatDictionaryService:
         Simple approximation: 1 token ≈ 4 characters
         """
         return len(text) // 4
+    
+    def toggle_dictionary_active(self, dictionary_id: int, is_active: bool) -> bool:
+        """
+        Toggle dictionary active status.
+        
+        Args:
+            dictionary_id: Dictionary ID
+            is_active: New active status
+            
+        Returns:
+            True if updated successfully
+        """
+        return self.update_dictionary(dictionary_id, is_active=is_active)
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """
+        Get dictionary usage statistics.
+        
+        Returns:
+            Dictionary containing statistics
+        """
+        try:
+            with self.db.get_connection() as conn:
+                # Get dictionary counts
+                cursor = conn.execute("""
+                    SELECT 
+                        COUNT(*) as total_dictionaries,
+                        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_dictionaries
+                    FROM chat_dictionaries 
+                    WHERE deleted = 0
+                """)
+                dict_stats = dict(cursor.fetchone())
+                
+                # Get entry counts
+                cursor = conn.execute("""
+                    SELECT COUNT(*) as total_entries
+                    FROM dictionary_entries e
+                    JOIN chat_dictionaries d ON e.dictionary_id = d.id
+                    WHERE d.deleted = 0
+                """)
+                entry_stats = dict(cursor.fetchone())
+                
+                # Calculate average entries per dictionary
+                avg_entries = 0
+                if dict_stats['total_dictionaries'] > 0:
+                    avg_entries = entry_stats['total_entries'] / dict_stats['total_dictionaries']
+                
+                return {
+                    "total_dictionaries": dict_stats['total_dictionaries'],
+                    "active_dictionaries": dict_stats['active_dictionaries'],
+                    "total_entries": entry_stats['total_entries'],
+                    "average_entries_per_dictionary": avg_entries
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting statistics: {e}")
+            raise CharactersRAGDBError(f"Error getting statistics: {e}")
+    
+    def bulk_add_entries(
+        self,
+        dictionary_id: int,
+        entries: List[Dict[str, Any]]
+    ) -> int:
+        """
+        Add multiple entries at once.
+        
+        Args:
+            dictionary_id: Dictionary ID
+            entries: List of entry dictionaries with keys: key, content, probability, group, etc.
+            
+        Returns:
+            Number of entries added
+        """
+        try:
+            added_count = 0
+            with self.db.get_connection() as conn:
+                for entry in entries:
+                    # Validate and prepare each entry
+                    key = entry.get('key', '')
+                    content = entry.get('content', '')
+                    probability = entry.get('probability', 100)
+                    group = entry.get('group')
+                    timed_effects = entry.get('timed_effects', {"sticky": 0, "cooldown": 0, "delay": 0})
+                    max_replacements = entry.get('max_replacements', 1)
+                    
+                    if not key or not content:
+                        continue
+                    
+                    # Validate probability
+                    if not 0 <= probability <= 100:
+                        probability = 100
+                    
+                    # Compile pattern to check validity and get is_regex flag
+                    test_entry = ChatDictionaryEntry(key, content)
+                    
+                    timed_effects_json = json.dumps(timed_effects)
+                    
+                    cursor = conn.execute(
+                        """
+                        INSERT INTO dictionary_entries 
+                        (dictionary_id, key, content, is_regex, probability, max_replacements, group_name, timed_effects)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (dictionary_id, key, content, test_entry.is_regex, probability, max_replacements, group, timed_effects_json)
+                    )
+                    added_count += 1
+                
+                conn.commit()
+                
+            logger.info(f"Added {added_count} entries to dictionary {dictionary_id}")
+            self._invalidate_cache()
+            return added_count
+            
+        except Exception as e:
+            logger.error(f"Error adding bulk entries: {e}")
+            raise CharactersRAGDBError(f"Error adding bulk entries: {e}")
+    
+    def search_entries(self, search_term: str) -> List[Dict[str, Any]]:
+        """
+        Search for entries by pattern.
+        
+        Args:
+            search_term: Search term to look for in keys and content
+            
+        Returns:
+            List of matching entries with dictionary info
+        """
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.execute("""
+                    SELECT 
+                        e.id,
+                        e.key,
+                        e.content,
+                        e.probability,
+                        e.group_name,
+                        d.name as dictionary_name,
+                        d.id as dictionary_id
+                    FROM dictionary_entries e
+                    JOIN chat_dictionaries d ON e.dictionary_id = d.id
+                    WHERE d.deleted = 0
+                    AND (e.key LIKE ? OR e.content LIKE ?)
+                    ORDER BY d.name, e.key
+                """, (f'%{search_term}%', f'%{search_term}%'))
+                
+                results = []
+                for row in cursor.fetchall():
+                    results.append(dict(row))
+                
+                return results
+                
+        except Exception as e:
+            logger.error(f"Error searching entries: {e}")
+            raise CharactersRAGDBError(f"Error searching entries: {e}")
+    
+    def clone_dictionary(self, source_dict_id: int, new_name: str) -> int:
+        """
+        Create a copy of a dictionary with all its entries.
+        
+        Args:
+            source_dict_id: Source dictionary ID
+            new_name: Name for the cloned dictionary
+            
+        Returns:
+            ID of the new dictionary
+        """
+        try:
+            # Get source dictionary
+            source_dict = self.get_dictionary(source_dict_id)
+            if not source_dict:
+                raise InputError(f"Source dictionary {source_dict_id} not found")
+            
+            # Create new dictionary
+            new_dict_id = self.create_dictionary(
+                name=new_name,
+                description=f"Cloned from {source_dict['name']}"
+            )
+            
+            # Get all entries from source dictionary
+            entries = self.get_entries(source_dict_id)
+            
+            # Add entries to new dictionary
+            if entries:
+                with self.db.get_connection() as conn:
+                    for entry in entries:
+                        timed_effects_json = json.dumps(entry.timed_effects)
+                        
+                        conn.execute(
+                            """
+                            INSERT INTO dictionary_entries 
+                            (dictionary_id, key, content, is_regex, probability, max_replacements, group_name, timed_effects)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (new_dict_id, entry.raw_key, entry.content, entry.is_regex, 
+                             entry.probability, entry.max_replacements, entry.group, timed_effects_json)
+                        )
+                    conn.commit()
+            
+            logger.info(f"Cloned dictionary {source_dict_id} to new dictionary {new_dict_id} with {len(entries)} entries")
+            self._invalidate_cache()
+            return new_dict_id
+            
+        except ConflictError:
+            raise
+        except Exception as e:
+            logger.error(f"Error cloning dictionary: {e}")
+            raise CharactersRAGDBError(f"Error cloning dictionary: {e}")
 
 
 # Import handling to prevent breaking changes

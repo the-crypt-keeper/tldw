@@ -25,7 +25,7 @@ from tldw_Server_API.app.core.DB_Management.PromptStudioDatabase import (
 # Router Setup
 
 router = APIRouter(
-    prefix="/api/v1/prompt_studio/projects",
+    prefix="/api/v1/prompt-studio/projects",
     tags=["Prompt Studio - Projects"],
     responses={
         401: {"description": "Unauthorized"},
@@ -38,7 +38,7 @@ router = APIRouter(
 ########################################################################################################################
 # Project CRUD Endpoints
 
-@router.post("/create", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     project_data: ProjectCreate,
     user_context: Dict = Depends(get_prompt_studio_user),
@@ -84,7 +84,7 @@ async def create_project(
             detail="Failed to create project"
         )
 
-@router.get("/list", response_model=ListResponse)
+@router.get("/", response_model=ListResponse)
 async def list_projects(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),

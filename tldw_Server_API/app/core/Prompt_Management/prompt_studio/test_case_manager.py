@@ -6,11 +6,55 @@ import sqlite3
 import uuid
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
+from dataclasses import dataclass, field
 from loguru import logger
 
 from tldw_Server_API.app.core.DB_Management.PromptStudioDatabase import (
     PromptStudioDatabase, DatabaseError, InputError, ConflictError
 )
+
+########################################################################################################################
+# Data Classes
+
+@dataclass
+class TestCase:
+    """Test case for prompt evaluation."""
+    name: str
+    inputs: Dict[str, Any]
+    expected_outputs: Dict[str, Any]
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    description: str = ""
+    tags: List[str] = field(default_factory=list)
+    is_golden: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "inputs": self.inputs,
+            "expected_outputs": self.expected_outputs,
+            "tags": self.tags,
+            "is_golden": self.is_golden,
+            "metadata": self.metadata
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]):
+        """Create from dictionary."""
+        return cls(**data)
+
+@dataclass
+class TestResult:
+    """Result of running a test case."""
+    test_case_id: str
+    actual_outputs: Dict[str, Any]
+    passed: bool
+    execution_time: float
+    error_message: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 ########################################################################################################################
 # Test Case Manager Class
@@ -27,6 +71,8 @@ class TestCaseManager:
         """
         self.db = db
         self.client_id = db.client_id
+        self.test_cases = {}
+        self.results = {}
     
     ####################################################################################################################
     # CRUD Operations
@@ -51,6 +97,10 @@ class TestCaseManager:
         Returns:
             Created test case record
         """
+        # Validate inputs
+        if not name or not name.strip():
+            raise InputError("Test case name cannot be empty")
+        
         try:
             conn = self.db.get_connection()
             cursor = conn.cursor()
