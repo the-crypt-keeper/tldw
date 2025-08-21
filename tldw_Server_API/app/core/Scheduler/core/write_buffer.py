@@ -125,11 +125,10 @@ class SafeWriteBuffer:
             self._flush_failures += 1
             logger.error(f"Failed to flush buffer: {e}. Re-queuing {len(tasks_to_flush)} tasks.")
             
-            # FAILURE: Re-add failed tasks to front of buffer
-            # We need to re-acquire the lock for this
-            async with self.lock:
-                # Add failed tasks to front so they're retried first
-                self.buffer = tasks_to_flush + self.buffer
+            # CRITICAL FIX: Re-add failed tasks atomically while still holding the lock
+            # The lock is still held here from the caller, so we can safely modify buffer
+            # Add failed tasks to front so they're retried first
+            self.buffer = tasks_to_flush + self.buffer
             
             # Re-raise to alert caller
             raise BufferFlushError(f"Flush failed: {e}")

@@ -44,6 +44,14 @@ class MockDatabase:
     def __init__(self):
         self.client_id = "test_client"
     
+    def transaction(self):
+        """Mock transaction context manager."""
+        from contextlib import contextmanager
+        @contextmanager
+        def mock_transaction():
+            yield self
+        return mock_transaction()
+    
     def get_character_card_by_id(self, char_id):
         if char_id == 1:
             return {"id": 1, "name": "TestChar", "description": "Test character"}

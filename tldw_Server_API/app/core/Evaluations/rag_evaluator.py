@@ -46,12 +46,9 @@ class RAGEvaluator:
         # Get embedding configuration
         self.embedding_config = self._setup_embedding_config()
         
-        # Check if embeddings are available by attempting a test embedding
-        self.embedding_available = self._test_embeddings()
-        if self.embedding_available:
-            logger.info(f"Initialized RAG evaluator with {embedding_provider}/{embedding_model} embeddings")
-        else:
-            logger.warning(f"Embeddings not available for {embedding_provider}/{embedding_model}. Using LLM-based fallback.")
+        # Lazy check - don't test embeddings on init, only when first used
+        self._embedding_available = None  # Will be set on first use
+        logger.info(f"RAG evaluator initialized with {embedding_provider}/{embedding_model} configuration")
     
     def _setup_embedding_config(self) -> Dict[str, Any]:
         """Setup embedding configuration."""
@@ -75,6 +72,15 @@ class RAGEvaluator:
                 )
         
         return config
+    
+    @property
+    def embedding_available(self) -> bool:
+        """Check if embeddings are available (lazy evaluation)."""
+        if self._embedding_available is None:
+            self._embedding_available = self._test_embeddings()
+            if not self._embedding_available:
+                logger.warning(f"Embeddings not available for {self.embedding_provider}/{self.embedding_model}. Using LLM-based fallback.")
+        return self._embedding_available
     
     def _test_embeddings(self) -> bool:
         """Test if embeddings are available."""

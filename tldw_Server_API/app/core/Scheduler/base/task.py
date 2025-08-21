@@ -66,6 +66,7 @@ class Task:
     status: TaskStatus = TaskStatus.PENDING
     result: Optional[Any] = None
     error: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     
     # Metadata
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -101,6 +102,7 @@ class Task:
             'status': self.status.value,
             'result': self.result,
             'error': self.error,
+            'metadata': self.metadata,
             'created_at': self.created_at.isoformat(),
             'queued_at': self.queued_at.isoformat() if self.queued_at else None,
             'started_at': self.started_at.isoformat() if self.started_at else None,
@@ -122,7 +124,7 @@ class Task:
                           'payload', 'priority', 'max_retries', 'retry_count',
                           'retry_delay', 'timeout', 'depends_on', 'result',
                           'error', 'worker_id', 'lease_id', 'execution_time',
-                          'payload_ref', 'result_ref']:
+                          'payload_ref', 'result_ref', 'metadata']:
             if field_name in data:
                 setattr(task, field_name, data[field_name])
         

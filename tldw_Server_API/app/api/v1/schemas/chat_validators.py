@@ -210,7 +210,7 @@ def validate_request_size(request_data: Any) -> bool:
     Validate total request size.
     
     Args:
-        request_data: Request data object
+        request_data: Request data object or JSON string
         
     Returns:
         True if valid
@@ -220,7 +220,16 @@ def validate_request_size(request_data: Any) -> bool:
     """
     try:
         import json
-        request_json = json.dumps(request_data.model_dump() if hasattr(request_data, 'model_dump') else request_data)
+        
+        # Check if it's already a JSON string
+        if isinstance(request_data, str):
+            request_json = request_data
+        # Check if it's a Pydantic model with model_dump
+        elif hasattr(request_data, 'model_dump'):
+            request_json = json.dumps(request_data.model_dump())
+        # Otherwise try to serialize it
+        else:
+            request_json = json.dumps(request_data)
         
         if len(request_json) > MAX_REQUEST_SIZE:
             raise ValueError(
@@ -229,6 +238,9 @@ def validate_request_size(request_data: Any) -> bool:
         
         return True
         
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON error validating request size: {e}")
+        raise ValueError(f"Invalid JSON in request: {str(e)}")
     except Exception as e:
         logger.error(f"Error validating request size: {e}")
         raise ValueError(f"Failed to validate request size: {str(e)}")

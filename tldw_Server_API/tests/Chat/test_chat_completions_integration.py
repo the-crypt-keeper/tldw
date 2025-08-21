@@ -29,46 +29,119 @@ from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGD
 from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
 from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
 from tldw_Server_API.app.core.Chat.prompt_template_manager import PromptTemplate  # For templating test
+from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
 
 
 # --- Fixtures defined locally in this file ---
 API_BEARER="default-secret-key-for-single-user"
+
+@pytest.fixture
+def mock_user():
+    """Create a mock user for testing."""
+    import datetime
+    return User(
+        id=1,
+        username="test_user",
+        email="test@example.com",
+        is_active=True,
+        is_admin=False,
+        created_at=datetime.datetime.now(),
+        updated_at=datetime.datetime.now()
+    )
+
+@pytest.fixture(autouse=True)
+def setup_auth_override(mock_user):
+    """Automatically override authentication for all tests based on AUTH_MODE."""
+    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+    
+    settings = get_settings()
+    
+    # Only override authentication in multi-user mode
+    if settings.AUTH_MODE == "multi_user":
+        # In multi-user mode, we need to mock the entire authentication flow
+        # The simplest approach is to override get_request_user to return mock user directly
+        async def mock_get_request_user(api_key=None, token=None):
+            return mock_user
+        
+        app.dependency_overrides[get_request_user] = mock_get_request_user
+        yield
+        # Clean up after test
+        app.dependency_overrides.pop(get_request_user, None)
+    else:
+        # In single-user mode, no override needed
+        yield
+
+# Helper function to make requests with CSRF token
+def make_request_with_csrf(client, method, url, headers=None, **kwargs):
+    """Helper to make requests with CSRF token included"""
+    if headers is None:
+        headers = {}
+    
+    # Get CSRF token from cookies if not already set
+    if not hasattr(client, 'csrf_token'):
+        # Make a GET request to get CSRF token
+        response = client.get("/api/v1/health")
+        csrf_token = response.cookies.get("csrf_token", "")
+        client.csrf_token = csrf_token
+    
+    # Add CSRF token to headers
+    headers["X-CSRF-Token"] = getattr(client, 'csrf_token', '')
+    
+    # Make the request
+    method_func = getattr(client, method.lower())
+    return method_func(url, headers=headers, **kwargs)
+
 @pytest.fixture(scope="function")
 def client():
     """Yields a TestClient instance for making requests to the app."""
     with TestClient(app) as c:
+        # Get a CSRF token by making a GET request first
+        response = c.get("/api/v1/health")
+        csrf_token = response.cookies.get("csrf_token", "")
+        
+        # Store the token in the client for use in tests
+        c.csrf_token = csrf_token
+        c.cookies = {"csrf_token": csrf_token}
+        
+        # Add helper method to client
+        c.post_with_csrf = lambda url, **kwargs: make_request_with_csrf(c, "POST", url, **kwargs)
+        
         yield c
 
 
 @pytest.fixture
 def valid_auth_token() -> str:
-    # Check if we're in multi-user mode or single-user mode
-    auth_mode = os.getenv("AUTH_MODE", "single_user")
-    api_bearer = os.getenv("API_BEARER")
+    """Generate appropriate auth token based on current AUTH_MODE."""
+    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
     
-    if auth_mode == "multi_user":
+    settings = get_settings()
+    
+    if settings.AUTH_MODE == "multi_user":
         # In multi-user mode, we need a proper JWT token
-        # For testing, we'll create a mock JWT token
+        # For testing, we'll create a mock JWT token using the actual JWT secret
         import jwt
         import datetime
         
-        # Create a test JWT token
-        secret_key = os.getenv("JWT_SECRET", "test-secret-key-for-testing")
+        # Use the actual JWT secret from settings
+        secret_key = settings.JWT_SECRET_KEY or os.getenv("JWT_SECRET_KEY", "test-secret-key")
+        
         payload = {
-            "sub": "test-user",
+            "sub": "1",  # User ID as string
+            "username": "test_user",
             "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
-            "iat": datetime.datetime.utcnow()
+            "iat": datetime.datetime.utcnow(),
+            "type": "access"
         }
-        test_token = jwt.encode(payload, secret_key, algorithm="HS256")
+        test_token = jwt.encode(payload, secret_key, algorithm=settings.JWT_ALGORITHM)
         return f"Bearer {test_token}"
-    
-    # In single-user mode, API_BEARER is optional
-    # Use the environment variable if set, otherwise use default
-    if api_bearer:
-        return api_bearer
     else:
-        # Default token for single-user mode
-        return "default-secret-key-for-single-user"
+        # In single-user mode, use API_BEARER if set
+        api_bearer = os.getenv("API_BEARER")
+        if api_bearer:
+            return api_bearer
+        else:
+            # Default token for single-user mode
+            return "default-secret-key-for-single-user"
 
 
 # --- Provider lists and helpers defined locally for this test file ---
@@ -229,7 +302,7 @@ def test_commercial_provider_non_streaming_no_template(
         request_body["max_tokens"] = 200  # Adjusted for potentially longer explanations
 
     print(f"\nTesting NON-STREAMING (no template) with {provider_name} using model {request_body['model']}")
-    response = client.post("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
 
     assert response.status_code == status.HTTP_200_OK, f"Provider {provider_name} failed: {response.text}"
     data = response.json()
@@ -271,7 +344,7 @@ def test_commercial_provider_streaming_no_template(
     if provider_name == "anthropic": request_body["max_tokens"] = 300
 
     print(f"\nTesting STREAMING (no template) with {provider_name} using model {request_body['model']}")
-    response = client.post("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
 
     assert response.status_code == status.HTTP_200_OK, f"Provider {provider_name} streaming pre-check failed: {response.text}"
     assert 'text/event-stream' in response.headers['content-type'].lower()
@@ -364,7 +437,7 @@ def test_commercial_provider_with_template_and_char_data_openai_integration(
         }
 
         print(f"\nTesting TEMPLATING with {provider_name} model {request_body['model']}")
-        response = client.post("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
+        response = client.post_with_csrf("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
 
         assert response.status_code == status.HTTP_200_OK, f"{provider_name} with template failed: {response.text}"
         data = response.json()
@@ -427,7 +500,7 @@ def test_local_provider_non_streaming_no_template(
     }
 
     print(f"\nTesting LOCAL NON-STREAMING (no template) with {provider_name} using model {request_body['model']}")
-    response = client.post("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
 
     assert response.status_code == status.HTTP_200_OK, f"Local provider {provider_name} failed: {response.text}"
     data = response.json()
@@ -461,7 +534,7 @@ def test_chat_integration_invalid_key_for_commercial_provider_standalone(
         "model": "gpt-4o-mini",
         "messages": [msg.model_dump(exclude_none=True) for msg in INTEGRATION_MESSAGES_NO_SYS_SCHEMA]
     }
-    response = client.post("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
     print(f"CI DEBUG: Status Code: {response.status_code}")
     print(f"CI DEBUG: Response Headers: {response.headers}")
     print(f"CI DEBUG: Response Text: {response.text}")
@@ -484,7 +557,7 @@ def test_chat_integration_bad_request_missing_messages_standalone(
         "model": "test-model",
         # "messages" field is intentionally missing
     }
-    response = client.post("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
     # This is a Pydantic validation error from FastAPI itself before hitting your logic.
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     errors = response.json().get("detail")

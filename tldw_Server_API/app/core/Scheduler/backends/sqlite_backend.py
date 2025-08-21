@@ -34,7 +34,7 @@ class SQLiteBackend(QueueBackend):
     
     def __init__(self, config: SchedulerConfig):
         """
-        Initialize SQLite backend.
+        Initialize SQLite backend with connection pooling.
         
         Args:
             config: Scheduler configuration
@@ -42,10 +42,20 @@ class SQLiteBackend(QueueBackend):
         self.config = config
         self.db_path = self._extract_db_path(config.database_url)
         self._connection: Optional[aiosqlite.Connection] = None
-        self._transaction_conn: Optional[aiosqlite.Connection] = None
-        self._lock = asyncio.Lock()
         
-        logger.info(f"Initializing SQLite backend with database: {self.db_path}")
+        # Connection pool for read operations
+        self._read_pool: List[aiosqlite.Connection] = []
+        self._read_pool_size = getattr(config, 'sqlite_pool_size', 5)
+        self._pool_lock = asyncio.Lock()
+        
+        # Separate connection for write operations
+        self._write_conn: Optional[aiosqlite.Connection] = None
+        self._write_lock = asyncio.Lock()
+        
+        # Legacy lock for backward compatibility
+        self._lock = self._write_lock
+        
+        logger.info(f"Initializing SQLite backend with database: {self.db_path}, pool size: {self._read_pool_size}")
     
     def _extract_db_path(self, url: str) -> str:
         """Extract database path from URL"""
@@ -56,8 +66,27 @@ class SQLiteBackend(QueueBackend):
         else:
             return url
     
+    @asynccontextmanager
+    async def _get_read_connection(self):
+        """Get a connection from the read pool"""
+        async with self._pool_lock:
+            if not self._read_pool:
+                # Fallback to main connection if pool is empty
+                yield self._connection
+            else:
+                conn = self._read_pool.pop()
+                try:
+                    yield conn
+                finally:
+                    # Return connection to pool
+                    self._read_pool.append(conn)
+    
+    async def _get_write_connection(self):
+        """Get the write connection (no context manager, uses lock directly)"""
+        return self._write_conn or self._connection
+    
     async def connect(self) -> None:
-        """Initialize database connection and create schema"""
+        """Initialize database connections and create schema"""
         if self._connection:
             return
         
@@ -66,33 +95,62 @@ class SQLiteBackend(QueueBackend):
             Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         
         try:
+            # Create main connection for backward compatibility
             self._connection = await aiosqlite.connect(
                 self.db_path,
                 isolation_level=None  # Autocommit mode
             )
             
-            # Enable optimizations
-            await self._connection.execute("PRAGMA journal_mode=WAL")  # Write-ahead logging
-            await self._connection.execute("PRAGMA synchronous=NORMAL")  # Balance safety/speed
-            await self._connection.execute("PRAGMA cache_size=10000")  # Larger cache
-            await self._connection.execute("PRAGMA temp_store=MEMORY")  # Temp tables in memory
-            await self._connection.execute("PRAGMA busy_timeout=5000")  # 5 second timeout
+            # Create write connection
+            self._write_conn = await aiosqlite.connect(
+                self.db_path,
+                isolation_level=None
+            )
             
-            # Create schema
+            # Create read pool
+            for _ in range(self._read_pool_size):
+                conn = await aiosqlite.connect(
+                    self.db_path,
+                    isolation_level=None
+                )
+                self._read_pool.append(conn)
+            
+            # Apply optimizations to all connections
+            all_conns = [self._connection, self._write_conn] + self._read_pool
+            for conn in all_conns:
+                await conn.execute("PRAGMA journal_mode=WAL")  # Write-ahead logging
+                await conn.execute("PRAGMA synchronous=NORMAL")  # Balance safety/speed
+                await conn.execute("PRAGMA cache_size=10000")  # Larger cache
+                await conn.execute("PRAGMA temp_store=MEMORY")  # Temp tables in memory
+                await conn.execute("PRAGMA busy_timeout=5000")  # 5 second timeout
+            
+            # Create schema using write connection
             await self.create_schema()
             
-            logger.info("SQLite backend connected and initialized")
+            logger.info(f"SQLite backend connected with {self._read_pool_size} read connections")
             
         except Exception as e:
             logger.error(f"Failed to connect to SQLite: {e}")
             raise ConnectionError(f"SQLite connection failed: {e}")
     
     async def disconnect(self) -> None:
-        """Close database connection"""
+        """Close all database connections"""
+        # Close read pool
+        for conn in self._read_pool:
+            await conn.close()
+        self._read_pool.clear()
+        
+        # Close write connection
+        if self._write_conn:
+            await self._write_conn.close()
+            self._write_conn = None
+        
+        # Close main connection
         if self._connection:
             await self._connection.close()
             self._connection = None
-            logger.info("SQLite backend disconnected")
+            
+        logger.info("SQLite backend disconnected")
     
     async def create_schema(self) -> None:
         """Create database schema (idempotent)"""
@@ -318,7 +376,7 @@ class SQLiteBackend(QueueBackend):
             
             try:
                 # Find next available task
-                row = await self._connection.execute_fetchone("""
+                cursor = await self._connection.execute("""
                     SELECT * FROM tasks
                     WHERE queue_name = ?
                       AND status = 'queued'
@@ -328,12 +386,13 @@ class SQLiteBackend(QueueBackend):
                     ORDER BY priority ASC, created_at ASC
                     LIMIT 1
                 """, (queue_name,))
+                row = await cursor.fetchone()
                 
                 if not row:
                     await self._connection.rollback()
                     return None
                 
-                task = await self._row_to_task(row)
+                task = await self._row_to_task(row, cursor)
                 
                 # Create lease
                 lease_id = str(uuid.uuid4())
@@ -481,19 +540,19 @@ class SQLiteBackend(QueueBackend):
     async def _row_to_task(self, row: sqlite3.Row) -> Task:
         """Convert database row to Task object"""
         task_dict = dict(row)
-        
+
         # Parse JSON fields
-        if task_dict.get('payload'):
-            task_dict['payload'] = json.loads(task_dict['payload'])
-        if task_dict.get('depends_on'):
-            task_dict['depends_on'] = json.loads(task_dict['depends_on'])
-        if task_dict.get('result'):
-            task_dict['result'] = json.loads(task_dict['result'])
-        
+        for key in ['payload', 'depends_on', 'result']:
+            if isinstance(task_dict.get(key), str):
+                try:
+                    task_dict[key] = json.loads(task_dict[key])
+                except json.JSONDecodeError:
+                    logger.warning(f"Could not decode JSON for key {key} in task {task_dict.get('id')}")
+
         # Convert status string to enum
         if task_dict.get('status'):
-            task_dict['status'] = task_dict['status']  # Keep as string for from_dict
-        
+            task_dict['status'] = TaskStatus(task_dict['status'])
+
         return Task.from_dict(task_dict)
     
     # Implement remaining abstract methods...
@@ -504,6 +563,13 @@ class SQLiteBackend(QueueBackend):
         if row:
             return await self._row_to_task(row)
         return None
+
+    async def get_task_by_idempotency_key(self, idempotency_key: str) -> Optional[str]:
+        """Get task ID by idempotency key"""
+        return await self.fetchval(
+            "SELECT id FROM tasks WHERE idempotency_key = ?",
+            idempotency_key
+        )
     
     async def update_task(self, task: Task) -> bool:
         """Update task"""
@@ -625,9 +691,9 @@ class SQLiteBackend(QueueBackend):
             return cursor.rowcount
     
     async def fetch(self, query: str, *args) -> List[Dict[str, Any]]:
-        """Fetch multiple rows"""
-        async with self._lock:
-            cursor = await self._connection.execute(query, args)
+        """Fetch multiple rows using read pool for better concurrency"""
+        async with self._get_read_connection() as conn:
+            cursor = await conn.execute(query, args)
             rows = await cursor.fetchall()
             if rows:
                 # Convert to dictionaries
@@ -636,16 +702,78 @@ class SQLiteBackend(QueueBackend):
             return []
     
     async def fetchval(self, query: str, *args) -> Any:
-        """Fetch single value"""
-        async with self._lock:
-            cursor = await self._connection.execute(query, args)
+        """Fetch single value using read pool"""
+        async with self._get_read_connection() as conn:
+            cursor = await conn.execute(query, args)
             row = await cursor.fetchone()
             return row[0] if row else None
     
     async def fetchrow(self, query: str, *args) -> Optional[Dict[str, Any]]:
-        """Fetch single row"""
-        rows = await self.fetch(query, *args)
-        return rows[0] if rows else None
+        """Fetch single row using read pool"""
+        async with self._get_read_connection() as conn:
+            cursor = await conn.execute(query, args)
+            row = await cursor.fetchone()
+            if row:
+                columns = [desc[0] for desc in cursor.description]
+                return dict(zip(columns, row)), cursor
+            return None, None
+    
+    async def reclaim_expired_leases(self) -> int:
+        """
+        Reclaim tasks with expired leases back to queued status.
+        
+        Returns:
+            Number of tasks reclaimed
+        """
+        async with self._lock:
+            # Begin transaction
+            await self._connection.execute("BEGIN IMMEDIATE")
+            
+            try:
+                # Find all expired leases
+                cursor = await self._connection.execute("""
+                    SELECT task_id FROM task_leases 
+                    WHERE expires_at < datetime('now')
+                """)
+                expired_rows = await cursor.fetchall()
+                
+                if not expired_rows:
+                    await self._connection.rollback()
+                    return 0
+                
+                task_ids = [row[0] for row in expired_rows]
+                
+                # Reset tasks to queued status
+                placeholders = ','.join(['?' for _ in task_ids])
+                await self._connection.execute(f"""
+                    UPDATE tasks
+                    SET status = 'queued',
+                        worker_id = NULL,
+                        lease_id = NULL,
+                        started_at = NULL,
+                        retry_count = retry_count + 1
+                    WHERE id IN ({placeholders})
+                    AND status = 'running'
+                """, task_ids)
+                
+                # Delete expired leases
+                await self._connection.execute(f"""
+                    DELETE FROM task_leases
+                    WHERE task_id IN ({placeholders})
+                """, task_ids)
+                
+                await self._connection.commit()
+                
+                reclaimed_count = len(task_ids)
+                if reclaimed_count > 0:
+                    logger.info(f"Reclaimed {reclaimed_count} tasks with expired leases")
+                
+                return reclaimed_count
+                
+            except Exception as e:
+                await self._connection.rollback()
+                logger.error(f"Failed to reclaim expired leases: {e}")
+                raise TransactionError(f"Lease reclamation failed: {e}")
     
     # Schema management
     
@@ -659,3 +787,13 @@ class SQLiteBackend(QueueBackend):
         if current < target_version:
             # TODO: Implement migrations
             pass
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get backend status for monitoring"""
+        return {
+            'type': 'sqlite',
+            'database': self.db_path,
+            'connected': self._connection is not None,
+            'read_pool_size': len(self._read_pool),
+            'write_connection': self._write_conn is not None
+        }

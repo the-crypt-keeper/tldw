@@ -15,19 +15,21 @@ import unicodedata
 
 from loguru import logger
 
-# Import from existing chunking library
+# Import from new modular chunking system
 try:
-    from ...Chunking.Chunk_Lib import (
+    from ...Chunking import (
         EnhancedChunk,
         ChunkType,
         improved_chunking_process,
         ChunkingError,
-        InvalidInputError
+        InvalidInputError,
+        Chunker,
+        ChunkerConfig
     )
     CHUNK_LIB_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     CHUNK_LIB_AVAILABLE = False
-    logger.warning("Chunk_Lib not available. Document processing will be limited.")
+    logger.warning(f"Chunking module not available: {e}. Document processing will be limited.")
 
 from .types import Document
 
@@ -98,7 +100,7 @@ class DocumentProcessor:
             List of enhanced chunks
         """
         if not CHUNK_LIB_AVAILABLE:
-            logger.error("Chunk_Lib not available")
+            logger.error("Chunking module not available")
             return []
         
         # Pre-process content
@@ -113,16 +115,15 @@ class DocumentProcessor:
         if self.config.detect_structure:
             structure_info = self._detect_structure(content)
         
-        # Use improved_chunking_process from Chunk_Lib
+        # Use improved_chunking_process from new module
         chunk_options = {
             "method": "semantic" if len(content) > 5000 else "sentences",
             "max_size": self.config.target_chunk_size,
-            "overlap": 50,
-            "adaptive": True
+            "overlap": 50
         }
         
         try:
-            # Call existing chunking function
+            # Call backward-compatible chunking function
             chunk_results = improved_chunking_process(
                 content,
                 chunk_options

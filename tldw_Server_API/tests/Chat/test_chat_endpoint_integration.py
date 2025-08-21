@@ -13,6 +13,7 @@ from httpx import AsyncClient
 
 from tldw_Server_API.app.main import app
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
+from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
 
 
 @pytest.fixture
@@ -60,7 +61,7 @@ async def async_test_client():
 @pytest.fixture
 def mock_llm():
     """Mock only the LLM calls to avoid actual API calls."""
-    with patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.chat_api_call') as mock:
+    with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock:
         mock.return_value = "This is a test response from the mocked LLM."
         yield mock
 
@@ -74,7 +75,7 @@ def mock_llm_streaming():
             yield chunk
             await asyncio.sleep(0.01)
     
-    with patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.chat_api_call') as mock:
+    with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock:
         mock.return_value = stream_generator()
         yield mock
 
@@ -90,7 +91,7 @@ class TestChatEndpointIntegration:
     
     def test_chat_completion_basic(self, test_client, test_db, mock_llm, auth_headers):
         """Test basic chat completion through the actual endpoint."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 response = test_client.post(
                     "/api/v1/chat/completions",
@@ -112,7 +113,7 @@ class TestChatEndpointIntegration:
     
     def test_chat_with_character(self, test_client, test_db, mock_llm, auth_headers):
         """Test chat with character context."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 response = test_client.post(
                     "/api/v1/chat/completions",
@@ -142,7 +143,7 @@ class TestChatEndpointIntegration:
     
     def test_conversation_persistence(self, test_client, test_db, mock_llm, auth_headers):
         """Test that conversations are persisted in the database."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 # First message
                 response1 = test_client.post(
@@ -189,7 +190,7 @@ class TestChatEndpointIntegration:
     
     def test_streaming_response(self, test_client, test_db, mock_llm_streaming, auth_headers):
         """Test streaming chat completion."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 with test_client as client:
                     response = client.post(
@@ -221,7 +222,7 @@ class TestChatEndpointIntegration:
     
     def test_message_validation(self, test_client, test_db, auth_headers):
         """Test message validation and error handling."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 # Test empty messages
                 response = test_client.post(
@@ -254,7 +255,7 @@ class TestChatEndpointIntegration:
     
     def test_image_handling(self, test_client, test_db, mock_llm, auth_headers):
         """Test handling of image inputs."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 # Small valid PNG image (1x1 pixel red dot)
                 image_data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
@@ -287,7 +288,7 @@ class TestChatEndpointIntegration:
     
     def test_tool_usage(self, test_client, test_db, mock_llm, auth_headers):
         """Test chat with tool definitions."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 response = test_client.post(
                     "/api/v1/chat/completions",
@@ -325,7 +326,7 @@ class TestChatEndpointIntegration:
     
     def test_transaction_handling(self, test_client, test_db, mock_llm, auth_headers):
         """Test database transaction handling."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 # Create multiple requests with transaction flag
                 response = test_client.post(
@@ -360,7 +361,7 @@ class TestChatEndpointIntegration:
         
         def make_request(index):
             try:
-                with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+                with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
                     with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": f"client_{index}"}):
                         response = test_client.post(
                             "/api/v1/chat/completions",
@@ -395,7 +396,7 @@ class TestChatEndpointIntegration:
     
     def test_rate_limiting(self, test_client, test_db, mock_llm, auth_headers):
         """Test rate limiting functionality."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 # Make multiple rapid requests
                 responses = []
@@ -422,7 +423,7 @@ class TestChatEndpointSecurity:
     
     def test_sql_injection_prevention(self, test_client, test_db, mock_llm, auth_headers):
         """Test SQL injection prevention."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 response = test_client.post(
                     "/api/v1/chat/completions",
@@ -445,7 +446,7 @@ class TestChatEndpointSecurity:
     
     def test_xss_prevention(self, test_client, test_db, mock_llm, auth_headers):
         """Test XSS prevention."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 response = test_client.post(
                     "/api/v1/chat/completions",
@@ -470,7 +471,7 @@ class TestChatEndpointSecurity:
     
     def test_large_request_dos_prevention(self, test_client, test_db, auth_headers):
         """Test DoS prevention for large requests."""
-        with patch('tldw_Server_API.app.api.v1.endpoints.chat.get_chachachat_db', return_value=test_db):
+        with patch('tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps.get_chacha_db_for_user', return_value=test_db):
             with patch('tldw_Server_API.app.api.v1.endpoints.chat.verify_api_key', return_value={"client_id": "test_client"}):
                 # Create a very large message
                 large_content = "x" * 500000  # 500KB of text

@@ -5,6 +5,7 @@ from fastapi import status, HTTPException
 from fastapi.testclient import TestClient
 import json
 import os
+import datetime
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -12,6 +13,8 @@ load_dotenv()
 
 # Import your FastAPI app instance
 from tldw_Server_API.app.main import app
+# Import helpers from conftest
+from .conftest import get_auth_headers
 # Import schemas from your actual file path
 from tldw_Server_API.app.api.v1.schemas.chat_request_schemas import (
     ChatCompletionRequest,
@@ -34,45 +37,128 @@ from tldw_Server_API.app.core.Chat.prompt_template_manager import PromptTemplate
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
 from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user, DEFAULT_CHARACTER_NAME
+from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
 
 
-# Fixture for TestClient
+# Helper function to make requests with CSRF token
+def make_request_with_csrf(client, method, url, headers=None, **kwargs):
+    """Helper to make requests with CSRF token included"""
+    if headers is None:
+        headers = {}
+    
+    # Get CSRF token from cookies if not already set
+    if not hasattr(client, 'csrf_token'):
+        # Make a GET request to get CSRF token
+        response = client.get("/api/v1/health")
+        csrf_token = response.cookies.get("csrf_token", "")
+        client.csrf_token = csrf_token
+    
+    # Add CSRF token to headers
+    headers["X-CSRF-Token"] = getattr(client, 'csrf_token', '')
+    
+    # Make the request
+    method_func = getattr(client, method.lower())
+    return method_func(url, headers=headers, **kwargs)
+
+def get_auth_headers(auth_token):
+    """Get appropriate auth headers based on AUTH_MODE."""
+    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+    settings = get_settings()
+    
+    if settings.AUTH_MODE == "multi_user":
+        return {"Authorization": auth_token}
+    else:
+        return {"Token": auth_token}
+
+# Fixture for TestClient with proper CSRF token handling
 @pytest.fixture(scope="function")
 def client():
     with TestClient(app) as c:
+        # Get a CSRF token by making a GET request first
+        response = c.get("/api/v1/health")  # Or any GET endpoint
+        csrf_token = response.cookies.get("csrf_token", "")
+        
+        # Store the token in the client for use in tests
+        c.csrf_token = csrf_token
+        c.cookies = {"csrf_token": csrf_token}
+        
+        # Add helper method to client
+        c.post_with_csrf = lambda url, **kwargs: make_request_with_csrf(c, "POST", url, **kwargs)
+        c.put_with_csrf = lambda url, **kwargs: make_request_with_csrf(c, "PUT", url, **kwargs)
+        c.patch_with_csrf = lambda url, **kwargs: make_request_with_csrf(c, "PATCH", url, **kwargs)
+        c.delete_with_csrf = lambda url, **kwargs: make_request_with_csrf(c, "DELETE", url, **kwargs)
+        
         yield c
 
 
 @pytest.fixture
-def valid_auth_token() -> str:
-    # Check if we're in multi-user mode or single-user mode
-    auth_mode = os.getenv("AUTH_MODE", "single_user")
-    api_bearer = os.getenv("API_BEARER")
+def mock_user():
+    """Create a mock user for testing."""
+    return User(
+        id=1,
+        username="test_user",
+        email="test@example.com",
+        is_active=True,
+        is_admin=False,
+        created_at=datetime.datetime.now(),
+        updated_at=datetime.datetime.now()
+    )
+
+@pytest.fixture(autouse=True)
+def setup_auth_override(mock_user):
+    """Automatically override authentication for all tests based on AUTH_MODE."""
+    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
     
-    if auth_mode == "multi_user":
+    settings = get_settings()
+    
+    # Only override authentication in multi-user mode
+    if settings.AUTH_MODE == "multi_user":
+        # In multi-user mode, we need to mock the entire authentication flow
+        # The simplest approach is to override get_request_user to return mock user directly
+        async def mock_get_request_user(api_key=None, token=None):
+            return mock_user
+        
+        app.dependency_overrides[get_request_user] = mock_get_request_user
+        yield
+        # Clean up after test
+        app.dependency_overrides.pop(get_request_user, None)
+    else:
+        # In single-user mode, no override needed
+        yield
+
+@pytest.fixture
+def valid_auth_token() -> str:
+    """Generate appropriate auth token based on current AUTH_MODE."""
+    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+    
+    settings = get_settings()
+    
+    if settings.AUTH_MODE == "multi_user":
         # In multi-user mode, we need a proper JWT token
-        # For testing, we'll create a mock JWT token
-        # This allows tests to run in both modes
+        # For testing, we'll create a mock JWT token using the actual JWT secret
         import jwt
         import datetime
         
-        # Create a test JWT token
-        secret_key = os.getenv("JWT_SECRET", "test-secret-key-for-testing")
+        # Use the actual JWT secret from settings
+        secret_key = settings.JWT_SECRET_KEY or os.getenv("JWT_SECRET_KEY", "test-secret-key")
+        
         payload = {
-            "sub": "test-user",
+            "sub": "1",  # User ID as string
+            "username": "test_user",
             "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
-            "iat": datetime.datetime.utcnow()
+            "iat": datetime.datetime.utcnow(),
+            "type": "access"
         }
-        test_token = jwt.encode(payload, secret_key, algorithm="HS256")
+        test_token = jwt.encode(payload, secret_key, algorithm=settings.JWT_ALGORITHM)
         return f"Bearer {test_token}"
-    
-    # In single-user mode, API_BEARER is optional
-    # Use the environment variable if set, otherwise use default
-    if api_bearer:
-        return api_bearer
     else:
-        # Default token for single-user mode
-        return "default-secret-key-for-single-user"
+        # In single-user mode, use API_BEARER if set
+        api_bearer = os.getenv("API_BEARER")
+        if api_bearer:
+            return api_bearer
+        else:
+            # Default token for single-user mode
+            return "default-secret-key-for-single-user"
 
 
 # --- Test Data defined locally in this file ---
@@ -153,11 +239,12 @@ def test_create_chat_completion_no_template(
     # In default_chat_request_data, prompt_template_name is None.
     # The endpoint will try to load DEFAULT_RAW_PASSTHROUGH_TEMPLATE.name.
 
-    response = client.post("/api/v1/chat/completions", json=request_data_dict, headers={"Token": valid_auth_token})
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_data_dict, headers=get_auth_headers(valid_auth_token))
 
     if response.status_code != status.HTTP_200_OK:
         print(f"Response status: {response.status_code}")
         print(f"Response body: {response.text}")
+        print(f"Response headers: {response.headers}")
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["choices"][0]["message"]["content"] == mock_response_data["choices"][0]["message"][
         "content"]  # Check relevant part
@@ -213,7 +300,7 @@ def test_create_chat_completion_success_streaming(  # Added default_chat_request
         app.dependency_overrides[get_chacha_db_for_user] = lambda: mock_chat_db
 
         streaming_request_data = default_chat_request_data.model_copy(update={"stream": True})
-        response = client.post(
+        response = client.post_with_csrf(
             "/api/v1/chat/completions",
             json=streaming_request_data.model_dump(),
             headers={"token": valid_auth_token}
@@ -265,7 +352,7 @@ def test_system_message_extraction(
     # Use the specific Pydantic models from your schema
     request_data_obj = ChatCompletionRequest(model="test-model", messages=messages_with_system)
 
-    client.post("/api/v1/chat/completions", json=request_data_obj.model_dump(), headers={"Token": valid_auth_token})
+    client.post_with_csrf("/api/v1/chat/completions", json=request_data_obj.model_dump(), headers={"Token": valid_auth_token})
 
     mock_chat_api_call.assert_called_once()
     call_args = mock_chat_api_call.call_args.kwargs
@@ -297,7 +384,7 @@ def test_no_system_message_in_payload(
     app.dependency_overrides[get_media_db_for_user] = lambda: mock_media_db
     app.dependency_overrides[get_chacha_db_for_user] = lambda: mock_chat_db
 
-    client.post("/api/v1/chat/completions", json=default_chat_request_data.model_dump(),
+    client.post_with_csrf("/api/v1/chat/completions", json=default_chat_request_data.model_dump(),
                 headers={"Token": valid_auth_token})
 
     mock_chat_api_call.assert_called_once()
@@ -349,7 +436,7 @@ def test_api_key_used_from_config(
 
         # Test 1: Default provider (should pick up "openai" key from patched dict)
         # default_chat_request_data has api_provider=None, so it will use DEFAULT_LLM_PROVIDER ("openai")
-        client.post("/api/v1/chat/completions", json=default_chat_request_data.model_dump(),
+        client.post_with_csrf("/api/v1/chat/completions", json=default_chat_request_data.model_dump(),
                     headers={"Token": valid_auth_token})
         mock_chat_api_call.assert_called_once()
         assert mock_chat_api_call.call_args.kwargs["api_key"] == "key_from_config"
@@ -420,7 +507,7 @@ def test_missing_api_key_for_required_provider(
     # The endpoint's providers_requiring_keys list includes "openai".
     request_data_openai = default_chat_request_data.model_copy(update={"api_provider": "openai"})
 
-    response = client.post(
+    response = client.post_with_csrf(
         "/api/v1/chat/completions",
         json=request_data_openai.model_dump(),
         headers={"token": valid_auth_token}
@@ -452,7 +539,7 @@ def test_keyless_provider_proceeds_without_key(  # Added default_chat_request_da
         mock_chat_api_call.return_value = {"id": "res_ollama"}
         request_data_ollama = default_chat_request_data.model_copy(update={"api_provider": "ollama"})
 
-        response = client.post(
+        response = client.post_with_csrf(
             "/api/v1/chat/completions",
             json=request_data_ollama.model_dump(),
             headers={"token": valid_auth_token}
@@ -528,7 +615,7 @@ def test_chat_api_call_exception_handling_unit(
     app.dependency_overrides[get_media_db_for_user] = lambda: mock_media_db
     app.dependency_overrides[get_chacha_db_for_user] = lambda: mock_chat_db
 
-    response = client.post(
+    response = client.post_with_csrf(
         "/api/v1/chat/completions",
         json=default_chat_request_data.model_dump(),
         headers={"Token": valid_auth_token}  # Ensure correct header name
@@ -572,7 +659,7 @@ def test_non_iterable_stream_generator_from_shim(
     app.dependency_overrides[get_chacha_db_for_user] = lambda: mock_chat_db
 
     streaming_request_data = default_chat_request_data.model_copy(update={"stream": True})
-    response = client.post(
+    response = client.post_with_csrf(
         "/api/v1/chat/completions",
         json=streaming_request_data.model_dump(),
         headers={"token": valid_auth_token}
@@ -614,7 +701,7 @@ def test_error_within_stream_generator(
     # Use the specific request data for this test
     request_data_dict = default_chat_request_data_error_stream.model_dump()
 
-    response = client.post(
+    response = client.post_with_csrf(
         "/api/v1/chat/completions",
         json=request_data_dict,
         headers={"Token": valid_auth_token}  # Corrected header name
@@ -727,7 +814,7 @@ def test_create_chat_completion_with_optional_params(
     })
     request_data_dict = request_with_optionals.model_dump(exclude_none=True)
 
-    response = client.post("/api/v1/chat/completions", json=request_data_dict, headers={"Token": valid_auth_token})
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_data_dict, headers={"Token": valid_auth_token})
 
     assert response.status_code == status.HTTP_200_OK
     mock_chat_api_call.assert_called_once()
@@ -784,7 +871,7 @@ def test_create_chat_completion_with_tools_unit(
     })
     request_data_dict = request_with_tools.model_dump(exclude_none=True)
 
-    response = client.post("/api/v1/chat/completions", json=request_data_dict, headers={"Token": valid_auth_token})
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_data_dict, headers={"Token": valid_auth_token})
     assert response.status_code == status.HTTP_200_OK
     mock_chat_api_call.assert_called_once()
     called_kwargs = mock_chat_api_call.call_args.kwargs
@@ -819,7 +906,7 @@ def test_create_chat_completion_character_not_found_uses_defaults(
     # If some_template_that_uses_char_vars is mocked by mock_load_template to use {char_name}
     # And char_name is not found, it will use the default "Character" from template_data initialization.
 
-    client.post("/api/v1/chat/completions", json=request_with_char.model_dump(), headers={"Token": valid_auth_token})
+    client.post_with_csrf("/api/v1/chat/completions", json=request_with_char.model_dump(), headers={"Token": valid_auth_token})
 
     mock_chat_api_call_shim.assert_called_once()
     called_args_to_shim = mock_chat_api_call_shim.call_args.kwargs
@@ -858,7 +945,7 @@ def test_create_chat_completion_template_file_not_found(
         "prompt_template_name": "definitely_missing_template"
     })
 
-    response = client.post("/api/v1/chat/completions", json=request_data.model_dump(),
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_data.model_dump(),
                            headers={"Token": valid_auth_token})
     assert response.status_code == status.HTTP_200_OK  # Should fall back to default template
     mock_load_template.assert_called_once_with("definitely_missing_template")

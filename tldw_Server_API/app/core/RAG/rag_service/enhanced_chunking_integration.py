@@ -10,8 +10,8 @@ from typing import List, Dict, Any, Optional
 from loguru import logger
 
 from .types import Document, DataSource
-# Enhanced features are now integrated into the main Chunk_Lib
-from ...Chunking.Chunk_Lib import Chunker as EnhancedChunker, EnhancedChunk, ChunkType
+# Import from the new modular chunking system
+from ...Chunking import Chunker, EnhancedChunk, ChunkType, ChunkerConfig
 
 
 async def enhanced_chunk_documents(
@@ -71,8 +71,17 @@ async def enhanced_chunk_documents(
     chunk_size = chunk_size or config.get("chunk_size", 512)
     overlap = overlap or config.get("chunk_overlap", 128)
     
-    # Initialize enhanced chunker
-    chunker = EnhancedChunker(chunking_options)
+    # Initialize chunker with new API
+    # Map old options to new configuration
+    method = 'structure_aware' if structure_aware else 'sentences'
+    
+    config = ChunkerConfig(
+        default_method=method,
+        default_max_size=chunk_size,
+        default_overlap=overlap,
+        enable_cache=True
+    )
+    chunker = Chunker(config)
     
     # Process each document
     chunked_documents = []
@@ -81,13 +90,46 @@ async def enhanced_chunk_documents(
     
     for doc in context.documents:
         try:
-            # Chunk the document
-            enhanced_chunks = chunker.chunk_text_enhanced(
+            # Chunk the document using new API
+            # Get chunks with metadata
+            chunk_results = chunker.chunk_text_with_metadata(
                 text=doc.content,
-                chunk_size=chunk_size,
+                method=method,
+                max_size=chunk_size,
                 overlap=overlap,
-                doc_id=doc.id
+                preserve_tables=preserve_tables,
+                preserve_code_blocks=preserve_code_blocks
             )
+            
+            # Convert to EnhancedChunk format for RAG
+            enhanced_chunks = []
+            for i, result in enumerate(chunk_results):
+                chunk_type_value = ChunkType.TEXT
+                if 'code' in result.text.lower() or '```' in result.text:
+                    chunk_type_value = ChunkType.CODE
+                elif result.text.strip().startswith('#'):
+                    chunk_type_value = ChunkType.HEADER
+                elif result.text.strip().startswith(('- ', '* ', '1.')):
+                    chunk_type_value = ChunkType.LIST
+                elif '|' in result.text and result.text.count('|') > 2:
+                    chunk_type_value = ChunkType.TABLE
+                
+                enhanced_chunk = EnhancedChunk(
+                    id=f"{doc.id}_chunk_{i}",
+                    content=result.text,
+                    chunk_type=chunk_type_value,
+                    start_char=result.metadata.start_char,
+                    end_char=result.metadata.end_char,
+                    chunk_index=i,
+                    metadata={
+                        'word_count': result.metadata.word_count,
+                        'language': result.metadata.language,
+                        'method': result.metadata.method,
+                        'doc_id': doc.id
+                    },
+                    parent_id=doc.id
+                )
+                enhanced_chunks.append(enhanced_chunk)
             
             # Convert enhanced chunks to documents
             for chunk in enhanced_chunks:

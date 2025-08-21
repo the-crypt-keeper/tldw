@@ -61,8 +61,23 @@ router = APIRouter(prefix="/evaluations", tags=["Evaluations"])
 
 # Initialize evaluation components
 evaluation_manager = EvaluationManager()
-rag_evaluator = RAGEvaluator()
-quality_evaluator = ResponseQualityEvaluator()
+# Lazy initialization - create evaluators only when needed to avoid startup embedding checks
+_rag_evaluator = None
+_quality_evaluator = None
+
+def get_rag_evaluator() -> RAGEvaluator:
+    """Get or create RAG evaluator instance (lazy initialization)."""
+    global _rag_evaluator
+    if _rag_evaluator is None:
+        _rag_evaluator = RAGEvaluator()
+    return _rag_evaluator
+
+def get_quality_evaluator() -> ResponseQualityEvaluator:
+    """Get or create quality evaluator instance (lazy initialization)."""
+    global _quality_evaluator
+    if _quality_evaluator is None:
+        _quality_evaluator = ResponseQualityEvaluator()
+    return _quality_evaluator
 
 
 # Rate limiting dependency for evaluation endpoints
@@ -353,7 +368,7 @@ async def evaluate_rag_system(
         # Run RAG evaluation with SLI tracking
         if advanced_metrics.enabled:
             with advanced_metrics.track_sli_request("/api/v1/evaluations/rag"):
-                results = await rag_evaluator.evaluate(
+                results = await get_rag_evaluator().evaluate(
                     query=request.query,
                     contexts=request.retrieved_contexts,
                     response=request.generated_response,
@@ -362,7 +377,7 @@ async def evaluate_rag_system(
                     api_name=request.api_name
                 )
         else:
-            results = await rag_evaluator.evaluate(
+            results = await get_rag_evaluator().evaluate(
                 query=request.query,
                 contexts=request.retrieved_contexts,
                 response=request.generated_response,
@@ -515,7 +530,7 @@ async def evaluate_response_quality(
         # Run quality evaluation with SLI tracking
         if advanced_metrics.enabled:
             with advanced_metrics.track_sli_request("/api/v1/evaluations/response-quality"):
-                results = await quality_evaluator.evaluate(
+                results = await get_quality_evaluator().evaluate(
                     prompt=request.prompt,
                     response=request.response,
                     expected_format=request.expected_format,
@@ -523,7 +538,7 @@ async def evaluate_response_quality(
                     api_name=request.api_name
                 )
         else:
-            results = await quality_evaluator.evaluate(
+            results = await get_quality_evaluator().evaluate(
                 prompt=request.prompt,
                 response=request.response,
                 expected_format=request.expected_format,

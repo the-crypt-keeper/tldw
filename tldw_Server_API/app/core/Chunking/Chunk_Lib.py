@@ -176,6 +176,10 @@ class Chunker:
             tokenizer_name_or_path (str): Name or path of the Hugging Face tokenizer to use.
                                            Defaults to "gpt2".
         """
+        # Initialize caches for performance
+        self._language_cache: Dict[int, str] = {}  # Cache language detection by text hash
+        self._cache_size_limit = 100  # Limit cache size to prevent memory issues
+        
         # Initialize options: start with defaults, then update with provided options
         self.options = DEFAULT_CHUNK_OPTIONS.copy()
         if options:
@@ -226,10 +230,9 @@ class Chunker:
             self.tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(tokenizer_name_or_path)
             logging.info(f"Tokenizer '{tokenizer_name_or_path}' loaded successfully.")
         except Exception as e:
-            logging.error(f"Failed to load tokenizer '{tokenizer_name_or_path}': {e}. Some token-based methods may fail.")
-            # Fallback or raise error? For now, set to None and let methods handle it.
+            logging.warning(f"Failed to load tokenizer '{tokenizer_name_or_path}': {e}. Token-based methods will not be available.")
+            # Set to None but warn user - token-based methods will check and raise appropriate errors
             self.tokenizer = None
-            # raise ChunkingError(f"Failed to load tokenizer '{tokenizer_name_or_path}': {e}") from e
         
         # Initialize table processor if available and tables should be preserved
         self.table_processor = None
@@ -262,7 +265,7 @@ class Chunker:
 
     def detect_language(self, text: str) -> str:
         """
-        Detects the language of the given text.
+        Detects the language of the given text with caching.
 
         Args:
             text (str): The text to detect language from.
@@ -274,19 +277,41 @@ class Chunker:
         if not text or not text.strip():
             logging.warning("Attempted to detect language from empty or whitespace-only text. Defaulting to 'en'.")
             return self._get_option('language', 'en') # Use option if available, else 'en'
+        
+        # Use first 1000 chars for language detection to improve cache efficiency
+        sample_text = text[:1000] if len(text) > 1000 else text
+        text_hash = hash(sample_text)
+        
+        # Check cache first
+        if text_hash in self._language_cache:
+            cached_lang = self._language_cache[text_hash]
+            logging.debug(f"Using cached language detection: {cached_lang}")
+            return cached_lang
+        
         try:
             # langdetect can be sensitive to very short texts.
             # Add a minimum length check if it becomes an issue.
             # For example: if len(text) < 20: return 'en' (or self.options.get('language', 'en'))
-            lang = detect(text)
+            lang = detect(sample_text)
             logging.debug(f"Detected language: {lang}")
+            
+            # Cache the result (with size limit)
+            if len(self._language_cache) >= self._cache_size_limit:
+                # Remove oldest entries (simple FIFO)
+                self._language_cache.pop(next(iter(self._language_cache)))
+            self._language_cache[text_hash] = lang
+            
             return lang
         except LangDetectException as e:
             logging.warning(f"Language detection failed: {e}. Defaulting to 'en'.")
-            return self._get_option('language', 'en')
+            default_lang = self._get_option('language', 'en')
+            self._language_cache[text_hash] = default_lang  # Cache the default too
+            return default_lang
         except Exception as e_gen:
             logging.error(f"Unexpected error during language detection: {e_gen}. Defaulting to 'en'.")
-            return self._get_option('language', 'en')
+            default_lang = self._get_option('language', 'en')
+            self._language_cache[text_hash] = default_lang  # Cache the default too
+            return default_lang
 
 
     def _ensure_language(self, text: str, language_option: Optional[str] = None) -> str:
@@ -307,6 +332,73 @@ class Chunker:
         Strips whitespace from each chunk and removes empty chunks.
         """
         return [chunk.strip() for chunk in chunks if chunk and chunk.strip()]
+    
+    def chunk_text_generator(self,
+                            text: str,
+                            method: Optional[str] = None,
+                            chunk_size: Optional[int] = None) -> Generator[str, None, None]:
+        """
+        Memory-efficient generator for chunking large texts.
+        
+        Args:
+            text (str): The text to chunk.
+            method (Optional[str]): Override the chunking method.
+            chunk_size (Optional[int]): Override the chunk size.
+            
+        Yields:
+            str: Individual chunks
+        """
+        # Use regular chunk_text for structured methods (JSON, XML, etc)
+        structured_methods = ['json', 'xml', 'ebook_chapters', 'rolling_summarize']
+        if method in structured_methods or self._get_option('method', 'words') in structured_methods:
+            # These methods need the full text, so yield all at once
+            for chunk in self.chunk_text(text, method):
+                yield chunk
+            return
+        
+        # For text-based methods, process in streaming fashion
+        chunk_method = method if method else self._get_option('method', 'words')
+        max_size = chunk_size if chunk_size else self._get_option('max_size', 400)
+        overlap = self._get_option('overlap', 200)
+        
+        # Process text in blocks to avoid loading everything into memory at once
+        BLOCK_SIZE = 1_000_000  # 1MB blocks
+        
+        if chunk_method == 'words':
+            buffer = []
+            word_count = 0
+            
+            for i in range(0, len(text), BLOCK_SIZE):
+                block = text[i:i + BLOCK_SIZE]
+                # Find last complete word boundary
+                if i + BLOCK_SIZE < len(text):
+                    last_space = block.rfind(' ')
+                    if last_space != -1:
+                        next_block_start = i + last_space + 1
+                        block = block[:last_space]
+                    else:
+                        next_block_start = i + BLOCK_SIZE
+                else:
+                    next_block_start = len(text)
+                
+                words = block.split()
+                for word in words:
+                    buffer.append(word)
+                    word_count += 1
+                    
+                    if word_count >= max_size:
+                        yield ' '.join(buffer[:max_size])
+                        # Keep overlap words
+                        buffer = buffer[max_size - overlap:] if overlap > 0 else []
+                        word_count = len(buffer)
+                
+                # Update position for next iteration
+                if i + BLOCK_SIZE < len(text):
+                    i = next_block_start - BLOCK_SIZE  # Adjust for the loop increment
+            
+            # Yield remaining words
+            if buffer:
+                yield ' '.join(buffer)
 
     def chunk_text(self,
                    text: str,
@@ -329,9 +421,32 @@ class Chunker:
             InvalidChunkingMethodError: If the method is not supported.
             ChunkingError: For errors during the chunking process.
         """
+        # Input validation
+        MAX_TEXT_SIZE = 100_000_000  # 100MB limit
+        if text is None:
+            logging.warning("Received None as text input. Returning empty list.")
+            return []
+        if not isinstance(text, str):
+            raise InvalidInputError(f"Expected string input, got {type(text).__name__}")
+        if len(text) > MAX_TEXT_SIZE:
+            raise InvalidInputError(f"Text size ({len(text)} bytes) exceeds maximum allowed size ({MAX_TEXT_SIZE} bytes)")
+        if not text.strip():
+            logging.debug("Empty text provided to chunk_text. Returning empty list.")
+            return []
+        
         chunk_method = method if method else self._get_option('method', 'words')
         max_size = self._get_option('max_size') # Already int from __init__
         overlap = self._get_option('overlap')   # Already int from __init__
+        
+        # Validate chunk parameters
+        if max_size <= 0:
+            raise ValueError(f"max_size must be positive, got {max_size}")
+        if overlap < 0:
+            raise ValueError(f"overlap cannot be negative, got {overlap}")
+        if overlap >= max_size:
+            logging.warning(f"Overlap ({overlap}) >= max_size ({max_size}). Setting overlap to max_size - 1")
+            overlap = max_size - 1
+            
         language = self._ensure_language(text, self._get_option('language')) # Ensure language is determined
 
         logging.debug(f"Chunking text with method='{chunk_method}', max_size={max_size}, overlap={overlap}, language='{language}'")
@@ -449,9 +564,8 @@ class Chunker:
 
 
         chunks = []
-        # Ensure step is at least 1 to prevent infinite loops if max_words equals overlap (though handled above)
-        step = max_words - overlap
-        if step <= 0: step = max_words # Should not happen if overlap < max_words
+        # Ensure step is at least 1 to prevent infinite loops
+        step = max(1, max_words - overlap)
 
         for i in range(0, len(words), step):
             chunk_words = words[i : i + max_words]
@@ -526,8 +640,7 @@ class Chunker:
             overlap = 0
 
         chunks = []
-        step = max_sentences - overlap
-        if step <= 0: step = max_sentences
+        step = max(1, max_sentences - overlap)
 
         for i in range(0, len(sentences), step):
             chunk_sentences = sentences[i : i + max_sentences]
@@ -551,8 +664,7 @@ class Chunker:
             overlap = 0
 
         chunks = []
-        step = max_paragraphs - overlap
-        if step <= 0: step = max_paragraphs
+        step = max(1, max_paragraphs - overlap)
 
         for i in range(0, len(paragraphs), step):
             chunk_paragraphs = paragraphs[i : i + max_paragraphs]
@@ -579,9 +691,7 @@ class Chunker:
             logging.warning(f"Token overlap {overlap} >= max_tokens {max_tokens}. Setting overlap to 0.")
             overlap = 0
 
-        step = max_tokens - overlap
-        if step <= 0: step = max_tokens
-
+        step = max(1, max_tokens - overlap)
 
         chunks = []
         for i in range(0, len(tokens), step):
@@ -762,6 +872,11 @@ class Chunker:
 
     def _chunk_text_by_json(self, text: str, max_size: int, overlap: int) -> List[Dict[str, Any]]:
         logging.debug("chunk_text_by_json (method) started...")
+        # Limit JSON size to prevent DoS
+        MAX_JSON_SIZE = 50_000_000  # 50MB limit for JSON text
+        if len(text) > MAX_JSON_SIZE:
+            raise InvalidInputError(f"JSON text size ({len(text)} bytes) exceeds maximum allowed size ({MAX_JSON_SIZE} bytes)")
+        
         try:
             json_data = json.loads(text)
         except json.JSONDecodeError as e:
@@ -789,8 +904,7 @@ class Chunker:
 
         chunks_output = []
         total_items = len(json_list)
-        step = max_size - overlap
-        if step <= 0: step = max_size
+        step = max(1, max_size - overlap)
 
         for i in range(0, total_items, step):
             chunk_data = json_list[i : i + max_size]
@@ -830,8 +944,7 @@ class Chunker:
         total_keys = len(all_keys)
 
         chunks_output = []
-        step = max_size - overlap
-        if step <= 0: step = max_size
+        step = max(1, max_size - overlap)
 
         # Preserve other parts of the original dictionary
         preserved_data_shell = {k: v for k, v in json_dict.items() if k != chunkable_key}
@@ -2064,13 +2177,18 @@ def improved_chunking_process(text: str,
             if json_end_match:
                 json_end_index = json_end_match.end()
                 potential_json_str = processed_text[:json_end_index].strip()
-                try:
-                    json_content_metadata = json.loads(potential_json_str)
-                    processed_text = processed_text[json_end_index:].strip()
-                    logging.debug(f"Extracted JSON metadata: {json_content_metadata}")
-                except json.JSONDecodeError:
-                    logging.debug("Potential JSON at start, but failed to parse. Treating as normal text.")
+                # Limit JSON metadata size
+                if len(potential_json_str) > 1_000_000:  # 1MB limit for metadata
+                    logging.warning(f"JSON metadata too large ({len(potential_json_str)} bytes), skipping")
                     json_content_metadata = {}
+                else:
+                    try:
+                        json_content_metadata = json.loads(potential_json_str)
+                        processed_text = processed_text[json_end_index:].strip()
+                        logging.debug(f"Extracted JSON metadata: {json_content_metadata}")
+                    except json.JSONDecodeError:
+                        logging.debug("Potential JSON at start, but failed to parse. Treating as normal text.")
+                        json_content_metadata = {}
             else:
                 logging.debug("Text starts with '{' but no clear '}\\n' end for JSON metadata.")
         else:

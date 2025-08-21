@@ -57,6 +57,10 @@ class TaskDependencyError(TaskError):
     pass
 
 
+# Alias for backward compatibility
+DependencyError = TaskDependencyError
+
+
 class TaskTimeoutError(TaskError):
     """Raised when task execution exceeds timeout"""
     pass
@@ -154,4 +158,16 @@ class BufferClosedError(BufferError):
 
 class BufferFlushError(BufferError):
     """Raised when buffer flush fails"""
+    pass
+
+
+# Payload exceptions
+
+class PayloadError(SchedulerError):
+    """Base exception for payload-related errors"""
+    pass
+
+
+class PayloadTooLargeError(PayloadError):
+    """Raised when payload exceeds maximum size"""
     pass

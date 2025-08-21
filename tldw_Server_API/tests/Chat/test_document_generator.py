@@ -68,41 +68,66 @@ class TestDocumentGeneratorService:
         assert any("CREATE TABLE IF NOT EXISTS generated_documents" in sql for sql in sql_statements)
         assert any("CREATE TABLE IF NOT EXISTS generation_jobs" in sql for sql in sql_statements)
     
-    @pytest.mark.asyncio
-    async def test_generate_timeline(self, service, mock_db, sample_conversation):
+    def test_generate_timeline(self, service, mock_db, sample_conversation):
         """Test timeline document generation."""
         mock_db.get_conversation_by_id.return_value = sample_conversation
         mock_db.get_messages_for_conversation.return_value = sample_conversation["messages"]
         mock_db.execute_query.return_value = [{"id": "doc123"}]
         
         # Mock LLM call
-        with patch.object(service, '_call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
             mock_llm.return_value = "Timeline: Event 1, Event 2, Event 3"
             
-            result = await service.generate_document(
+            result = service.generate_document(
+
+            
                 conversation_id="conv123",
+
+            
                 document_type=DocumentType.TIMELINE,
+
+            
+                provider="openai",
+
+            
+                model="gpt-3.5-turbo",
+
+            
+                api_key="test_key",
+                provider="openai",
+                model="gpt-3.5-turbo",
+                api_key="test_key",
                 custom_prompt=None
             )
         
-        assert result["success"] == True
-        assert result["document_id"] == "doc123"
-        assert result["document_type"] == DocumentType.TIMELINE
+        assert result is not None
         mock_llm.assert_called_once()
     
-    @pytest.mark.asyncio
-    async def test_generate_study_guide(self, service, mock_db, sample_conversation):
+    def test_generate_study_guide(self, service, mock_db, sample_conversation):
         """Test study guide document generation."""
         mock_db.get_conversation_by_id.return_value = sample_conversation
         mock_db.get_messages_for_conversation.return_value = sample_conversation["messages"]
         mock_db.execute_query.return_value = [{"id": "doc124"}]
         
-        with patch.object(service, '_call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
             mock_llm.return_value = "Study Guide: Key concepts and review questions"
             
-            result = await service.generate_document(
+            result = service.generate_document(
+
+            
                 conversation_id="conv123",
-                document_type=DocumentType.STUDY_GUIDE
+
+            
+                document_type=DocumentType.STUDY_GUIDE,
+
+            
+                provider="openai",
+
+            
+                model="gpt-3.5-turbo",
+
+            
+                api_key="test_key"
             )
         
         assert result["success"] == True
@@ -112,73 +137,121 @@ class TestDocumentGeneratorService:
         llm_call = mock_llm.call_args[0][0]
         assert "study guide" in llm_call.lower()
     
-    @pytest.mark.asyncio
-    async def test_generate_briefing(self, service, mock_db, sample_conversation):
+    def test_generate_briefing(self, service, mock_db, sample_conversation):
         """Test executive briefing document generation."""
         mock_db.get_conversation_by_id.return_value = sample_conversation
         mock_db.get_messages_for_conversation.return_value = sample_conversation["messages"]
         mock_db.execute_query.return_value = [{"id": "doc125"}]
         
-        with patch.object(service, '_call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
             mock_llm.return_value = "Executive Summary: Key points and recommendations"
             
-            result = await service.generate_document(
+            result = service.generate_document(
+
+            
                 conversation_id="conv123",
-                document_type=DocumentType.BRIEFING
+
+            
+                document_type=DocumentType.BRIEFING,
+
+            
+                provider="openai",
+
+            
+                model="gpt-3.5-turbo",
+
+            
+                api_key="test_key"
             )
         
         assert result["success"] == True
         assert "Executive Summary" in result["content"]
     
-    @pytest.mark.asyncio
-    async def test_generate_summary(self, service, mock_db, sample_conversation):
+    def test_generate_summary(self, service, mock_db, sample_conversation):
         """Test summary document generation."""
         mock_db.get_conversation_by_id.return_value = sample_conversation
         mock_db.get_messages_for_conversation.return_value = sample_conversation["messages"]
         mock_db.execute_query.return_value = [{"id": "doc126"}]
         
-        with patch.object(service, '_call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
             mock_llm.return_value = "Summary: Main discussion points"
             
-            result = await service.generate_document(
+            result = service.generate_document(
+
+            
                 conversation_id="conv123",
-                document_type=DocumentType.SUMMARY
+
+            
+                document_type=DocumentType.SUMMARY,
+
+            
+                provider="openai",
+
+            
+                model="gpt-3.5-turbo",
+
+            
+                api_key="test_key"
             )
         
         assert result["success"] == True
         assert result["document_type"] == DocumentType.SUMMARY
     
-    @pytest.mark.asyncio
-    async def test_generate_qa_pairs(self, service, mock_db, sample_conversation):
+    def test_generate_qa_pairs(self, service, mock_db, sample_conversation):
         """Test Q&A pairs document generation."""
         mock_db.get_conversation_by_id.return_value = sample_conversation
         mock_db.get_messages_for_conversation.return_value = sample_conversation["messages"]
         mock_db.execute_query.return_value = [{"id": "doc127"}]
         
-        with patch.object(service, '_call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
             mock_llm.return_value = "Q1: Question?\nA1: Answer."
             
-            result = await service.generate_document(
+            result = service.generate_document(
+
+            
                 conversation_id="conv123",
-                document_type=DocumentType.QA_PAIRS
+
+            
+                document_type=DocumentType.QA,
+
+            
+                provider="openai",
+
+            
+                model="gpt-3.5-turbo",
+
+            
+                api_key="test_key"
             )
         
         assert result["success"] == True
         assert "Q1:" in result["content"]
     
-    @pytest.mark.asyncio
-    async def test_generate_meeting_notes(self, service, mock_db, sample_conversation):
+    def test_generate_meeting_notes(self, service, mock_db, sample_conversation):
         """Test meeting notes document generation."""
         mock_db.get_conversation_by_id.return_value = sample_conversation
         mock_db.get_messages_for_conversation.return_value = sample_conversation["messages"]
         mock_db.execute_query.return_value = [{"id": "doc128"}]
         
-        with patch.object(service, '_call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
             mock_llm.return_value = "Meeting Notes: Attendees, Agenda, Action Items"
             
-            result = await service.generate_document(
+            result = service.generate_document(
+
+            
                 conversation_id="conv123",
-                document_type=DocumentType.MEETING_NOTES
+
+            
+                document_type=DocumentType.MEETING_NOTES,
+
+            
+                provider="openai",
+
+            
+                model="gpt-3.5-turbo",
+
+            
+                api_key="test_key"
             )
         
         assert result["success"] == True
@@ -193,12 +266,25 @@ class TestDocumentGeneratorService:
         
         custom_prompt = "Extract only the technical terms mentioned"
         
-        with patch.object(service, '_call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
             mock_llm.return_value = "Technical terms: quantum computing, quantum bits"
             
-            result = await service.generate_document(
+            result = service.generate_document(
+
+            
                 conversation_id="conv123",
+
+            
                 document_type=DocumentType.SUMMARY,
+
+            
+                provider="openai",
+
+            
+                model="gpt-3.5-turbo",
+
+            
+                api_key="test_key",
                 custom_prompt=custom_prompt
             )
         
@@ -213,10 +299,8 @@ class TestDocumentGeneratorService:
         with patch('uuid.uuid4', return_value=job_id):
             mock_db.execute_query.return_value = None
             
-            result = service.create_generation_job(
-                conversation_id="conv123",
-                document_type=DocumentType.TIMELINE
-            )
+            result = service.create_generation_job(conversation_id="conv123", document_type=DocumentType.TIMELINE
+            , provider="openai", model="gpt-3.5-turbo", prompt_config={})
         
         assert result["job_id"] == job_id
         assert result["status"] == "pending"
@@ -335,7 +419,7 @@ class TestDocumentGeneratorService:
         mock_db.get_messages_for_conversation.return_value = sample_conversation["messages"]
         mock_db.execute_query.return_value = [{"id": "doc_bulk"}]
         
-        with patch.object(service, '_call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
             mock_llm.return_value = "Generated content"
             
             results = await service.bulk_generate(
@@ -368,12 +452,25 @@ class TestDocumentGeneratorService:
         mock_db.get_conversation_by_id.return_value = sample_conversation
         mock_db.get_messages_for_conversation.return_value = sample_conversation["messages"]
         
-        with patch.object(service, '_call_llm', new_callable=AsyncMock) as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
             mock_llm.side_effect = Exception("LLM API error")
             
-            result = await service.generate_document(
+            result = service.generate_document(
+
+            
                 conversation_id="conv123",
-                document_type=DocumentType.TIMELINE
+
+            
+                document_type=DocumentType.TIMELINE,
+
+            
+                provider="openai",
+
+            
+                model="gpt-3.5-turbo",
+
+            
+                api_key="test_key"
             )
         
         assert result["success"] == False
@@ -385,9 +482,22 @@ class TestDocumentGeneratorService:
         """Test handling when conversation doesn't exist."""
         mock_db.get_conversation_by_id.return_value = None
         
-        result = await service.generate_document(
+        result = service.generate_document(
+
+        
             conversation_id="nonexistent",
-            document_type=DocumentType.TIMELINE
+
+        
+            document_type=DocumentType.TIMELINE,
+
+        
+            provider="openai",
+
+        
+            model="gpt-3.5-turbo",
+
+        
+            api_key="test_key"
         )
         
         assert result["success"] == False

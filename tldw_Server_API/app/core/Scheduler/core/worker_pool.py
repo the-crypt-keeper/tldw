@@ -131,6 +131,12 @@ class Worker:
                     await asyncio.sleep(1)
                     continue
                 
+                # Check if task was cancelled before processing
+                fresh_task = await self.backend.get_task(task.id)
+                if fresh_task and fresh_task.status == TaskStatus.CANCELLED:
+                    logger.info(f"Skipping cancelled task {task.id}")
+                    continue
+                
                 # Process the task
                 self.state = WorkerState.BUSY
                 self.current_task = task
@@ -179,13 +185,17 @@ class Worker:
         """
         logger.info(f"Worker {self.worker_id} processing task {task.id}")
         
-        # Start lease renewal
-        lease_service = LeaseService(self.backend, self.config.lease_duration_seconds)
-        self._lease_task = await lease_service.auto_renew(
-            task.id, task.lease_id, self.config.lease_renewal_interval
-        )
+        # Initialize lease task to None for proper cleanup
+        lease_task = None
         
         try:
+            # Start lease renewal
+            lease_service = LeaseService(self.backend, self.config.lease_duration_seconds)
+            lease_task = await lease_service.auto_renew(
+                task.id, task.lease_id, self.config.lease_renewal_interval
+            )
+            self._lease_task = lease_task
+            
             # Get handler
             handler = self.registry.get_handler(task.handler)
             
@@ -216,14 +226,14 @@ class Worker:
             return False
             
         finally:
-            # Stop lease renewal
-            if self._lease_task:
-                self._lease_task.cancel()
+            # CRITICAL FIX: Always stop lease renewal, even if lease_task creation failed
+            if lease_task:
+                lease_task.cancel()
                 try:
-                    await self._lease_task
+                    await lease_task
                 except asyncio.CancelledError:
                     pass
-                self._lease_task = None
+            self._lease_task = None
     
     def get_status(self) -> Dict[str, Any]:
         """Get worker status."""

@@ -37,13 +37,28 @@ class EvaluationRunner:
             eval_timeout: Timeout in seconds for each evaluation
         """
         self.db = EvaluationsDatabase(db_path)
-        self.rag_evaluator = RAGEvaluator()
-        self.quality_evaluator = ResponseQualityEvaluator()
+        # Lazy initialization - create evaluators only when needed
+        self._rag_evaluator = None
+        self._quality_evaluator = None
         self.running_tasks = {}  # Track running evaluations
         
         # Concurrency control
         self.semaphore = asyncio.Semaphore(max_concurrent_evals)
         self.eval_timeout = eval_timeout
+    
+    @property
+    def rag_evaluator(self) -> RAGEvaluator:
+        """Get or create RAG evaluator instance (lazy initialization)."""
+        if self._rag_evaluator is None:
+            self._rag_evaluator = RAGEvaluator()
+        return self._rag_evaluator
+    
+    @property
+    def quality_evaluator(self) -> ResponseQualityEvaluator:
+        """Get or create quality evaluator instance (lazy initialization)."""
+        if self._quality_evaluator is None:
+            self._quality_evaluator = ResponseQualityEvaluator()
+        return self._quality_evaluator
     
     async def run_evaluation(
         self,

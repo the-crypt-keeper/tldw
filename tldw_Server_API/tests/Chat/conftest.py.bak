@@ -1,0 +1,282 @@
+"""
+Shared fixtures for Chat module tests.
+Provides test database setup with real users for authentication testing.
+"""
+
+import pytest
+import asyncio
+import tempfile
+import os
+import sqlite3
+from pathlib import Path
+from typing import Generator, AsyncGenerator, Dict, Any
+import datetime
+from contextlib import asynccontextmanager
+from unittest.mock import MagicMock, AsyncMock
+
+from fastapi.testclient import TestClient
+
+from tldw_Server_API.app.main import app
+from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+from tldw_Server_API.app.core.AuthNZ.password_service import get_password_service
+from tldw_Server_API.app.core.AuthNZ.jwt_service import get_jwt_service
+from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
+from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User
+
+
+# Test user credentials
+TEST_USER_USERNAME = "test_user"
+TEST_USER_EMAIL = "test@example.com"
+TEST_USER_PASSWORD = "TestPassword123!"
+
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create an event loop for the test session."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="session")
+def test_db_path():
+    """Create a temporary database file for testing."""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+    
+    yield db_path
+    
+    # Cleanup
+    try:
+        os.unlink(db_path)
+    except:
+        pass
+
+
+@pytest.fixture(scope="session")
+async def test_db_pool(test_db_path):
+    """Create a test database pool with tables initialized."""
+    # Create test database URL
+    test_db_url = f"sqlite:///{test_db_path}"
+    
+    # Create a test settings object
+    test_settings = Settings(
+        AUTH_MODE="multi_user",
+        DATABASE_URL=test_db_url,
+        JWT_SECRET_KEY=os.getenv("JWT_SECRET_KEY", "test-secret-key-for-testing"),
+        ALLOW_REGISTRATION=True
+    )
+    
+    # Initialize database pool
+    db_pool = DatabasePool(test_settings)
+    await db_pool.initialize()
+    
+    # Create tables
+    async with db_pool.get_session() as session:
+        # Import models to ensure they're registered
+        from tldw_Server_API.app.core.AuthNZ.models import Base, User, RefreshToken
+        
+        # Create all tables
+        async with session.begin():
+            # For SQLite, we need to use the sync engine
+            await session.run_sync(Base.metadata.create_all)
+    
+    yield db_pool
+    
+    # Cleanup
+    await db_pool.close()
+
+
+@pytest.fixture(scope="session")
+async def test_user(test_db_pool):
+    """Create a test user in the database."""
+    from tldw_Server_API.app.core.AuthNZ.models import User
+    
+    password_service = get_password_service()
+    hashed_password = password_service.hash_password(TEST_USER_PASSWORD)
+    
+    async with test_db_pool.get_session() as session:
+        # Check if user already exists
+        from sqlalchemy import select
+        result = await session.execute(
+            select(User).where(User.username == TEST_USER_USERNAME)
+        )
+        existing_user = result.scalar_one_or_none()
+        
+        if existing_user:
+            return existing_user
+        
+        # Create new user
+        user = User(
+            username=TEST_USER_USERNAME,
+            email=TEST_USER_EMAIL,
+            hashed_password=hashed_password,
+            is_active=True,
+            is_verified=True,
+            created_at=datetime.datetime.utcnow(),
+            updated_at=datetime.datetime.utcnow()
+        )
+        
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        
+        return user
+
+
+@pytest.fixture
+async def auth_token(test_user):
+    """Generate a valid JWT token for the test user."""
+    jwt_service = get_jwt_service()
+    
+    # Create access token
+    token_data = {
+        "sub": str(test_user.id),
+        "username": test_user.username,
+        "email": test_user.email,
+        "type": "access"
+    }
+    
+    access_token = jwt_service.create_access_token(token_data)
+    return f"Bearer {access_token}"
+
+
+@pytest.fixture
+async def authenticated_client(auth_token):
+    """Create a test client with authentication headers."""
+    with TestClient(app) as client:
+        # Get CSRF token
+        response = client.get("/api/v1/health")
+        csrf_token = response.cookies.get("csrf_token", "")
+        
+        # Set up headers
+        client.headers = {
+            "Authorization": auth_token,
+            "X-CSRF-Token": csrf_token
+        }
+        client.cookies = {"csrf_token": csrf_token}
+        
+        yield client
+
+
+@pytest.fixture
+def mock_media_db(test_user):
+    """Create a mock media database for testing."""
+    from unittest.mock import MagicMock
+    
+    mock_db = MagicMock()
+    mock_db.client_id = f"user_{test_user.id}"
+    mock_db.db_path = f"/tmp/test_media_{test_user.id}.db"
+    
+    # Add common mock methods
+    mock_db.get_character_card_by_name = MagicMock(return_value=None)
+    mock_db.get_character_card_by_id = MagicMock(return_value=None)
+    mock_db.add_character_card = MagicMock(return_value=1)
+    mock_db.get_conversation_by_id = MagicMock(return_value=None)
+    mock_db.add_conversation = MagicMock(return_value="test_conv_1")
+    mock_db.add_message = MagicMock(return_value=1)
+    mock_db.get_messages_for_conversation = MagicMock(return_value=[])
+    
+    return mock_db
+
+
+@pytest.fixture
+async def mock_chacha_db(test_user):
+    """Create a mock ChaChaNotes database for testing."""
+    # Create a temporary database file
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+    
+    # Initialize the database
+    db = CharactersRAGDB(db_path, f"user_{test_user.id}")
+    
+    # Add a default character
+    db.add_character_card({
+        "name": "Assistant",
+        "description": "A helpful AI assistant",
+        "personality": "Helpful and friendly",
+        "scenario": "General conversation",
+        "system_prompt": "You are a helpful assistant",
+        "first_message": "Hello! How can I help you today?",
+        "creator_notes": "Default character for testing"
+    })
+    
+    yield db
+    
+    # Cleanup
+    try:
+        os.unlink(db_path)
+    except:
+        pass
+
+
+@pytest.fixture(autouse=True)
+async def setup_test_environment(test_db_pool, mock_media_db, mock_chacha_db):
+    """Set up the test environment with proper database overrides."""
+    from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
+    from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
+    from tldw_Server_API.app.core.AuthNZ.database import get_db_pool
+    
+    # Override database pool
+    app.dependency_overrides[get_db_pool] = lambda: test_db_pool
+    
+    # Override media database
+    app.dependency_overrides[get_media_db_for_user] = lambda: mock_media_db
+    
+    # Override chacha database  
+    app.dependency_overrides[get_chacha_db_for_user] = lambda: mock_chacha_db
+    
+    yield
+    
+    # Cleanup overrides
+    app.dependency_overrides.clear()
+
+
+# Helper functions for tests
+
+def get_auth_headers(token: str) -> dict:
+    """Get authentication headers for requests."""
+    settings = get_settings()
+    
+    if settings.AUTH_MODE == "multi_user":
+        return {"Authorization": token}
+    else:
+        return {"X-API-Key": token}
+
+
+async def create_test_user(db_pool: DatabasePool, username: str, password: str, email: str = None):
+    """Helper to create additional test users."""
+    from tldw_Server_API.app.core.AuthNZ.models import User
+    
+    password_service = get_password_service()
+    hashed_password = password_service.hash_password(password)
+    
+    async with db_pool.get_session() as session:
+        user = User(
+            username=username,
+            email=email or f"{username}@test.com",
+            hashed_password=hashed_password,
+            is_active=True,
+            is_verified=True,
+            created_at=datetime.datetime.utcnow(),
+            updated_at=datetime.datetime.utcnow()
+        )
+        
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        
+        return user
+
+
+async def login_user(client: TestClient, username: str, password: str) -> str:
+    """Helper to login a user and get an access token."""
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": password}
+    )
+    
+    if response.status_code == 200:
+        return response.json()["access_token"]
+    else:
+        raise Exception(f"Login failed: {response.text}")

@@ -27,7 +27,7 @@ class SchedulerConfig:
     base_path: Path = field(
         default_factory=lambda: Path(
             os.getenv('SCHEDULER_BASE_PATH', '/var/lib/scheduler')
-        ).resolve()
+        )
     )
     
     # Write buffer configuration
@@ -150,10 +150,19 @@ class SchedulerConfig:
     
     def __post_init__(self):
         """Validate configuration and create necessary directories"""
-        # Ensure base path and subdirectories exist
-        self.base_path.mkdir(parents=True, exist_ok=True)
-        self.payload_storage_path.mkdir(parents=True, exist_ok=True)
-        self.emergency_backup_path.parent.mkdir(parents=True, exist_ok=True)
+        # Validate and sanitize paths to prevent directory traversal
+        # This must happen before attempting to create directories
+        self._validate_and_sanitize_paths()
+        
+        # Only create directories after validation passes
+        try:
+            # Ensure base path and subdirectories exist
+            self.base_path.mkdir(parents=True, exist_ok=True)
+            self.payload_storage_path.mkdir(parents=True, exist_ok=True)
+            self.emergency_backup_path.parent.mkdir(parents=True, exist_ok=True)
+        except (PermissionError, OSError) as e:
+            logger.error(f"Failed to create scheduler directories: {e}")
+            raise ValueError(f"Cannot create scheduler directories at {self.base_path}: {e}")
         
         # Validate configuration
         self._validate()
@@ -163,6 +172,49 @@ class SchedulerConfig:
         logger.info(f"  Base path: {self.base_path}")
         logger.info(f"  Workers: {self.min_workers}-{self.max_workers}")
         logger.info(f"  Buffer: {self.write_buffer_size} items, {self.write_buffer_flush_interval}s flush")
+    
+    def _validate_and_sanitize_paths(self):
+        """Validate and sanitize paths to prevent directory traversal attacks"""
+        import platform
+        
+        # Check for directory traversal BEFORE resolving
+        original_base = str(self.base_path)
+        
+        # Detect and prevent directory traversal attempts
+        if '..' in original_base or '~' in original_base:
+            raise ValueError(f"Directory traversal detected in base_path: {original_base}")
+        
+        # Now resolve to absolute path after validation
+        self.base_path = self.base_path.resolve()
+        
+        # Platform-specific path validation
+        if platform.system() == 'Windows':
+            # Windows-specific validations
+            if ':' in str(self.base_path)[2:]:  # Allow drive letter
+                raise ValueError(f"Invalid Windows path: {self.base_path}")
+            # Use user's local app data if /var/lib doesn't exist
+            if not self.base_path.exists() and str(self.base_path).startswith('/var/lib'):
+                import tempfile
+                self.base_path = Path(tempfile.gettempdir()) / 'scheduler'
+                logger.warning(f"Using Windows temp path: {self.base_path}")
+        else:
+            # Unix-like systems
+            if str(self.base_path).startswith('/var/lib') and not os.access('/var/lib', os.W_OK):
+                # Fall back to user's home directory if /var/lib is not writable
+                self.base_path = Path.home() / '.local' / 'share' / 'scheduler'
+                logger.warning(f"Using user directory: {self.base_path}")
+        
+        # Ensure path is not a symlink to prevent symlink attacks
+        if self.base_path.exists() and self.base_path.is_symlink():
+            raise ValueError(f"Base path cannot be a symlink: {self.base_path}")
+        
+        # Validate database URL if it's a file path
+        if self.is_sqlite and 'sqlite:///' in self.database_url:
+            db_path = self.database_url.replace('sqlite:///', '')
+            if db_path and db_path != ':memory:':
+                db_path_obj = Path(db_path)
+                if '..' in str(db_path_obj) or '~' in str(db_path_obj):
+                    raise ValueError(f"Directory traversal detected in database path: {db_path}")
     
     def _validate(self):
         """Validate configuration values"""

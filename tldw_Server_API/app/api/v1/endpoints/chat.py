@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import time
+import uuid
 from collections import deque
 from functools import partial
 from io import BytesIO
@@ -346,10 +347,13 @@ async def create_chat_completion(
     request_data: ChatCompletionRequest = Body(...),
     chat_db: CharactersRAGDB = Depends(get_chacha_db_for_user),
     Token: str = Header(None, description="Bearer token for authentication."),
+    request: Request = None,  # Optional Request object for audit logging and rate limiting
     # background_tasks: BackgroundTasks = Depends(), # Replaced by starlette.background.BackgroundTask for StreamingResponse
-    # request: Request, # For rate limiting via slowapi if enabled - get_remote_address(request)
 ):
     current_loop = asyncio.get_running_loop()
+    
+    # Generate unique request ID for tracking
+    request_id = str(uuid.uuid4())
     
     # Wrap database with async wrapper for better performance
     async_db = create_async_db(chat_db)
@@ -362,32 +366,42 @@ async def create_chat_completion(
     model = request_data.model or "unknown"
     client_id = getattr(chat_db, 'client_id', 'unknown_client')
     
-    # Initialize audit logger
-    audit_service = await get_unified_audit_service()
+    # Initialize audit logger with error handling
+    audit_service = None
+    try:
+        audit_service = await get_unified_audit_service()
+    except Exception as audit_error:
+        logger.warning(f"Failed to initialize audit service: {audit_error}")
+        # Continue without audit logging rather than failing the request
     
     # Get user ID for rate limiting and audit (extract from token or use client_id)
     user_id = client_id  # In production, extract from JWT token
     
-    # Log audit event for chat request
+    # Initialize audit context for logging
+    context = None
     if audit_service:
-        context = AuditContext(
-            user_id=user_id,
-            request_id=request_id,
-            ip_address=request.client.host if request else None
-        )
-        await audit_service.log_event(
-            event_type=AuditEventType.API_REQUEST,
-            context=context,
-            action="chat_completion_request",
-            metadata={
-                "model": model,
-                "provider": provider,
-                "message_count": len(request_data.messages),
-                "streaming": request_data.stream,
-                "has_tools": bool(request_data.tools),
-                "conversation_id": request_data.conversation_id
-            }
-        )
+        try:
+            context = AuditContext(
+                user_id=user_id,
+                request_id=request_id,
+                ip_address=request.client.host if request and hasattr(request, 'client') else None
+            )
+            await audit_service.log_event(
+                event_type=AuditEventType.API_REQUEST,
+                context=context,
+                action="chat_completion_request",
+                metadata={
+                    "model": model,
+                    "provider": provider,
+                    "message_count": len(request_data.messages),
+                    "streaming": request_data.stream,
+                    "has_tools": bool(request_data.tools),
+                    "conversation_id": request_data.conversation_id
+                }
+            )
+        except Exception as log_error:
+            logger.warning(f"Failed to log audit event: {log_error}")
+            # Continue without logging rather than failing the request
     
     # Start tracking the request
     # Serialize request once and reuse
@@ -474,7 +488,7 @@ async def create_chat_completion(
             
             if not allowed:
                 metrics.track_rate_limit(user_id)
-                if audit_service:
+                if audit_service and context:
                     await audit_service.log_event(
                         event_type=AuditEventType.API_RATE_LIMITED,
                         context=context,
@@ -891,7 +905,7 @@ async def create_chat_completion(
                     }
                 )
             # Log successful response
-            if audit_service:
+            if audit_service and context:
                 await audit_service.log_event(
                     event_type=AuditEventType.API_RESPONSE,
                     context=context,
@@ -917,7 +931,7 @@ async def create_chat_completion(
 
     except (ChatAuthenticationError, ChatRateLimitError, ChatBadRequestError, ChatConfigurationError, ChatProviderError, ChatAPIError) as e_chat:
         # Log audit event for chat error
-        if audit_service:
+        if audit_service and context:
             await audit_service.log_event(
                 event_type=AuditEventType.API_ERROR,
                 context=context,
