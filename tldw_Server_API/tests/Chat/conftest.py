@@ -85,14 +85,15 @@ def mock_chacha_db(test_user):
     
     db = CharactersRAGDB(db_path, f"user_{test_user.id}")
     
-    # Add default character
-    db.add_character_card({
-        "name": "Assistant",
+    # Add default character with the expected name
+    char_id = db.add_character_card({
+        "name": "Default Character",  # This is the name expected by the system
         "description": "A helpful AI assistant",
         "personality": "Helpful",
         "scenario": "General",
         "system_prompt": "You are a helpful assistant"
     })
+    print(f"Created default character with ID: {char_id}")
     
     yield db
     
