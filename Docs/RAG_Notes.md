@@ -17,9 +17,18 @@ https://www.lesswrong.com/posts/bT8yyJHpK64v3nh2N/ai-safety-chatbot
 https://github.com/tbroadley/ai-safety-conversational-agent
 https://github.com/yichuan-w/LEANN?tab=readme-ov-file
 https://medium.com/@bravekjh/rag-mcp-supercharging-ai-agents-with-retrieval-augmented-generation-and-model-context-protocol-775ff5a7206f
+https://github.com/Aquiles-ai/Aquiles-RAG
+
+https://integral-business-intelligence.github.io/archivist/
+
+https://cloud.google.com/generative-ai-app-builder/docs/check-grounding#claim-level-score-response-examples
+
+https://www.tutorialspoint.com/basic-understanding-of-cure-algorithm
+	https://cloud.google.com/generative-ai-app-builder/docs/check-grounding
 
 
-
+https://github.com/SciPhi-AI/R2R/
+https://github.com/Aquiles-ai/Aquiles-RAG
 https://aclanthology.org/2024.acl-long.585/
 https://dl.acm.org/doi/10.1145/3626772.3657853
 https://aclanthology.org/2024.findings-emnlp.449/

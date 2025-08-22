@@ -34,7 +34,7 @@ https://github.com/the-crypt-keeper/reasonscape/tree/main
 https://www.amazon.science/blog/falsereject-reducing-overcautiousness-in-llms-through-reasoning-aware-safety-evaluation
 https://arxiv.org/abs/2303.12528
 https://arxiv.org/abs/2508.03644
-
+https://github.com/lechmazur/pact/
 
 
 
