@@ -1,0 +1,383 @@
+"""
+Comprehensive tests for the Mock OpenAI API Server.
+"""
+
+import json
+import pytest
+import asyncio
+from typing import Dict, Any
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+from httpx import AsyncClient
+
+# Import the app and configuration
+from mock_openai.server import app
+from mock_openai.config import MockConfig, load_config
+from mock_openai.responses import ResponseManager
+
+
+@pytest.fixture
+def client():
+    """Create a test client."""
+    return TestClient(app)
+
+
+@pytest.fixture
+async def async_client():
+    """Create an async test client."""
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        yield ac
+
+
+@pytest.fixture
+def auth_headers():
+    """Get valid authentication headers."""
+    return {"Authorization": "Bearer sk-test-key-12345"}
+
+
+@pytest.fixture
+def invalid_auth_headers():
+    """Get invalid authentication headers."""
+    return {"Authorization": "Bearer invalid-key"}
+
+
+class TestAuthentication:
+    """Test authentication functionality."""
+    
+    def test_valid_api_key(self, client, auth_headers):
+        """Test with valid API key."""
+        response = client.get("/v1/models", headers=auth_headers)
+        assert response.status_code == 200
+    
+    def test_invalid_api_key(self, client, invalid_auth_headers):
+        """Test with invalid API key."""
+        response = client.get("/v1/models", headers=invalid_auth_headers)
+        assert response.status_code == 401
+    
+    def test_missing_api_key(self, client):
+        """Test without API key."""
+        response = client.get("/v1/models")
+        assert response.status_code == 401
+
+
+class TestChatCompletions:
+    """Test chat completions endpoint."""
+    
+    def test_basic_chat_completion(self, client, auth_headers):
+        """Test basic chat completion request."""
+        payload = {
+            "model": "gpt-4",
+            "messages": [
+                {"role": "user", "content": "Hello"}
+            ]
+        }
+        
+        response = client.post(
+            "/v1/chat/completions",
+            headers=auth_headers,
+            json=payload
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert "id" in data
+        assert data["object"] == "chat.completion"
+        assert "choices" in data
+        assert len(data["choices"]) > 0
+        assert "message" in data["choices"][0]
+        assert data["choices"][0]["message"]["role"] == "assistant"
+    
+    def test_chat_with_system_message(self, client, auth_headers):
+        """Test chat completion with system message."""
+        payload = {
+            "model": "gpt-4",
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant"},
+                {"role": "user", "content": "Hello"}
+            ],
+            "temperature": 0.5
+        }
+        
+        response = client.post(
+            "/v1/chat/completions",
+            headers=auth_headers,
+            json=payload
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "choices" in data
+    
+    def test_chat_with_parameters(self, client, auth_headers):
+        """Test chat completion with various parameters."""
+        payload = {
+            "model": "gpt-3.5-turbo",
+            "messages": [{"role": "user", "content": "Test"}],
+            "temperature": 0.7,
+            "max_tokens": 100,
+            "top_p": 0.9,
+            "frequency_penalty": 0.5,
+            "presence_penalty": 0.5,
+            "n": 1
+        }
+        
+        response = client.post(
+            "/v1/chat/completions",
+            headers=auth_headers,
+            json=payload
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["model"] == "gpt-3.5-turbo"
+    
+    @pytest.mark.asyncio
+    async def test_streaming_chat_completion(self, async_client, auth_headers):
+        """Test streaming chat completion."""
+        payload = {
+            "model": "gpt-4",
+            "messages": [{"role": "user", "content": "Tell me a story"}],
+            "stream": True
+        }
+        
+        async with async_client.stream(
+            "POST",
+            "/v1/chat/completions",
+            headers=auth_headers,
+            json=payload
+        ) as response:
+            assert response.status_code == 200
+            
+            chunks = []
+            async for line in response.aiter_lines():
+                if line and not line.startswith("data: [DONE]"):
+                    if line.startswith("data: "):
+                        chunk_data = json.loads(line[6:])
+                        chunks.append(chunk_data)
+            
+            assert len(chunks) > 0
+            assert chunks[0]["object"] == "chat.completion.chunk"
+
+
+class TestEmbeddings:
+    """Test embeddings endpoint."""
+    
+    def test_single_embedding(self, client, auth_headers):
+        """Test creating a single embedding."""
+        payload = {
+            "model": "text-embedding-ada-002",
+            "input": "This is a test text"
+        }
+        
+        response = client.post(
+            "/v1/embeddings",
+            headers=auth_headers,
+            json=payload
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert data["object"] == "list"
+        assert "data" in data
+        assert len(data["data"]) == 1
+        assert "embedding" in data["data"][0]
+        assert isinstance(data["data"][0]["embedding"], list)
+    
+    def test_multiple_embeddings(self, client, auth_headers):
+        """Test creating multiple embeddings."""
+        payload = {
+            "model": "text-embedding-ada-002",
+            "input": ["First text", "Second text", "Third text"]
+        }
+        
+        response = client.post(
+            "/v1/embeddings",
+            headers=auth_headers,
+            json=payload
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert len(data["data"]) == 3
+        for i, embedding_data in enumerate(data["data"]):
+            assert embedding_data["index"] == i
+            assert "embedding" in embedding_data
+
+
+class TestCompletions:
+    """Test legacy completions endpoint."""
+    
+    def test_basic_completion(self, client, auth_headers):
+        """Test basic completion request."""
+        payload = {
+            "model": "gpt-3.5-turbo-instruct",
+            "prompt": "Once upon a time",
+            "max_tokens": 50
+        }
+        
+        response = client.post(
+            "/v1/completions",
+            headers=auth_headers,
+            json=payload
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert data["object"] == "text_completion"
+        assert "choices" in data
+        assert len(data["choices"]) > 0
+        assert "text" in data["choices"][0]
+
+
+class TestModels:
+    """Test models endpoint."""
+    
+    def test_list_models(self, client, auth_headers):
+        """Test listing available models."""
+        response = client.get("/v1/models", headers=auth_headers)
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        assert data["object"] == "list"
+        assert "data" in data
+        assert len(data["data"]) > 0
+        
+        for model in data["data"]:
+            assert "id" in model
+            assert model["object"] == "model"
+            assert "owned_by" in model
+
+
+class TestConfiguration:
+    """Test configuration management."""
+    
+    def test_load_config_from_dict(self):
+        """Test loading configuration from dictionary."""
+        config_dict = {
+            "server": {
+                "host": "127.0.0.1",
+                "port": 9090
+            },
+            "streaming": {
+                "enabled": False
+            }
+        }
+        
+        config = MockConfig.from_dict(config_dict)
+        
+        assert config.server.host == "127.0.0.1"
+        assert config.server.port == 9090
+        assert config.streaming.enabled is False
+    
+    def test_pattern_matching(self):
+        """Test request pattern matching."""
+        from mock_openai.config import ResponsePattern
+        
+        pattern = ResponsePattern(
+            match={"model": "gpt-4", "content_regex": ".*test.*"},
+            response_file="test.json"
+        )
+        
+        # Should match
+        request_data = {
+            "model": "gpt-4",
+            "messages": [{"role": "user", "content": "This is a test"}]
+        }
+        assert pattern.matches(request_data) is True
+        
+        # Should not match - different model
+        request_data["model"] = "gpt-3.5-turbo"
+        assert pattern.matches(request_data) is False
+        
+        # Should not match - no "test" in content
+        request_data["model"] = "gpt-4"
+        request_data["messages"][0]["content"] = "Hello world"
+        assert pattern.matches(request_data) is False
+
+
+class TestResponseManager:
+    """Test response management."""
+    
+    def test_template_variables(self):
+        """Test template variable substitution."""
+        manager = ResponseManager()
+        
+        vars = manager.get_template_vars()
+        assert "timestamp" in vars
+        assert "request_id" in vars
+        assert "chat_id" in vars
+        
+        manager.set_template_var("custom", "value")
+        vars = manager.get_template_vars()
+        assert vars["custom"] == "value"
+    
+    def test_default_responses(self):
+        """Test default response generation."""
+        manager = ResponseManager()
+        
+        # Chat response
+        chat_response = manager.get_default_chat_response()
+        assert chat_response["object"] == "chat.completion"
+        assert "choices" in chat_response
+        
+        # Embedding response
+        embedding_response = manager.get_default_embedding_response()
+        assert embedding_response["object"] == "list"
+        assert "data" in embedding_response
+        
+        # Completion response
+        completion_response = manager.get_default_completion_response()
+        assert completion_response["object"] == "text_completion"
+        assert "choices" in completion_response
+
+
+class TestErrorHandling:
+    """Test error handling and simulation."""
+    
+    def test_404_not_found(self, client, auth_headers):
+        """Test 404 for non-existent endpoint."""
+        response = client.get("/v1/nonexistent", headers=auth_headers)
+        assert response.status_code == 404
+    
+    def test_invalid_request_body(self, client, auth_headers):
+        """Test invalid request body."""
+        payload = {
+            "invalid": "data"
+        }
+        
+        response = client.post(
+            "/v1/chat/completions",
+            headers=auth_headers,
+            json=payload
+        )
+        
+        assert response.status_code == 422  # Validation error
+
+
+class TestHealthCheck:
+    """Test health check endpoints."""
+    
+    def test_root_endpoint(self, client):
+        """Test root endpoint."""
+        response = client.get("/")
+        assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
+        assert "endpoints" in data
+    
+    def test_health_endpoint(self, client):
+        """Test health check endpoint."""
+        response = client.get("/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

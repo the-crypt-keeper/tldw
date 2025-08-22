@@ -53,8 +53,11 @@ def make_request_with_csrf(client, method, url, headers=None, **kwargs):
         csrf_token = response.cookies.get("csrf_token", "")
         client.csrf_token = csrf_token
     
-    # Add CSRF token to headers
+    # Add CSRF token to headers (preserving any existing headers)
+    headers = dict(headers)  # Make a copy to avoid modifying the original
     headers["X-CSRF-Token"] = getattr(client, 'csrf_token', '')
+    
+    print(f"DEBUG make_request_with_csrf: Final headers being sent: {headers}")
     
     # Make the request
     method_func = getattr(client, method.lower())
@@ -68,12 +71,15 @@ def get_auth_headers(auth_token):
     if settings.AUTH_MODE == "multi_user":
         return {"Authorization": auth_token}
     else:
-        return {"Token": auth_token}
+        # For single-user mode, use X-API-KEY header
+        return {"X-API-KEY": auth_token}
 
 # Fixture for TestClient with proper CSRF token handling
 @pytest.fixture(scope="function")
 def client():
+    print(f"DEBUG: Creating TestClient, app.dependency_overrides before: {app.dependency_overrides}")
     with TestClient(app) as c:
+        print(f"DEBUG: Created TestClient, app.dependency_overrides after: {app.dependency_overrides}")
         # Get a CSRF token by making a GET request first
         response = c.get("/api/v1/health")  # Or any GET endpoint
         csrf_token = response.cookies.get("csrf_token", "")
@@ -106,24 +112,16 @@ def mock_user():
 
 @pytest.fixture(autouse=True)
 def setup_auth_override(mock_user):
-    """Automatically override authentication for all tests based on AUTH_MODE."""
-    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+    """Automatically override authentication for all tests.
     
-    settings = get_settings()
+    Note: The chat endpoint doesn't use dependency injection for auth,
+    so we need to mock the auth utility functions instead.
+    """
+    from unittest.mock import patch
     
-    # Only override authentication in multi-user mode
-    if settings.AUTH_MODE == "multi_user":
-        # In multi-user mode, we need to mock the entire authentication flow
-        # The simplest approach is to override get_request_user to return mock user directly
-        async def mock_get_request_user(api_key=None, token=None):
-            return mock_user
-        
-        app.dependency_overrides[get_request_user] = mock_get_request_user
-        yield
-        # Clean up after test
-        app.dependency_overrides.pop(get_request_user, None)
-    else:
-        # In single-user mode, no override needed
+    # Mock the auth utility functions used by the chat endpoint
+    with patch('tldw_Server_API.app.api.v1.endpoints.chat.is_authentication_required', return_value=False):
+        # When auth is not required, the endpoint won't check the token
         yield
 
 @pytest.fixture
@@ -152,13 +150,12 @@ def valid_auth_token() -> str:
         test_token = jwt.encode(payload, secret_key, algorithm=settings.JWT_ALGORITHM)
         return f"Bearer {test_token}"
     else:
-        # In single-user mode, use API_BEARER if set
-        api_bearer = os.getenv("API_BEARER")
-        if api_bearer:
-            return api_bearer
-        else:
-            # Default token for single-user mode
-            return "default-secret-key-for-single-user"
+        # In single-user mode, use SINGLE_USER_API_KEY
+        api_key = settings.SINGLE_USER_API_KEY
+        if not api_key:
+            # Use the default key from environment or fallback
+            api_key = os.getenv("SINGLE_USER_API_KEY", "test-api-key-12345")
+        return api_key
 
 
 # --- Test Data defined locally in this file ---
@@ -239,7 +236,10 @@ def test_create_chat_completion_no_template(
     # In default_chat_request_data, prompt_template_name is None.
     # The endpoint will try to load DEFAULT_RAW_PASSTHROUGH_TEMPLATE.name.
 
-    response = client.post_with_csrf("/api/v1/chat/completions", json=request_data_dict, headers=get_auth_headers(valid_auth_token))
+    auth_headers = get_auth_headers(valid_auth_token)
+    print(f"DEBUG: Using auth headers: {auth_headers}")
+    print(f"DEBUG: app.dependency_overrides at request time: {app.dependency_overrides}")
+    response = client.post_with_csrf("/api/v1/chat/completions", json=request_data_dict, headers=auth_headers)
 
     if response.status_code != status.HTTP_200_OK:
         print(f"Response status: {response.status_code}")
@@ -269,7 +269,9 @@ def test_create_chat_completion_no_template(
     # (due to mock_load_template.return_value = None) and sys_msg_from_req is empty.
     mock_apply_template.assert_not_called()
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 # (The rest of the tests in test_chat_endpoint.py remain the same as the corrected version from the previous response)
@@ -324,7 +326,9 @@ def test_create_chat_completion_success_streaming(  # Added default_chat_request
         call_args = mock_chat_api_call_inner.call_args[1]
         assert call_args["streaming"] is True
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -360,7 +364,9 @@ def test_system_message_extraction(
     assert len(call_args["messages_payload"]) == 1
     assert call_args["messages_payload"][0]["role"] == "user"
     assert call_args["messages_payload"][0]["content"] == "Hello there."  # Assuming passthrough template
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -406,7 +412,9 @@ def test_no_system_message_in_payload(
         # So it should be a direct string comparison if the passthrough template just returns the message_content
         assert actual_msg["content"] == expected_msg["content"]
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 VALID_ALTERNATIVE_PROVIDER_FOR_TEST = "groq"
 
@@ -479,7 +487,9 @@ def test_api_key_used_from_config(
         assert mock_chat_api_call.call_args.kwargs["api_key"] == "cohere_test_key_if_needed_separately"
         assert mock_chat_api_call.call_args.kwargs["api_endpoint"] == "cohere"
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -517,7 +527,9 @@ def test_missing_api_key_for_required_provider(
     expected_detail = "Service for 'openai' is not configured (key missing)."  # Or the relevant provider
     assert response.json()["detail"] == expected_detail
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -548,7 +560,9 @@ def test_keyless_provider_proceeds_without_key(  # Added default_chat_request_da
         mock_chat_api_call.assert_called_once()
         assert mock_chat_api_call.call_args[1].get(
             "api_key") is None  # Check that api_key was indeed None or not passed
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -635,7 +649,9 @@ def test_chat_api_call_exception_handling_unit(
     assert expected_detail_substring.lower() in response_detail_text.lower(), \
         f"Expected detail '{expected_detail_substring}' not found in actual detail '{response_detail_text}'"
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -668,7 +684,9 @@ def test_non_iterable_stream_generator_from_shim(
     assert response.status_code == status.HTTP_502_BAD_GATEWAY
     assert response.json()["detail"] == "Provider did not return a valid stream."
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 @pytest.mark.unit
 @patch.dict("tldw_Server_API.app.api.v1.endpoints.chat.API_KEYS", {"openai": "test_key"})
@@ -780,7 +798,9 @@ def test_error_within_stream_generator(
     # mock_chat_db.add_message.assert_called() # Or more specific checks on what was saved.
     # The `_sse_state['full_reply']` would contain "Good start..." in this case.
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -839,7 +859,9 @@ def test_create_chat_completion_with_optional_params(
     assert called_kwargs["topk"] == 50
     # user is not directly passed to chat_api_call
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -879,7 +901,9 @@ def test_create_chat_completion_with_tools_unit(
     assert called_kwargs.get("tool_choice") == tool_choice_payload.model_dump(exclude_none=True)
     assert called_kwargs.get("tools") == [t.model_dump(exclude_none=True) for t in tools_payload]
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -922,7 +946,9 @@ def test_create_chat_completion_character_not_found_uses_defaults(
     mock_chat_db.get_character_card_by_name.assert_called_once_with("non_existent_char_id")
     mock_chat_db.get_character_card_by_id.assert_not_called()
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 
 @pytest.mark.unit
@@ -952,6 +978,8 @@ def test_create_chat_completion_template_file_not_found(
     mock_chat_api_call_shim.assert_called_once()
     # Further assertions could check if the payload sent to chat_api_call reflects the passthrough template.
 
-    app.dependency_overrides = {}
+    # Clean up only the overrides we added (not the auth override from fixture)
+    app.dependency_overrides.pop(get_media_db_for_user, None)
+    app.dependency_overrides.pop(get_chacha_db_for_user, None)
 
 

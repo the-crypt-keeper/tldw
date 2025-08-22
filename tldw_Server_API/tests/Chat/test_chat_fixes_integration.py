@@ -4,6 +4,8 @@ Tests the fixes for issues identified in the code review.
 """
 
 import pytest
+from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
+from tldw_Server_API.app.main import app
 import asyncio
 import json
 import jwt
@@ -30,6 +32,27 @@ from tldw_Server_API.app.api.v1.schemas.chat_request_schemas import (
     ChatCompletionRequest,
     ChatCompletionUserMessageParam
 )
+
+
+
+@pytest.fixture(autouse=True)
+def setup_auth_override():
+    """Override authentication for tests."""
+    from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User
+    
+    test_user = User(
+        id=1,
+        username="test_user",
+        email="test@example.com",
+        is_active=True
+    )
+    
+    async def mock_get_request_user(api_key=None, token=None):
+        return test_user
+    
+    app.dependency_overrides[get_request_user] = mock_get_request_user
+    yield
+    app.dependency_overrides.clear()
 
 
 class TestEmptyMessageFix:

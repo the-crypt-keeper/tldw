@@ -163,3 +163,39 @@ def client():
         test_client.post_with_auth = post_with_auth
         
         yield test_client
+
+
+@pytest.fixture
+def authenticated_client(client, auth_token):
+    """Create an authenticated test client."""
+    settings = get_settings()
+    
+    # Add authentication to all requests
+    original_post = client.post
+    
+    def authenticated_post(url, **kwargs):
+        headers = kwargs.pop("headers", {})
+        
+        if settings.AUTH_MODE == "multi_user":
+            headers["Authorization"] = auth_token
+        else:
+            headers["X-API-KEY"] = auth_token
+        
+        return original_post(url, headers=headers, **kwargs)
+    
+    client.post = authenticated_post
+    return client
+
+
+def get_auth_headers(auth_token, csrf_token=""):
+    """Helper function to get authentication headers."""
+    settings = get_settings()
+    headers = {"X-CSRF-Token": csrf_token}
+    
+    if settings.AUTH_MODE == "multi_user":
+        headers["Authorization"] = auth_token
+    else:
+        # Use X-API-KEY (with hyphen, all caps) as expected by the dependency
+        headers["X-API-KEY"] = auth_token
+    
+    return headers

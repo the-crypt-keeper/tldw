@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  mock-openai:
+    build: .
+    container_name: mock-openai-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./responses:/app/responses:ro
+    environment:
+      - MOCK_OPENAI_HOST=0.0.0.0
+      - MOCK_OPENAI_PORT=8080
+      - MOCK_OPENAI_LOG_REQUESTS=true
+      - MOCK_OPENAI_STREAMING_ENABLED=true
+      - MOCK_OPENAI_CHUNK_DELAY=50
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

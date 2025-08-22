@@ -2,6 +2,8 @@
 Simplified chat endpoint tests using real database and authentication.
 """
 import pytest
+from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
+from tldw_Server_API.app.main import app
 from unittest.mock import patch, MagicMock
 from fastapi import status
 
@@ -15,16 +17,18 @@ from tldw_Server_API.app.api.v1.schemas.chat_request_schemas import (
 async def test_chat_completion_basic(authenticated_client, mock_chacha_db):
     """Test basic chat completion with authenticated user."""
     
-    # Prepare request data
+    # Prepare request data - must include api_provider
     request_data = ChatCompletionRequest(
         model="test-model",
+        api_provider="openai",  # Must specify provider
         messages=[
             ChatCompletionUserMessageParam(role="user", content="Hello, how are you?")
         ]
     )
     
-    # Mock the LLM call
-    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm:
+    # Mock the LLM call and API keys
+    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm, \
+         patch("tldw_Server_API.app.api.v1.endpoints.chat.API_KEYS", {"openai": "test-key"}):
         mock_llm.return_value = {
             "id": "chatcmpl-test",
             "choices": [{
@@ -54,6 +58,7 @@ async def test_chat_completion_streaming(authenticated_client, mock_chacha_db):
     
     request_data = ChatCompletionRequest(
         model="test-model",
+        api_provider="openai",
         messages=[
             ChatCompletionUserMessageParam(role="user", content="Tell me a story")
         ],
@@ -68,7 +73,8 @@ async def test_chat_completion_streaming(authenticated_client, mock_chacha_db):
         yield "data: {\"choices\": [{\"delta\": {\"content\": \"time...\"}}]}\n\n"
         yield "data: [DONE]\n\n"
     
-    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm:
+    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm, \
+         patch("tldw_Server_API.app.api.v1.endpoints.chat.API_KEYS", {"openai": "test-key"}):
         mock_llm.return_value = mock_stream()
         
         response = authenticated_client.post(
@@ -95,13 +101,15 @@ async def test_chat_completion_with_character(authenticated_client, mock_chacha_
     
     request_data = ChatCompletionRequest(
         model="test-model",
+        api_provider="openai",
         messages=[
             ChatCompletionUserMessageParam(role="user", content="Who are you?")
         ],
         character_id=str(character_id)
     )
     
-    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm:
+    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm, \
+         patch("tldw_Server_API.app.api.v1.endpoints.chat.API_KEYS", {"openai": "test-key"}):
         mock_llm.return_value = {
             "id": "chatcmpl-test",
             "choices": [{
@@ -155,13 +163,14 @@ async def test_chat_completion_invalid_model(authenticated_client, mock_chacha_d
     
     request_data = ChatCompletionRequest(
         model="invalid-model",
+        api_provider="invalid_provider",
         messages=[
             ChatCompletionUserMessageParam(role="user", content="Hello")
-        ],
-        api_provider="invalid_provider"
+        ]
     )
     
-    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm:
+    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm, \
+         patch("tldw_Server_API.app.api.v1.endpoints.chat.API_KEYS", {"invalid_provider": "test-key"}):
         mock_llm.side_effect = Exception("Invalid provider")
         
         response = authenticated_client.post(
@@ -197,13 +206,15 @@ async def test_chat_completion_with_conversation_history(authenticated_client, m
     
     request_data = ChatCompletionRequest(
         model="test-model",
+        api_provider="openai",
         messages=[
             ChatCompletionUserMessageParam(role="user", content="Continue our conversation")
         ],
         conversation_id=str(conv_id)
     )
     
-    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm:
+    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm, \
+         patch("tldw_Server_API.app.api.v1.endpoints.chat.API_KEYS", {"openai": "test-key"}):
         mock_llm.return_value = {
             "id": "chatcmpl-test",
             "choices": [{
@@ -231,12 +242,14 @@ async def test_chat_completion_rate_limiting(authenticated_client, mock_chacha_d
     
     request_data = ChatCompletionRequest(
         model="test-model",
+        api_provider="openai",
         messages=[
             ChatCompletionUserMessageParam(role="user", content="Hello")
         ]
     )
     
-    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm:
+    with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_llm, \
+         patch("tldw_Server_API.app.api.v1.endpoints.chat.API_KEYS", {"openai": "test-key"}):
         mock_llm.return_value = {
             "id": "chatcmpl-test",
             "choices": [{

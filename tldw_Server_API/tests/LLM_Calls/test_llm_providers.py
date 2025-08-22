@@ -47,32 +47,38 @@ class TestMoonshotProvider:
             }
         }
     
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
-    def test_moonshot_basic_chat(self, mock_post, mock_response):
+    def test_moonshot_basic_chat(self, mock_response):
         """Test basic chat functionality."""
-        mock_post.return_value.status_code = 200
-        mock_post.return_value.json.return_value = mock_response
-        
-        result = chat_with_moonshot(
-            input_data=[{"role": "user", "content": "Hello"}],
-            api_key="test_key",
-            model="moonshot-v1-8k"
-        )
-        
-        assert result == "Hello from Moonshot AI!"
-        mock_post.assert_called_once()
-        
-        # Check request payload
-        call_args = mock_post.call_args
-        payload = json.loads(call_args[1]['data'])
-        assert payload['model'] == "moonshot-v1-8k"
-        assert len(payload['messages']) == 1
+        with patch('requests.post') as mock_post:
+            mock_response_obj = Mock()
+            mock_response_obj.status_code = 200
+            mock_response_obj.json.return_value = mock_response
+            mock_response_obj.raise_for_status = Mock()
+            mock_post.return_value = mock_response_obj
+            
+            result = chat_with_moonshot(
+                input_data=[{"role": "user", "content": "Hello"}],
+                api_key="test_key",
+                model="moonshot-v1-8k"
+            )
+            
+            assert result == "Hello from Moonshot AI!"
+            mock_post.assert_called_once()
+            
+            # Check request payload
+            call_args = mock_post.call_args
+            payload = json.loads(call_args[1]['data'])
+            assert payload['model'] == "moonshot-v1-8k"
+            assert len(payload['messages']) == 1
     
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
+    @patch('requests.post')
     def test_moonshot_with_system_message(self, mock_post, mock_response):
         """Test chat with system message."""
-        mock_post.return_value.status_code = 200
-        mock_post.return_value.json.return_value = mock_response
+        mock_response_obj = Mock()
+        mock_response_obj.status_code = 200
+        mock_response_obj.json.return_value = mock_response
+        mock_response_obj.raise_for_status = Mock()
+        mock_post.return_value = mock_response_obj
         
         result = chat_with_moonshot(
             input_data=[{"role": "user", "content": "Hello"}],
@@ -85,12 +91,15 @@ class TestMoonshotProvider:
         assert payload['messages'][0]['role'] == "system"
         assert payload['messages'][0]['content'] == "You are a helpful assistant."
     
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
+    @patch('requests.post')
     def test_moonshot_vision_model(self, mock_post, mock_response):
         """Test vision model with image content."""
         mock_response['model'] = "moonshot-v1-8k-vision-preview"
-        mock_post.return_value.status_code = 200
-        mock_post.return_value.json.return_value = mock_response
+        mock_response_obj = Mock()
+        mock_response_obj.status_code = 200
+        mock_response_obj.json.return_value = mock_response
+        mock_response_obj.raise_for_status = Mock()
+        mock_post.return_value = mock_response_obj
         
         input_data = [{
             "role": "user",
@@ -111,7 +120,7 @@ class TestMoonshotProvider:
         payload = json.loads(call_args[1]['data'])
         assert payload['model'] == "moonshot-v1-8k-vision-preview"
     
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
+    @patch('requests.post')
     def test_moonshot_streaming(self, mock_post):
         """Test streaming response."""
         # Mock SSE streaming response
@@ -139,11 +148,14 @@ class TestMoonshotProvider:
         assert len(chunks) == 4  # 3 content chunks + [DONE]
         assert chunks[-1] == "[DONE]"
     
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
+    @patch('requests.post')
     def test_moonshot_error_handling(self, mock_post):
         """Test error handling."""
-        mock_post.return_value.status_code = 401
-        mock_post.return_value.text = "Unauthorized"
+        mock_response_obj = Mock()
+        mock_response_obj.status_code = 401
+        mock_response_obj.text = "Unauthorized"
+        mock_response_obj.raise_for_status.side_effect = Exception("401 Unauthorized")
+        mock_post.return_value = mock_response_obj
         
         result = chat_with_moonshot(
             input_data=[{"role": "user", "content": "Hello"}],
@@ -180,11 +192,14 @@ class TestZAIProvider:
             }
         }
     
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
+    @patch('requests.post')
     def test_zai_basic_chat(self, mock_post, mock_response):
         """Test basic chat functionality."""
-        mock_post.return_value.status_code = 200
-        mock_post.return_value.json.return_value = mock_response
+        mock_response_obj = Mock()
+        mock_response_obj.status_code = 200
+        mock_response_obj.json.return_value = mock_response
+        mock_response_obj.raise_for_status = Mock()
+        mock_post.return_value = mock_response_obj
         
         result = chat_with_zai(
             input_data=[{"role": "user", "content": "Hello"}],
@@ -200,11 +215,14 @@ class TestZAIProvider:
         payload = json.loads(call_args[1]['data'])
         assert payload['model'] == "glm-4.5"
     
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
+    @patch('requests.post')
     def test_zai_with_request_id(self, mock_post, mock_response):
         """Test chat with request_id."""
-        mock_post.return_value.status_code = 200
-        mock_post.return_value.json.return_value = mock_response
+        mock_response_obj = Mock()
+        mock_response_obj.status_code = 200
+        mock_response_obj.json.return_value = mock_response
+        mock_response_obj.raise_for_status = Mock()
+        mock_post.return_value = mock_response_obj
         
         result = chat_with_zai(
             input_data=[{"role": "user", "content": "Hello"}],
@@ -216,15 +234,18 @@ class TestZAIProvider:
         payload = json.loads(call_args[1]['data'])
         assert payload.get('request_id') == "custom_req_123"
     
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
+    @patch('requests.post')
     def test_zai_model_variants(self, mock_post, mock_response):
         """Test different model variants."""
         models = ["glm-4.5", "glm-4.5-air", "glm-4.5-flash", "glm-4-32b-0414-128k"]
         
         for model in models:
             mock_response['model'] = model
-            mock_post.return_value.status_code = 200
-            mock_post.return_value.json.return_value = mock_response
+            mock_response_obj = Mock()
+            mock_response_obj.status_code = 200
+            mock_response_obj.json.return_value = mock_response
+            mock_response_obj.raise_for_status = Mock()
+            mock_post.return_value = mock_response_obj
             
             result = chat_with_zai(
                 input_data=[{"role": "user", "content": "Test"}],
@@ -236,7 +257,7 @@ class TestZAIProvider:
             payload = json.loads(call_args[1]['data'])
             assert payload['model'] == model
     
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
+    @patch('requests.post')
     def test_zai_streaming(self, mock_post):
         """Test streaming response."""
         mock_response = Mock()
@@ -455,7 +476,7 @@ class TestIntegration:
     """Integration tests for provider interactions."""
     
     @pytest.mark.asyncio
-    @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.requests.post')
+    @patch('requests.post')
     async def test_provider_switching(self, mock_post):
         """Test switching between different providers."""
         # Mock responses for different providers
@@ -466,10 +487,13 @@ class TestIntegration:
             "choices": [{"message": {"content": "Z.AI response"}}]
         }
         
-        mock_post.return_value.status_code = 200
+        mock_response_obj = Mock()
+        mock_response_obj.status_code = 200
+        mock_response_obj.raise_for_status = Mock()
+        mock_post.return_value = mock_response_obj
         
         # Test Moonshot
-        mock_post.return_value.json.return_value = moonshot_response
+        mock_response_obj.json.return_value = moonshot_response
         result1 = chat_with_moonshot(
             input_data=[{"role": "user", "content": "Test"}],
             api_key="key1"
@@ -477,7 +501,7 @@ class TestIntegration:
         assert result1 == "Moonshot response"
         
         # Test Z.AI
-        mock_post.return_value.json.return_value = zai_response
+        mock_response_obj.json.return_value = zai_response
         result2 = chat_with_zai(
             input_data=[{"role": "user", "content": "Test"}],
             api_key="key2"
@@ -487,11 +511,14 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_concurrent_requests(self):
         """Test concurrent requests to multiple providers."""
-        with patch('app.core.LLM_Calls.LLM_API_Calls.requests.post') as mock_post:
-            mock_post.return_value.status_code = 200
-            mock_post.return_value.json.return_value = {
+        with patch('requests.post') as mock_post:
+            mock_response_obj = Mock()
+            mock_response_obj.status_code = 200
+            mock_response_obj.json.return_value = {
                 "choices": [{"message": {"content": "Response"}}]
             }
+            mock_response_obj.raise_for_status = Mock()
+            mock_post.return_value = mock_response_obj
             
             # Simulate concurrent requests
             tasks = [

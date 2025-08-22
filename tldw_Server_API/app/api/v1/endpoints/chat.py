@@ -493,8 +493,6 @@ async def create_chat_completion(
                         event_type=AuditEventType.API_RATE_LIMITED,
                         context=context,
                         action="rate_limit_exceeded",
-                        user_id=user_id,
-                        client_id=client_id,
                         details={"reason": rate_error}
                     )
                 raise HTTPException(
@@ -724,7 +722,9 @@ async def create_chat_completion(
                 logger.warning(f"No healthy providers available, using {provider} anyway")
         
         # Update provider in cleaned_args
-        cleaned_args['api_provider'] = selected_provider
+        # Note: chat_api_call expects 'api_endpoint', not 'api_provider'
+        # This is already set in call_params as 'api_endpoint'
+        # cleaned_args['api_provider'] = selected_provider  # REMOVED - causes error
         
         # TODO: Request Queue Integration (SHIM)
         # ------------------------------------------------------------------------
@@ -846,7 +846,8 @@ async def create_chat_completion(
                         fallback_provider = provider_manager.get_available_provider(exclude=[selected_provider])
                         if fallback_provider:
                             logger.warning(f"Trying fallback provider {fallback_provider} after {selected_provider} failed")
-                            cleaned_args['api_provider'] = fallback_provider
+                            # Fix: chat_api_call expects 'api_endpoint', not 'api_provider'
+                            cleaned_args['api_endpoint'] = fallback_provider
                             llm_call_func = partial(perform_chat_api_call, **cleaned_args)
                             
                             try:
@@ -911,9 +912,7 @@ async def create_chat_completion(
                     context=context,
                     action="chat_completion_success",
                     result="success",
-                    user_id=user_id,
-                    client_id=client_id,
-                    details={
+                    metadata={
                         "conversation_id": final_conversation_id,
                         "provider": selected_provider,
                         "model": model,
@@ -937,9 +936,7 @@ async def create_chat_completion(
                 context=context,
                 action="chat_error",
                 result="failure",
-                user_id=user_id,
-                client_id=client_id,
-                details={
+                metadata={
                     "error_type": type(e_chat).__name__,
                     "error_message": str(e_chat),
                     "provider": provider,
