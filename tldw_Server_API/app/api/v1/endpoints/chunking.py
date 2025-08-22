@@ -18,13 +18,27 @@ from fastapi import (
 )
 
 # Local Imports
-from tldw_Server_API.app.core.Chunking.Chunk_Lib import (
+from tldw_Server_API.app.core.Chunking import (
     improved_chunking_process,
-    DEFAULT_CHUNK_OPTIONS as default_chunk_options_from_lib,
-    ChunkingError, # Import custom exceptions from Chunk_Lib
+    ChunkingError,
     InvalidInputError,
     InvalidChunkingMethodError
 )
+
+# Default chunking options
+default_chunk_options_from_lib = {
+    'method': 'words',
+    'max_size': 400,
+    'overlap': 200,
+    'language': 'en',
+    'adaptive': False,
+    'multi_level': False,
+    'semantic_similarity_threshold': 0.7,
+    'semantic_overlap_sentences': 2,
+    'json_chunkable_data_key': 'data',
+    'summarization_detail': 0.5,
+    'tokenizer_name_or_path': 'gpt2'
+}
 from tldw_Server_API.app.api.v1.schemas.chunking_schema import ChunkingResponse, ChunkingTextRequest, \
     ChunkingOptionsRequest, ChunkedContentResponse
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze as general_llm_analyzer

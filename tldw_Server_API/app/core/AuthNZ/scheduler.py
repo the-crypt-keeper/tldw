@@ -279,17 +279,33 @@ class AuthNZScheduler:
             threshold = 10  # Alert if more than 10 failures in 5 minutes
             time_window = datetime.utcnow() - timedelta(minutes=5)
             
-            # Check for failed login attempts
-            result = await db_pool.fetchone(
-                """
-                SELECT COUNT(*) as failure_count,
-                       COUNT(DISTINCT ip_address) as unique_ips
-                FROM audit_logs 
-                WHERE action IN ('login_failed', 'invalid_api_key', 'invalid_token')
-                AND created_at > ?
-                """,
-                time_window.isoformat() if not hasattr(db_pool, 'fetchval') else time_window
-            )
+            # Check for failed login attempts (properly parameterized)
+            if hasattr(db_pool, 'fetchval'):
+                # PostgreSQL
+                result = await db_pool.fetchone(
+                    """
+                    SELECT COUNT(*) as failure_count,
+                           COUNT(DISTINCT ip_address) as unique_ips
+                    FROM audit_logs 
+                    WHERE action = ANY($1)
+                    AND created_at > $2
+                    """,
+                    ['login_failed', 'invalid_api_key', 'invalid_token'],
+                    time_window
+                )
+            else:
+                # SQLite - use proper parameterization
+                result = await db_pool.fetchone(
+                    """
+                    SELECT COUNT(*) as failure_count,
+                           COUNT(DISTINCT ip_address) as unique_ips
+                    FROM audit_logs 
+                    WHERE action IN (?, ?, ?)
+                    AND created_at > ?
+                    """,
+                    'login_failed', 'invalid_api_key', 'invalid_token',
+                    time_window.isoformat()
+                )
             
             if result:
                 failure_count = result['failure_count'] or 0
@@ -317,25 +333,50 @@ class AuthNZScheduler:
             # Get API usage statistics for the last hour
             time_window = datetime.utcnow() - timedelta(hours=1)
             
-            results = await db_pool.fetchall(
-                """
-                SELECT 
-                    k.id,
-                    k.name,
-                    k.user_id,
-                    COUNT(l.id) as usage_count,
-                    k.rate_limit
-                FROM api_keys k
-                LEFT JOIN api_key_audit_log l ON k.id = l.api_key_id
-                WHERE k.status = 'active'
-                AND l.created_at > ?
-                GROUP BY k.id, k.name, k.user_id, k.rate_limit
-                HAVING COUNT(l.id) > 0
-                ORDER BY usage_count DESC
-                LIMIT 10
-                """,
-                time_window.isoformat() if not hasattr(db_pool, 'fetchval') else time_window
-            )
+            if hasattr(db_pool, 'fetchval'):
+                # PostgreSQL
+                results = await db_pool.fetchall(
+                    """
+                    SELECT 
+                        k.id,
+                        k.name,
+                        k.user_id,
+                        COUNT(l.id) as usage_count,
+                        k.rate_limit
+                    FROM api_keys k
+                    LEFT JOIN api_key_audit_log l ON k.id = l.api_key_id
+                    WHERE k.status = $1
+                    AND l.created_at > $2
+                    GROUP BY k.id, k.name, k.user_id, k.rate_limit
+                    HAVING COUNT(l.id) > 0
+                    ORDER BY usage_count DESC
+                    LIMIT 10
+                    """,
+                    'active',
+                    time_window
+                )
+            else:
+                # SQLite
+                results = await db_pool.fetchall(
+                    """
+                    SELECT 
+                        k.id,
+                        k.name,
+                        k.user_id,
+                        COUNT(l.id) as usage_count,
+                        k.rate_limit
+                    FROM api_keys k
+                    LEFT JOIN api_key_audit_log l ON k.id = l.api_key_id
+                    WHERE k.status = ?
+                    AND l.created_at > ?
+                    GROUP BY k.id, k.name, k.user_id, k.rate_limit
+                    HAVING COUNT(l.id) > 0
+                    ORDER BY usage_count DESC
+                    LIMIT 10
+                    """,
+                    'active',
+                    time_window.isoformat()
+                )
             
             for row in results:
                 usage = row['usage_count']
@@ -363,23 +404,46 @@ class AuthNZScheduler:
             time_window = datetime.utcnow() - timedelta(minutes=15)
             
             # Find IPs/users hitting rate limits
-            results = await db_pool.fetchall(
-                """
-                SELECT 
-                    identifier,
-                    endpoint,
-                    SUM(request_count) as total_requests,
-                    COUNT(*) as window_count
-                FROM rate_limits
-                WHERE window_start > ?
-                GROUP BY identifier, endpoint
-                HAVING SUM(request_count) > ?
-                ORDER BY total_requests DESC
-                LIMIT 20
-                """,
-                time_window.isoformat() if not hasattr(db_pool, 'fetchval') else time_window,
-                self.settings.RATE_LIMIT_PER_MINUTE * 15  # 15 minute threshold
-            )
+            rate_threshold = self.settings.RATE_LIMIT_PER_MINUTE * 15  # 15 minute threshold
+            
+            if hasattr(db_pool, 'fetchval'):
+                # PostgreSQL
+                results = await db_pool.fetchall(
+                    """
+                    SELECT 
+                        identifier,
+                        endpoint,
+                        SUM(request_count) as total_requests,
+                        COUNT(*) as window_count
+                    FROM rate_limits
+                    WHERE window_start > $1
+                    GROUP BY identifier, endpoint
+                    HAVING SUM(request_count) > $2
+                    ORDER BY total_requests DESC
+                    LIMIT 20
+                    """,
+                    time_window,
+                    rate_threshold
+                )
+            else:
+                # SQLite
+                results = await db_pool.fetchall(
+                    """
+                    SELECT 
+                        identifier,
+                        endpoint,
+                        SUM(request_count) as total_requests,
+                        COUNT(*) as window_count
+                    FROM rate_limits
+                    WHERE window_start > ?
+                    GROUP BY identifier, endpoint
+                    HAVING SUM(request_count) > ?
+                    ORDER BY total_requests DESC
+                    LIMIT 20
+                    """,
+                    time_window.isoformat(),
+                    rate_threshold
+                )
             
             if results:
                 logger.warning(f"Rate limit violations detected for {len(results)} identifiers")

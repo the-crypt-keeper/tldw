@@ -191,8 +191,10 @@ async def get_request_user(
       and returns the User object fetched from Users_DB.
     """
     #print(f"DEBUGPRINT: Inside get_request_user. api_key from header: '{api_key}', token from scheme: '{token}'") #DEBUGPRINT
-    # Check mode from the settings dictionary
-    if settings["SINGLE_USER_MODE"]:
+    # Check mode from the settings
+    settings = get_settings()
+    logger.debug(f"Authentication mode: {'single_user' if is_single_user_mode() else 'multi_user'} (AUTH_MODE={settings.AUTH_MODE})")
+    if is_single_user_mode():
         # Single-User Mode: X-API-KEY is primary.
         # The 'token' parameter from oauth2_scheme will likely be None here, which is fine.
         logger.debug("get_request_user: In SINGLE_USER_MODE.")
@@ -202,7 +204,6 @@ async def get_request_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="X-API-KEY header required for single-user mode"
             )
-        settings = get_settings()
         if api_key != settings.SINGLE_USER_API_KEY:
             logger.warning(
                 f"Single-User Mode: Invalid X-API-KEY. Got: '{api_key[:10]}...'")

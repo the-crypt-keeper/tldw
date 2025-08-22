@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from typing import List, Union, Optional, Dict, Any, Tuple
 from enum import Enum
 import numpy as np
-from functools import lru_cache
+from functools import lru_cache, wraps
 import atexit
 import os
 
@@ -58,10 +58,6 @@ from slowapi.util import get_remote_address
 
 # Monitoring
 from prometheus_client import Counter, Histogram, Gauge
-import structlog
-
-# Configure structured logging
-log = structlog.get_logger()
 
 # ============================================================================
 # CRITICAL: Embeddings Implementation Import with Explicit Failure
@@ -412,13 +408,22 @@ limiter = Limiter(key_func=get_remote_address)
 
 # Helper to conditionally apply rate limiting
 def apply_rate_limit(limit_string: str):
-    """Apply rate limiting unless we're in test mode"""
-    if os.getenv("TESTING", "").lower() == "true":
-        # In test mode, return a no-op decorator
-        return lambda f: f
-    else:
-        # In production, apply the actual rate limit
-        return limiter.limit(limit_string)
+    """Apply rate limiting unless we're in test mode - checks at runtime"""
+    def decorator(f):
+        # Create wrapper that checks env var at actual runtime
+        @wraps(f)
+        async def wrapper(*args, **kwargs):
+            # Check TESTING env var when the function is actually called
+            if os.getenv("TESTING", "").lower() == "true":
+                # In test mode, call function directly without rate limiting
+                return await f(*args, **kwargs)
+            else:
+                # In production, apply the rate limit
+                limited_func = limiter.limit(limit_string)(f)
+                return await limited_func(*args, **kwargs)
+        
+        return wrapper
+    return decorator
 
 router = APIRouter(
     tags=["Embeddings"],

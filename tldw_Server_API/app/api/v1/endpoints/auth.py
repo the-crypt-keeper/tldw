@@ -38,7 +38,11 @@ from tldw_Server_API.app.core.AuthNZ.session_manager import SessionManager
 from tldw_Server_API.app.core.AuthNZ.rate_limiter import RateLimiter
 from tldw_Server_API.app.services.registration_service import RegistrationService
 from tldw_Server_API.app.core.AuthNZ.settings import Settings, get_settings
-from tldw_Server_API.app.services.audit_service import get_audit_service, AuditAction
+from tldw_Server_API.app.core.Audit.unified_audit_service import (
+    get_unified_audit_service,
+    AuditEventType,
+    AuditContext
+)
 from tldw_Server_API.app.core.AuthNZ.exceptions import (
     AuthenticationError,
     InvalidCredentialsError,

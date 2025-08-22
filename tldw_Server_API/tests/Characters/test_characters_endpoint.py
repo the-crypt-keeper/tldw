@@ -48,12 +48,13 @@ def test_db(tmp_path) -> Generator[CharactersRAGDB, Any, None]:
 def client(test_db: CharactersRAGDB) -> Generator[TestClient, Any, None]:
     """
     Provides a TestClient instance with the real DB dependency overridden
-    for integration tests.
+    for integration tests. Also handles CSRF token setup.
     """
     # This is where get_chacha_db_for_user is defined or imported in your actual app
     # For testing, we override the dependency that the *endpoints file* uses.
     # The path for dependency_overrides should be the actual dependency callable.
     from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
+    from tldw_Server_API.app.core.config import settings as global_settings
 
     def override_get_db_for_test():
         logger.info("<<<<< OVERRIDE override_get_db_for_test CALLED >>>>>")
@@ -62,9 +63,51 @@ def client(test_db: CharactersRAGDB) -> Generator[TestClient, Any, None]:
         finally:
             pass  # test_db fixture handles its own close
 
+    # Disable CSRF protection for tests
+    original_csrf_setting = global_settings.get('CSRF_ENABLED', None)
+    global_settings['CSRF_ENABLED'] = False
+    
     app.dependency_overrides[get_chacha_db_for_user] = override_get_db_for_test
     with TestClient(app) as c:
         yield c
+    
+    # Restore original settings
+    app.dependency_overrides.clear()
+    if original_csrf_setting is None:
+        global_settings.pop('CSRF_ENABLED', None)
+    else:
+        global_settings['CSRF_ENABLED'] = original_csrf_setting
+
+
+@pytest.fixture
+def client_with_csrf(test_db: CharactersRAGDB) -> Generator[TestClient, Any, None]:
+    """
+    Provides a TestClient instance with CSRF protection enabled.
+    Use this fixture when you want to test CSRF token handling.
+    """
+    from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
+
+    def override_get_db_for_test():
+        logger.info("<<<<< OVERRIDE override_get_db_for_test WITH CSRF ENABLED >>>>>")
+        try:
+            yield test_db
+        finally:
+            pass
+
+    app.dependency_overrides[get_chacha_db_for_user] = override_get_db_for_test
+    
+    with TestClient(app) as c:
+        # First make a GET request to obtain CSRF token
+        response = c.get("/api/v1/health")  # Or any GET endpoint
+        csrf_token = response.cookies.get("csrf_token")
+        
+        # Add CSRF token to client's default headers if obtained
+        if csrf_token:
+            c.headers["X-CSRF-Token"] = csrf_token
+            c.cookies["csrf_token"] = csrf_token
+        
+        yield c
+    
     app.dependency_overrides.clear()
 
 

@@ -45,7 +45,7 @@ from tldw_Server_API.app.core.Utils.Utils import downloaded_files, \
 from tldw_Server_API.app.core.Ingestion_Media_Processing.Video.Video_DL_Ingestion_Lib import extract_metadata
 from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Lib import speech_to_text, \
     convert_to_wav, ConversionError
-from tldw_Server_API.app.core.Chunking.Chunk_Lib import improved_chunking_process
+from tldw_Server_API.app.core.Chunking import improved_chunking_process
 #
 #######################################################################################################################
 # Constants

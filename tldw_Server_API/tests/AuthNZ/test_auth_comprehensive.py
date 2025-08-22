@@ -22,7 +22,7 @@ from tldw_Server_API.app.core.AuthNZ.database import DatabasePool, get_db_pool
 from tldw_Server_API.app.core.AuthNZ.password_service import get_password_service
 from tldw_Server_API.app.core.AuthNZ.jwt_service import get_jwt_service
 from tldw_Server_API.app.services.registration_service import get_registration_service
-from tldw_Server_API.app.services.audit_service import get_audit_service
+from tldw_Server_API.app.core.Audit.unified_audit_service import get_unified_audit_service
 
 #######################################################################################################################
 #

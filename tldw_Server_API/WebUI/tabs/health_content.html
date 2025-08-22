@@ -1,0 +1,307 @@
+<!-- Health Check Dashboard Tab -->
+<div id="tabHealthDashboard" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>System Health Dashboard</h2>
+        <p>Monitor the health status of all API services</p>
+        
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="checkAllHealth()">
+                Check All Services
+            </button>
+            <button class="btn btn-secondary" onclick="clearHealthResults()">
+                Clear Results
+            </button>
+        </div>
+        
+        <div id="health-status-grid" style="margin-top: 20px;">
+            <!-- Health status cards will be dynamically inserted here -->
+        </div>
+    </div>
+</div>
+
+<div id="tabHealthDetails" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>Individual Health Checks</h2>
+        
+        <div class="health-check-item">
+            <h3>Main API Health</h3>
+            <p>Check the main API server status</p>
+            <button class="api-button" onclick="checkHealth('main', '/health')">
+                Check Main API
+            </button>
+            <pre id="health_main_response"></pre>
+        </div>
+        
+        <div class="health-check-item">
+            <h3>API V1 Health</h3>
+            <p>Check the API v1 endpoints health</p>
+            <button class="api-button" onclick="checkHealth('apiv1', '/api/v1/health')">
+                Check API V1
+            </button>
+            <pre id="health_apiv1_response"></pre>
+        </div>
+        
+        <div class="health-check-item">
+            <h3>RAG Service Health</h3>
+            <p>Check RAG (Retrieval-Augmented Generation) service status</p>
+            <button class="api-button" onclick="checkHealth('rag', '/api/v1/rag/health')">
+                Check RAG Service
+            </button>
+            <pre id="health_rag_response"></pre>
+        </div>
+        
+        <div class="health-check-item">
+            <h3>Embeddings Service Health</h3>
+            <p>Check embeddings service status and metrics</p>
+            <button class="api-button" onclick="checkHealth('embeddings', '/api/v1/embeddings/health')">
+                Check Embeddings
+            </button>
+            <pre id="health_embeddings_response"></pre>
+        </div>
+        
+        <div class="health-check-item">
+            <h3>MCP Service Health</h3>
+            <p>Check Model Context Protocol service status</p>
+            <button class="api-button" onclick="checkHealth('mcp', '/api/v1/mcp/health')">
+                Check MCP Service
+            </button>
+            <pre id="health_mcp_response"></pre>
+        </div>
+        
+        <div class="health-check-item">
+            <h3>Web Scraping Service Status</h3>
+            <p>Check web scraping service status</p>
+            <button class="api-button" onclick="checkHealth('webscraping', '/api/v1/web-scraping/status')">
+                Check Web Scraping
+            </button>
+            <pre id="health_webscraping_response"></pre>
+        </div>
+        
+        <div class="health-check-item">
+            <h3>Llama.cpp Server Status</h3>
+            <p>Check local LLM server status</p>
+            <button class="api-button" onclick="checkHealth('llamacpp', '/api/v1/llamacpp/status')">
+                Check Llama.cpp
+            </button>
+            <pre id="health_llamacpp_response"></pre>
+        </div>
+    </div>
+</div>
+
+<style>
+.health-check-item {
+    border: 1px solid var(--color-border, #ddd);
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    background: var(--color-surface-alt, #f9f9f9);
+}
+
+.health-check-item h3 {
+    margin-top: 0;
+    color: var(--color-primary, #007bff);
+}
+
+#health-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.health-card {
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.health-card.healthy {
+    border-color: #28a745;
+    background: #d4edda;
+}
+
+.health-card.unhealthy {
+    border-color: #dc3545;
+    background: #f8d7da;
+}
+
+.health-card.checking {
+    border-color: #ffc107;
+    background: #fff3cd;
+}
+
+.health-card.unknown {
+    border-color: #6c757d;
+    background: #e2e3e5;
+}
+
+.health-card h4 {
+    margin: 0 0 10px 0;
+    font-size: 1rem;
+}
+
+.health-status-icon {
+    font-size: 2rem;
+    margin: 10px 0;
+}
+
+.health-status-text {
+    font-weight: bold;
+    margin-top: 5px;
+}
+
+.health-card .response-time {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 5px;
+}
+</style>
+
+<script>
+// Health check service definitions
+const healthServices = [
+    { id: 'main', name: 'Main API', endpoint: '/health' },
+    { id: 'apiv1', name: 'API V1', endpoint: '/api/v1/health' },
+    { id: 'rag', name: 'RAG Service', endpoint: '/api/v1/rag/health' },
+    { id: 'embeddings', name: 'Embeddings', endpoint: '/api/v1/embeddings/health' },
+    { id: 'mcp', name: 'MCP Service', endpoint: '/api/v1/mcp/health' },
+    { id: 'webscraping', name: 'Web Scraping', endpoint: '/api/v1/web-scraping/status' },
+    { id: 'llamacpp', name: 'Llama.cpp', endpoint: '/api/v1/llamacpp/status' }
+];
+
+// Check individual service health
+async function checkHealth(serviceId, endpoint) {
+    const responseEl = document.getElementById(`health_${serviceId}_response`);
+    if (!responseEl) return;
+    
+    responseEl.textContent = 'Checking...';
+    
+    try {
+        const startTime = Date.now();
+        const response = await apiClient.get(endpoint);
+        const duration = Date.now() - startTime;
+        
+        responseEl.textContent = JSON.stringify({
+            ...response,
+            response_time_ms: duration
+        }, null, 2);
+        
+        return { success: true, data: response, duration };
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        return { success: false, error: error.message };
+    }
+}
+
+// Check all services and display in dashboard
+async function checkAllHealth() {
+    const grid = document.getElementById('health-status-grid');
+    grid.innerHTML = '';
+    
+    // Create cards for each service
+    healthServices.forEach(service => {
+        const card = createHealthCard(service);
+        grid.appendChild(card);
+    });
+    
+    // Check each service asynchronously
+    healthServices.forEach(async service => {
+        await updateHealthCard(service);
+    });
+}
+
+// Create a health status card
+function createHealthCard(service) {
+    const card = document.createElement('div');
+    card.className = 'health-card checking';
+    card.id = `health-card-${service.id}`;
+    card.innerHTML = `
+        <h4>${service.name}</h4>
+        <div class="health-status-icon">⏳</div>
+        <div class="health-status-text">Checking...</div>
+        <div class="response-time"></div>
+    `;
+    return card;
+}
+
+// Update health card with status
+async function updateHealthCard(service) {
+    const card = document.getElementById(`health-card-${service.id}`);
+    if (!card) return;
+    
+    try {
+        const startTime = Date.now();
+        const response = await apiClient.get(service.endpoint);
+        const duration = Date.now() - startTime;
+        
+        // Determine health status
+        const isHealthy = response.status === 'healthy' || 
+                         response.status === 'ok' || 
+                         response.healthy === true ||
+                         response.running === true ||
+                         (response.status && typeof response.status === 'object');
+        
+        card.className = `health-card ${isHealthy ? 'healthy' : 'unhealthy'}`;
+        card.querySelector('.health-status-icon').textContent = isHealthy ? '✅' : '❌';
+        card.querySelector('.health-status-text').textContent = isHealthy ? 'Healthy' : 'Unhealthy';
+        card.querySelector('.response-time').textContent = `${duration}ms`;
+        
+        // Store full response for tooltip/details
+        card.dataset.response = JSON.stringify(response);
+        card.title = 'Click for details';
+        card.style.cursor = 'pointer';
+        card.onclick = () => showHealthDetails(service, response);
+        
+    } catch (error) {
+        card.className = 'health-card unhealthy';
+        card.querySelector('.health-status-icon').textContent = '❌';
+        card.querySelector('.health-status-text').textContent = 'Error';
+        card.querySelector('.response-time').textContent = error.message;
+    }
+}
+
+// Show detailed health information
+function showHealthDetails(service, response) {
+    const modal = new Modal({
+        title: `${service.name} Health Details`,
+        size: 'medium',
+        content: `
+            <div style="font-family: monospace; white-space: pre-wrap;">
+${JSON.stringify(response, null, 2)}
+            </div>
+        `,
+        buttons: [
+            {
+                text: 'Close',
+                className: 'btn btn-secondary',
+                handler: (modal) => modal.close()
+            }
+        ]
+    });
+    modal.show();
+}
+
+// Clear all health check results
+function clearHealthResults() {
+    document.getElementById('health-status-grid').innerHTML = '';
+    
+    // Clear individual response areas
+    healthServices.forEach(service => {
+        const responseEl = document.getElementById(`health_${service.id}_response`);
+        if (responseEl) {
+            responseEl.textContent = '';
+        }
+    });
+}
+
+// Auto-check health on tab load (optional)
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if we're on the health dashboard tab
+    const healthTab = document.querySelector('[data-content-id="tabHealthDashboard"]');
+    if (healthTab && healthTab.classList.contains('active')) {
+        // Auto-check all services
+        setTimeout(checkAllHealth, 500);
+    }
+});
+</script>

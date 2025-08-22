@@ -37,6 +37,8 @@ class ChunkingConfig(BaseModel):
     separator: str = "\n"
     preserve_metadata: bool = True
     contextualize: bool = False  # Whether to add context via LLM
+    contextual_llm_model: Optional[str] = Field(default=None, description="LLM model for contextualization")
+    context_window_size: Optional[int] = Field(default=None, ge=100, le=2000, description="Context window size")
 
 
 class ChunkData(BaseModel):

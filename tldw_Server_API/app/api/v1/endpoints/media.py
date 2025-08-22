@@ -1625,6 +1625,10 @@ def _prepare_chunking_options_dict(form_data: AddMediaForm) -> Optional[Dict[str
         # Use specific chunk language, fallback to transcription lang, else None
         'language': form_data.chunk_language or (form_data.transcription_language if form_data.media_type in ['audio', 'video'] else None),
         'custom_chapter_pattern': form_data.custom_chapter_pattern,
+        # Add contextual chunking options
+        'enable_contextual_chunking': form_data.enable_contextual_chunking,
+        'contextual_llm_model': form_data.contextual_llm_model,
+        'context_window_size': form_data.context_window_size
     }
     logging.info(f"Chunking enabled with options: {chunk_options}")
     return chunk_options
@@ -5426,7 +5430,8 @@ async def debug_schema(
 
         return schema_info
     except Exception as e:
-        return {"error": str(e)}
+        logging.error({"error": str(e)})
+        return {"error": "An internal error has occurred."}
 
 #
 # End of Debugging and Diagnostics

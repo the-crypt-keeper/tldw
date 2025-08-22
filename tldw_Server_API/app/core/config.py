@@ -28,8 +28,10 @@ SERVER_CLIENT_ID = "SERVER_API_V1"
 ALLOWED_ORIGINS = [
     "http://localhost",
     "http://localhost:8080",
+    "http://localhost:8081",
     "http://127.0.0.1",
     "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
     "https://localhost",
     "https://localhost:8080",
 ]
@@ -247,13 +249,13 @@ def load_settings():
     
     redis_url = os.getenv("REDIS_URL", f"redis://{redis_host}:{redis_port}/{redis_db}")
 
-    # Base directory for all user-specific data: ACTUAL_PROJECT_ROOT/user_databases/
-    default_user_data_base_dir = ACTUAL_PROJECT_ROOT / "user_databases"
+    # Base directory for all user-specific data: ACTUAL_PROJECT_ROOT/Databases/user_databases/
+    default_user_data_base_dir = ACTUAL_PROJECT_ROOT / "Databases" / "user_databases"
     user_data_base_dir_str = os.getenv("USER_DB_BASE_DIR", str(default_user_data_base_dir.resolve()))
     user_data_base_dir = Path(user_data_base_dir_str)
 
-    # Main/central SQLite database: ACTUAL_PROJECT_ROOT/user_databases/databases/tldw.db
-    default_main_db_path = (ACTUAL_PROJECT_ROOT / "user_databases" / f"{single_user_fixed_id}" / "tldw.db").resolve()
+    # Main/central SQLite database: ACTUAL_PROJECT_ROOT/Databases/user_databases/databases/tldw.db
+    default_main_db_path = (ACTUAL_PROJECT_ROOT / "Databases" / "user_databases" / f"{single_user_fixed_id}" / "tldw.db").resolve()
     default_database_url = f"sqlite:///{default_main_db_path}"
     database_url = os.getenv("DATABASE_URL", default_database_url)
 

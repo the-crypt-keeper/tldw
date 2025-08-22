@@ -272,7 +272,7 @@ db = MediaDatabase(db_path="path/to/media.db", client_id="api_client")
 - **Async Operations**: For I/O-bound tasks
 
 ### Deployment Considerations
-- **Docker**: Dockerfiles available in Helper_Scripts/Dockerfiles/
+- **Docker**: Dockerfiles available in tldw_Server_API/Dockerfiles/
 - **Environment**: Supports Linux, macOS, Windows
 - **Dependencies**: CUDA support optional for transcription
 - **Backup**: Built-in backup management for databases

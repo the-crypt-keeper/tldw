@@ -30,6 +30,24 @@ strategy = character_lore_first
 max_tokens = 1000
 default_rag_prompt = simplified_promptflow_RAG_system_prompt
 
+[Chat-Module]
+# Request size limits
+max_base64_image_size_mb = 3
+max_text_length_per_message = 400000
+max_messages_per_request = 1000
+max_images_per_request = 10
+max_request_size_bytes = 1000000
+# Streaming settings
+streaming_idle_timeout_seconds = 300
+streaming_heartbeat_interval_seconds = 30
+streaming_max_response_size_mb = 10
+# Transaction retry settings
+conversation_creation_max_retries = 3
+db_transaction_max_retries = 3
+# Rate limiting
+rate_limit_per_minute = 60
+rate_limit_per_conversation_per_minute = 20
+
 
 [Settings]
 chunk_duration = 30
@@ -72,6 +90,13 @@ adaptive_chunking = false
 # Use ntlk+punkt to split text into sentences and then ID average sentence length and set that as the chunk size
 chunking_multi_level = false
 language = english
+# Contextual Retrieval Settings
+enable_contextual_retrieval = false
+# When enabled, adds LLM-generated context to chunks for better retrieval
+context_window_size = 500
+# Size of context window around chunks (in characters)
+include_parent_context = false
+# Include parent document context when retrieving chunks
 #
 # Default Chunking Options for each media type
 #
@@ -168,7 +193,34 @@ chunk_size = 400
 overlap = 200
 # 'embedding_provider' Can be 'openai', 'local', or 'huggingface'
 # `embedding_model` Set to the model name you want to use for embeddings. For OpenAI, this can be 'text-embedding-3-small', or 'text-embedding-3-large'.
+# Contextual Chunking Settings
+enable_contextual_chunking = false
+# When enabled, uses LLM to add contextual information to each chunk before embedding
+contextual_llm_model = gpt-3.5-turbo
+# LLM model to use for generating contextual summaries
+contextual_chunk_method = situate_context
+# Method for adding context: 'situate_context' adds document-aware summaries
 # huggingface: model = dunzhang/stella_en_400M_v5
+
+
+[RAG]
+# RAG (Retrieval-Augmented Generation) Settings
+enable_parent_expansion = false
+# When enabled, expands retrieved chunks with parent document context
+parent_expansion_size = 500
+# Size of parent context to include (in characters)
+include_sibling_chunks = false
+# Include adjacent chunks from the same document for continuity
+# Performance Settings
+semantic_cache_enabled = true
+# Enable semantic caching for faster repeated queries
+cache_similarity_threshold = 0.85
+# Similarity threshold for cache hits (0-1)
+# Reranking Settings
+enable_reranking = true
+# Enable document reranking for better relevance
+rerank_top_k = 10
+# Number of documents to keep after reranking
 
 
 [API]

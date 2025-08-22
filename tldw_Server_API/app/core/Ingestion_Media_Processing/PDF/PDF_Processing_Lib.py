@@ -448,7 +448,7 @@ def process_pdf(
 
             logging.info(f"Attempting chunking for {filename} with options: {chunk_options}")
             try:
-                from tldw_Server_API.app.core.Chunking.Chunk_Lib import improved_chunking_process
+                from tldw_Server_API.app.core.Chunking import improved_chunking_process
                 processed_chunks = improved_chunking_process(content, chunk_options)
 
                 if not processed_chunks:

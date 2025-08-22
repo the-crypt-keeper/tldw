@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tldw_server - Interactive Quick Start</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-badge {
+            font-size: 14px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background: #f0f0f0;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .config-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .config-label {
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 5px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .config-value {
+            font-family: 'Courier New', monospace;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+            word-break: break-all;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: #5a67d8;
+        }
+        
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            position: relative;
+            margin-top: 15px;
+        }
+        
+        .code-block pre {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .language-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #cbd5e0;
+        }
+        
+        .test-section {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .test-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .test-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .test-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .result-box.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .result-box.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .result-box.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            color: #718096;
+            position: relative;
+            transition: color 0.3s;
+        }
+        
+        .tab.active {
+            color: #667eea;
+        }
+        
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .provider-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #667eea15;
+            color: #667eea;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                🚀 tldw_server Evaluation API
+                <span class="status-badge auto-config" data-config="status">Checking...</span>
+            </h1>
+            <p>Interactive quick start guide with auto-populated configuration</p>
+        </header>
+        
+        <div class="card">
+            <h2>📋 Your Configuration</h2>
+            <div class="config-grid">
+                <div class="config-item">
+                    <div class="config-label">API Key</div>
+                    <div class="config-value">
+                        <span class="auto-config" data-config="api_key">Loading...</span>
+                        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+                    </div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Base URL</div>
+                    <div class="config-value">
+                        <span class="auto-config" data-config="base_url">Loading...</span>
+                        <button class="copy-btn" onclick="copyText(this)">Copy</button>
+                    </div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">Auth Mode</div>
+                    <div class="config-value">
+                        <span class="auto-config" data-config="auth_mode">Loading...</span>
+                    </div>
+                </div>
+                <div class="config-item">
+                    <div class="config-label">LLM Providers</div>
+                    <div class="config-value">
+                        <span class="auto-config" data-config="providers">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>🧪 Test Your Setup</h2>
+            <div class="test-section">
+                <p>Test your configuration by creating a simple evaluation:</p>
+                <button class="test-btn" onclick="runTest()" id="testBtn">
+                    <span id="testBtnText">Run Test</span>
+                    <span id="testSpinner" class="spinner" style="display: none;"></span>
+                </button>
+                <div id="testResult" class="result-box"></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>💻 Code Examples</h2>
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('python')">Python</button>
+                <button class="tab" onclick="showTab('curl')">cURL</button>
+                <button class="tab" onclick="showTab('javascript')">JavaScript</button>
+            </div>
+            
+            <div id="python" class="tab-content active">
+                <div class="code-block">
+                    <span class="language-badge">Python</span>
+                    <pre class="auto-config" data-config="python_example">Loading...</pre>
+                </div>
+            </div>
+            
+            <div id="curl" class="tab-content">
+                <div class="code-block">
+                    <span class="language-badge">Bash</span>
+                    <pre class="auto-config" data-config="curl_example">Loading...</pre>
+                </div>
+            </div>
+            
+            <div id="javascript" class="tab-content">
+                <div class="code-block">
+                    <span class="language-badge">JavaScript</span>
+                    <pre class="auto-config" data-config="javascript_example">Loading...</pre>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📚 Next Steps</h2>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li>Review the <a href="Evaluations_Quick_Start.md" style="color: #667eea;">Complete Quick Start Guide</a></li>
+                <li>Explore the <a href="API-related/Evaluations_API_Reference.md" style="color: #667eea;">API Reference</a></li>
+                <li>Learn about <a href="#" style="color: #667eea;">evaluation types and metrics</a></li>
+                <li>Configure <a href="#" style="color: #667eea;">LLM providers</a> for advanced evaluations</li>
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Include the auto-configuration script -->
+    <script src="assets/auto-config.js"></script>
+    
+    <script>
+        // Tab switching
+        function showTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+        }
+        
+        // Copy text functionality
+        function copyText(button) {
+            const textElement = button.previousElementSibling;
+            const text = textElement.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.style.background = '#48bb78';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                button.textContent = 'Error';
+                button.style.background = '#f56565';
+            });
+        }
+        
+        // Test API functionality
+        async function runTest() {
+            const button = document.getElementById('testBtn');
+            const spinner = document.getElementById('testSpinner');
+            const btnText = document.getElementById('testBtnText');
+            const resultBox = document.getElementById('testResult');
+            
+            // Disable button and show spinner
+            button.disabled = true;
+            spinner.style.display = 'inline-block';
+            btnText.textContent = 'Testing...';
+            
+            // Get configuration
+            const apiKey = document.querySelector('[data-config="api_key"]').textContent;
+            const baseUrl = document.querySelector('[data-config="base_url"]').textContent;
+            
+            try {
+                // First check if server is running
+                const healthResponse = await fetch(`${baseUrl}/health`);
+                
+                if (!healthResponse.ok) {
+                    throw new Error('Server is not responding. Make sure the server is running.');
+                }
+                
+                // Create test evaluation
+                const evalData = {
+                    name: `test_eval_${Date.now()}`,
+                    eval_type: 'exact_match',
+                    eval_spec: { threshold: 1.0 },
+                    dataset: [
+                        { input: { output: 'Paris' }, expected: { output: 'Paris' } },
+                        { input: { output: 'London' }, expected: { output: 'London' } },
+                        { input: { output: 'Berlin' }, expected: { output: 'Madrid' } }
+                    ]
+                };
+                
+                const response = await fetch(`${baseUrl}/api/v1/evals`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(evalData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultBox.className = 'result-box success';
+                    resultBox.innerHTML = `
+                        <strong>✅ Success!</strong><br>
+                        <strong>Evaluation ID:</strong> <code>${data.id}</code><br>
+                        <strong>Name:</strong> ${data.name}<br>
+                        <strong>Type:</strong> ${data.eval_type}<br>
+                        <br>
+                        Your API is working correctly! You can now:
+                        <ul style="margin-left: 20px; margin-top: 10px;">
+                            <li>Run the evaluation with POST /api/v1/evals/${data.id}/runs</li>
+                            <li>Check results with GET /api/v1/runs/{run_id}/results</li>
+                        </ul>
+                    `;
+                    resultBox.style.display = 'block';
+                } else {
+                    let errorMessage = 'Unknown error';
+                    if (data.error) {
+                        errorMessage = data.error.message || data.error;
+                    } else if (data.detail) {
+                        if (typeof data.detail === 'object' && data.detail.error) {
+                            errorMessage = data.detail.error.message || data.detail.error;
+                        } else {
+                            errorMessage = data.detail;
+                        }
+                    }
+                    
+                    resultBox.className = 'result-box error';
+                    resultBox.innerHTML = `
+                        <strong>❌ API Error</strong><br>
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>Message:</strong> ${errorMessage}<br>
+                        <br>
+                        Please check your configuration and try again.
+                    `;
+                    resultBox.style.display = 'block';
+                }
+            } catch (error) {
+                resultBox.className = 'result-box error';
+                resultBox.innerHTML = `
+                    <strong>❌ Connection Error</strong><br>
+                    ${error.message}<br>
+                    <br>
+                    <strong>To fix this:</strong>
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                        <li>Make sure the server is running: <code>python -m uvicorn tldw_Server_API.app.main:app --reload</code></li>
+                        <li>Check that the server is accessible at: <code>${baseUrl}</code></li>
+                        <li>Verify your API key is correct in the configuration</li>
+                    </ol>
+                `;
+                resultBox.style.display = 'block';
+            } finally {
+                // Re-enable button
+                button.disabled = false;
+                spinner.style.display = 'none';
+                btnText.textContent = 'Run Test';
+            }
+        }
+        
+        // Listen for configuration loaded event
+        window.addEventListener('tldw-config-loaded', (event) => {
+            const config = event.detail;
+            console.log('Configuration loaded:', config);
+            
+            // Update provider badges if configured
+            if (config.configured_providers && config.configured_providers.length > 0) {
+                const providersElement = document.querySelector('[data-config="providers"]');
+                providersElement.innerHTML = config.configured_providers
+                    .map(p => `<span class="provider-badge">${p}</span>`)
+                    .join('');
+            }
+        });
+    </script>
+</body>
+</html>

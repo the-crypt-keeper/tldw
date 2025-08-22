@@ -384,8 +384,8 @@ class TestRAGServiceCaching:
         
         assert response1.status_code == 200
         
-        # Get the cached service (in single-user mode, always user ID 0)
-        cache_entry1 = rag_service_manager._cache.get(0)
+        # Get the cached service (in single-user mode, user ID is from SINGLE_USER_FIXED_ID, default is 1)
+        cache_entry1 = rag_service_manager._cache.get(1)
         assert cache_entry1 is not None
         service1 = cache_entry1['service'] if cache_entry1 else None
         
@@ -399,7 +399,7 @@ class TestRAGServiceCaching:
         assert response2.status_code == 200
         
         # Verify same service was used
-        cache_entry2 = rag_service_manager._cache.get(0)
+        cache_entry2 = rag_service_manager._cache.get(1)
         assert cache_entry2 is not None
         service2 = cache_entry2['service'] if cache_entry2 else None
         assert service2 is service1  # Same instance

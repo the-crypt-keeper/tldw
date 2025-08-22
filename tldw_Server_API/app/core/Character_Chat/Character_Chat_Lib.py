@@ -63,6 +63,15 @@ def replace_placeholders(text: Optional[str], char_name: Optional[str], user_nam
 
 def replace_user_placeholder(history: List[Tuple[Optional[str], Optional[str]]], user_name: Optional[str]) -> List[
     Tuple[Optional[str], Optional[str]]]:
+    """Replace {{user}} placeholders in chat history with the actual user name.
+    
+    Args:
+        history: List of tuples containing (user_message, bot_message) pairs
+        user_name: The name to replace {{user}} with, defaults to "User" if None
+        
+    Returns:
+        Updated history with placeholders replaced
+    """
     user_name_actual = user_name if user_name else "User"
     updated_history = []
     for user_msg, bot_msg in history:
@@ -708,7 +717,6 @@ def parse_character_book(book_data: Dict[str, Any]) -> Dict[str, Any]:
 # Importing and Parsing External Card/Chat Formats
 #
 
-# FIXME
 def extract_json_from_image_file(image_file_input: Union[str, bytes, io.BytesIO]) -> Optional[str]:
     """Extracts 'chara' metadata (Base64 encoded JSON) from an image file.
 
@@ -1260,11 +1268,13 @@ def validate_v2_card(card_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
         validation_messages.append("Missing 'spec_version' field (expected '2.0' for V2 spec).")
     else:
         try:
-            # Spec version should be a string like "2.0"
+            # Spec version should be a string like "2.0" or "2.1.0"
             if isinstance(card_data['spec_version'], str):
-                spec_version_float = float(
-                    card_data['spec_version'])  # TODO: More robust version comparison if needed (e.g., major.minor)
-                if spec_version_float < 2.0:
+                # Parse semantic version string - handle both "2.0" and "2.1.0" formats
+                version_parts = card_data['spec_version'].split('.')
+                major_version = int(version_parts[0]) if version_parts else 0
+                
+                if major_version < 2:
                     validation_messages.append(
                         f"'spec_version' must be '2.0' or higher. Found '{card_data['spec_version']}'.")
             else:

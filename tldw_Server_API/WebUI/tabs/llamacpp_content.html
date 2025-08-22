@@ -1,0 +1,268 @@
+<!-- Llama.cpp Server Management Tab -->
+<div id="tabLlamaCppStatus" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/llamacpp/status</span>
+        </h2>
+        <p>Get Llama.cpp server status</p>
+        
+        <button class="api-button" onclick="makeRequest('llamacppStatus', 'GET', '/api/v1/llamacpp/status', 'none')">
+            Check Status
+        </button>
+        
+        <pre id="llamacppStatus_response"></pre>
+    </div>
+</div>
+
+<div id="tabLlamaCppModels" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/llamacpp/models</span>
+        </h2>
+        <p>List available Llama.cpp models</p>
+        
+        <button class="api-button" onclick="makeRequest('llamacppModels', 'GET', '/api/v1/llamacpp/models', 'none')">
+            List Models
+        </button>
+        
+        <pre id="llamacppModels_response"></pre>
+    </div>
+</div>
+
+<div id="tabLlamaCppServer" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/llamacpp/start_server</span>
+        </h2>
+        <p>Start or swap Llama.cpp server model</p>
+        
+        <div class="form-group">
+            <label for="llamacppStart_model">Model Name:</label>
+            <input type="text" id="llamacppStart_model" placeholder="Enter model filename (e.g., llama-2-7b.gguf)">
+            <small>Leave empty to use default model</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppStart_port">Port:</label>
+            <input type="number" id="llamacppStart_port" value="8080" placeholder="8080">
+            <small>Server port (default: 8080)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppStart_n_gpu_layers">GPU Layers:</label>
+            <input type="number" id="llamacppStart_n_gpu_layers" value="-1" placeholder="-1">
+            <small>Number of layers to offload to GPU (-1 for all)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppStart_n_ctx">Context Size:</label>
+            <input type="number" id="llamacppStart_n_ctx" value="4096" placeholder="4096">
+            <small>Context window size (default: 4096)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppStart_n_batch">Batch Size:</label>
+            <input type="number" id="llamacppStart_n_batch" value="512" placeholder="512">
+            <small>Batch size for prompt processing (default: 512)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppStart_n_threads">CPU Threads:</label>
+            <input type="number" id="llamacppStart_n_threads" placeholder="Auto-detect">
+            <small>Number of CPU threads to use (leave empty for auto)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppStart_flash_attn">
+                <input type="checkbox" id="llamacppStart_flash_attn">
+                Enable Flash Attention
+            </label>
+            <small>Use flash attention for faster inference</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppStart_mlock">
+                <input type="checkbox" id="llamacppStart_mlock">
+                Lock Model in Memory
+            </label>
+            <small>Prevent model from being swapped to disk</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppStart_payload">Additional Parameters (JSON):</label>
+            <textarea id="llamacppStart_payload" rows="5" placeholder='{"verbose": true}'>{}</textarea>
+            <small>Additional server parameters in JSON format</small>
+        </div>
+        
+        <button class="api-button" onclick="handleLlamaCppStart()">
+            Start/Swap Server
+        </button>
+        
+        <pre id="llamacppStart_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/llamacpp/stop_server</span>
+        </h2>
+        <p>Stop Llama.cpp server</p>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Stop the Llama.cpp server?')) makeRequest('llamacppStop', 'POST', '/api/v1/llamacpp/stop_server', 'json')">
+            Stop Server
+        </button>
+        
+        <pre id="llamacppStop_response"></pre>
+    </div>
+</div>
+
+<div id="tabLlamaCppInference" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/llamacpp/inference</span>
+        </h2>
+        <p>Run inference with Llama.cpp</p>
+        
+        <div class="form-group">
+            <label for="llamacppInference_prompt">Prompt <span class="required">*</span>:</label>
+            <textarea id="llamacppInference_prompt" rows="5" placeholder="Enter your prompt here...">Hello! How can I help you today?</textarea>
+        </div>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="llamacppInference_max_tokens">Max Tokens:</label>
+                    <input type="number" id="llamacppInference_max_tokens" value="256" placeholder="256">
+                </div>
+                
+                <div class="form-group">
+                    <label for="llamacppInference_temperature">Temperature:</label>
+                    <input type="number" id="llamacppInference_temperature" value="0.7" step="0.1" min="0" max="2" placeholder="0.7">
+                </div>
+                
+                <div class="form-group">
+                    <label for="llamacppInference_top_p">Top P:</label>
+                    <input type="number" id="llamacppInference_top_p" value="0.9" step="0.1" min="0" max="1" placeholder="0.9">
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="form-group">
+                    <label for="llamacppInference_top_k">Top K:</label>
+                    <input type="number" id="llamacppInference_top_k" value="40" placeholder="40">
+                </div>
+                
+                <div class="form-group">
+                    <label for="llamacppInference_repeat_penalty">Repeat Penalty:</label>
+                    <input type="number" id="llamacppInference_repeat_penalty" value="1.1" step="0.1" placeholder="1.1">
+                </div>
+                
+                <div class="form-group">
+                    <label for="llamacppInference_stream">
+                        <input type="checkbox" id="llamacppInference_stream">
+                        Stream Response
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppInference_stop">Stop Sequences (one per line):</label>
+            <textarea id="llamacppInference_stop" rows="3" placeholder="### Human:
+### Assistant:
+</s>"></textarea>
+            <small>Enter stop sequences, one per line</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="llamacppInference_system">System Prompt:</label>
+            <textarea id="llamacppInference_system" rows="3" placeholder="You are a helpful assistant.">You are a helpful AI assistant.</textarea>
+        </div>
+        
+        <button class="api-button" onclick="handleLlamaCppInference()">
+            Run Inference
+        </button>
+        
+        <pre id="llamacppInference_response"></pre>
+    </div>
+</div>
+
+<script>
+// Helper function for Llama.cpp start server
+function handleLlamaCppStart() {
+    const payload = {};
+    
+    const model = document.getElementById('llamacppStart_model').value;
+    if (model) payload.model = model;
+    
+    const port = document.getElementById('llamacppStart_port').value;
+    if (port) payload.port = parseInt(port);
+    
+    const n_gpu_layers = document.getElementById('llamacppStart_n_gpu_layers').value;
+    if (n_gpu_layers) payload.n_gpu_layers = parseInt(n_gpu_layers);
+    
+    const n_ctx = document.getElementById('llamacppStart_n_ctx').value;
+    if (n_ctx) payload.n_ctx = parseInt(n_ctx);
+    
+    const n_batch = document.getElementById('llamacppStart_n_batch').value;
+    if (n_batch) payload.n_batch = parseInt(n_batch);
+    
+    const n_threads = document.getElementById('llamacppStart_n_threads').value;
+    if (n_threads) payload.n_threads = parseInt(n_threads);
+    
+    payload.flash_attn = document.getElementById('llamacppStart_flash_attn').checked;
+    payload.mlock = document.getElementById('llamacppStart_mlock').checked;
+    
+    // Merge additional parameters
+    try {
+        const additionalParams = JSON.parse(document.getElementById('llamacppStart_payload').value || '{}');
+        Object.assign(payload, additionalParams);
+    } catch (e) {
+        alert('Invalid JSON in additional parameters');
+        return;
+    }
+    
+    // Store payload for makeRequest
+    document.getElementById('llamacppStart_payload').value = JSON.stringify(payload, null, 2);
+    makeRequest('llamacppStart', 'POST', '/api/v1/llamacpp/start_server', 'json');
+}
+
+// Helper function for Llama.cpp inference
+function handleLlamaCppInference() {
+    const payload = {
+        prompt: document.getElementById('llamacppInference_prompt').value,
+        max_tokens: parseInt(document.getElementById('llamacppInference_max_tokens').value || 256),
+        temperature: parseFloat(document.getElementById('llamacppInference_temperature').value || 0.7),
+        top_p: parseFloat(document.getElementById('llamacppInference_top_p').value || 0.9),
+        top_k: parseInt(document.getElementById('llamacppInference_top_k').value || 40),
+        repeat_penalty: parseFloat(document.getElementById('llamacppInference_repeat_penalty').value || 1.1),
+        stream: document.getElementById('llamacppInference_stream').checked
+    };
+    
+    const stopText = document.getElementById('llamacppInference_stop').value;
+    if (stopText) {
+        payload.stop = stopText.split('\n').filter(s => s.trim());
+    }
+    
+    const system = document.getElementById('llamacppInference_system').value;
+    if (system) {
+        payload.system = system;
+    }
+    
+    // Create hidden textarea with payload for makeRequest
+    const hiddenPayload = document.createElement('textarea');
+    hiddenPayload.id = 'llamacppInference_payload';
+    hiddenPayload.style.display = 'none';
+    hiddenPayload.value = JSON.stringify(payload, null, 2);
+    document.body.appendChild(hiddenPayload);
+    
+    makeRequest('llamacppInference', 'POST', '/api/v1/llamacpp/inference', 'json');
+    
+    // Clean up
+    document.body.removeChild(hiddenPayload);
+}
+</script>

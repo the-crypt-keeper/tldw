@@ -2,6 +2,10 @@
 # Comprehensive test suite for production embeddings service - FIXED VERSION
 # Unit tests with mocks
 
+import os
+# Set TESTING environment variable BEFORE importing anything else
+os.environ["TESTING"] = "true"
+
 import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch, Mock
@@ -12,14 +16,12 @@ from fastapi.testclient import TestClient
 from tldw_Server_API.app.main import app
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User, get_request_user
 
-# Disable rate limiting for all tests
-@pytest.fixture(autouse=True)
-def disable_rate_limiting():
-    """Disable rate limiting for all tests in this module"""
-    import os
-    os.environ["TESTING"] = "true"
+# Cleanup fixture to remove TESTING env var after tests
+@pytest.fixture(autouse=True, scope="module")
+def cleanup_testing_env():
+    """Cleanup TESTING environment variable after module tests"""
     yield
-    # Clean up after tests
+    # Clean up after all tests in module
     if "TESTING" in os.environ:
         del os.environ["TESTING"]
 

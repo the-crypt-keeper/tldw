@@ -19,7 +19,7 @@ docker run --name tldw-postgres \
 
 # 2. Wait a few seconds for it to start, then apply the schema
 sleep 5
-docker exec -i tldw-postgres psql -U tldw_user -d tldw_multiuser < schema/postgresql_users.sql
+docker exec -i tldw-postgres psql -U tldw_user -d tldw_multiuser < tldw_Server_API/Databases/Postgres/Schema/postgresql_users.sql
 
 # 3. Test the connection
 python test_postgres_connection.py
@@ -50,7 +50,7 @@ GRANT ALL ON SCHEMA public TO tldw_user;
 EOF
 
 # 4. Apply schema
-psql -U tldw_user -h localhost -d tldw_multiuser -f schema/postgresql_users.sql
+psql -U tldw_user -h localhost -d tldw_multiuser -f tldw_Server_API/Databases/Postgres/Schema/postgresql_users.sql
 # Password: TestPassword123!
 
 # 5. Test connection
@@ -77,7 +77,7 @@ GRANT ALL ON SCHEMA public TO tldw_user;
 
 5. Apply schema:
 ```bash
-psql -U tldw_user -h localhost -d tldw_multiuser -f schema/postgresql_users.sql
+psql -U tldw_user -h localhost -d tldw_multiuser -f tldw_Server_API/Databases/Postgres/Schema/postgresql_users.sql
 ```
 
 ### Option 4: Ubuntu/Debian
@@ -107,7 +107,7 @@ sudo nano /etc/postgresql/14/main/pg_hba.conf
 sudo systemctl restart postgresql
 
 # 5. Apply schema
-psql -U tldw_user -h localhost -d tldw_multiuser -f schema/postgresql_users.sql
+psql -U tldw_user -h localhost -d tldw_multiuser -f tldw_Server_API/Databases/Postgres/Schema/postgresql_users.sql
 
 # 6. Test connection
 python test_postgres_connection.py
@@ -267,7 +267,7 @@ ERROR: relation "users" does not exist
 ```
 **Solution**: Apply the schema:
 ```bash
-psql -U tldw_user -h localhost -d tldw_multiuser -f schema/postgresql_users.sql
+psql -U tldw_user -h localhost -d tldw_multiuser -f tldw_Server_API/Databases/Postgres/Schema/postgresql_users.sql
 ```
 
 ## Cleanup
