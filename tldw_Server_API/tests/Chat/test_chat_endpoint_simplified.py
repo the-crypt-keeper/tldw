@@ -13,7 +13,7 @@ from tldw_Server_API.app.api.v1.schemas.chat_request_schemas import (
 )
 
 
-def test_chat_completion_basic(authenticated_client, mock_chacha_db):
+def test_chat_completion_basic(authenticated_client, mock_chacha_db, setup_dependencies):
     """Test basic chat completion with authenticated user."""
     
     # Prepare request data - must include api_provider
@@ -86,7 +86,7 @@ def test_chat_completion_streaming(authenticated_client, mock_chacha_db):
         # Actual streaming validation would require async client
 
 
-def test_chat_completion_with_character(authenticated_client, mock_chacha_db):
+def test_chat_completion_with_character(authenticated_client, mock_chacha_db, setup_dependencies):
     """Test chat completion with a specific character."""
     
     # Add a character to the mock database
@@ -180,7 +180,7 @@ def test_chat_completion_invalid_model(authenticated_client, mock_chacha_db):
         assert response.status_code >= 400
 
 
-def test_chat_completion_with_conversation_history(authenticated_client, mock_chacha_db):
+def test_chat_completion_with_conversation_history(authenticated_client, mock_chacha_db, setup_dependencies):
     """Test chat with conversation history."""
     
     # Get the actual default character ID (it's usually 2 based on our tests)
@@ -249,7 +249,7 @@ def test_chat_completion_with_conversation_history(authenticated_client, mock_ch
         assert len(messages) > 1  # Should include history
 
 
-def test_chat_completion_rate_limiting(authenticated_client, mock_chacha_db):
+def test_chat_completion_rate_limiting(authenticated_client, mock_chacha_db, setup_dependencies):
     """Test rate limiting functionality."""
     
     request_data = ChatCompletionRequest(

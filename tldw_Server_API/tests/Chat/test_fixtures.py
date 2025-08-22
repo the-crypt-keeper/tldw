@@ -172,5 +172,4 @@ def setup_test_auth(test_user, real_test_db, real_media_db):
     
     yield
     
-    # Cleanup overrides
-    app.dependency_overrides.clear()
+    # Cleanup - don't clear, let the autouse fixture handle it

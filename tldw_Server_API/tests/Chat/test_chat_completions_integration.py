@@ -173,10 +173,16 @@ def get_commercial_providers_with_keys_integration():
         # Add others that are external and need keys from your config
     ]
     # Check against keys actually loaded by the app's config (via schemas)
-    return [
-        p for p in potentially_commercial
-        if p in ALL_CONFIGURED_PROVIDERS_FROM_APP and APP_API_KEYS_FROM_SCHEMA.get(p)
-    ]
+    # Also check environment variables to ensure real API keys are available
+    providers_with_keys = []
+    for p in potentially_commercial:
+        if p in ALL_CONFIGURED_PROVIDERS_FROM_APP and APP_API_KEYS_FROM_SCHEMA.get(p):
+            # Additional check for real API keys (not mock keys)
+            api_key = APP_API_KEYS_FROM_SCHEMA.get(p, "")
+            # Skip if it's a mock key or test key
+            if api_key and not api_key.startswith("sk-mock") and not api_key.startswith("test-"):
+                providers_with_keys.append(p)
+    return providers_with_keys
 
 
 def get_local_providers_integration():

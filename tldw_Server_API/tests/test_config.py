@@ -32,7 +32,8 @@ class TestConfig:
     def setup_test_environment(cls) -> None:
         """Set up environment variables for testing."""
         os.environ["AUTH_MODE"] = cls.AUTH_MODE
-        os.environ["API_BEARER"] = cls.TEST_API_KEY
+        # Don't set API_BEARER - it causes the wrong authentication path in single-user mode
+        # os.environ["API_BEARER"] = cls.TEST_API_KEY
         os.environ["SINGLE_USER_API_KEY"] = cls.TEST_API_KEY
         
         # Disable CSRF for testing

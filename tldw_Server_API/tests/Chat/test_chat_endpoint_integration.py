@@ -122,8 +122,7 @@ def test_client(test_db):
             
             yield client
             
-            # Clean up overrides
-            app.dependency_overrides.clear()
+            # Cleanup - don't clear, let the autouse fixture handle it
 
 
 @pytest.fixture
@@ -154,10 +153,10 @@ def auth_headers(test_client):
     # Import settings to get the actual API key used in single-user mode
     from tldw_Server_API.app.core.AuthNZ.settings import get_settings
     settings = get_settings()
-    # Use Token header with Bearer prefix as expected by the endpoint
+    # Use X-API-KEY header as expected by the endpoint in single-user mode
     api_key = settings.SINGLE_USER_API_KEY or "default-secret-key-for-single-user"
     return {
-        "Token": f"Bearer {api_key}",
+        "X-API-KEY": api_key,
         "X-CSRF-Token": getattr(test_client, 'csrf_token', '')
     }
 

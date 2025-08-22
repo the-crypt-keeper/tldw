@@ -116,8 +116,7 @@ def setup_dependencies(test_user, test_chacha_db, test_media_db):
     
     yield
     
-    # Cleanup
-    app.dependency_overrides.clear()
+    # Cleanup - don't clear, let the autouse fixture handle it
 
 
 @pytest.fixture
@@ -133,7 +132,7 @@ def client():
         yield test_client
 
 
-def test_chat_completion_integration(client, auth_token, test_chacha_db, setup_dependencies):
+def test_chat_completion_integration(client, auth_token, test_chacha_db, setup_dependencies, configure_for_mock_server):
     """Test chat completion with real database and no mocking."""
     
     settings = get_settings()
@@ -153,7 +152,7 @@ def test_chat_completion_integration(client, auth_token, test_chacha_db, setup_d
     if settings.AUTH_MODE == "multi_user":
         headers["Authorization"] = auth_token
     else:
-        # Use X-API-KEY header as expected by the endpoint
+        # Use X-API-KEY header as expected by the endpoint in single-user mode
         headers["X-API-KEY"] = auth_token
     
     print(f"AUTH_MODE: {settings.AUTH_MODE}")

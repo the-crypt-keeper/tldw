@@ -13,7 +13,7 @@ from tldw_Server_API.app.api.v1.schemas.chat_request_schemas import (
 )
 
 
-def test_chat_completion_works(client, auth_token, mock_chacha_db, setup_dependencies):
+def test_chat_completion_works(client, auth_token, mock_chacha_db, setup_dependencies, configure_for_mock_server):
     """Test that chat completion works with proper auth."""
     
     # Set the app to debug mode for better error messages
@@ -68,7 +68,7 @@ def test_chat_completion_works(client, auth_token, mock_chacha_db, setup_depende
             headers["Authorization"] = auth_token
             print(f"Using Authorization header")
         else:
-            # Use X-API-KEY header as expected by the endpoint
+            # Use X-API-KEY header as expected by the endpoint in single-user mode
             headers["X-API-KEY"] = auth_token
             print(f"Using X-API-KEY header")
         

@@ -10,6 +10,10 @@ import os
 os.environ["OPENAI_API_KEY"] = "sk-mock-key-12345"
 os.environ["OPENAI_API_BASE"] = "http://localhost:8080/v1"
 
+# IMPORTANT: Ensure API_BEARER is not set - it causes wrong authentication path in single-user mode
+if "API_BEARER" in os.environ:
+    del os.environ["API_BEARER"]
+
 import subprocess
 import time
 import requests
@@ -33,6 +37,9 @@ from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
 # Global variable to track mock server process
 _mock_server_process = None
 
+# Global variable to store original dependency overrides
+_original_dependency_overrides = None
+
 
 def cleanup_mock_server():
     """Cleanup function to ensure mock server is stopped."""
@@ -51,6 +58,40 @@ def cleanup_mock_server():
 
 # Register cleanup function
 atexit.register(cleanup_mock_server)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def preserve_app_state():
+    """Preserve the original app dependency overrides across all tests."""
+    global _original_dependency_overrides
+    
+    # Store the original state at the beginning of the test session
+    _original_dependency_overrides = app.dependency_overrides.copy()
+    
+    yield
+    
+    # Restore the original state at the end of the test session
+    app.dependency_overrides = _original_dependency_overrides.copy()
+
+
+@pytest.fixture(autouse=True)
+def reset_app_overrides():
+    """Reset app dependency overrides before each test."""
+    global _original_dependency_overrides
+    
+    # Reset to original state before each test
+    if _original_dependency_overrides is not None:
+        app.dependency_overrides = _original_dependency_overrides.copy()
+    else:
+        app.dependency_overrides.clear()
+    
+    yield
+    
+    # Clean up after each test
+    if _original_dependency_overrides is not None:
+        app.dependency_overrides = _original_dependency_overrides.copy()
+    else:
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="session")
@@ -134,7 +175,7 @@ def mock_openai_server():
     cleanup_mock_server()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def configure_for_mock_server(mock_openai_server, monkeypatch):
     """Configure the application to use the mock OpenAI server."""
     # Ensure environment variables are set
@@ -288,8 +329,7 @@ def setup_dependencies(test_user, mock_user_db, mock_chacha_db, mock_media_db):
     
     yield
     
-    # Cleanup
-    app.dependency_overrides.clear()
+    # Cleanup - don't clear, let the autouse fixture handle it
 
 
 @pytest.fixture
@@ -313,7 +353,7 @@ def client():
             if settings.AUTH_MODE == "multi_user":
                 headers["Authorization"] = auth_token
             else:
-                # Use X-API-KEY (with hyphen, all caps) as expected by the dependency
+                # Use X-API-KEY header for single-user mode
                 headers["X-API-KEY"] = auth_token
             
             return test_client.post(url, headers=headers, **kwargs)
@@ -337,7 +377,9 @@ def authenticated_client(client, auth_token):
         if settings.AUTH_MODE == "multi_user":
             headers["Authorization"] = auth_token
         else:
-            headers["X-API-KEY"] = auth_token
+            # Use Token header with Bearer format for chat endpoint
+            token_with_bearer = auth_token if auth_token.startswith("Bearer ") else f"Bearer {auth_token}"
+            headers["Token"] = token_with_bearer
         
         return original_post(url, headers=headers, **kwargs)
     
@@ -353,7 +395,7 @@ def get_auth_headers(auth_token, csrf_token=""):
     if settings.AUTH_MODE == "multi_user":
         headers["Authorization"] = auth_token
     else:
-        # Use X-API-KEY (with hyphen, all caps) as expected by the dependency
+        # Use X-API-KEY header for single-user mode
         headers["X-API-KEY"] = auth_token
     
     return headers
@@ -409,6 +451,19 @@ def sample_chat_request():
     )
 
 
+@pytest.fixture(autouse=True)
+def ensure_no_api_bearer():
+    """Ensure API_BEARER is not set for chat tests."""
+    import os
+    # Remove API_BEARER if it exists - it causes wrong authentication path
+    if "API_BEARER" in os.environ:
+        del os.environ["API_BEARER"]
+    yield
+    # Clean up after test as well
+    if "API_BEARER" in os.environ:
+        del os.environ["API_BEARER"]
+
+
 @pytest.fixture
 def unit_test_client(client, auth_token, isolated_db):
     """Create a test client configured for unit tests."""
@@ -457,7 +512,9 @@ def unit_test_client(client, auth_token, isolated_db):
         if settings.AUTH_MODE == "multi_user":
             headers["Authorization"] = auth_token
         else:
-            headers["X-API-KEY"] = auth_token
+            # Use Token header with Bearer format for chat endpoint
+            token_with_bearer = auth_token if auth_token.startswith("Bearer ") else f"Bearer {auth_token}"
+            headers["Token"] = token_with_bearer
         
         # Mock the LLM call
         with patch("tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call") as mock_llm, \
