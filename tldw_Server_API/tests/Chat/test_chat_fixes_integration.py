@@ -35,7 +35,7 @@ from tldw_Server_API.app.api.v1.schemas.chat_request_schemas import (
 
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def setup_auth_override():
     """Override authentication for tests."""
     from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User
@@ -50,9 +50,14 @@ def setup_auth_override():
     async def mock_get_request_user(api_key=None, token=None):
         return test_user
     
+    # Store original overrides to restore later
+    original_overrides = app.dependency_overrides.copy()
+    
     app.dependency_overrides[get_request_user] = mock_get_request_user
-    yield
-    app.dependency_overrides.clear()
+    yield test_user
+    
+    # Restore original overrides instead of clearing all
+    app.dependency_overrides = original_overrides
 
 
 class TestEmptyMessageFix:

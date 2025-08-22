@@ -270,7 +270,7 @@ def mock_media_db(test_user):
     return mock_db
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def setup_dependencies(test_user, mock_user_db, mock_chacha_db, mock_media_db):
     """Override all dependencies for testing."""
     settings = get_settings()
@@ -357,3 +357,119 @@ def get_auth_headers(auth_token, csrf_token=""):
         headers["X-API-KEY"] = auth_token
     
     return headers
+
+
+# Additional fixtures for unit tests
+@pytest.fixture
+def isolated_db():
+    """Create an isolated database for each test."""
+    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+        db_path = tmp.name
+    
+    db = CharactersRAGDB(db_path, f"test_client_{id(tmp)}")
+    
+    # Enable WAL mode for better concurrency
+    conn = db.get_connection()
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.close()
+    
+    # Add default character
+    char_id = db.add_character_card({
+        "name": "Default Character",
+        "description": "A helpful AI assistant",
+        "personality": "Helpful",
+        "scenario": "General",
+        "system_prompt": "You are a helpful assistant"
+    })
+    
+    yield db
+    
+    # Cleanup
+    try:
+        os.unlink(db_path)
+    except:
+        pass
+
+
+@pytest.fixture
+def sample_chat_request():
+    """Create a sample chat completion request."""
+    from tldw_Server_API.app.api.v1.schemas.chat_request_schemas import (
+        ChatCompletionRequest,
+        ChatCompletionUserMessageParam
+    )
+    
+    return ChatCompletionRequest(
+        model="test-model",
+        messages=[
+            ChatCompletionUserMessageParam(role="user", content="Test message")
+        ],
+        api_provider="openai"
+    )
+
+
+@pytest.fixture
+def unit_test_client(client, auth_token, isolated_db):
+    """Create a test client configured for unit tests."""
+    from unittest.mock import patch
+    
+    settings = get_settings()
+    
+    # Create test user
+    test_user = User(
+        id=1,
+        username="test_user",
+        email="test@example.com",
+        is_active=True
+    )
+    
+    # Override dependencies
+    async def mock_get_request_user(api_key=None, token=None):
+        return test_user
+    
+    app.dependency_overrides[get_request_user] = mock_get_request_user
+    app.dependency_overrides[get_chacha_db_for_user] = lambda: isolated_db
+    
+    # Mock LLM responses
+    mock_response = {
+        "id": "chatcmpl-test",
+        "object": "chat.completion",
+        "created": 1234567890,
+        "model": "test-model",
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": "This is a test response"},
+            "finish_reason": "stop"
+        }],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15
+        }
+    }
+    
+    # Add helper method for authenticated requests
+    def post_with_auth(url, json_data, **kwargs):
+        headers = kwargs.pop("headers", {})
+        headers["X-CSRF-Token"] = client.csrf_token
+        
+        if settings.AUTH_MODE == "multi_user":
+            headers["Authorization"] = auth_token
+        else:
+            headers["X-API-KEY"] = auth_token
+        
+        # Mock the LLM call
+        with patch("tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call") as mock_llm, \
+             patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call") as mock_perform:
+            mock_llm.return_value = mock_response
+            mock_perform.return_value = mock_response
+            
+            return client.post(url, json=json_data, headers=headers, **kwargs)
+    
+    client.post_with_auth = post_with_auth
+    
+    yield client
+    
+    # Cleanup
+    app.dependency_overrides.clear()

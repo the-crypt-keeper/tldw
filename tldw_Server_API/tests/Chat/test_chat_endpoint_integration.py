@@ -20,11 +20,19 @@ from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_
 @pytest.fixture
 def test_db():
     """Create a temporary test database."""
+    import sqlite3
     with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
         db_path = tmp.name
     
     # Initialize database
     db = CharactersRAGDB(db_path, "test_client")
+    
+    # Enable WAL mode for better concurrency handling in tests
+    conn = db.get_connection()
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")  # 30 second timeout for locks
+    conn.execute("PRAGMA synchronous=NORMAL")  # Faster writes for tests
+    conn.commit()
     
     # Add default character (required by the chat endpoint)
     db.add_character_card({
@@ -53,6 +61,11 @@ def test_db():
     # Cleanup
     try:
         os.unlink(db_path)
+        # Also remove WAL files if they exist
+        if os.path.exists(db_path + "-wal"):
+            os.unlink(db_path + "-wal")
+        if os.path.exists(db_path + "-shm"):
+            os.unlink(db_path + "-shm")
     except:
         pass
 
@@ -60,14 +73,57 @@ def test_db():
 @pytest.fixture
 def test_client(test_db):
     """Create test client with database dependency override."""
-    # Override the database dependency to use our test database
-    app.dependency_overrides[get_chacha_db_for_user] = lambda: test_db
+    from unittest.mock import patch, MagicMock
+    from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User, get_request_user
     
-    client = TestClient(app)
-    yield client
+    # Create a test user for authentication
+    test_user = User(
+        id=1,
+        username="test_user",
+        email="test@example.com",
+        is_active=True
+    )
     
-    # Clean up overrides
-    app.dependency_overrides.clear()
+    # Mock API keys to prevent 503 errors
+    with patch.dict("tldw_Server_API.app.api.v1.endpoints.chat.API_KEYS", {"openai": "sk-mock-key-12345"}):
+        # Mock the actual chat API call
+        mock_response = {
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "created": 1234567890,
+            "model": "test-model",
+            "choices": [{
+                "index": 0,
+                "message": {"role": "assistant", "content": "This is a test response"},
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15
+            }
+        }
+        
+        with patch("tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call", return_value=mock_response):
+            # Override authentication to use test user
+            async def mock_get_request_user(api_key=None, token=None):
+                return test_user
+            
+            # Override the database and auth dependencies
+            app.dependency_overrides[get_chacha_db_for_user] = lambda: test_db
+            app.dependency_overrides[get_request_user] = mock_get_request_user
+            
+            client = TestClient(app)
+            
+            # Get CSRF token
+            response = client.get("/api/v1/health")
+            csrf_token = response.cookies.get("csrf_token", "")
+            client.csrf_token = csrf_token
+            
+            yield client
+            
+            # Clean up overrides
+            app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -93,12 +149,17 @@ def configure_test_llm():
 
 
 @pytest.fixture
-def auth_headers():
+def auth_headers(test_client):
     """Provide test authentication headers."""
     # Import settings to get the actual API key used in single-user mode
     from tldw_Server_API.app.core.AuthNZ.settings import get_settings
     settings = get_settings()
-    return {"X-API-Key": settings.SINGLE_USER_API_KEY}
+    # Use Token header with Bearer prefix as expected by the endpoint
+    api_key = settings.SINGLE_USER_API_KEY or "default-secret-key-for-single-user"
+    return {
+        "Token": f"Bearer {api_key}",
+        "X-CSRF-Token": getattr(test_client, 'csrf_token', '')
+    }
 
 
 class TestChatEndpointIntegration:

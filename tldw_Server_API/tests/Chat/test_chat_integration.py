@@ -99,7 +99,7 @@ def test_media_db(test_user):
         pass
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def setup_dependencies(test_user, test_chacha_db, test_media_db):
     """Override dependencies to use test databases."""
     settings = get_settings()
@@ -133,7 +133,7 @@ def client():
         yield test_client
 
 
-def test_chat_completion_integration(client, auth_token, test_chacha_db):
+def test_chat_completion_integration(client, auth_token, test_chacha_db, setup_dependencies):
     """Test chat completion with real database and no mocking."""
     
     settings = get_settings()
@@ -153,7 +153,7 @@ def test_chat_completion_integration(client, auth_token, test_chacha_db):
     if settings.AUTH_MODE == "multi_user":
         headers["Authorization"] = auth_token
     else:
-        # Use X-API-KEY (with hyphen, all caps) as expected by the dependency
+        # Use X-API-KEY header as expected by the endpoint
         headers["X-API-KEY"] = auth_token
     
     print(f"AUTH_MODE: {settings.AUTH_MODE}")
