@@ -1,5 +1,14 @@
 # Chunk_Lib.py
 #########################################
+# ⚠️ DEPRECATED - V1 IMPLEMENTATION ⚠️
+# This is the legacy V1 chunking implementation.
+# All production code has been migrated to use V2 through the module's public API.
+# 
+# To use chunking in your code:
+#   from tldw_Server_API.app.core.Chunking import improved_chunking_process
+# 
+# This file is maintained for test compatibility only and will be removed in v2.0.0
+#########################################
 # Chunking Library
 # This library is used to perform chunking of input files.
 # Includes both basic and enhanced chunking approaches.

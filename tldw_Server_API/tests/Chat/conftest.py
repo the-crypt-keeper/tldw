@@ -5,6 +5,18 @@ Simplified test configuration that works with the existing system.
 import pytest
 import tempfile
 import os
+# Set environment variables BEFORE any tldw imports
+import os
+os.environ["OPENAI_API_KEY"] = "sk-mock-key-12345"
+os.environ["OPENAI_API_BASE"] = "http://localhost:8080/v1"
+
+import subprocess
+import time
+import requests
+import atexit
+import signal
+import sys
+from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 import datetime
@@ -16,6 +28,152 @@ from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User, get_request_u
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
 from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
+
+
+# Global variable to track mock server process
+_mock_server_process = None
+
+
+def cleanup_mock_server():
+    """Cleanup function to ensure mock server is stopped."""
+    global _mock_server_process
+    if _mock_server_process:
+        try:
+            _mock_server_process.terminate()
+            _mock_server_process.wait(timeout=5)
+        except:
+            try:
+                _mock_server_process.kill()
+            except:
+                pass
+        _mock_server_process = None
+
+
+# Register cleanup function
+atexit.register(cleanup_mock_server)
+
+
+@pytest.fixture(scope="session")
+def mock_openai_server():
+    """Start the mock OpenAI server for testing."""
+    global _mock_server_process
+    
+    # Check if server is already running
+    try:
+        response = requests.get("http://localhost:8080/v1/models", timeout=1)
+        if response.status_code == 200:
+            print("Mock OpenAI server already running")
+            yield "http://localhost:8080"
+            return
+    except:
+        pass
+    
+    # FIXME: Once mock_openai_server is published as a PyPI package,
+    # replace this relative path approach with:
+    # from mock_openai_server import start_server
+    # or use: python -m mock_openai_server
+    
+    # Get the path to mock_openai_server relative to this test file
+    test_dir = Path(__file__).parent
+    project_root = test_dir.parent.parent.parent  # Go up to tldw_server root
+    mock_server_dir = project_root / "mock_openai_server"
+    
+    if not mock_server_dir.exists():
+        pytest.skip("mock_openai_server not found - skipping integration tests")
+    
+    # Start the mock server
+    print(f"Starting mock OpenAI server from {mock_server_dir}...")
+    _mock_server_process = subprocess.Popen(
+        [sys.executable, "-m", "mock_openai.server"],
+        cwd=str(mock_server_dir),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,  # Combine stderr with stdout
+        text=True  # Text mode for easier debugging
+    )
+    
+    # Wait for server to start
+    max_retries = 60  # Increase retries
+    for i in range(max_retries):
+        # Check if process is still running
+        if _mock_server_process.poll() is not None:
+            # Process has died, get output for debugging
+            output = _mock_server_process.stdout.read()
+            cleanup_mock_server()
+            pytest.fail(f"Mock server process died. Output:\n{output}")
+        
+        try:
+            # Test with the auth header that the mock server expects
+            response = requests.get(
+                "http://localhost:8080/v1/models", 
+                headers={"Authorization": "Bearer sk-mock-key-12345"},
+                timeout=1
+            )
+            if response.status_code == 200:
+                print("Mock OpenAI server started successfully")
+                break
+        except requests.exceptions.ConnectionError:
+            # Server not ready yet
+            time.sleep(0.5)
+        except Exception as e:
+            print(f"Error checking server: {e}")
+            time.sleep(0.5)
+    else:
+        # Get any output for debugging
+        output = ""
+        if _mock_server_process and _mock_server_process.stdout:
+            try:
+                output = _mock_server_process.stdout.read()
+            except:
+                pass
+        cleanup_mock_server()
+        pytest.fail(f"Failed to start mock OpenAI server after {max_retries} retries. Output:\n{output}")
+    
+    yield "http://localhost:8080"
+    
+    # Cleanup
+    cleanup_mock_server()
+
+
+@pytest.fixture(autouse=True)
+def configure_for_mock_server(mock_openai_server, monkeypatch):
+    """Configure the application to use the mock OpenAI server."""
+    # Ensure environment variables are set
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-mock-key-12345")
+    monkeypatch.setenv("OPENAI_API_BASE", f"{mock_openai_server}/v1")
+    
+    # Also set custom endpoint variables
+    monkeypatch.setenv("CUSTOM_OPENAI_API_IP", f"{mock_openai_server}/v1/chat/completions")
+    monkeypatch.setenv("CUSTOM_OPENAI_API_KEY", "sk-mock-key-12345")
+    
+    # Reload the schemas module to pick up the new environment variables
+    import importlib
+    import tldw_Server_API.app.api.v1.schemas.chat_request_schemas as chat_schemas
+    importlib.reload(chat_schemas)
+    
+    # Update API_KEYS directly
+    chat_schemas.API_KEYS['openai'] = 'sk-mock-key-12345'
+    
+    # Also patch the chat endpoint's imported API_KEYS
+    from tldw_Server_API.app.api.v1.endpoints import chat as chat_endpoint
+    if hasattr(chat_endpoint, 'API_KEYS'):
+        chat_endpoint.API_KEYS = chat_schemas.API_KEYS
+    
+    # Patch the OpenAI API URL in the config
+    from tldw_Server_API.app.core.config import load_and_log_configs
+    config = load_and_log_configs()
+    if 'openai_api' not in config:
+        config['openai_api'] = {}
+    config['openai_api']['api_key'] = 'sk-mock-key-12345'
+    config['openai_api']['api_base_url'] = f'{mock_openai_server}/v1'
+    
+    # Patch the load_and_log_configs function to return our patched config
+    def mock_load_and_log_configs():
+        return config
+    
+    monkeypatch.setattr('tldw_Server_API.app.core.config.load_and_log_configs', mock_load_and_log_configs)
+    monkeypatch.setattr('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.load_and_log_configs', mock_load_and_log_configs)
+    
+    yield
 
 
 @pytest.fixture

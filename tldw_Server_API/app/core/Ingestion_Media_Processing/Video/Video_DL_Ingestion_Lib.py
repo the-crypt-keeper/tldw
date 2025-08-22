@@ -46,7 +46,7 @@ from tldw_Server_API.app.core.Utils.Utils import (
     extract_text_from_segments,
     logging
 )
-from tldw_Server_API.app.core.Chunking.Chunk_Lib import improved_chunking_process
+from tldw_Server_API.app.core.Chunking import improved_chunking_process
 from tldw_Server_API.app.core.Metrics.metrics_logger import (
     log_counter, log_histogram
 )

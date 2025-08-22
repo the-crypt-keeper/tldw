@@ -20,10 +20,10 @@ from .models import (
 class StreamingResponseGenerator:
     """Generates streaming responses for chat completions."""
     
-    def __init__(self, chunk_delay_ms: int = 50, tokens_per_chunk: int = 5):
+    def __init__(self, chunk_delay_ms: int = 50, words_per_chunk: int = 5):
         """Initialize the streaming response generator."""
         self.chunk_delay_ms = chunk_delay_ms
-        self.tokens_per_chunk = tokens_per_chunk
+        self.words_per_chunk = words_per_chunk
     
     async def generate_stream(
         self,
@@ -41,8 +41,8 @@ class StreamingResponseGenerator:
         chunks = []
         
         # Group words into chunks
-        for i in range(0, len(words), self.tokens_per_chunk):
-            chunk_words = words[i:i + self.tokens_per_chunk]
+        for i in range(0, len(words), self.words_per_chunk):
+            chunk_words = words[i:i + self.words_per_chunk]
             chunk_text = " ".join(chunk_words)
             if i > 0:
                 chunk_text = " " + chunk_text  # Add leading space for continuation
@@ -176,8 +176,8 @@ class StreamingResponseGenerator:
                 words = content.split()
                 chunks = []
                 
-                for i in range(0, len(words), self.tokens_per_chunk):
-                    chunk_words = words[i:i + self.tokens_per_chunk]
+                for i in range(0, len(words), self.words_per_chunk):
+                    chunk_words = words[i:i + self.words_per_chunk]
                     chunk_text = " ".join(chunk_words)
                     if i > 0:
                         chunk_text = " " + chunk_text

@@ -60,7 +60,4 @@ setup(
         ],
     },
     include_package_data=True,
-    package_data={
-        "mock_openai": ["../responses/**/*.json", "../config.json"],
-    },
 )

@@ -344,8 +344,8 @@ class TestChatEndpointIntegration:
         assert response.status_code in [200, 400]  # Accept either success or validation error
     
     def test_transaction_handling(self, test_client, test_db, auth_headers):
-        """Test database transaction handling."""
-        # Create multiple requests with transaction flag
+        """Test database transaction handling - messages are persisted correctly."""
+        # Test that messages are properly saved to the database
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
@@ -353,8 +353,8 @@ class TestChatEndpointIntegration:
                     {"role": "user", "content": "Test transaction"}
                 ],
                 "model": "gpt-4",
-                "api_provider": "openai",  # Fixed field name
-                "use_transaction": True
+                "api_provider": "openai"  # Fixed field name
+                # Removed use_transaction as it's not a valid API parameter
             },
             headers=auth_headers
         )
@@ -516,7 +516,10 @@ class TestChatEndpointSecurity:
             assert "too long" in response.json()["detail"].lower() or "too large" in response.json()["detail"].lower()
     
     def test_authentication_required(self, test_client, test_db):
-        """Test that authentication is required."""
+        """Test authentication behavior based on auth mode."""
+        from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+        settings = get_settings()
+        
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
@@ -529,9 +532,13 @@ class TestChatEndpointSecurity:
             # No auth headers
         )
         
-        # Should require authentication or fail due to missing configuration
-        # Without auth, the endpoint may proceed but fail when trying to access API keys
-        assert response.status_code in [401, 403, 503]
+        if settings.AUTH_MODE == "single_user":
+            # In single-user mode, authentication is not required
+            # The request should succeed (200) or fail due to other reasons like missing API keys (503)
+            assert response.status_code in [200, 503], f"In single-user mode, got unexpected status: {response.status_code}"
+        else:
+            # In multi-user mode, should require authentication
+            assert response.status_code in [401, 403], f"In multi-user mode, expected auth error but got: {response.status_code}"
 
 
 if __name__ == "__main__":

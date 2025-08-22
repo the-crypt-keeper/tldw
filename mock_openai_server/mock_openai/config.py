@@ -61,7 +61,7 @@ class StreamingConfig:
     """Streaming configuration."""
     enabled: bool = True
     chunk_delay_ms: int = 50
-    tokens_per_chunk: int = 5
+    words_per_chunk: int = 5  # More accurate name since we split by spaces
 
 
 @dataclass
@@ -140,7 +140,7 @@ class MockConfig:
             config.streaming = StreamingConfig(
                 enabled=stream_data.get("enabled", True),
                 chunk_delay_ms=stream_data.get("chunk_delay_ms", 50),
-                tokens_per_chunk=stream_data.get("tokens_per_chunk", 5)
+                words_per_chunk=stream_data.get("words_per_chunk", stream_data.get("tokens_per_chunk", 5))  # Support both names for backwards compatibility
             )
         
         # Parse response configs

@@ -36,12 +36,9 @@ from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import (
     CharactersRAGDBError,
     InputError
 )
-from tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls import (
-    chat_with_openai, chat_with_anthropic, chat_with_cohere,
-    chat_with_groq, chat_with_openrouter, chat_with_deepseek,
-    chat_with_mistral, chat_with_huggingface
-)
 from tldw_Server_API.app.core.Chat.Chat_Deps import ChatAPIError
+from tldw_Server_API.app.core.Chat.chat_helpers import load_conversation_history
+from tldw_Server_API.app.core.Chat.Chat_Functions import chat_api_call
 
 
 class DocumentType(Enum):
@@ -127,19 +124,7 @@ class DocumentGeneratorService:
         # Request-scoped cache for prompts
         self._prompt_cache: Dict[DocumentType, Dict[str, Any]] = {}
         
-        # Provider mapping (could be extended with local models)
-        self.provider_functions = {
-            "openai": chat_with_openai,
-            "anthropic": chat_with_anthropic,
-            "cohere": chat_with_cohere,
-            "groq": chat_with_groq,
-            "openrouter": chat_with_openrouter,
-            "deepseek": chat_with_deepseek,
-            "mistral": chat_with_mistral,
-            "mistralai": chat_with_mistral,
-            "huggingface": chat_with_huggingface,
-            # Local providers could be added here
-        }
+        # No longer need provider mapping - using chat_api_call abstraction
     
     def _init_tables(self):
         """Initialize document generation tables in the user's database if they don't exist."""
@@ -212,7 +197,7 @@ class DocumentGeneratorService:
     
     def get_conversation_context(
         self, 
-        conversation_id: int, 
+        conversation_id: str,  # Changed to str for UUID
         limit: int = 50,
         include_system: bool = False
     ) -> List[Dict[str, Any]]:
@@ -220,7 +205,7 @@ class DocumentGeneratorService:
         Get conversation context including recent messages.
         
         Args:
-            conversation_id: ID of the conversation
+            conversation_id: ID of the conversation (UUID string)
             limit: Maximum number of messages to include
             include_system: Whether to include system messages
             
@@ -228,31 +213,37 @@ class DocumentGeneratorService:
             List of message dictionaries
         """
         try:
-            with self.db.get_connection() as conn:
-                query = """
-                    SELECT role, content, timestamp
-                    FROM conversation_messages
-                    WHERE conversation_id = ?
-                """
-                
-                if not include_system:
-                    query += " AND role != 'system'"
-                
-                query += " ORDER BY timestamp DESC LIMIT ?"
-                
-                cursor = conn.execute(query, (conversation_id, limit))
-                messages = []
-                
-                for row in cursor.fetchall():
-                    messages.append({
-                        'role': row[0],
-                        'content': row[1],
-                        'timestamp': row[2]
-                    })
-                
-                # Reverse to get chronological order
-                messages.reverse()
-                return messages
+            # Use the interop layer to get conversation messages
+            import asyncio
+            
+            # Get or create event loop
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            # Load conversation history using the chat helper
+            messages = loop.run_until_complete(
+                load_conversation_history(
+                    db=self.db,
+                    conversation_id=conversation_id,
+                    character_card=None,  # We don't need character card for document generation
+                    limit=limit,
+                    loop=loop
+                )
+            )
+            
+            # Filter out system messages if requested
+            if not include_system:
+                messages = [msg for msg in messages if msg.get('role') != 'system']
+            
+            # Messages from load_conversation_history are already in the right format
+            # with 'role', 'content', and other fields
+            return messages if messages else []
                 
         except Exception as e:
             logger.error(f"Failed to get conversation context: {e}")
@@ -433,9 +424,24 @@ class DocumentGeneratorService:
         logger.info(f"Generating {document_type.value} for conversation {conversation_id} (user: {self.user_id})")
         
         # Get conversation context
-        messages = self.get_conversation_context(conversation_id)
-        if not messages:
-            raise InputError(f"No messages found for conversation {conversation_id}")
+        try:
+            messages = self.get_conversation_context(conversation_id)
+            if not messages:
+                logger.warning(f"No messages found for conversation {conversation_id}")
+                return {
+                    "success": False,
+                    "error": f"No messages found for conversation {conversation_id}",
+                    "document_type": document_type.value,
+                    "conversation_id": conversation_id
+                }
+        except Exception as e:
+            logger.error(f"Error retrieving conversation: {e}")
+            return {
+                "success": False,
+                "error": f"Error retrieving conversation: {str(e)}",
+                "document_type": document_type.value,
+                "conversation_id": conversation_id
+            }
         
         context = self.format_context_for_llm(messages, specific_message)
         
@@ -495,7 +501,7 @@ class DocumentGeneratorService:
         stream: bool = False
     ) -> Union[str, Any]:
         """
-        Call the appropriate LLM provider.
+        Call the appropriate LLM provider using the chat abstraction layer.
         
         Args:
             provider: Provider name
@@ -510,26 +516,22 @@ class DocumentGeneratorService:
         Returns:
             Generated content or stream generator
         """
-        provider_lower = provider.lower()
-        chat_function = self.provider_functions.get(provider_lower)
-        
-        if not chat_function:
-            raise ChatAPIError(f"Unknown provider: {provider}")
-        
+        # Prepare messages in OpenAI format
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
         
-        # Call the provider function
-        response = chat_function(
-            messages=messages,
+        # Use the chat_api_call abstraction layer
+        response = chat_api_call(
+            api_endpoint=provider.lower(),
+            messages_payload=messages,
             api_key=api_key,
             model=model,
-            temperature=temperature,
+            temp=temperature,
             max_tokens=max_tokens,
-            stream=stream,
-            system_prompt=system_prompt
+            streaming=stream,
+            system_message=system_prompt
         )
         
         return response

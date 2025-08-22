@@ -58,12 +58,17 @@ class Chunker:
         # Import strategies here to avoid circular imports
         from .strategies.semantic import SemanticChunkingStrategy
         from .strategies.json_xml import JSONChunkingStrategy, XMLChunkingStrategy
+        from .strategies.paragraphs import ParagraphChunkingStrategy
+        from .strategies.ebook_chapters import EbookChapterChunkingStrategy
         
         # Core strategies
         self._strategies[ChunkingMethod.WORDS.value] = WordChunkingStrategy(
             language=self.config.language
         )
         self._strategies[ChunkingMethod.SENTENCES.value] = SentenceChunkingStrategy(
+            language=self.config.language
+        )
+        self._strategies[ChunkingMethod.PARAGRAPHS.value] = ParagraphChunkingStrategy(
             language=self.config.language
         )
         self._strategies[ChunkingMethod.TOKENS.value] = TokenChunkingStrategy(
@@ -79,6 +84,9 @@ class Chunker:
             language=self.config.language
         )
         self._strategies[ChunkingMethod.XML.value] = XMLChunkingStrategy(
+            language=self.config.language
+        )
+        self._strategies[ChunkingMethod.EBOOK_CHAPTERS.value] = EbookChapterChunkingStrategy(
             language=self.config.language
         )
         self._strategies[ChunkingMethod.ROLLING_SUMMARIZE.value] = RollingSummarizeStrategy(

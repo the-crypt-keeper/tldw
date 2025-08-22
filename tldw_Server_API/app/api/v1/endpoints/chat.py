@@ -465,7 +465,12 @@ async def create_chat_completion(
         if request_data.character_id:
             request_data.character_id = validate_character_id(request_data.character_id)
         if request_data.tools:
-            request_data.tools = validate_tool_definitions(request_data.tools)
+            # Convert ToolDefinition objects to dictionaries for validation
+            tools_as_dicts = [tool.model_dump(exclude_none=True) if hasattr(tool, 'model_dump') else tool 
+                              for tool in request_data.tools]
+            validated_tools = validate_tool_definitions(tools_as_dicts)
+            # Keep the validated tools as dicts since that's what the LLM API expects
+            request_data.tools = validated_tools
         if request_data.temperature is not None:
             request_data.temperature = validate_temperature(request_data.temperature)
         if request_data.max_tokens is not None:
@@ -535,6 +540,8 @@ async def create_chat_completion(
             request_data.character_id,
             current_loop
         )
+        if character_card_for_context:
+            logger.debug(f"Loaded character: {character_card_for_context.get('name')} with system_prompt: {character_card_for_context.get('system_prompt', 'None')[:50]}...")
         
         # Track character access
         if character_card_for_context:
@@ -628,14 +635,25 @@ async def create_chat_completion(
             # Add specific character fields used by templates if not covered by above
             template_data["character_system_prompt"] = character_card_for_context.get('system_prompt', "")
 
-        sys_msg_from_req = next((m.content for m in request_data.messages if m.role == 'system' and isinstance(m.content, str)), "")
-        template_data["original_system_message_from_request"] = sys_msg_from_req
+        sys_msg_from_req = next((m.content for m in request_data.messages if m.role == 'system' and isinstance(m.content, str)), None)
+        template_data["original_system_message_from_request"] = sys_msg_from_req or ""
 
         final_system_message: Optional[str] = None
+        logger.debug(f"sys_msg_from_req: {sys_msg_from_req}, active_template: {active_template}, character: {character_card_for_context.get('name') if character_card_for_context else None}")
         if active_template and active_template.system_message_template:
             final_system_message = apply_template_to_string(active_template.system_message_template, template_data)
+            # If template produces empty string and we have a character with system prompt, use that instead
+            if not final_system_message and character_card_for_context and character_card_for_context.get('system_prompt'):
+                final_system_message = character_card_for_context.get('system_prompt')
+                logger.debug(f"Template produced empty, using character system prompt: {final_system_message[:50]}...")
         elif sys_msg_from_req:
             final_system_message = sys_msg_from_req
+        elif character_card_for_context and character_card_for_context.get('system_prompt'):
+            # Use character's system prompt if no template and no system message in request
+            final_system_message = character_card_for_context.get('system_prompt')
+            logger.debug(f"Using character system prompt: {final_system_message[:50]}...")
+        
+        logger.debug(f"Final system message: {final_system_message}")
 
         templated_llm_payload: List[Dict[str, Any]] = []
         # FIXME
@@ -706,7 +724,10 @@ async def create_chat_completion(
 
         # Filter out None values before making the call, as chat_api_call's defaults handle Nones.
         # The previous `cleaned_args` did this.
+        # Keep system_message even if it's None - let the LLM call handle it
         cleaned_args = {k: v for k, v in call_params.items() if v is not None}
+        if 'system_message' not in cleaned_args and final_system_message is not None:
+            cleaned_args['system_message'] = final_system_message
 
         # Use provider manager for health checks and failover
         provider_manager = get_provider_manager()

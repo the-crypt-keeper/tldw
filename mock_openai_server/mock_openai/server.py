@@ -45,32 +45,45 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Global instances
-response_manager: ResponseManager = None
-streaming_generator: StreamingResponseGenerator = None
-config: MockConfig = None
+# Dependency injection functions
+from functools import lru_cache
+from fastapi import Depends
+
+
+@lru_cache()
+def get_config_instance() -> MockConfig:
+    """Get the configuration instance (cached)."""
+    return get_config()
+
+
+def get_response_manager() -> ResponseManager:
+    """Get the response manager instance."""
+    return ResponseManager()
+
+
+def get_streaming_generator(config: MockConfig = Depends(get_config_instance)) -> StreamingResponseGenerator:
+    """Get the streaming generator instance."""
+    return StreamingResponseGenerator(
+        chunk_delay_ms=config.streaming.chunk_delay_ms,
+        words_per_chunk=config.streaming.words_per_chunk
+    )
+
+
+# Add CORS middleware right after app creation
+config = get_config_instance()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=config.server.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize the server on startup."""
-    global response_manager, streaming_generator, config
-    
-    config = get_config()
-    response_manager = ResponseManager()
-    streaming_generator = StreamingResponseGenerator(
-        chunk_delay_ms=config.streaming.chunk_delay_ms,
-        tokens_per_chunk=config.streaming.tokens_per_chunk
-    )
-    
-    # Add CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=config.server.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    config = get_config_instance()
     
     logger.info(f"Mock OpenAI server started on {config.server.host}:{config.server.port}")
     logger.info(f"Streaming enabled: {config.streaming.enabled}")
@@ -94,7 +107,7 @@ def validate_api_key(authorization: Optional[str] = Header(None)) -> bool:
     return True
 
 
-def should_simulate_error() -> bool:
+def should_simulate_error(config: MockConfig) -> bool:
     """Determine if we should simulate an error based on configuration."""
     if not config.server.simulate_errors:
         return False
@@ -105,10 +118,13 @@ def should_simulate_error() -> bool:
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Log incoming requests if enabled."""
-    if config and config.server.log_requests:
+    config = get_config_instance()
+    if config.server.log_requests:
         logger.info(f"{request.method} {request.url.path}")
         
         # Log request body for debugging (be careful with sensitive data)
+        # Note: This reads the entire body into memory twice, which has a performance cost
+        # but is acceptable for a mock server used in testing environments
         if request.method == "POST":
             body = await request.body()
             if body:
@@ -118,7 +134,8 @@ async def log_requests(request: Request, call_next):
                 except json.JSONDecodeError:
                     logger.debug(f"Request body (raw): {body[:200]}...")
             
-            # Recreate the request with the body we read
+            # IMPORTANT: We must recreate the request with the body we read
+            # because FastAPI endpoints need to read the body again
             from starlette.datastructures import Headers
             from starlette.requests import Request as StarletteRequest
             
@@ -155,7 +172,10 @@ async def health():
 @app.post("/v1/chat/completions")
 async def chat_completions(
     request: ChatCompletionRequest,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    config: MockConfig = Depends(get_config_instance),
+    response_manager: ResponseManager = Depends(get_response_manager),
+    streaming_generator: StreamingResponseGenerator = Depends(get_streaming_generator)
 ):
     """Chat completions endpoint."""
     # Validate API key
@@ -166,7 +186,7 @@ async def chat_completions(
         )
     
     # Simulate errors if configured
-    if should_simulate_error():
+    if should_simulate_error(config):
         error_response = response_manager.generate_error_response(
             message="Simulated error for testing",
             error_type="server_error",
@@ -211,7 +231,9 @@ async def chat_completions(
 @app.post("/v1/embeddings")
 async def embeddings(
     request: EmbeddingRequest,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    config: MockConfig = Depends(get_config_instance),
+    response_manager: ResponseManager = Depends(get_response_manager)
 ):
     """Embeddings endpoint."""
     # Validate API key
@@ -222,7 +244,7 @@ async def embeddings(
         )
     
     # Simulate errors if configured
-    if should_simulate_error():
+    if should_simulate_error(config):
         error_response = response_manager.generate_error_response(
             message="Simulated error for testing",
             error_type="server_error",
@@ -246,7 +268,9 @@ async def embeddings(
 @app.post("/v1/completions")
 async def completions(
     request: CompletionRequest,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    config: MockConfig = Depends(get_config_instance),
+    response_manager: ResponseManager = Depends(get_response_manager)
 ):
     """Legacy completions endpoint."""
     # Validate API key
@@ -257,7 +281,7 @@ async def completions(
         )
     
     # Simulate errors if configured
-    if should_simulate_error():
+    if should_simulate_error(config):
         error_response = response_manager.generate_error_response(
             message="Simulated error for testing",
             error_type="server_error",
@@ -279,7 +303,10 @@ async def completions(
 
 
 @app.get("/v1/models")
-async def list_models(authorization: Optional[str] = Header(None)):
+async def list_models(
+    authorization: Optional[str] = Header(None),
+    config: MockConfig = Depends(get_config_instance)
+):
     """List available models endpoint."""
     # Validate API key
     if not validate_api_key(authorization):

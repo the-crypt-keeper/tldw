@@ -2,6 +2,8 @@
 
 A standalone mock server that implements the OpenAI API specification for testing purposes. This server can be used across different projects to test OpenAI API integrations without making actual API calls or incurring costs.
 
+Alternative: https://github.com/StacklokLabs/mockllm
+
 ## Features
 
 - ✅ **OpenAI-Compatible Endpoints**
@@ -38,12 +40,24 @@ A standalone mock server that implements the OpenAI API specification for testin
 git clone https://github.com/yourusername/mock-openai-server.git
 cd mock-openai-server
 pip install -e .
+
+# Or with development dependencies
+pip install -e ".[dev]"
+
+# Or with test dependencies
+pip install -e ".[test]"
+
+# Or with all optional dependencies
+pip install -e ".[all]"
 ```
 
 ### Using pip
 
 ```bash
 pip install mock-openai-server
+
+# Or with optional dependencies
+pip install "mock-openai-server[test]"
 ```
 
 ### Using Docker
@@ -254,11 +268,27 @@ Run the test suite:
 # Install test dependencies
 pip install -e ".[test]"
 
-# Run tests
-pytest tests/
+# Run all tests
+pytest
 
-# Run with coverage
-pytest tests/ --cov=mock_openai --cov-report=html
+# Run with coverage (already configured in pyproject.toml)
+pytest --cov
+
+# Run only unit tests
+pytest -m unit
+
+# Run only integration tests
+pytest -m integration
+
+# Run tests with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_server.py
+
+# Generate HTML coverage report
+pytest --cov-report=html
+# Open htmlcov/index.html in your browser
 ```
 
 ## Docker Support
@@ -369,9 +399,69 @@ This mock server implements the OpenAI API v1 specification and is compatible wi
 - LangChain
 - Any OpenAI-compatible client library
 
+## Development
+
+### Setting Up Development Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/mock-openai-server.git
+cd mock-openai-server
+
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install in development mode with all dependencies
+pip install -e ".[all]"
+```
+
+### Code Quality Tools
+
+```bash
+# Format code with black
+black mock_openai tests
+
+# Sort imports with isort
+isort mock_openai tests
+
+# Type checking with mypy
+mypy mock_openai
+
+# Linting with ruff
+ruff check mock_openai tests
+
+# Run all quality checks
+black mock_openai tests && isort mock_openai tests && mypy mock_openai && ruff check mock_openai tests
+```
+
+### Pre-commit Hooks (Optional)
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Set up the git hook scripts
+pre-commit install
+
+# Run against all files
+pre-commit run --all-files
+```
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Contributing Guidelines
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests and ensure they pass (`pytest`)
+5. Run code quality tools (`black`, `isort`, `mypy`, `ruff`)
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
 
 ## License
 

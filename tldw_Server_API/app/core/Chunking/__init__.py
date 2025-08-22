@@ -30,6 +30,21 @@ from .chunker import (
     create_chunker,
 )
 
+# Default chunking options for backward compatibility
+DEFAULT_CHUNK_OPTIONS = {
+    'method': 'words',
+    'max_size': 400,
+    'overlap': 200,
+    'language': 'en',
+    'adaptive': False,
+    'multi_level': False,
+    'semantic_similarity_threshold': 0.7,
+    'semantic_overlap_sentences': 2,
+    'json_chunkable_data_key': 'data',
+    'summarization_detail': 0.5,
+    'tokenizer_name_or_path': 'gpt2'
+}
+
 # For backward compatibility with existing code
 # These will be implemented as we port more functionality
 def improved_chunking_process(text: str, 

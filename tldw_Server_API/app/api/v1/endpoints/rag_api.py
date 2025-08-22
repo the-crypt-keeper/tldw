@@ -36,6 +36,9 @@ from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import (
     store_in_cache,
     analyze_performance,
 )
+from tldw_Server_API.app.core.RAG.rag_service.enhanced_chunking_integration import (
+    expand_with_parent_context
+)
 
 from tldw_Server_API.app.core.RAG.rag_service.types import DataSource, Document
 
@@ -94,6 +97,27 @@ class SimpleSearchRequest(BaseModel):
         default=None,
         description="Filter results by keywords (optional)",
         example=["python", "api"]
+    )
+    
+    # Contextual Retrieval Options
+    enable_contextual_retrieval: bool = Field(
+        default=False,
+        description="Enable contextual retrieval with parent document expansion",
+        example=False
+    )
+    
+    parent_expansion_size: Optional[int] = Field(
+        default=None,
+        ge=100,
+        le=2000,
+        description="Size of parent context to include (in characters) when contextual retrieval is enabled",
+        example=500
+    )
+    
+    include_sibling_chunks: bool = Field(
+        default=False,
+        description="Include adjacent chunks from the same document for continuity",
+        example=False
     )
     
     class Config:
@@ -240,6 +264,12 @@ class ComplexSearchRequest(BaseModel):
             "deduplication": {
                 "enabled": True,
                 "threshold": 0.9
+            },
+            "contextual_retrieval": {
+                "enabled": False,
+                "parent_expansion_size": 500,
+                "include_siblings": False,
+                "context_window_size": 500
             }
         }
     )
@@ -501,6 +531,12 @@ async def simple_search(
             "chacha_db_path": Path(chacha_db.db_path),
         }
         
+        # Add contextual retrieval options
+        if request.enable_contextual_retrieval:
+            config["expand_parent_context"] = True
+            config["parent_expansion_size"] = request.parent_expansion_size or 500
+            config["include_siblings"] = request.include_sibling_chunks
+        
         # Add keyword filters if provided
         if request.keywords:
             config["keyword_filters"] = request.keywords
@@ -516,6 +552,10 @@ async def simple_search(
             optimize_chromadb_search,
             retrieve_documents,
         ])
+        
+        # Add contextual expansion if enabled
+        if request.enable_contextual_retrieval:
+            pipeline_functions.append(expand_with_parent_context)
         
         # Add reranking if enabled
         if request.enable_reranking:
@@ -640,6 +680,16 @@ async def complex_search(
                 config["table_serialize_method"] = request.processing["table_processing"].get(
                     "method", "hybrid"
                 )
+            
+            # Contextual retrieval configuration
+            if request.processing.get("contextual_retrieval", {}).get("enabled", False):
+                config["expand_parent_context"] = True
+                config["parent_expansion_size"] = request.processing["contextual_retrieval"].get(
+                    "parent_expansion_size", 500
+                )
+                config["include_siblings"] = request.processing["contextual_retrieval"].get(
+                    "include_siblings", False
+                )
         
         # Reranking configuration
         if request.reranking and request.reranking.get("enabled", True):
@@ -688,6 +738,10 @@ async def complex_search(
         # Table processing
         if config.get("table_serialize_method"):
             pipeline_functions.append(process_tables)
+        
+        # Contextual expansion
+        if config.get("expand_parent_context"):
+            pipeline_functions.append(expand_with_parent_context)
         
         # Reranking
         if config.get("reranking_strategy"):

@@ -15,7 +15,7 @@ from chromadb.api.models.Collection import Collection
 from chromadb.api.types import QueryResult
 #
 # Local Imports:
-from tldw_Server_API.app.core.Chunking.Chunk_Lib import chunk_for_embedding  # Assuming this is correct
+from tldw_Server_API.app.core.Chunking import chunk_for_embedding  # Using V2 through compatibility layer
 from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import create_embedding, create_embeddings_batch
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze  # Assuming this is correct
 from tldw_Server_API.app.core.Utils.Utils import logger  # Assuming this is 'logging' aliased or a custom logger
@@ -260,7 +260,7 @@ class ChromaDBManager:
                                   collection_name: Optional[str] = None,
                                   embedding_model_id_override: Optional[str] = None,
                                   create_embeddings: bool = True,
-                                  create_contextualized: bool = False,  # Default to False due to cost/speed
+                                  create_contextualized: Optional[bool] = None,  # None means use config default
                                   llm_model_for_context: Optional[str] = None,  # e.g., "gpt-3.5-turbo"
                                   chunk_options: Optional[Dict] = None):
         """
@@ -275,8 +275,15 @@ class ChromaDBManager:
                 f"User '{self.user_id}': No embedding model ID (default or override) for media_id {media_id}. Cannot create embeddings.")
             raise ValueError("Embedding model ID not specified for content processing with embeddings.")
 
+        # Read contextual settings from config if not explicitly provided
+        if create_contextualized is None:
+            # Try to get from embedding_config first, then fall back to False
+            create_contextualized = self.embedding_config.get("enable_contextual_chunking", False)
+            logger.debug(f"Using contextual chunking from config: {create_contextualized}")
+        
         effective_llm_model_for_context = llm_model_for_context or self.embedding_config.get(
-            "default_llm_for_contextualization", "gpt-3.5-turbo")
+            "contextual_llm_model", self.embedding_config.get(
+                "default_llm_for_contextualization", "gpt-3.5-turbo"))
 
         logger.info(
             f"User '{self.user_id}': Processing content for media_id {media_id} "

@@ -142,8 +142,8 @@ class TestDocumentGeneratorService:
         # Use the real conversation created in the fixture
         conv_id = real_db.test_conversation_id
         
-        # Mock LLM call
-        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
+        # Mock LLM call - patch chat_api_call where it's imported in document_generator
+        with patch('tldw_Server_API.app.core.Chat.document_generator.chat_api_call') as mock_llm:
             mock_llm.return_value = "Timeline: Event 1, Event 2, Event 3"
             
             result = service.generate_document(
@@ -163,7 +163,7 @@ class TestDocumentGeneratorService:
         # Use the real conversation created in the fixture
         conv_id = real_db.test_conversation_id
         
-        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.document_generator.chat_api_call') as mock_llm:
             mock_llm.return_value = "Study Guide: Key concepts and review questions"
             
             result = service.generate_document(
@@ -181,7 +181,7 @@ class TestDocumentGeneratorService:
         """Test executive briefing document generation."""
         conv_id = real_db.test_conversation_id
         
-        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.document_generator.chat_api_call') as mock_llm:
             mock_llm.return_value = "Executive Summary: Key points and recommendations"
             
             result = service.generate_document(
@@ -199,7 +199,7 @@ class TestDocumentGeneratorService:
         """Test summary document generation."""
         conv_id = real_db.test_conversation_id
         
-        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.document_generator.chat_api_call') as mock_llm:
             mock_llm.return_value = "Summary: Main discussion points"
             
             result = service.generate_document(
@@ -217,7 +217,7 @@ class TestDocumentGeneratorService:
         """Test Q&A pairs document generation."""
         conv_id = real_db.test_conversation_id
         
-        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.document_generator.chat_api_call') as mock_llm:
             mock_llm.return_value = "Q1: Question?\nA1: Answer."
             
             result = service.generate_document(
@@ -235,7 +235,7 @@ class TestDocumentGeneratorService:
         """Test meeting notes document generation."""
         conv_id = real_db.test_conversation_id
         
-        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.document_generator.chat_api_call') as mock_llm:
             mock_llm.return_value = "Meeting Notes: Attendees, Agenda, Action Items"
             
             result = service.generate_document(
@@ -254,7 +254,7 @@ class TestDocumentGeneratorService:
         conv_id = real_db.test_conversation_id
         custom_prompt = "Extract only the technical terms mentioned"
         
-        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.document_generator.chat_api_call') as mock_llm:
             mock_llm.return_value = "Technical terms: quantum computing, quantum bits"
             
             result = service.generate_document(
@@ -347,7 +347,7 @@ class TestDocumentGeneratorService:
         """Test error handling during generation."""
         conv_id = "invalid_conversation_id"
         
-        with patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call') as mock_llm:
+        with patch('tldw_Server_API.app.core.Chat.document_generator.chat_api_call') as mock_llm:
             mock_llm.side_effect = Exception("LLM API error")
             
             result = service.generate_document(

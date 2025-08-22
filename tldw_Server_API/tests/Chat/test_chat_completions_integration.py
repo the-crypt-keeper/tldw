@@ -138,10 +138,13 @@ def valid_auth_token() -> str:
         # In single-user mode, use API_BEARER if set
         api_bearer = os.getenv("API_BEARER")
         if api_bearer:
+            # Ensure it has Bearer prefix
+            if not api_bearer.startswith("Bearer "):
+                return f"Bearer {api_bearer}"
             return api_bearer
         else:
-            # Default token for single-user mode
-            return "default-secret-key-for-single-user"
+            # Default token for single-user mode with Bearer prefix
+            return "Bearer default-secret-key-for-single-user"
 
 
 # --- Provider lists and helpers defined locally for this test file ---
@@ -344,34 +347,52 @@ def test_commercial_provider_streaming_no_template(
     if provider_name == "anthropic": request_body["max_tokens"] = 300
 
     print(f"\nTesting STREAMING (no template) with {provider_name} using model {request_body['model']}")
+    
+    # Make streaming request with TestClient
+    # Note: TestClient doesn't support stream=True the same way as requests library
+    # We need to handle the response directly
     response = client.post_with_csrf("/api/v1/chat/completions", json=request_body, headers={"Token": valid_auth_token})
-
+    
     assert response.status_code == status.HTTP_200_OK, f"Provider {provider_name} streaming pre-check failed: {response.text}"
-    assert 'text/event-stream' in response.headers['content-type'].lower()
+    assert 'text/event-stream' in response.headers.get('content-type', '').lower()
 
     full_content = ""
     received_done = False
     raw_stream_text_for_debug = ""
+    
     try:
-        for line in response.iter_lines():
+        # The response.text should contain the full streamed content for TestClient
+        # Split it into lines to process SSE events
+        response_text = response.text
+        lines = response_text.split('\n')
+        
+        for line in lines:
+            if not line:
+                continue
+                
             raw_stream_text_for_debug += line + "\n"
+            
             if line.startswith("data:") and "[DONE]" in line:
-                received_done = True;
+                received_done = True
                 break
+                
             if line.startswith("data:"):
                 try:
                     chunk_data_str = line[len("data:"):].strip()
-                    if not chunk_data_str: continue
-                    chunk = json.loads(chunk_data_str)
+                    if not chunk_data_str: 
+                        continue
+                    chunk_json = json.loads(chunk_data_str)
 
-                    if chunk.get("choices", [{}])[0].get("finish_reason") == "stop":
+                    if chunk_json.get("choices", [{}])[0].get("finish_reason") == "stop":
                         received_done = True
-                        break  # Or continue if other final events might follow
+                        break
 
-                    delta_content = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
-                    if delta_content: full_content += delta_content
+                    delta_content = chunk_json.get("choices", [{}])[0].get("delta", {}).get("content")
+                    if delta_content: 
+                        full_content += delta_content
                 except json.JSONDecodeError:
                     print(f"WARN: ({provider_name}) Test JSON decode error for line: '{line}' in stream.")
+                    
     except Exception as e:
         print(f"Raw stream for {provider_name} before error:\n{raw_stream_text_for_debug}")
         pytest.fail(f"Error consuming stream for {provider_name}: {e}")
