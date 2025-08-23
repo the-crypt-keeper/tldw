@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 import hashlib
 import asyncio
+import json
 #
 # 3rd-party imports
 import redis
@@ -76,6 +77,262 @@ class RateLimiter:
         
         self._initialized = True
         logger.info(f"RateLimiter initialized (enabled={self.enabled})")
+    
+    async def record_failed_attempt(
+        self,
+        identifier: str,
+        attempt_type: str = "login",
+        lockout_threshold: Optional[int] = None,
+        lockout_duration_minutes: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Record a failed authentication attempt and check for lockout
+        
+        Args:
+            identifier: Unique identifier (IP, username, etc.)
+            attempt_type: Type of attempt (login, password_reset, etc.)
+            lockout_threshold: Number of failures before lockout
+            lockout_duration_minutes: Duration of lockout in minutes
+            
+        Returns:
+            Dict with attempt count, lockout status, and reset time
+        """
+        if not self._initialized:
+            await self.initialize()
+        
+        # Use settings defaults if not provided
+        lockout_threshold = lockout_threshold or self.settings.MAX_LOGIN_ATTEMPTS
+        lockout_duration_minutes = lockout_duration_minutes or self.settings.LOCKOUT_DURATION_MINUTES
+        
+        key = f"failed_{attempt_type}:{identifier}"
+        now = datetime.utcnow()
+        
+        # Try Redis first if available
+        if self.redis_client:
+            try:
+                # Increment counter with expiry
+                pipe = self.redis_client.pipeline()
+                pipe.incr(key)
+                pipe.expire(key, lockout_duration_minutes * 60)
+                results = pipe.execute()
+                
+                attempt_count = results[0]
+                
+                if attempt_count >= lockout_threshold:
+                    # Set lockout key
+                    lockout_key = f"lockout:{identifier}"
+                    self.redis_client.setex(
+                        lockout_key,
+                        lockout_duration_minutes * 60,
+                        json.dumps({
+                            "locked_at": now.isoformat(),
+                            "attempts": attempt_count,
+                            "reason": f"Too many failed {attempt_type} attempts"
+                        })
+                    )
+                    
+                    logger.warning(f"Account locked for {identifier} after {attempt_count} failed attempts")
+                    
+                    return {
+                        "attempt_count": attempt_count,
+                        "is_locked": True,
+                        "lockout_expires": (now + timedelta(minutes=lockout_duration_minutes)).isoformat(),
+                        "remaining_attempts": 0
+                    }
+                
+                return {
+                    "attempt_count": attempt_count,
+                    "is_locked": False,
+                    "remaining_attempts": lockout_threshold - attempt_count
+                }
+                
+            except (RedisError, Exception) as e:
+                logger.warning(f"Redis error in record_failed_attempt: {e}")
+        
+        # Database fallback
+        async with self.db_pool.transaction() as conn:
+            if hasattr(conn, 'fetchrow'):
+                # PostgreSQL - use ON CONFLICT
+                result = await conn.fetchrow("""
+                    INSERT INTO failed_attempts (identifier, attempt_type, attempt_count, window_start)
+                    VALUES ($1, $2, 1, $3)
+                    ON CONFLICT (identifier, attempt_type)
+                    DO UPDATE SET 
+                        attempt_count = failed_attempts.attempt_count + 1,
+                        window_start = CASE
+                            WHEN failed_attempts.window_start + INTERVAL '%s minutes' < $3
+                            THEN $3
+                            ELSE failed_attempts.window_start
+                        END
+                    RETURNING attempt_count, window_start
+                """, identifier, attempt_type, now, lockout_duration_minutes)
+                
+                attempt_count = result['attempt_count']
+                
+            else:
+                # SQLite
+                cursor = await conn.execute(
+                    """
+                    INSERT INTO failed_attempts (identifier, attempt_type, attempt_count, window_start)
+                    VALUES (?, ?, 1, ?)
+                    ON CONFLICT (identifier, attempt_type)
+                    DO UPDATE SET 
+                        attempt_count = attempt_count + 1,
+                        window_start = CASE
+                            WHEN datetime(window_start, '+' || ? || ' minutes') < ?
+                            THEN ?
+                            ELSE window_start
+                        END
+                    """,
+                    (identifier, attempt_type, now.isoformat(), lockout_duration_minutes, 
+                     now.isoformat(), now.isoformat())
+                )
+                
+                # Get the updated count
+                cursor = await conn.execute(
+                    "SELECT attempt_count FROM failed_attempts WHERE identifier = ? AND attempt_type = ?",
+                    (identifier, attempt_type)
+                )
+                row = await cursor.fetchone()
+                attempt_count = row[0] if row else 1
+            
+            # Check for lockout
+            if attempt_count >= lockout_threshold:
+                lockout_expires = now + timedelta(minutes=lockout_duration_minutes)
+                
+                # Record lockout
+                if hasattr(conn, 'execute'):
+                    await conn.execute(
+                        """
+                        INSERT INTO account_lockouts (identifier, locked_until, reason)
+                        VALUES ($1, $2, $3)
+                        ON CONFLICT (identifier) DO UPDATE SET
+                            locked_until = $2,
+                            reason = $3
+                        """,
+                        identifier, lockout_expires, f"Too many failed {attempt_type} attempts"
+                    )
+                else:
+                    await conn.execute(
+                        """
+                        INSERT OR REPLACE INTO account_lockouts (identifier, locked_until, reason)
+                        VALUES (?, ?, ?)
+                        """,
+                        (identifier, lockout_expires.isoformat(), f"Too many failed {attempt_type} attempts")
+                    )
+                
+                logger.warning(f"Account locked for {identifier} after {attempt_count} failed attempts")
+                
+                return {
+                    "attempt_count": attempt_count,
+                    "is_locked": True,
+                    "lockout_expires": lockout_expires.isoformat(),
+                    "remaining_attempts": 0
+                }
+        
+        return {
+            "attempt_count": attempt_count,
+            "is_locked": False,
+            "remaining_attempts": lockout_threshold - attempt_count
+        }
+    
+    async def check_lockout(self, identifier: str) -> Tuple[bool, Optional[datetime]]:
+        """
+        Check if an identifier is currently locked out
+        
+        Args:
+            identifier: Unique identifier to check
+            
+        Returns:
+            Tuple of (is_locked, lockout_expires)
+        """
+        if not self._initialized:
+            await self.initialize()
+        
+        now = datetime.utcnow()
+        
+        # Check Redis first
+        if self.redis_client:
+            try:
+                lockout_key = f"lockout:{identifier}"
+                lockout_data = self.redis_client.get(lockout_key)
+                if lockout_data:
+                    data = json.loads(lockout_data)
+                    locked_at = datetime.fromisoformat(data['locked_at'])
+                    # Calculate expiry based on TTL
+                    ttl = self.redis_client.ttl(lockout_key)
+                    if ttl > 0:
+                        expires = now + timedelta(seconds=ttl)
+                        return True, expires
+                return False, None
+            except (RedisError, Exception) as e:
+                logger.warning(f"Redis error in check_lockout: {e}")
+        
+        # Database fallback
+        async with self.db_pool.acquire() as conn:
+            if hasattr(conn, 'fetchrow'):
+                # PostgreSQL
+                row = await conn.fetchrow(
+                    "SELECT locked_until FROM account_lockouts WHERE identifier = $1 AND locked_until > $2",
+                    identifier, now
+                )
+                if row:
+                    return True, row['locked_until']
+            else:
+                # SQLite
+                cursor = await conn.execute(
+                    "SELECT locked_until FROM account_lockouts WHERE identifier = ? AND locked_until > ?",
+                    (identifier, now.isoformat())
+                )
+                row = await cursor.fetchone()
+                if row:
+                    return True, datetime.fromisoformat(row[0])
+        
+        return False, None
+    
+    async def reset_failed_attempts(self, identifier: str, attempt_type: str = "login"):
+        """
+        Reset failed attempt counter for an identifier
+        
+        Args:
+            identifier: Unique identifier
+            attempt_type: Type of attempt to reset
+        """
+        if not self._initialized:
+            await self.initialize()
+        
+        key = f"failed_{attempt_type}:{identifier}"
+        
+        # Clear from Redis
+        if self.redis_client:
+            try:
+                self.redis_client.delete(key)
+                self.redis_client.delete(f"lockout:{identifier}")
+            except (RedisError, Exception) as e:
+                logger.warning(f"Redis error in reset_failed_attempts: {e}")
+        
+        # Clear from database
+        async with self.db_pool.transaction() as conn:
+            if hasattr(conn, 'execute'):
+                # PostgreSQL
+                await conn.execute(
+                    "DELETE FROM failed_attempts WHERE identifier = $1 AND attempt_type = $2",
+                    identifier, attempt_type
+                )
+                await conn.execute(
+                    "DELETE FROM account_lockouts WHERE identifier = $1",
+                    identifier
+                )
+            else:
+                # SQLite
+                await conn.execute(
+                    "DELETE FROM failed_attempts WHERE identifier = ? AND attempt_type = ?",
+                    (identifier, attempt_type)
+                )
+                await conn.execute(
+                    "DELETE FROM account_lockouts WHERE identifier = ?",
+                    (identifier,)
+                )
     
     async def check_rate_limit(
         self,

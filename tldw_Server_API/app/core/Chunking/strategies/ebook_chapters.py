@@ -6,6 +6,8 @@ Splits text into chunks based on chapter markers.
 
 from typing import List, Optional, Any, Dict
 import re
+import signal
+from contextlib import contextmanager
 from loguru import logger
 
 from ..base import BaseChunkingStrategy, ChunkResult, ChunkMetadata
@@ -28,6 +30,18 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
         'default': r'(?:Chapter|CHAPTER|Section|SECTION|Part|PART)\s+(?:[0-9]+|[IVXLCDM]+)(?:\.|:|\s|$)'
     }
     
+    # Regex complexity limits for security
+    MAX_REGEX_LENGTH = 500  # Maximum length of custom regex pattern
+    REGEX_TIMEOUT = 2  # Seconds before regex timeout
+    DANGEROUS_PATTERNS = [
+        r'\(\*',  # Possessive quantifiers
+        r'\(\?R\)',  # Recursive patterns
+        r'\(\?\(DEFINE\)',  # DEFINE patterns
+        r'{\d{4,}}',  # Large repetition ranges
+        r'[*+]{2,}',  # Nested quantifiers
+        r'\([^)]*[*+].*[*+].*\)',  # Multiple quantifiers in group
+    ]
+    
     def __init__(self, language: str = 'en'):
         """
         Initialize the ebook chapter chunking strategy.
@@ -37,6 +51,67 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
         """
         super().__init__(language)
         logger.debug(f"EbookChapterChunkingStrategy initialized for language: {language}")
+    
+    @contextmanager
+    def _regex_timeout(self, seconds):
+        """Context manager for regex timeout to prevent ReDoS attacks."""
+        def timeout_handler(signum, frame):
+            raise ProcessingError("Regex operation timed out - possible ReDoS attack")
+        
+        # Set the timeout handler
+        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(seconds)
+        
+        try:
+            yield
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+    
+    def _validate_regex_pattern(self, pattern: str) -> bool:
+        """
+        Validate a regex pattern for security issues.
+        
+        Args:
+            pattern: Regex pattern to validate
+            
+        Returns:
+            True if pattern is safe, False otherwise
+            
+        Raises:
+            InvalidInputError: If pattern is dangerous
+        """
+        # Check pattern length
+        if len(pattern) > self.MAX_REGEX_LENGTH:
+            raise InvalidInputError(
+                f"Regex pattern too long ({len(pattern)} chars). "
+                f"Maximum allowed: {self.MAX_REGEX_LENGTH}"
+            )
+        
+        # Check for dangerous patterns
+        for dangerous in self.DANGEROUS_PATTERNS:
+            if re.search(dangerous, pattern):
+                raise InvalidInputError(
+                    f"Regex pattern contains potentially dangerous construct: {dangerous}"
+                )
+        
+        # Test pattern compilation
+        try:
+            re.compile(pattern)
+        except re.error as e:
+            raise InvalidInputError(f"Invalid regex pattern: {e}")
+        
+        # Test for exponential complexity with a sample
+        test_input = "a" * 50
+        try:
+            with self._regex_timeout(1):  # 1 second timeout for test
+                re.search(pattern, test_input)
+        except ProcessingError:
+            raise InvalidInputError(
+                "Regex pattern appears to have exponential complexity"
+            )
+        
+        return True
     
     def chunk(self, 
               text: str, 
@@ -63,8 +138,10 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
             # Get custom pattern or use language-specific default
             custom_pattern = options.get('custom_chapter_pattern')
             if custom_pattern:
+                # Validate custom pattern for security
+                self._validate_regex_pattern(custom_pattern)
                 chapter_pattern = custom_pattern
-                logger.debug(f"Using custom chapter pattern: {custom_pattern}")
+                logger.debug(f"Using validated custom chapter pattern: {custom_pattern}")
             else:
                 chapter_pattern = self.CHAPTER_PATTERNS.get(
                     self.language, 
@@ -72,8 +149,13 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
                 )
                 logger.debug(f"Using {self.language} chapter pattern")
             
-            # Find all chapter markers
-            chapter_markers = list(re.finditer(chapter_pattern, text, re.MULTILINE))
+            # Find all chapter markers with timeout protection
+            try:
+                with self._regex_timeout(self.REGEX_TIMEOUT):
+                    chapter_markers = list(re.finditer(chapter_pattern, text, re.MULTILINE))
+            except ProcessingError as e:
+                logger.error(f"Regex timeout during chapter detection: {e}")
+                raise InvalidInputError(f"Chapter pattern search timed out: {e}")
             
             if not chapter_markers:
                 logger.info("No chapter markers found, treating entire text as single chapter")

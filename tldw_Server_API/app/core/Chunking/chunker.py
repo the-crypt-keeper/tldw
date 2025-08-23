@@ -6,6 +6,7 @@ This is the primary entry point for the chunking module.
 
 from typing import List, Dict, Any, Optional, Union, Generator
 from pathlib import Path
+import unicodedata
 from loguru import logger
 
 from .base import ChunkerConfig, ChunkingMethod, ChunkResult
@@ -97,6 +98,53 @@ class Chunker:
         
         logger.debug(f"Initialized {len(self._strategies)} chunking strategies")
     
+    def _sanitize_input(self, text: str) -> str:
+        """
+        Sanitize input text for security.
+        
+        Args:
+            text: Raw input text
+            
+        Returns:
+            Sanitized text
+            
+        Raises:
+            InvalidInputError: If text contains dangerous content
+        """
+        if not isinstance(text, str):
+            raise InvalidInputError(f"Expected string input, got {type(text).__name__}")
+        
+        # Remove null bytes which could cause issues
+        if '\x00' in text:
+            logger.warning("Null bytes detected in input, removing them")
+            text = text.replace('\x00', '')
+        
+        # Normalize unicode to prevent various unicode-based attacks
+        # Using NFC (Canonical Decomposition, followed by Canonical Composition)
+        text = unicodedata.normalize('NFC', text)
+        
+        # Check for control characters (except common ones like \n, \t, \r)
+        allowed_control_chars = {'\n', '\t', '\r', '\f'}
+        control_chars = []
+        for char in text:
+            if unicodedata.category(char) == 'Cc' and char not in allowed_control_chars:
+                control_chars.append(repr(char))
+        
+        if control_chars:
+            logger.warning(f"Suspicious control characters found: {control_chars[:10]}")
+            # Remove suspicious control characters
+            for char in set(control_chars):
+                text = text.replace(eval(char), '')
+        
+        # Check for bidirectional text override characters (could be used for spoofing)
+        bidi_chars = ['\u202a', '\u202b', '\u202c', '\u202d', '\u202e', '\u2066', '\u2067', '\u2068', '\u2069']
+        for bidi_char in bidi_chars:
+            if bidi_char in text:
+                logger.warning("Bidirectional override characters detected and removed")
+                text = text.replace(bidi_char, '')
+        
+        return text
+    
     def chunk_text(self,
                    text: str,
                    method: Optional[str] = None,
@@ -123,9 +171,8 @@ class Chunker:
             InvalidChunkingMethodError: If method is not supported
             ChunkingError: For other chunking errors
         """
-        # Validate input
-        if not isinstance(text, str):
-            raise InvalidInputError(f"Expected string input, got {type(text).__name__}")
+        # Sanitize and validate input
+        text = self._sanitize_input(text)
         
         if not text.strip():
             logger.debug("Empty text provided, returning empty list")
@@ -208,6 +255,9 @@ class Chunker:
         Returns:
             List of ChunkResult objects with text and metadata
         """
+        # Sanitize input
+        text = self._sanitize_input(text)
+        
         # Use defaults if not specified
         method = method or self.config.default_method.value
         max_size = max_size if max_size is not None else self.config.default_max_size
@@ -254,6 +304,9 @@ class Chunker:
         Yields:
             Individual text chunks
         """
+        # Sanitize input
+        text = self._sanitize_input(text)
+        
         # Use defaults if not specified
         method = method or self.config.default_method.value
         max_size = max_size if max_size is not None else self.config.default_max_size

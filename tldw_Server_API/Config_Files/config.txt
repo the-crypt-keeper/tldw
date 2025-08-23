@@ -48,6 +48,16 @@ db_transaction_max_retries = 3
 rate_limit_per_minute = 60
 rate_limit_per_conversation_per_minute = 20
 
+[Character-Chat]
+# Rate limiting for character operations
+# Maximum number of character operations (create/update/import) per user per time window
+CHARACTER_RATE_LIMIT_OPS = 100
+# Time window for rate limiting in seconds (3600 = 1 hour)
+CHARACTER_RATE_LIMIT_WINDOW = 3600
+# Maximum number of characters a single user can have
+MAX_CHARACTERS_PER_USER = 1000
+# Maximum size for character import files in MB
+MAX_CHARACTER_IMPORT_SIZE_MB = 10
 
 [Settings]
 chunk_duration = 30
@@ -201,6 +211,14 @@ contextual_llm_model = gpt-3.5-turbo
 contextual_chunk_method = situate_context
 # Method for adding context: 'situate_context' adds document-aware summaries
 # huggingface: model = dunzhang/stella_en_400M_v5
+
+# Resource Management Settings
+max_models_in_memory = 3
+# Maximum number of embedding models to keep loaded in memory simultaneously
+max_model_memory_gb = 8
+# Maximum total memory (in GB) allocated for all embedding models
+model_lru_ttl_seconds = 3600
+# Time to keep unused models in memory before eviction (in seconds, default 1 hour)
 
 
 [RAG]

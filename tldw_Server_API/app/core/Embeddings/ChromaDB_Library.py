@@ -5,6 +5,8 @@
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, Sequence, Literal
 import threading
+import re
+import os
 # 3rd-Party Imports:
 import chromadb
 from chromadb import Settings
@@ -17,10 +19,92 @@ from chromadb.api.types import QueryResult
 # Local Imports:
 from tldw_Server_API.app.core.Chunking import chunk_for_embedding  # Using V2 through compatibility layer
 from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import create_embedding, create_embeddings_batch
+from tldw_Server_API.app.core.Embeddings.audit_logger import audit_log, AuditEventType
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze  # Assuming this is correct
 from tldw_Server_API.app.core.Utils.Utils import logger  # Assuming this is 'logging' aliased or a custom logger
 #
 #######################################################################################################################
+#
+# Security Functions:
+def validate_user_id(user_id: str) -> str:
+    """
+    Validates and sanitizes user_id to prevent path traversal attacks.
+    
+    Args:
+        user_id: The user identifier to validate
+        
+    Returns:
+        Sanitized user_id
+        
+    Raises:
+        ValueError: If user_id contains invalid characters or patterns
+    """
+    if not user_id:
+        raise ValueError("user_id cannot be empty")
+    
+    # Convert to string and strip whitespace
+    user_id = str(user_id).strip()
+    
+    # Check for path traversal attempts
+    if any(pattern in user_id for pattern in ['..', '/', '\\', '\x00', '\n', '\r']):
+        logger.error(f"Potential path traversal attempt detected in user_id: {user_id[:50]}")
+        audit_log(
+            AuditEventType.PATH_TRAVERSAL_ATTEMPT,
+            user_id=user_id[:50],
+            details={"attempted_value": user_id[:100]},
+            severity="WARNING"
+        )
+        raise ValueError("Invalid user_id: contains forbidden characters")
+    
+    # Only allow alphanumeric, underscore, and hyphen
+    if not re.match(r'^[a-zA-Z0-9_-]+$', user_id):
+        logger.error(f"Invalid user_id format: {user_id[:50]}")
+        audit_log(
+            AuditEventType.INVALID_USER_ID,
+            user_id=user_id[:50],
+            details={"reason": "invalid_characters"},
+            severity="WARNING"
+        )
+        raise ValueError("Invalid user_id: must contain only alphanumeric characters, underscores, and hyphens")
+    
+    # Limit length to prevent DoS
+    if len(user_id) > 255:
+        raise ValueError("Invalid user_id: exceeds maximum length of 255 characters")
+    
+    return user_id
+
+def validate_model_id(model_id: str) -> str:
+    """
+    Validates model identifier to prevent injection attacks.
+    
+    Args:
+        model_id: The model identifier to validate
+        
+    Returns:
+        Validated model_id
+        
+    Raises:
+        ValueError: If model_id contains invalid patterns
+    """
+    if not model_id:
+        raise ValueError("model_id cannot be empty")
+    
+    model_id = str(model_id).strip()
+    
+    # Allow forward slash for model paths like "org/model" but prevent traversal
+    if '..' in model_id or model_id.startswith('/') or '\\' in model_id:
+        logger.error(f"Invalid model_id format: {model_id[:100]}")
+        raise ValueError("Invalid model_id: contains forbidden patterns")
+    
+    # Allow alphanumeric, underscore, hyphen, forward slash, and dot
+    if not re.match(r'^[a-zA-Z0-9_\-/\.]+$', model_id):
+        raise ValueError("Invalid model_id: contains invalid characters")
+    
+    if len(model_id) > 500:
+        raise ValueError("Invalid model_id: exceeds maximum length")
+    
+    return model_id
+
 #
 # Functions:
 ChromaIncludeLiteral = Literal["documents", "embeddings", "metadatas", "distances", "uris", "data"]
@@ -40,14 +124,17 @@ class ChromaDBManager:
             user_id (str): The ID of the user for whom this ChromaDB instance is.
             user_embedding_config (Dict[str, Any]): The global application configuration dictionary.
         """
-        if not user_id:
-            logger.error("Initialization failed: user_id cannot be empty for ChromaDBManager.")
-            raise ValueError("user_id cannot be empty for ChromaDBManager.")
         if not user_embedding_config:
             logger.error("Initialization failed: user_embedding_config cannot be empty for ChromaDBManager.")
             raise ValueError("user_embedding_config cannot be empty for ChromaDBManager.")
 
-        self.user_id = str(user_id)
+        # Validate and sanitize user_id to prevent path traversal
+        try:
+            self.user_id = validate_user_id(user_id)
+        except ValueError as e:
+            logger.error(f"Initialization failed: {e}")
+            raise
+        
         self.user_embedding_config = user_embedding_config
         self._lock = threading.RLock()  # Instance-specific lock
 
@@ -57,7 +144,21 @@ class ChromaDBManager:
             logger.critical("USER_DB_BASE_DIR not found in user_embedding_config. ChromaDBManager cannot be initialized.")
             raise ValueError("USER_DB_BASE_DIR not configured in application settings.")
 
-        self.user_chroma_path: Path = (Path(user_db_base_dir_str) / self.user_id / "chroma_storage").resolve()
+        # Validate base directory path
+        user_db_base_path = Path(user_db_base_dir_str).resolve()
+        if not user_db_base_path.exists():
+            logger.error(f"USER_DB_BASE_DIR does not exist: {user_db_base_path}")
+            raise ValueError(f"USER_DB_BASE_DIR does not exist: {user_db_base_path}")
+        
+        # Construct path safely with validated user_id
+        self.user_chroma_path: Path = (user_db_base_path / self.user_id / "chroma_storage").resolve()
+        
+        # Ensure the resolved path is within the base directory (defense in depth)
+        try:
+            self.user_chroma_path.relative_to(user_db_base_path)
+        except ValueError:
+            logger.critical(f"Security violation: Resolved path {self.user_chroma_path} is outside base directory {user_db_base_path}")
+            raise ValueError("Invalid path: security violation detected")
         try:
             self.user_chroma_path.mkdir(parents=True, exist_ok=True)
         except OSError as e:

@@ -6,6 +6,7 @@ Handles structured data formats while preserving structure and relationships.
 
 import json
 import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import ParseError
 from typing import List, Dict, Any, Optional, Tuple, Generator
 from loguru import logger
 
@@ -288,10 +289,50 @@ class XMLChunkingStrategy(BaseChunkingStrategy):
                 f"allowed size ({self.MAX_XML_SIZE} bytes)"
             )
         
-        # Parse XML
+        # Parse XML with security hardening against XXE attacks
         try:
-            root = ET.fromstring(text)
-        except ET.ParseError as e:
+            # Try to use defusedxml if available (most secure)
+            try:
+                import defusedxml.ElementTree as DefusedET
+                import defusedxml.common
+                
+                # Additional pre-check for DOCTYPE SYSTEM which might not always be caught
+                if 'DOCTYPE' in text and 'SYSTEM' in text:
+                    logger.error("XML contains DOCTYPE SYSTEM declaration")
+                    raise InvalidInputError("XML contains DOCTYPE SYSTEM declaration which is not allowed for security reasons")
+                
+                try:
+                    root = DefusedET.fromstring(text)
+                    logger.debug("Using defusedxml for secure XML parsing")
+                except (defusedxml.common.EntitiesForbidden, 
+                        defusedxml.common.ExternalReferenceForbidden,
+                        defusedxml.common.DTDForbidden,
+                        defusedxml.common.NotSupportedError) as e:
+                    logger.error(f"Blocked potential XXE attack: {e}")
+                    raise InvalidInputError(f"XML contains forbidden constructs (potential XXE attack): {e}")
+            except ImportError:
+                # Fall back to standard library with security measures
+                # Create parser with entity resolution disabled
+                parser = ET.XMLParser()
+                parser.entity = {}  # Clear entity definitions
+                parser.default = lambda x: None  # Ignore undefined entities
+                
+                # Pre-check for dangerous XML constructs
+                if '<!DOCTYPE' in text or '<!ENTITY' in text or 'SYSTEM' in text:
+                    raise InvalidInputError(
+                        "XML contains potentially dangerous DTD/Entity declarations. "
+                        "These are not allowed for security reasons."
+                    )
+                
+                # Additional check for external references
+                if any(x in text.lower() for x in ['file://', 'http://', 'https://', 'ftp://']):
+                    raise InvalidInputError(
+                        "XML contains external references which are not allowed for security reasons."
+                    )
+                
+                root = ET.fromstring(text, parser=parser)
+                logger.debug("Using standard xml.etree with security checks")
+        except ParseError as e:
             logger.error(f"Invalid XML data: {e}")
             raise InvalidInputError(f"Invalid XML data: {e}") from e
         

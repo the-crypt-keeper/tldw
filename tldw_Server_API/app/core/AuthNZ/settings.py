@@ -38,16 +38,6 @@ class Settings(BaseSettings):
         description="JWT signing key - MUST be set via environment variable in production"
     )
     
-    JWT_SECRET_FILE: Optional[str] = Field(
-        default=None,  # Disabled by default for security
-        description="DEPRECATED - File storage for JWT secret (development only)"
-    )
-    
-    ALLOW_JWT_SECRET_FILE: bool = Field(
-        default=False,
-        description="Allow JWT secret file storage (INSECURE - development only)"
-    )
-    
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
         default=30,
         description="Access token expiration time in minutes"
@@ -303,53 +293,19 @@ class Settings(BaseSettings):
             logger.debug("Single-user mode - skipping JWT secret initialization")
             return
         
-        # Priority 1: Environment variable (REQUIRED for production)
+        # Environment variable is REQUIRED for JWT secret
         if self.JWT_SECRET_KEY:
             # Secret provided via environment - validate it
             if len(self.JWT_SECRET_KEY) < 32:
-                raise ValueError("JWT_SECRET_KEY must be at least 32 characters")
+                raise ValueError("JWT_SECRET_KEY must be at least 32 characters for security")
             logger.info("Using JWT secret from environment variable")
             return
         
-        # Priority 2: File storage (ONLY if explicitly allowed for development)
-        if self.ALLOW_JWT_SECRET_FILE and self.JWT_SECRET_FILE:
-            logger.warning("⚠️ JWT secret file storage is ENABLED - This is INSECURE for production!")
-            secret_file = Path(self.JWT_SECRET_FILE)
-            
-            if secret_file.exists():
-                # Load existing secret
-                try:
-                    self.JWT_SECRET_KEY = secret_file.read_text().strip()
-                    if not self.JWT_SECRET_KEY:
-                        raise ValueError("Empty JWT secret file")
-                    logger.warning(f"Loaded JWT secret from file: {secret_file} (INSECURE)")
-                except Exception as e:
-                    logger.error(f"Failed to load JWT secret from {secret_file}: {e}")
-                    raise
-            else:
-                # Generate and save new secret (development only)
-                self.JWT_SECRET_KEY = secrets.token_urlsafe(64)
-                try:
-                    # Create parent directories if needed
-                    secret_file.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    # Write secret to file
-                    secret_file.write_text(self.JWT_SECRET_KEY)
-                    
-                    # Secure file permissions (Unix-like systems)
-                    if os.name != 'nt':
-                        os.chmod(secret_file, 0o600)
-                        
-                    logger.warning(f"Generated and saved JWT secret to file: {secret_file} (INSECURE)")
-                except Exception as e:
-                    logger.error(f"Failed to save JWT secret to {secret_file}: {e}")
-                    raise
-        else:
-            # No JWT secret available - this is a configuration error
-            raise ValueError(
-                "JWT_SECRET_KEY must be set via environment variable for multi-user mode. "
-                "For development only, you can set ALLOW_JWT_SECRET_FILE=true to use file storage."
-            )
+        # No JWT secret available - this is a configuration error
+        raise ValueError(
+            "JWT_SECRET_KEY must be set via environment variable for multi-user mode. "
+            "This is required for security - file-based storage is not supported."
+        )
     
     def _validate_api_key(self):
         """Validate API key for single-user mode"""
