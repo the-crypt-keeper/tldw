@@ -196,10 +196,12 @@ class ConnectionPool:
         """Create a new database connection."""
         try:
             # Create SQLite connection
+            # Note: Removed check_same_thread=False for thread safety
+            # Each connection should only be used by the thread that created it
             conn = sqlite3.connect(
                 str(self.db_path),
                 timeout=30.0,
-                check_same_thread=False
+                check_same_thread=True  # Enforce thread safety
             )
             
             # Row factory for dict-like access

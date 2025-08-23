@@ -12,6 +12,7 @@ from loguru import logger
 
 from ..base import BaseChunkingStrategy, ChunkResult, ChunkMetadata
 from ..exceptions import InvalidInputError, ChunkingError
+from ..security_logger import get_security_logger, SecurityEventType
 
 
 class JSONChunkingStrategy(BaseChunkingStrategy):
@@ -257,6 +258,7 @@ class XMLChunkingStrategy(BaseChunkingStrategy):
             language: Language code for text content
         """
         super().__init__(language)
+        self._security_logger = get_security_logger()
         logger.debug("XMLChunkingStrategy initialized")
     
     def chunk(self,
@@ -299,6 +301,7 @@ class XMLChunkingStrategy(BaseChunkingStrategy):
                 # Additional pre-check for DOCTYPE SYSTEM which might not always be caught
                 if 'DOCTYPE' in text and 'SYSTEM' in text:
                     logger.error("XML contains DOCTYPE SYSTEM declaration")
+                    self._security_logger.log_xxe_attempt(text[:500], source="xml_chunk")
                     raise InvalidInputError("XML contains DOCTYPE SYSTEM declaration which is not allowed for security reasons")
                 
                 try:

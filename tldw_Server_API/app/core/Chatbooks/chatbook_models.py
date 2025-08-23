@@ -72,6 +72,28 @@ class ConflictResolution(Enum):
 
 
 @dataclass
+class ImportStatusData:
+    """Import status tracking data."""
+    total_items: int = 0
+    successful_items: int = 0
+    failed_items: int = 0
+    skipped_items: int = 0
+    conflicts: List[Dict[str, Any]] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "total_items": self.total_items,
+            "successful_items": self.successful_items,
+            "failed_items": self.failed_items,
+            "skipped_items": self.skipped_items,
+            "conflicts": self.conflicts,
+            "warnings": self.warnings
+        }
+
+
+@dataclass
 class ContentItem:
     """Individual content item in a chatbook."""
     id: str
@@ -155,10 +177,14 @@ class ChatbookManifest:
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
     export_id: Optional[str] = None  # Unique export identifier
+    exported_at: Optional[str] = None  # For compatibility with tests
+    user_id: Optional[str] = None  # User who created the export
     
     # Content summary
     content_items: List[ContentItem] = field(default_factory=list)
     relationships: List[Relationship] = field(default_factory=list)
+    content_summary: Optional[Dict[str, int]] = field(default_factory=dict)  # For compatibility
+    metadata: Optional[Dict[str, Any]] = field(default_factory=dict)  # For compatibility
     
     # Configuration
     include_media: bool = False
@@ -189,7 +215,7 @@ class ChatbookManifest:
     def to_dict(self) -> dict:
         """Convert manifest to dictionary for JSON serialization."""
         return {
-            "version": self.version.value,
+            "version": self.version.value if isinstance(self.version, Enum) else str(self.version),
             "name": self.name,
             "description": self.description,
             "author": self.author,

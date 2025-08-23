@@ -510,15 +510,29 @@ class AccessController:
 class SecurityAuditor:
     """Audit logger for security events."""
     
-    def __init__(self, db_path: str = "security_audit.db"):
+    def __init__(
+        self, 
+        db_path: str = "security_audit.db",
+        max_size_mb: int = 100,
+        max_age_days: int = 90,
+        rotation_check_interval: int = 3600
+    ):
         """
-        Initialize security auditor.
+        Initialize security auditor with rotation support.
         
         Args:
             db_path: Path to audit database
+            max_size_mb: Maximum database size in MB before rotation
+            max_age_days: Maximum age of records in days
+            rotation_check_interval: Seconds between rotation checks
         """
         self.db_path = db_path
+        self.max_size_mb = max_size_mb
+        self.max_age_days = max_age_days
+        self.rotation_check_interval = rotation_check_interval
+        self._last_rotation_check = time.time()
         self._init_database()
+        self._check_rotation()
     
     def _init_database(self):
         """Initialize audit database."""
@@ -603,6 +617,9 @@ class SecurityAuditor:
         limit: int = 100
     ) -> List[Dict[str, Any]]:
         """Get audit trail."""
+        # Check for rotation before querying
+        self._check_rotation()
+        
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             
@@ -626,6 +643,106 @@ class SecurityAuditor:
             
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
+    
+    def _check_rotation(self):
+        """Check if audit log needs rotation."""
+        current_time = time.time()
+        
+        # Only check rotation periodically
+        if current_time - self._last_rotation_check < self.rotation_check_interval:
+            return
+        
+        self._last_rotation_check = current_time
+        
+        try:
+            # Check database size
+            if Path(self.db_path).exists():
+                size_mb = Path(self.db_path).stat().st_size / (1024 * 1024)
+                if size_mb > self.max_size_mb:
+                    logger.info(f"Audit log size ({size_mb:.2f}MB) exceeds limit ({self.max_size_mb}MB), rotating...")
+                    self._rotate_by_size()
+            
+            # Check for old records
+            self._delete_old_records()
+            
+        except Exception as e:
+            logger.error(f"Error checking rotation: {e}")
+    
+    def _rotate_by_size(self):
+        """Rotate audit log when size limit exceeded."""
+        try:
+            # Create archive filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            archive_path = f"{self.db_path}.{timestamp}.archive"
+            
+            # Rename current database to archive
+            Path(self.db_path).rename(archive_path)
+            
+            # Create new database
+            self._init_database()
+            
+            # Copy recent records from archive to new database
+            with sqlite3.connect(archive_path) as archive_conn:
+                with sqlite3.connect(self.db_path) as new_conn:
+                    # Copy last 30 days of records
+                    cutoff_date = (datetime.now() - timedelta(days=30)).isoformat()
+                    
+                    cursor = archive_conn.execute(
+                        "SELECT * FROM audit_log WHERE timestamp >= ? ORDER BY timestamp",
+                        (cutoff_date,)
+                    )
+                    
+                    records = cursor.fetchall()
+                    if records:
+                        new_conn.executemany(
+                            """
+                            INSERT INTO audit_log
+                            (id, timestamp, user_id, action, resource, sensitivity, pii_detected, access_granted, metadata)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            records
+                        )
+                        new_conn.commit()
+            
+            logger.info(f"Audit log rotated to {archive_path}")
+            
+            # Compress archive if possible
+            try:
+                import gzip
+                import shutil
+                
+                with open(archive_path, 'rb') as f_in:
+                    with gzip.open(f"{archive_path}.gz", 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                
+                # Remove uncompressed archive
+                Path(archive_path).unlink()
+                logger.info(f"Archive compressed to {archive_path}.gz")
+                
+            except ImportError:
+                logger.debug("gzip not available, archive not compressed")
+                
+        except Exception as e:
+            logger.error(f"Error rotating audit log: {e}")
+    
+    def _delete_old_records(self):
+        """Delete records older than max_age_days."""
+        try:
+            cutoff_date = (datetime.now() - timedelta(days=self.max_age_days)).isoformat()
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    "DELETE FROM audit_log WHERE timestamp < ?",
+                    (cutoff_date,)
+                )
+                deleted_count = cursor.rowcount
+                
+                if deleted_count > 0:
+                    conn.execute("VACUUM")  # Reclaim space
+                    logger.info(f"Deleted {deleted_count} old audit records")
+                    
+        except Exception as e:
+            logger.error(f"Error deleting old records: {e}")
 
 
 class SecurityFilters:

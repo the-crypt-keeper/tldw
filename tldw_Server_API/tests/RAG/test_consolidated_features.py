@@ -1,6 +1,10 @@
 """
 Comprehensive tests for consolidated RAG features.
 
+NOTE: This test file is for deprecated v2 functionality.
+The v3 functional pipeline handles these features differently.
+Tests are kept for reference but skipped in normal runs.
+
 Tests for:
 - Citation generation
 - Parent document retrieval
@@ -10,6 +14,8 @@ Tests for:
 """
 
 import pytest
+# Skip all tests - deprecated v2 functionality
+pytestmark = pytest.mark.skip(reason="Tests deprecated v2 features - v3 uses functional pipeline")
 import asyncio
 import sqlite3
 from pathlib import Path

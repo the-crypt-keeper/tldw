@@ -17,7 +17,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from .cache import CacheEntry, LRUCache
+from .advanced_cache import CacheEntry, MemoryCache
 
 
 @dataclass
@@ -99,14 +99,35 @@ class SemanticCache:
             Embedding vector or None if unavailable
         """
         if not self.embedding_model:
+            logger.debug("No embedding model configured for semantic cache")
             return None
         
         try:
-            # This would use the actual embedding model
-            # For now, generate a deterministic fake embedding for testing
-            np.random.seed(hash(text) % (2**32))
-            embedding = np.random.rand(768)
-            embedding = embedding / np.linalg.norm(embedding)  # Normalize
+            # Check if embedding_model has the expected interface
+            if hasattr(self.embedding_model, 'encode'):
+                # Sentence transformers style
+                embedding = self.embedding_model.encode(text)
+                if isinstance(embedding, list):
+                    embedding = np.array(embedding)
+            elif hasattr(self.embedding_model, 'embed'):
+                # Generic embedding interface
+                embedding = await self.embedding_model.embed(text)
+                if isinstance(embedding, list):
+                    embedding = np.array(embedding)
+            elif callable(self.embedding_model):
+                # Function-based embedding model
+                embedding = await self.embedding_model(text) if asyncio.iscoroutinefunction(self.embedding_model) else self.embedding_model(text)
+                if isinstance(embedding, list):
+                    embedding = np.array(embedding)
+            else:
+                logger.warning(f"Embedding model does not have expected interface: {type(self.embedding_model)}")
+                return None
+            
+            # Normalize the embedding
+            norm = np.linalg.norm(embedding)
+            if norm > 0:
+                embedding = embedding / norm
+            
             return embedding
         except Exception as e:
             logger.error(f"Failed to generate embedding: {e}")

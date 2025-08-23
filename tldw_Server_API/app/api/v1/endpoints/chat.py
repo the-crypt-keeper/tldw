@@ -1101,7 +1101,7 @@ async def create_chat_completion(
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=unexpected_error.to_response_dict()
+            detail="An unexpected internal server error occurred."
         )
 
 

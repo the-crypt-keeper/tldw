@@ -22,6 +22,7 @@ from ....core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from ....core.Chatbooks.chatbook_service import ChatbookService
 from ....core.Chatbooks.chatbook_models import ContentType, ConflictResolution, ExportStatus
 from ....core.Chatbooks.quota_manager import QuotaManager
+from ....core.Chatbooks.chatbook_validators import ChatbookValidator
 from ....core.AuthNZ.User_DB_Handling import User
 from ..API_Deps.auth_deps import get_current_user
 from ..API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user as get_chacha_db
@@ -79,6 +80,16 @@ async def create_chatbook(
         CreateChatbookResponse with job ID (async) or file path (sync)
     """
     try:
+        # Validate metadata
+        valid, error = ChatbookValidator.validate_chatbook_metadata(
+            request_data.name,
+            request_data.description,
+            request_data.tags,
+            request_data.categories
+        )
+        if not valid:
+            raise HTTPException(status_code=400, detail=error)
+        
         # Initialize quota manager
         quota_manager = QuotaManager(str(user.id), getattr(user, 'tier', 'free'))
         
@@ -187,15 +198,10 @@ async def import_chatbook(
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
         
-        # Sanitize filename - extract only the basename and remove dangerous characters
-        import os
-        import re
-        safe_filename = os.path.basename(file.filename)
-        safe_filename = re.sub(r'[^a-zA-Z0-9._\-]', '_', safe_filename)
-        
-        # Validate file extension
-        if not safe_filename.lower().endswith(('.zip', '.chatbook')):
-            raise HTTPException(status_code=400, detail="Invalid file type. Only .zip or .chatbook files are allowed")
+        # Validate and sanitize filename
+        valid, error, safe_filename = ChatbookValidator.validate_filename(file.filename)
+        if not valid:
+            raise HTTPException(status_code=400, detail=error)
         
         # Check file size
         file.file.seek(0, 2)  # Seek to end
@@ -207,13 +213,24 @@ async def import_chatbook(
         if not allowed:
             raise HTTPException(status_code=413, detail=message)
         
-        # Save uploaded file to temp location with sanitized name
-        temp_dir = Path(f"/tmp/tldw/{user.id}/uploads")
-        temp_dir.mkdir(parents=True, exist_ok=True)
+        # Save uploaded file to secure temp location with sanitized name
+        import tempfile
+        base_temp = Path(tempfile.gettempdir())
+        temp_dir = base_temp / f"tldw_uploads/{user.id}"
+        temp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         
         temp_file = temp_dir / f"import_{safe_filename}"
         with open(temp_file, 'wb') as f:
             shutil.copyfileobj(file.file, f)
+        
+        # Validate the uploaded ZIP file
+        valid, error = ChatbookValidator.validate_zip_file(str(temp_file))
+        if not valid:
+            try:
+                temp_file.unlink()
+            except:
+                pass
+            raise HTTPException(status_code=400, detail=error)
         
         # Convert content selections if provided
         content_selections = None
@@ -232,11 +249,11 @@ async def import_chatbook(
             prefix_imported=import_request.prefix_imported,
             import_media=import_request.import_media,
             import_embeddings=import_request.import_embeddings,
-            async_mode=request_data.async_mode
+            async_mode=import_request.async_mode
         )
         
         if success:
-            if request_data.async_mode:
+            if import_request.async_mode:
                 # Async mode - return job ID
                 return ImportChatbookResponse(
                     success=True,
@@ -260,7 +277,7 @@ async def import_chatbook(
         raise HTTPException(status_code=500, detail="An error occurred while importing the chatbook")
     finally:
         # Cleanup uploaded file if not async
-        if not request_data.async_mode and temp_file.exists():
+        if 'temp_file' in locals() and not import_request.async_mode and temp_file.exists():
             try:
                 temp_file.unlink()
             except:
@@ -294,15 +311,10 @@ async def preview_chatbook(
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
         
-        # Sanitize filename
-        import os
-        import re
-        safe_filename = os.path.basename(file.filename)
-        safe_filename = re.sub(r'[^a-zA-Z0-9._\-]', '_', safe_filename)
-        
-        # Validate file extension
-        if not safe_filename.lower().endswith(('.zip', '.chatbook')):
-            raise HTTPException(status_code=400, detail="Invalid file type. Only .zip or .chatbook files are allowed")
+        # Validate and sanitize filename
+        valid, error, safe_filename = ChatbookValidator.validate_filename(file.filename)
+        if not valid:
+            raise HTTPException(status_code=400, detail=error)
         
         # Check file size (limit to 100MB for preview)
         file.file.seek(0, 2)
@@ -312,9 +324,11 @@ async def preview_chatbook(
         if file_size > 100 * 1024 * 1024:
             raise HTTPException(status_code=413, detail="File too large. Maximum size is 100MB")
         
-        # Save uploaded file to temp location with sanitized name
-        temp_dir = Path(f"/tmp/tldw/{user.id}/uploads")
-        temp_dir.mkdir(parents=True, exist_ok=True)
+        # Save uploaded file to secure temp location with sanitized name
+        import tempfile
+        base_temp = Path(tempfile.gettempdir())
+        temp_dir = base_temp / f"tldw_uploads/{user.id}"
+        temp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         
         temp_file = temp_dir / f"preview_{safe_filename}"
         with open(temp_file, 'wb') as f:
@@ -594,8 +608,7 @@ async def download_chatbook(
     """
     try:
         # Validate job_id format (UUID)
-        import re
-        if not re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', job_id.lower()):
+        if not ChatbookValidator.validate_job_id(job_id):
             raise HTTPException(status_code=400, detail="Invalid job ID format")
         
         # Get job from service (validates ownership)
@@ -638,7 +651,7 @@ async def download_chatbook(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error downloading chatbook {filename} for user {user.id}: {e}")
+        logger.error(f"Error downloading chatbook {job_id} for user {user.id}: {e}")
         raise HTTPException(status_code=500, detail="An error occurred while downloading the file")
 
 

@@ -22,7 +22,7 @@ from tldw_Server_API.app.main import app
 from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import User
-from tldw_Server_API.app.api.v1.endpoints.rag_v2 import rag_service_manager
+from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_router
 from tldw_Server_API.app.core.config import settings
 
 

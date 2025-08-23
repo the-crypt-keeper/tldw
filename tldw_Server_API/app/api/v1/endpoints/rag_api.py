@@ -12,9 +12,11 @@ from typing import Optional, Dict, Any, List, Union
 from uuid import uuid4
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Depends, Body, status
+from fastapi import APIRouter, HTTPException, Depends, Body, status, Request
 from loguru import logger
 from pydantic import BaseModel, Field, validator
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 # Dependencies
 from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
@@ -423,6 +425,9 @@ router = APIRouter(
     }
 )
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # ============= Helper Functions =============
 
 def map_databases(databases: Union[List[str], Dict[str, Dict[str, Any]]]) -> List[DataSource]:
@@ -507,8 +512,10 @@ def create_citation(doc: Document, include_metadata: bool = True) -> Citation:
     suitable for most use cases without complex configuration.
     """
 )
+@limiter.limit("30/minute")  # Rate limit: 30 simple searches per minute
 async def simple_search(
     request: SimpleSearchRequest,
+    req: Request,  # Required for rate limiter
     current_user: User = Depends(get_request_user),
     media_db: MediaDatabase = Depends(get_media_db_for_user),
     chacha_db: CharactersRAGDB = Depends(get_chacha_db_for_user),
@@ -629,8 +636,10 @@ async def simple_search(
     fine-grained control over the search process.
     """
 )
+@limiter.limit("10/minute")  # Rate limit: 10 complex searches per minute (more resource intensive)
 async def complex_search(
     request: ComplexSearchRequest,
+    req: Request,  # Required for rate limiter
     current_user: User = Depends(get_request_user),
     media_db: MediaDatabase = Depends(get_media_db_for_user),
     chacha_db: CharactersRAGDB = Depends(get_chacha_db_for_user),

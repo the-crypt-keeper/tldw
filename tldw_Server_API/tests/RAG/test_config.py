@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import os
 
-from ..config import RAGConfig, RetrieverConfig, ProcessorConfig, GeneratorConfig
+from tldw_Server_API.app.core.RAG.rag_service.config import RAGConfig
 
 
 class TestRAGConfig:

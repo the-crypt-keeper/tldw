@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 import sqlite3
 import json
+import os
+from pathlib import Path
 from datetime import datetime, timedelta
 
 from loguru import logger
@@ -48,9 +50,71 @@ class BaseRetriever(ABC):
         Args:
             db_path: Path to database
             config: Retrieval configuration
+        
+        Raises:
+            ValueError: If db_path is invalid or contains path traversal
         """
-        self.db_path = db_path
+        # Validate and sanitize the database path
+        self.db_path = self._validate_path(db_path)
         self.config = config or RetrievalConfig()
+    
+    def _validate_path(self, path: str) -> str:
+        """
+        Validate and sanitize a file path to prevent path traversal attacks.
+        
+        Args:
+            path: The path to validate
+            
+        Returns:
+            Sanitized absolute path
+            
+        Raises:
+            ValueError: If path is invalid or contains traversal attempts
+        """
+        try:
+            # Convert to Path object for safe handling
+            path_obj = Path(path)
+            
+            # Resolve to absolute path (follows symlinks and resolves ..)
+            abs_path = path_obj.resolve()
+            
+            # Check if path contains suspicious patterns
+            path_str = str(abs_path)
+            suspicious_patterns = [
+                '../',  # Parent directory traversal
+                '..\\',  # Windows parent directory traversal
+                '/etc/',  # System configuration
+                '/proc/',  # Process information
+                '/sys/',  # System information
+                '\\System32\\',  # Windows system directory
+                '\\Windows\\',  # Windows directory
+            ]
+            
+            for pattern in suspicious_patterns:
+                if pattern in path_str:
+                    logger.warning(f"Suspicious path pattern detected: {pattern} in {path_str}")
+                    raise ValueError(f"Invalid path: contains suspicious pattern '{pattern}'")
+            
+            # Ensure the path is within allowed directories (configurable)
+            # For now, just ensure it's not trying to access system directories
+            if abs_path.parts[0] == '/' and len(abs_path.parts) > 1:
+                # Unix-like systems
+                restricted_dirs = ['etc', 'proc', 'sys', 'dev', 'boot', 'root']
+                if abs_path.parts[1] in restricted_dirs:
+                    raise ValueError(f"Access to /{abs_path.parts[1]}/ directory is not allowed")
+            
+            # Check if parent directory exists (database might not exist yet)
+            parent_dir = abs_path.parent
+            if not parent_dir.exists():
+                logger.warning(f"Parent directory does not exist: {parent_dir}")
+                # Optionally create parent directory with restricted permissions
+                # parent_dir.mkdir(parents=True, mode=0o700)
+            
+            return str(abs_path)
+            
+        except Exception as e:
+            logger.error(f"Path validation error for '{path}': {e}")
+            raise ValueError(f"Invalid database path: {e}")
     
     @abstractmethod
     async def retrieve(

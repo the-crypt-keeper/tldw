@@ -7,6 +7,10 @@ This is the primary entry point for the chunking module.
 from typing import List, Dict, Any, Optional, Union, Generator
 from pathlib import Path
 import unicodedata
+import ast
+import threading
+from functools import lru_cache
+from collections import OrderedDict
 from loguru import logger
 
 from .base import ChunkerConfig, ChunkingMethod, ChunkResult
@@ -21,6 +25,90 @@ from .strategies.sentences import SentenceChunkingStrategy
 from .strategies.tokens import TokenChunkingStrategy
 from .strategies.structure_aware import StructureAwareChunkingStrategy
 from .strategies.rolling_summarize import RollingSummarizeStrategy
+from .security_logger import get_security_logger, SecurityEventType
+
+
+class LRUCache:
+    """
+    Thread-safe LRU (Least Recently Used) cache implementation.
+    """
+    
+    def __init__(self, max_size: int = 100):
+        """
+        Initialize the LRU cache.
+        
+        Args:
+            max_size: Maximum number of items to store in cache
+        """
+        self.max_size = max_size
+        self.cache = OrderedDict()
+        self._lock = threading.Lock()
+        self.hits = 0
+        self.misses = 0
+        
+    def get(self, key: str) -> Optional[Any]:
+        """
+        Get an item from cache.
+        
+        Args:
+            key: Cache key
+            
+        Returns:
+            Cached value or None if not found
+        """
+        with self._lock:
+            if key in self.cache:
+                # Move to end (most recently used)
+                self.cache.move_to_end(key)
+                self.hits += 1
+                return self.cache[key]
+            self.misses += 1
+            return None
+    
+    def put(self, key: str, value: Any) -> None:
+        """
+        Put an item into cache.
+        
+        Args:
+            key: Cache key
+            value: Value to cache
+        """
+        with self._lock:
+            if key in self.cache:
+                # Update existing and move to end
+                self.cache.move_to_end(key)
+                self.cache[key] = value
+            else:
+                # Add new item
+                self.cache[key] = value
+                # Remove oldest if over capacity
+                if len(self.cache) > self.max_size:
+                    self.cache.popitem(last=False)
+    
+    def clear(self) -> None:
+        """Clear the cache."""
+        with self._lock:
+            self.cache.clear()
+            self.hits = 0
+            self.misses = 0
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get cache statistics.
+        
+        Returns:
+            Dictionary with cache statistics
+        """
+        with self._lock:
+            total = self.hits + self.misses
+            hit_rate = self.hits / total if total > 0 else 0
+            return {
+                'size': len(self.cache),
+                'max_size': self.max_size,
+                'hits': self.hits,
+                'misses': self.misses,
+                'hit_rate': hit_rate
+            }
 
 
 class Chunker:
@@ -49,8 +137,11 @@ class Chunker:
         self._strategies = {}
         self._initialize_strategies()
         
-        # Cache for processed results
-        self._cache = {} if self.config.enable_cache else None
+        # Cache for processed results - using LRU cache
+        self._cache = LRUCache(max_size=self.config.cache_size) if self.config.enable_cache else None
+        
+        # Security logger
+        self._security_logger = get_security_logger()
         
         logger.info(f"Chunker initialized with default method: {self.config.default_method.value}")
     
@@ -117,6 +208,9 @@ class Chunker:
         # Remove null bytes which could cause issues
         if '\x00' in text:
             logger.warning("Null bytes detected in input, removing them")
+            self._security_logger.log_suspicious_content(
+                "null_bytes", f"Found {text.count('\\x00')} null bytes in input", source="sanitize_input"
+            )
             text = text.replace('\x00', '')
         
         # Normalize unicode to prevent various unicode-based attacks
@@ -132,9 +226,12 @@ class Chunker:
         
         if control_chars:
             logger.warning(f"Suspicious control characters found: {control_chars[:10]}")
+            self._security_logger.log_suspicious_content(
+                "control_characters", f"Found {len(control_chars)} suspicious control characters", source="sanitize_input"
+            )
             # Remove suspicious control characters
             for char in set(control_chars):
-                text = text.replace(eval(char), '')
+                text = text.replace(ast.literal_eval(char), '')
         
         # Check for bidirectional text override characters (could be used for spoofing)
         bidi_chars = ['\u202a', '\u202b', '\u202c', '\u202d', '\u202e', '\u2066', '\u2067', '\u2068', '\u2069']
@@ -193,9 +290,10 @@ class Chunker:
         # Check cache if enabled
         if self._cache is not None:
             cache_key = self._get_cache_key(text, method, max_size, overlap, language, options)
-            if cache_key in self._cache:
+            cached_result = self._cache.get(cache_key)
+            if cached_result is not None:
                 logger.debug("Returning cached result")
-                return self._cache[cache_key]
+                return cached_result
         
         # Get strategy
         if method not in self._strategies:
@@ -219,11 +317,7 @@ class Chunker:
             
             # Cache result if enabled
             if self._cache is not None and len(chunks) > 0:
-                self._cache[cache_key] = chunks
-                # Limit cache size
-                if len(self._cache) > self.config.cache_size:
-                    # Remove oldest entry (simple FIFO)
-                    self._cache.pop(next(iter(self._cache)))
+                self._cache.put(cache_key, chunks)
             
             logger.info(f"Created {len(chunks)} chunks using {method} method")
             return chunks
@@ -379,6 +473,196 @@ class Chunker:
         if self._cache is not None:
             self._cache.clear()
             logger.debug("Chunk cache cleared")
+    
+    def get_cache_stats(self) -> Optional[Dict[str, Any]]:
+        """
+        Get cache statistics.
+        
+        Returns:
+            Dictionary with cache statistics or None if cache is disabled
+        """
+        if self._cache is not None:
+            return self._cache.get_stats()
+        return None
+    
+    def chunk_text_generator(self,
+                            text: str,
+                            method: Optional[str] = None,
+                            max_size: Optional[int] = None,
+                            overlap: Optional[int] = None,
+                            language: Optional[str] = None,
+                            **options) -> Generator[str, None, None]:
+        """
+        Memory-efficient generator for chunking large texts.
+        Yields chunks one at a time instead of loading all into memory.
+        
+        Args:
+            text: Text to chunk
+            method: Chunking method to use
+            max_size: Maximum size per chunk
+            overlap: Number of units to overlap between chunks
+            language: Language code for text processing
+            **options: Additional method-specific options
+            
+        Yields:
+            Text chunks one at a time
+        """
+        # Sanitize input
+        text = self._sanitize_input(text)
+        if not text:
+            return
+        
+        # Use defaults where not specified
+        method = method or self.config.default_method.value
+        max_size = max_size if max_size is not None else self.config.default_max_size
+        overlap = overlap if overlap is not None else self.config.default_overlap
+        language = language or self.config.language
+        
+        # Get strategy
+        if method not in self._strategies:
+            available = ', '.join(self._strategies.keys())
+            raise InvalidChunkingMethodError(
+                f"Unknown chunking method: {method}. Available methods: {available}"
+            )
+        
+        strategy = self._strategies[method]
+        
+        # Update strategy language if different
+        if language != strategy.language:
+            strategy.language = language
+        
+        try:
+            logger.debug(f"Starting generator chunking with method={method}, max_size={max_size}")
+            
+            # Check if strategy supports generator mode
+            if hasattr(strategy, 'chunk_generator'):
+                # Use generator method if available
+                for chunk in strategy.chunk_generator(text, max_size, overlap, **options):
+                    yield chunk
+            else:
+                # Fallback to regular chunking but yield one at a time
+                chunks = strategy.chunk(text, max_size, overlap, **options)
+                for chunk in chunks:
+                    yield chunk
+                    
+        except Exception as e:
+            logger.error(f"Generator chunking failed: {e}")
+            if isinstance(e, ChunkingError):
+                raise
+            raise ChunkingError(f"Generator chunking failed: {str(e)}")
+    
+    def chunk_file_stream(self,
+                         file_path: Union[str, Path],
+                         method: Optional[str] = None,
+                         max_size: Optional[int] = None,
+                         overlap: Optional[int] = None,
+                         language: Optional[str] = None,
+                         buffer_size: int = 8192,
+                         **options) -> Generator[str, None, None]:
+        """
+        Stream-process a file for memory-efficient chunking of very large files.
+        
+        Args:
+            file_path: Path to the file to chunk
+            method: Chunking method to use
+            max_size: Maximum size per chunk
+            overlap: Number of units to overlap between chunks
+            language: Language code for text processing
+            buffer_size: Size of read buffer in bytes
+            **options: Additional method-specific options
+            
+        Yields:
+            Text chunks one at a time
+        """
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            raise InvalidInputError(f"File not found: {file_path}")
+        
+        # Check file size
+        file_size = file_path.stat().st_size
+        if file_size > self.config.max_text_size:
+            logger.warning(f"File size ({file_size} bytes) exceeds max size "
+                         f"({self.config.max_text_size} bytes), will process in streaming mode")
+        
+        logger.info(f"Stream processing file: {file_path} ({file_size} bytes)")
+        
+        # Read file in chunks and accumulate until we have enough for chunking
+        buffer = ""
+        overlap_buffer = ""
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                while True:
+                    # Read next buffer
+                    chunk = f.read(buffer_size)
+                    if not chunk:
+                        # Process remaining buffer
+                        if buffer:
+                            for text_chunk in self.chunk_text_generator(
+                                buffer, method, max_size, overlap, language, **options
+                            ):
+                                yield text_chunk
+                        break
+                    
+                    buffer += chunk
+                    
+                    # Process buffer when it's large enough
+                    if len(buffer) >= max_size * 2:  # Keep some extra for overlap
+                        # Find a good split point (end of sentence/paragraph)
+                        split_point = self._find_split_point(buffer, max_size)
+                        
+                        # Process the first part
+                        to_process = buffer[:split_point]
+                        for text_chunk in self.chunk_text_generator(
+                            overlap_buffer + to_process, 
+                            method, max_size, overlap, language, **options
+                        ):
+                            yield text_chunk
+                        
+                        # Keep overlap for next iteration
+                        if overlap > 0:
+                            overlap_buffer = to_process[-overlap:]
+                        
+                        # Keep the rest in buffer
+                        buffer = buffer[split_point:]
+                        
+        except Exception as e:
+            logger.error(f"File stream processing failed: {e}")
+            raise ChunkingError(f"Failed to process file stream: {str(e)}")
+    
+    def _find_split_point(self, text: str, target: int) -> int:
+        """
+        Find a good split point in text near the target position.
+        Prefers to split at paragraph or sentence boundaries.
+        
+        Args:
+            text: Text to find split point in
+            target: Target position for split
+            
+        Returns:
+            Best split position
+        """
+        if len(text) <= target:
+            return len(text)
+        
+        # Look for paragraph break near target
+        for i in range(target, min(target + 500, len(text))):
+            if text[i:i+2] == '\n\n':
+                return i + 2
+        
+        # Look for sentence end near target
+        for i in range(target, min(target + 200, len(text))):
+            if text[i] in '.!?' and i + 1 < len(text) and text[i + 1].isspace():
+                return i + 1
+        
+        # Look for any newline
+        for i in range(target, min(target + 100, len(text))):
+            if text[i] == '\n':
+                return i + 1
+        
+        # Default to target position
+        return target
 
 
 # Convenience function for backward compatibility

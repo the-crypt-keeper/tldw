@@ -6,7 +6,9 @@ Splits text into chunks based on chapter markers.
 
 from typing import List, Optional, Any, Dict
 import re
-import signal
+import sys
+import threading
+import time
 from contextlib import contextmanager
 from loguru import logger
 
@@ -54,19 +56,59 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
     
     @contextmanager
     def _regex_timeout(self, seconds):
-        """Context manager for regex timeout to prevent ReDoS attacks."""
-        def timeout_handler(signum, frame):
-            raise ProcessingError("Regex operation timed out - possible ReDoS attack")
+        """
+        Cross-platform context manager for regex timeout to prevent ReDoS attacks.
+        Uses threading instead of signals for Windows compatibility.
+        """
+        result = {'completed': False, 'error': None}
         
-        # Set the timeout handler
-        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(seconds)
+        def target_func(func, args, kwargs):
+            try:
+                result['value'] = func(*args, **kwargs)
+                result['completed'] = True
+            except Exception as e:
+                result['error'] = e
+                result['completed'] = True
         
-        try:
-            yield
-        finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
+        # For cross-platform compatibility, we'll use a different approach
+        # This wraps the regex operation in a way that can be interrupted
+        class RegexTimeout:
+            def __init__(self, timeout_seconds):
+                self.timeout_seconds = timeout_seconds
+                self.timed_out = False
+                
+            def __enter__(self):
+                return self
+                
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                pass
+                
+            def run_with_timeout(self, func, *args, **kwargs):
+                """Run a function with a timeout."""
+                result_container = {'value': None, 'error': None}
+                
+                def wrapper():
+                    try:
+                        result_container['value'] = func(*args, **kwargs)
+                    except Exception as e:
+                        result_container['error'] = e
+                
+                thread = threading.Thread(target=wrapper)
+                thread.daemon = True
+                thread.start()
+                thread.join(timeout=self.timeout_seconds)
+                
+                if thread.is_alive():
+                    # Thread is still running after timeout
+                    self.timed_out = True
+                    raise ProcessingError("Regex operation timed out - possible ReDoS attack")
+                
+                if result_container['error']:
+                    raise result_container['error']
+                    
+                return result_container['value']
+        
+        yield RegexTimeout(seconds)
     
     def _validate_regex_pattern(self, pattern: str) -> bool:
         """
@@ -104,8 +146,8 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
         # Test for exponential complexity with a sample
         test_input = "a" * 50
         try:
-            with self._regex_timeout(1):  # 1 second timeout for test
-                re.search(pattern, test_input)
+            with self._regex_timeout(1) as timeout:  # 1 second timeout for test
+                timeout.run_with_timeout(re.search, pattern, test_input)
         except ProcessingError:
             raise InvalidInputError(
                 "Regex pattern appears to have exponential complexity"

@@ -360,7 +360,11 @@ def sanitize_error_message(error: Exception) -> str:
     error_str = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '[ip]', error_str)
     
     # Remove potential secrets (anything that looks like a key/token)
-    error_str = re.sub(r'\b[A-Za-z0-9_\-]{20,}\b', '[redacted]', error_str)
+    # Redact: API keys starting with sk_, hex strings > 32 chars, mixed case+digit strings > 40 chars
+    # But don't redact simple repeated characters
+    error_str = re.sub(r'\bsk_[A-Za-z0-9_\-]{20,}\b', '[redacted]', error_str)  # API keys
+    error_str = re.sub(r'\b[A-Fa-f0-9]{32,}\b', '[redacted]', error_str)  # Hex tokens
+    error_str = re.sub(r'\b(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])[A-Za-z0-9_\-]{40,}\b', '[redacted]', error_str)  # Mixed long tokens
     
     # Truncate if too long
     if len(error_str) > 200:

@@ -13,7 +13,9 @@ import pytest
 import json
 import tempfile
 import zipfile
-from unittest.mock import MagicMock, patch, AsyncMock, call
+import os
+import shutil
+from unittest.mock import MagicMock, patch, AsyncMock, call, PropertyMock
 from datetime import datetime
 from uuid import uuid4
 from pathlib import Path
@@ -25,7 +27,9 @@ from tldw_Server_API.app.core.Chatbooks.chatbook_models import (
     ExportJob,
     ImportJob,
     ExportStatus,
-    ImportStatus
+    ImportStatus,
+    ChatbookVersion,
+    ContentType
 )
 from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 
@@ -40,16 +44,38 @@ def mock_db():
 
 
 @pytest.fixture
-def service(mock_db):
-    """Create a ChatbookService instance with mocked database."""
-    return ChatbookService(user_id="test_user", db=mock_db)
+def service(mock_db, tmp_path, monkeypatch):
+    """Create a ChatbookService instance with mocked database and temp directories."""
+    # Set environment variable to use temp directory for tests
+    monkeypatch.setenv('PYTEST_CURRENT_TEST', 'test')
+    monkeypatch.setenv('TLDW_USER_DATA_PATH', str(tmp_path))
+    
+    # Mock execute_query to return empty results for table creation
+    mock_db.execute_query.return_value = []
+    mock_db.get_connection.return_value.execute = MagicMock()
+    mock_db.get_connection.return_value.close = MagicMock()
+    
+    with patch('tldw_Server_API.app.core.Chatbooks.chatbook_service.Path.mkdir') as mock_mkdir:
+        mock_mkdir.return_value = None
+        service = ChatbookService(user_id="test_user", db=mock_db)
+    
+    # Ensure directories exist in tmp_path
+    service.user_data_dir = tmp_path / 'users' / 'test_user' / 'chatbooks'
+    service.export_dir = service.user_data_dir / 'exports'
+    service.import_dir = service.user_data_dir / 'imports'
+    service.temp_dir = service.user_data_dir / 'temp'
+    
+    for dir_path in [service.user_data_dir, service.export_dir, service.import_dir, service.temp_dir]:
+        dir_path.mkdir(parents=True, exist_ok=True)
+    
+    return service
 
 
 @pytest.fixture
 def sample_manifest():
     """Create a sample chatbook manifest."""
     return ChatbookManifest(
-        version="1.0.0",
+        version=ChatbookVersion.V1,
         exported_at=datetime.now().isoformat(),
         user_id="test_user",
         name="Test Chatbook",
@@ -72,19 +98,15 @@ def sample_content_items():
     return [
         ContentItem(
             id="conv1",
-            type="conversation",
-            name="Test Conversation",
-            content={"messages": ["Hello", "Hi"]},
-            metadata={"created_at": "2024-01-01"},
-            user_id="test_user"
+            type=ContentType.CONVERSATION,
+            title="Test Conversation",
+            metadata={"created_at": "2024-01-01"}
         ),
         ContentItem(
             id="char1",
-            type="character",
-            name="Test Character",
-            content={"description": "A test character"},
-            metadata={},
-            user_id="test_user"
+            type=ContentType.CHARACTER,
+            title="Test Character",
+            metadata={"description": "A test character"}
         )
     ]
 
@@ -92,9 +114,16 @@ def sample_content_items():
 class TestChatbookService:
     """Test suite for ChatbookService."""
     
-    def test_init_creates_tables(self, mock_db):
+    def test_init_creates_tables(self, mock_db, tmp_path, monkeypatch):
         """Test that initialization creates necessary tables."""
-        service = ChatbookService(user_id="test_user", db=mock_db)
+        monkeypatch.setenv('PYTEST_CURRENT_TEST', 'test')
+        monkeypatch.setenv('TLDW_USER_DATA_PATH', str(tmp_path))
+        
+        mock_db.execute_query.return_value = []
+        
+        with patch('tldw_Server_API.app.core.Chatbooks.chatbook_service.Path.mkdir') as mock_mkdir:
+            mock_mkdir.return_value = None
+            service = ChatbookService(user_id="test_user", db=mock_db)
         
         # Should create export and import job tables
         assert mock_db.execute_query.call_count >= 2
@@ -107,9 +136,10 @@ class TestChatbookService:
     
     def test_create_export_job(self, service, mock_db):
         """Test creating an export job."""
-        job_id = str(uuid4())
+        test_uuid = uuid4()
+        job_id = str(test_uuid)
         
-        with patch('uuid.uuid4', return_value=job_id):
+        with patch('tldw_Server_API.app.core.Chatbooks.chatbook_service.uuid4', return_value=test_uuid):
             mock_db.execute_query.return_value = None
             
             result = service.create_export_job(
@@ -153,9 +183,10 @@ class TestChatbookService:
     @pytest.mark.asyncio
     async def test_export_chatbook_async_job(self, service, mock_db):
         """Test asynchronous chatbook export with job management."""
-        job_id = str(uuid4())
+        test_uuid = uuid4()
+        job_id = str(test_uuid)
         
-        with patch('uuid.uuid4', return_value=job_id):
+        with patch('tldw_Server_API.app.core.Chatbooks.chatbook_service.uuid4', return_value=test_uuid):
             mock_db.execute_query.return_value = None
             
             result = await service.export_chatbook(
@@ -241,7 +272,7 @@ class TestChatbookService:
             
             result = await service.import_chatbook(
                 file_path=tmp.name,
-                conflict_strategy="skip"
+                conflict_resolution="skip"
             )
         
         assert result["success"] == True

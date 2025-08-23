@@ -198,7 +198,16 @@ class QuotaManager:
         # For now, calculate from user's data directory
         try:
             import os
-            base_dir = Path(os.environ.get('TLDW_USER_DATA_PATH', '/var/lib/tldw/user_data'))
+            import tempfile
+            
+            # Use environment variable, or temp dir for testing, or system default
+            if os.environ.get('TLDW_USER_DATA_PATH'):
+                base_dir = Path(os.environ.get('TLDW_USER_DATA_PATH'))
+            elif os.environ.get('PYTEST_CURRENT_TEST') or os.environ.get('CI'):
+                base_dir = Path(tempfile.gettempdir()) / 'tldw_test_data'
+            else:
+                base_dir = Path('/var/lib/tldw/user_data')
+            
             user_dir = base_dir / 'users' / str(self.user_id)
             
             if user_dir.exists():
@@ -236,7 +245,16 @@ class QuotaManager:
         """
         try:
             import os
-            base_dir = Path(os.environ.get('TLDW_USER_DATA_PATH', '/var/lib/tldw/user_data'))
+            import tempfile
+            
+            # Use environment variable, or temp dir for testing, or system default
+            if os.environ.get('TLDW_USER_DATA_PATH'):
+                base_dir = Path(os.environ.get('TLDW_USER_DATA_PATH'))
+            elif os.environ.get('PYTEST_CURRENT_TEST') or os.environ.get('CI'):
+                base_dir = Path(tempfile.gettempdir()) / 'tldw_test_data'
+            else:
+                base_dir = Path('/var/lib/tldw/user_data')
+            
             user_export_dir = base_dir / 'users' / str(self.user_id) / 'chatbooks' / 'exports'
             
             if not user_export_dir.exists():

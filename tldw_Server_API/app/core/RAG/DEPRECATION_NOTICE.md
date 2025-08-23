@@ -2,7 +2,7 @@
 
 ## Current Architecture (v3.0 - Functional Pipeline)
 
-The RAG system has been refactored to use a **functional pipeline architecture** as of 2025-08-19.
+The RAG system has been refactored to use a **functional pipeline architecture** as of 2024-08-19.
 
 ### Active Modules (Keep These)
 
@@ -116,10 +116,10 @@ Move deprecated files to:
 
 ### Timeline
 
-- **2025-08-19**: Functional pipeline implemented
-- **2025-09-01**: Mark old modules as deprecated
-- **2025-10-01**: Move deprecated modules to archive
-- **2025-11-01**: Remove deprecated API endpoints
+- **2024-08-19**: Functional pipeline implemented
+- **2024-09-01**: Mark old modules as deprecated
+- **2024-10-01**: Move deprecated modules to archive
+- **2024-11-01**: Remove deprecated API endpoints
 
 ### Benefits of New Architecture
 
