@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any, Set
 from enum import Enum
 import json
+from typing import Dict, Any
 
 
 class ChatbookVersion(Enum):
@@ -111,7 +112,7 @@ class ContentItem:
         """Convert to dictionary for JSON serialization."""
         return {
             "id": self.id,
-            "type": self.type.value,
+            "type": self.type.value if hasattr(self.type, 'value') else str(self.type),
             "title": self.title,
             "description": self.description,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -215,7 +216,7 @@ class ChatbookManifest:
     def to_dict(self) -> dict:
         """Convert manifest to dictionary for JSON serialization."""
         return {
-            "version": self.version.value if isinstance(self.version, Enum) else str(self.version),
+            "version": self.version.value if hasattr(self.version, 'value') else str(self.version),
             "name": self.name,
             "description": self.description,
             "author": self.author,
