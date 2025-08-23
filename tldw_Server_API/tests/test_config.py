@@ -14,7 +14,8 @@ class TestConfig:
     
     # Generate unique test API key for this test session
     # Can be overridden with TEST_API_KEY environment variable
-    TEST_API_KEY = os.environ.get("TEST_API_KEY", f"test-key-{secrets.token_hex(16)}")
+    # Use a fixed test key for consistency across all tests
+    TEST_API_KEY = os.environ.get("TEST_API_KEY", "test-api-key-for-authentication-testing")
     
     # Generate unique SK key for OpenAI compatibility testing
     TEST_SK_KEY = os.environ.get("TEST_SK_KEY", f"sk-test-{secrets.token_hex(16)}")

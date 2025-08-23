@@ -55,6 +55,7 @@ def client(test_db: CharactersRAGDB) -> Generator[TestClient, Any, None]:
     # The path for dependency_overrides should be the actual dependency callable.
     from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
     from tldw_Server_API.app.core.config import settings as global_settings
+    from tldw_Server_API.tests.test_config import TestConfig
 
     def override_get_db_for_test():
         logger.info("<<<<< OVERRIDE override_get_db_for_test CALLED >>>>>")
@@ -69,6 +70,8 @@ def client(test_db: CharactersRAGDB) -> Generator[TestClient, Any, None]:
     
     app.dependency_overrides[get_chacha_db_for_user] = override_get_db_for_test
     with TestClient(app) as c:
+        # Set authentication header for single-user mode
+        c.headers["X-API-KEY"] = TestConfig.TEST_API_KEY
         yield c
     
     # Restore original settings
@@ -86,6 +89,7 @@ def client_with_csrf(test_db: CharactersRAGDB) -> Generator[TestClient, Any, Non
     Use this fixture when you want to test CSRF token handling.
     """
     from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
+    from tldw_Server_API.tests.test_config import TestConfig
 
     def override_get_db_for_test():
         logger.info("<<<<< OVERRIDE override_get_db_for_test WITH CSRF ENABLED >>>>>")
@@ -97,6 +101,9 @@ def client_with_csrf(test_db: CharactersRAGDB) -> Generator[TestClient, Any, Non
     app.dependency_overrides[get_chacha_db_for_user] = override_get_db_for_test
     
     with TestClient(app) as c:
+        # Set authentication header for single-user mode
+        c.headers["X-API-KEY"] = TestConfig.TEST_API_KEY
+        
         # First make a GET request to obtain CSRF token
         response = c.get("/api/v1/health")  # Or any GET endpoint
         csrf_token = response.cookies.get("csrf_token")
