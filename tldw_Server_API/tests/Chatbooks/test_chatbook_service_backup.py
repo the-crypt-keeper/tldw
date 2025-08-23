@@ -189,12 +189,9 @@ class TestChatbookService:
                 content_types=["conversations"]
             )
         
-        # Check result structure - export_chatbook returns a dict from the async wrapper
-        assert "status" in result or "success" in result
-        if "success" in result:
-            assert result["success"] == True
-        if "file_path" in result:
-            assert result["file_path"] is not None
+        assert result["success"] == True
+        assert result["file_path"] is not None  # Path will be dynamic
+        assert result["content_summary"]["conversations"] == 1
     
     @pytest.mark.asyncio
     async def test_export_chatbook_async_job(self, service, mock_db):
@@ -218,37 +215,38 @@ class TestChatbookService:
     
     def test_preview_export(self, service, mock_db):
         """Test previewing export content."""
-        # Mock queries based on what's being queried
-        def mock_query(query, params=None):
-            if "conversations" in query.lower():
-                return [{"id": "conv1"}, {"id": "conv2"}]
-            elif "characters" in query.lower():
-                return [{"id": "char1"}]
-            elif "notes" in query.lower():
-                return [{"id": "note1"}, {"id": "note2"}]
-            return []
-        
-        mock_db.execute_query = mock_query
+        # Store the side effects in a list for reference
+        side_effects = [
+            [{"id": "conv1"}, {"id": "conv2"}],  # Conversations
+            [{"id": "char1"}],  # Characters
+            [],  # World books
+            [],  # Dictionaries
+            [{"id": "note1"}, {"id": "note2"}],  # Notes
+            []   # Prompts
+        ]
+        mock_db.execute_query.side_effect = side_effects
         
         result = service.preview_export(
             content_types=["conversations", "characters", "notes"]
         )
         
         # Results should match mocked data
-        assert result["conversations"] == 2
-        assert result["characters"] == 1
-        assert result["notes"] == 2
+        assert result["conversations"] == len(side_effects[0])
+        assert result["characters"] == len(side_effects[1])
+        assert result["notes"] == len(side_effects[4])
         assert result["world_books"] == 0
     
     def test_get_export_job_status(self, service, mock_db):
         """Test retrieving export job status."""
-        # Return tuple matching database schema
-        mock_db.execute_query.return_value = [
-            ("job123", "test_user", "completed", "Test Export",
-             "/tmp/export.chatbook", "2024-01-01T00:00:00",
-             "2024-01-01T00:01:00", "2024-01-01T00:05:00",
-             None, 100, 100, 100, 1024, None, None)
-        ]
+        mock_db.execute_query.return_value = [{
+            "job_id": "job123",
+            "status": "completed",
+            "file_path": "/tmp/export.chatbook",
+            "content_summary": json.dumps({"conversations": 5}),
+            "created_at": "2024-01-01T00:00:00",
+            "completed_at": "2024-01-01T00:05:00",
+            "error_message": None
+        }]
         
         result = service.get_export_job_status("job123")
         
@@ -306,12 +304,9 @@ class TestChatbookService:
                 conflict_resolution="skip"
             )
         
-        # Result is a tuple (success, message, path)
-        if isinstance(result, tuple):
-            success, message, _ = result
-            assert success or "conflict" in message.lower()
-        else:
-            assert result.get("success", False) == True
+        assert result["success"] == True
+        assert result["conflicts_found"] > 0
+        assert result["conflicts_resolved"]["skipped"] > 0
     
     @pytest.mark.asyncio
     async def test_import_chatbook_replace_strategy(self, service, mock_db, sample_manifest):
@@ -378,67 +373,66 @@ class TestChatbookService:
     
     def test_get_import_job_status(self, service, mock_db):
         """Test retrieving import job status."""
-        # Return tuple matching database schema
-        mock_db.execute_query.return_value = [
-            ("job456", "test_user", "completed", "/tmp/import.chatbook",
-             "2024-01-01T00:00:00", "2024-01-01T00:01:00", "2024-01-01T00:10:00",
-             None, 100, 10, 10, 10, 0, 2, "[]", "[]")
-        ]
+        mock_db.execute_query.return_value = [{
+            "job_id": "job456",
+            "status": "completed",
+            "file_path": "/tmp/import.chatbook",
+            "conflict_strategy": "skip",
+            "items_imported": 10,
+            "conflicts_found": 2,
+            "conflicts_resolved": json.dumps({"skipped": 2}),
+            "created_at": "2024-01-01T00:00:00",
+            "completed_at": "2024-01-01T00:10:00",
+            "error_message": None
+        }]
         
         result = service.get_import_job_status("job456")
         
         assert result["job_id"] == "job456"
         assert result["status"] == "completed"
-        assert result["successful_items"] == 10
+        assert result["items_imported"] == 10
         assert result["conflicts_found"] == 2
         assert result["conflicts_resolved"]["skipped"] == 2
     
     def test_list_export_jobs(self, service, mock_db):
         """Test listing export jobs."""
-        # Return tuples matching database schema
         mock_db.execute_query.return_value = [
-            ("job1", "test_user", "completed", "Export 1", None,
-             "2024-01-01T00:00:00", None, None, None, 100, 0, 0, 0, None, None),
-            ("job2", "test_user", "pending", "Export 2", None,
-             "2024-01-01T00:00:00", None, None, None, 50, 0, 0, 0, None, None)
+            {"job_id": "job1", "status": "completed", "name": "Export 1"},
+            {"job_id": "job2", "status": "pending", "name": "Export 2"}
         ]
         
-        results = service.list_export_jobs("test_user")
+        results = service.list_export_jobs(status="all")
         
         assert len(results) == 2
-        assert results[0]["chatbook_name"] == "Export 1"
+        assert results[0]["name"] == "Export 1"
         assert results[1]["status"] == "pending"
     
     def test_list_import_jobs(self, service, mock_db):
         """Test listing import jobs."""
-        # Return tuples matching database schema
         mock_db.execute_query.return_value = [
-            ("job3", "test_user", "completed", "/tmp/import.chatbook",
-             "2024-01-01T00:00:00", None, None, None, 100, 5, 5, 5, 0, 0, "[]", "[]"),
-            ("job4", "test_user", "failed", "/tmp/import2.chatbook",
-             "2024-01-01T00:00:00", None, None, "File not found", 0, 0, 0, 0, 0, 0, "[]", "[]")
+            {"job_id": "job3", "status": "completed", "items_imported": 5},
+            {"job_id": "job4", "status": "failed", "error_message": "File not found"}
         ]
         
-        results = service.list_import_jobs("test_user")
+        results = service.list_import_jobs(limit=10)
         
         assert len(results) == 2
-        assert results[0]["successful_items"] == 5
+        assert results[0]["items_imported"] == 5
         assert results[1]["error_message"] == "File not found"
     
     def test_clean_old_exports(self, service, mock_db):
         """Test cleaning old export files."""
-        # Return tuples with job_id and output_path
         mock_db.execute_query.return_value = [
-            ("old1", "/tmp/old1.chatbook"),
-            ("old2", "/tmp/old2.chatbook")
+            {"file_path": "/tmp/old1.chatbook"},
+            {"file_path": "/tmp/old2.chatbook"}
         ]
         
         with patch('os.path.exists', return_value=True):
-            with patch('os.unlink') as mock_unlink:
-                count = service.clean_old_exports(days=7)
+            with patch('os.remove') as mock_remove:
+                result = service.clean_old_exports(days_old=30)
         
-        assert count == 2
-        assert mock_unlink.call_count == 2
+        assert result["files_deleted"] == 2
+        assert mock_remove.call_count == 2
     
     def test_validate_chatbook_file(self, service, sample_manifest):
         """Test validating a chatbook file structure."""
@@ -468,19 +462,21 @@ class TestChatbookService:
     
     def test_get_statistics(self, service, mock_db):
         """Test getting import/export statistics."""
-        # Mock returns tuples for status counts
         mock_db.execute_query.side_effect = [
-            [("completed", 45), ("failed", 5)],  # Export stats by status
-            [("completed", 28), ("failed", 2)],  # Import stats by status
+            [{"total_exports": 50, "completed_exports": 45}],
+            [{"total_imports": 30, "completed_imports": 28}],
+            [{"total_items_exported": 500}],
+            [{"total_items_imported": 350}]
         ]
         
         stats = service.get_statistics()
         
-        # Check the structure returned by get_statistics
-        assert "export_stats" in stats
-        assert "import_stats" in stats
-        assert stats["export_stats"].get("completed", 0) == 45
-        assert stats["import_stats"].get("completed", 0) == 28
+        assert stats["total_exports"] == 50
+        assert stats["export_success_rate"] == 45 / 50
+        assert stats["total_imports"] == 30
+        assert stats["import_success_rate"] == 28 / 30
+        assert stats["total_items_exported"] == 500
+        assert stats["total_items_imported"] == 350
     
     @pytest.mark.asyncio
     async def test_error_handling_during_export(self, service, mock_db):

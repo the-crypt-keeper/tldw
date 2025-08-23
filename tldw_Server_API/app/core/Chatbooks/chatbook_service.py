@@ -176,6 +176,18 @@ class ChatbookService:
     # Alias for compatibility with tests
     async def export_chatbook(self, **kwargs):
         """Alias for create_chatbook to match test expectations."""
+        # Extract user_id for internal use but don't pass it to create_chatbook
+        user_id = kwargs.pop('user_id', None)
+        
+        # Extract chatbook_name and use it as 'name'
+        if 'chatbook_name' in kwargs:
+            kwargs['name'] = kwargs.pop('chatbook_name')
+        
+        # Extract options and merge them into kwargs
+        if 'options' in kwargs:
+            options = kwargs.pop('options')
+            kwargs.update(options)
+        
         # Map content_types to content_selections for compatibility
         if 'content_types' in kwargs:
             content_types = kwargs.pop('content_types')
@@ -1853,6 +1865,42 @@ class ChatbookService:
             if isinstance(e, (ValidationError, ArchiveError)):
                 raise
             raise ValidationError(f"Validation failed: {e}", cause=e)
+    
+    def validate_chatbook_file(self, file_path: str) -> Dict[str, Any]:
+        """
+        Validate a chatbook file (test compatibility method).
+        
+        Args:
+            file_path: Path to chatbook file
+            
+        Returns:
+            Dict with validation results
+        """
+        try:
+            # Try to validate using the main method
+            is_valid = self.validate_chatbook(file_path)
+            
+            # If valid, try to get manifest
+            manifest = None
+            if is_valid:
+                try:
+                    with zipfile.ZipFile(file_path, 'r') as zf:
+                        manifest_data = zf.read('manifest.json')
+                        manifest = json.loads(manifest_data)
+                except:
+                    pass
+            
+            return {
+                "is_valid": is_valid,
+                "manifest": manifest,
+                "error": None
+            }
+        except Exception as e:
+            return {
+                "is_valid": False,
+                "manifest": None,
+                "error": str(e)
+            }
     
     def get_statistics(self) -> Dict[str, Any]:
         """Get import/export statistics."""

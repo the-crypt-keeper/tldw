@@ -15,8 +15,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Depends, Body, status, Request
 from loguru import logger
 from pydantic import BaseModel, Field, validator
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+# Rate limiting should be configured at the application level
 
 # Dependencies
 from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
@@ -355,6 +354,55 @@ class ComplexSearchRequest(BaseModel):
         }
     )
     
+    # Quick wins features
+    quick_wins: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Quick wins features configuration",
+        example={
+            "spell_check": {"enabled": True, "confidence_threshold": 0.8},
+            "highlight_results": {"enabled": True, "max_snippets": 3},
+            "cost_tracking": {"enabled": True, "include_in_response": True},
+            "debug_mode": {"enabled": False, "include_timings": True},
+            "webhook_notification": {"enabled": False, "url": "https://example.com/webhook"}
+        }
+    )
+    
+    # Resilience configuration
+    resilience: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Resilience and error recovery configuration",
+        example={
+            "circuit_breaker": {
+                "enabled": True,
+                "failure_threshold": 5,
+                "timeout": 60
+            },
+            "retry_policy": {
+                "enabled": True,
+                "max_attempts": 3,
+                "initial_delay": 1.0,
+                "exponential_backoff": True
+            },
+            "fallback": {
+                "enabled": True,
+                "use_cache_on_error": True,
+                "degraded_mode": True
+            }
+        }
+    )
+    
+    # Pipeline configuration
+    pipeline_config: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Pipeline configuration",
+        example={
+            "preset": "standard",  # minimal, standard, quality, enhanced, or custom
+            "custom_functions": [],  # List of function names for custom pipeline
+            "conditional_execution": {},  # Conditional logic configuration
+            "parallel_components": []  # Components to run in parallel
+        }
+    )
+    
     # Extensible options for future features
     extensions: Dict[str, Any] = Field(
         default_factory=dict,
@@ -408,9 +456,12 @@ class ComplexSearchResponse(BaseModel):
     """Complex search response with detailed information."""
     request_id: str
     query: str
+    corrected_query: Optional[str] = None  # Spell-checked query if different
     results: List[ComplexSearchResult]
     metadata: Dict[str, Any]
     performance: Dict[str, Any]
+    cost_tracking: Optional[Dict[str, Any]] = None  # LLM cost information
+    resilience_status: Optional[Dict[str, Any]] = None  # Circuit breaker/retry status
     debug: Optional[Dict[str, Any]] = None
 
 
@@ -426,7 +477,7 @@ router = APIRouter(
 )
 
 # Initialize rate limiter
-limiter = Limiter(key_func=get_remote_address)
+# Rate limiter removed - configure in main.py to avoid decorator conflicts
 
 # ============= Helper Functions =============
 
@@ -512,7 +563,7 @@ def create_citation(doc: Document, include_metadata: bool = True) -> Citation:
     suitable for most use cases without complex configuration.
     """
 )
-@limiter.limit("30/minute")  # Rate limit: 30 simple searches per minute
+# Rate limit removed - decorator order issues with FastAPI
 async def simple_search(
     request: SimpleSearchRequest,
     req: Request,  # Required for rate limiter
@@ -636,7 +687,7 @@ async def simple_search(
     fine-grained control over the search process.
     """
 )
-@limiter.limit("10/minute")  # Rate limit: 10 complex searches per minute (more resource intensive)
+# Rate limit removed - decorator order issues with FastAPI
 async def complex_search(
     request: ComplexSearchRequest,
     req: Request,  # Required for rate limiter
@@ -727,9 +778,54 @@ async def complex_search(
             config["enable_monitoring"] = request.performance.get("enable_monitoring", True)
             config["enable_profiling"] = request.performance.get("enable_profiling", False)
             config["parallel_processing"] = request.performance.get("parallel_processing", True)
+            config["analyze_performance"] = request.performance.get("analyze_performance", False)
+        
+        # Quick wins configuration
+        if request.quick_wins:
+            config["quick_wins"] = request.quick_wins
+            config["spell_check"] = request.quick_wins.get("spell_check", {}).get("enabled", False)
+            config["highlight_results"] = request.quick_wins.get("highlight_results", {}).get("enabled", False)
+            config["cost_tracking"] = request.quick_wins.get("cost_tracking", {}).get("enabled", False)
+            config["debug_mode"] = request.quick_wins.get("debug_mode", {}).get("enabled", False)
+        
+        # Resilience configuration
+        if request.resilience:
+            config["enable_resilience"] = True
+            config["resilience"] = request.resilience
+        
+        # Pipeline configuration
+        pipeline_preset = None
+        if request.pipeline_config:
+            pipeline_preset = request.pipeline_config.get("preset")
+            config["custom_functions"] = request.pipeline_config.get("custom_functions", [])
+            config["parallel_components"] = request.pipeline_config.get("parallel_components", [])
         
         # Build dynamic pipeline based on configuration
         pipeline_functions = []
+        
+        # Check if using preset pipeline
+        if pipeline_preset and pipeline_preset in ["minimal", "standard", "quality", "enhanced"]:
+            # Use preset pipeline
+            from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import (
+                minimal_pipeline, standard_pipeline, quality_pipeline, enhanced_pipeline
+            )
+            preset_pipelines = {
+                "minimal": minimal_pipeline,
+                "standard": standard_pipeline,
+                "quality": quality_pipeline,
+                "enhanced": enhanced_pipeline
+            }
+            pipeline_func = preset_pipelines[pipeline_preset]
+            context = await pipeline_func(request.query, config)
+        else:
+            # Build custom pipeline
+            # Add spell check if enabled
+            if config.get("spell_check"):
+                try:
+                    from tldw_Server_API.app.core.RAG.rag_service.quick_wins import spell_check_query
+                    pipeline_functions.append(spell_check_query)
+                except ImportError:
+                    logger.warning("Spell check not available")
         
         # Query expansion
         if config.get("expansion_strategies"):
@@ -760,13 +856,34 @@ async def complex_search(
         if config.get("enable_cache", True):
             pipeline_functions.append(store_in_cache)
         
+        # Add highlight results if enabled
+        if config.get("highlight_results"):
+            try:
+                from tldw_Server_API.app.core.RAG.rag_service.quick_wins import highlight_results
+                pipeline_functions.append(highlight_results)
+            except ImportError:
+                logger.warning("Result highlighting not available")
+        
+        # Add cost tracking if enabled
+        if config.get("cost_tracking"):
+            try:
+                from tldw_Server_API.app.core.RAG.rag_service.quick_wins import track_llm_cost
+                pipeline_functions.append(track_llm_cost)
+            except ImportError:
+                logger.warning("Cost tracking not available")
+        
         # Performance analysis
-        if config.get("enable_monitoring"):
+        if config.get("enable_monitoring") or config.get("analyze_performance"):
             pipeline_functions.append(analyze_performance)
         
-        # Execute pipeline
-        pipeline = build_pipeline(*pipeline_functions)
-        context = await pipeline(request.query, config)
+        # Execute pipeline - check if we already have context from preset
+        if pipeline_preset and 'context' in locals():
+            # Already executed preset pipeline
+            pass
+        else:
+            # Execute custom pipeline
+            pipeline = build_pipeline(*pipeline_functions)
+            context = await pipeline(request.query, config)
         
         # Process results based on configuration
         max_context = request.processing.get("max_context_size", 10000) if request.processing else 10000
@@ -809,9 +926,30 @@ async def complex_search(
             "stage_timings": context.timings,
         }
         
+        # Add cost tracking if enabled
+        cost_data = None
+        if config.get("cost_tracking") and "cost_tracking" in context.metadata:
+            cost_data = context.metadata["cost_tracking"]
+        
+        # Add resilience status if enabled
+        resilience_data = None
+        if config.get("enable_resilience"):
+            resilience_data = {
+                "circuit_breaker_status": context.metadata.get("circuit_breaker_status"),
+                "retry_attempts": context.metadata.get("retry_attempts", 0),
+                "fallback_used": context.metadata.get("fallback_used", False)
+            }
+        
+        # Get corrected query if spell check was used
+        corrected_query = None
+        if config.get("spell_check") and "corrected_query" in context.metadata:
+            corrected_query = context.metadata["corrected_query"]
+            if corrected_query == request.query:
+                corrected_query = None  # Don't include if no correction was made
+        
         # Add debug information if profiling enabled
         debug_data = None
-        if request.performance.get("enable_profiling"):
+        if request.performance and request.performance.get("enable_profiling"):
             debug_data = {
                 "expanded_queries": context.metadata.get("expanded_queries", []),
                 "errors": context.errors,
@@ -821,9 +959,12 @@ async def complex_search(
         return ComplexSearchResponse(
             request_id=request_id,
             query=request.query,
+            corrected_query=corrected_query,
             results=results,
             metadata=response_metadata,
             performance=performance_data,
+            cost_tracking=cost_data,
+            resilience_status=resilience_data,
             debug=debug_data
         )
         
@@ -835,21 +976,143 @@ async def complex_search(
         )
 
 
+# ============= Pipeline Management =============
+
+@router.get(
+    "/pipelines",
+    summary="List available pipelines",
+    description="Get list of available pipeline presets and their descriptions."
+)
+async def list_pipelines():
+    """List available pipeline presets."""
+    return {
+        "pipelines": {
+            "minimal": {
+                "description": "Minimal pipeline with basic retrieval only",
+                "stages": ["retrieve_documents"],
+                "best_for": "Fast, simple searches"
+            },
+            "standard": {
+                "description": "Standard pipeline with caching and reranking",
+                "stages": ["expand_query", "check_cache", "retrieve_documents", "rerank_documents", "store_in_cache"],
+                "best_for": "Balanced performance and quality"
+            },
+            "quality": {
+                "description": "Quality-focused pipeline with advanced features",
+                "stages": ["expand_query", "check_cache", "optimize_chromadb_search", "retrieve_documents", 
+                          "process_tables", "rerank_documents", "store_in_cache", "analyze_performance"],
+                "best_for": "High-quality results with detailed processing"
+            },
+            "enhanced": {
+                "description": "Enhanced pipeline with contextual retrieval and chunking",
+                "stages": ["expand_query", "check_cache", "optimize_chromadb_search", "retrieve_documents",
+                          "enhanced_chunk_documents", "expand_with_parent_context", "process_tables",
+                          "rerank_documents", "store_in_cache", "analyze_performance"],
+                "best_for": "Complex documents requiring context expansion"
+            }
+        },
+        "custom_pipeline_support": True,
+        "available_functions": [
+            "expand_query", "check_cache", "retrieve_documents", "optimize_chromadb_search",
+            "process_tables", "rerank_documents", "store_in_cache", "analyze_performance",
+            "expand_with_parent_context", "spell_check_query", "highlight_results", "track_llm_cost"
+        ]
+    }
+
+
+@router.get(
+    "/capabilities",
+    summary="Get RAG service capabilities",
+    description="Get detailed information about available RAG service features and capabilities."
+)
+async def get_capabilities():
+    """Get RAG service capabilities."""
+    return {
+        "features": {
+            "retrieval": {
+                "vector_search": True,
+                "full_text_search": True,
+                "hybrid_search": True,
+                "multi_database": ["media_db", "notes", "characters", "chat_history"],
+                "contextual_retrieval": True
+            },
+            "processing": {
+                "query_expansion": ["acronym", "semantic", "domain", "entity"],
+                "table_processing": True,
+                "chunking": ["enhanced", "semantic", "sliding_window"],
+                "reranking": ["similarity", "diversity", "hybrid", "flashrank"]
+            },
+            "quick_wins": {
+                "spell_check": True,
+                "result_highlighting": True,
+                "cost_tracking": True,
+                "debug_mode": True,
+                "webhook_notifications": True,
+                "query_templates": True
+            },
+            "resilience": {
+                "circuit_breaker": True,
+                "retry_policies": True,
+                "fallback_chains": True,
+                "health_monitoring": True,
+                "degraded_mode": True
+            },
+            "caching": {
+                "exact_match": True,
+                "semantic_similarity": True,
+                "adaptive_caching": True,
+                "multi_level": True,
+                "persistence": True
+            },
+            "performance": {
+                "parallel_processing": True,
+                "batch_processing": True,
+                "performance_monitoring": True,
+                "component_profiling": True,
+                "resource_tracking": True
+            }
+        },
+        "api_version": "1.0",
+        "pipeline_version": "3.0"
+    }
+
+
 # ============= Health Check =============
 
 @router.get(
     "/health",
     summary="RAG API health check",
-    description="Check if the RAG API is operational."
+    description="Check if the RAG API is operational and get component health status."
 )
-async def health_check():
+async def health_check(
+    request: Request,
+    include_components: bool = False
+):
     """Check RAG API health."""
-    return {
+    health_status = {
         "status": "healthy",
         "api_version": "1.0",
         "endpoints": {
             "simple": "/api/v1/rag/search/simple",
-            "complex": "/api/v1/rag/search/complex"
+            "complex": "/api/v1/rag/search/complex",
+            "pipelines": "/api/v1/rag/pipelines",
+            "capabilities": "/api/v1/rag/capabilities"
         },
         "timestamp": time.time()
     }
+    
+    # Add component health if requested
+    if include_components:
+        try:
+            from tldw_Server_API.app.core.RAG.rag_service.resilience import check_component_health
+            
+            components_health = {}
+            for component in ["retriever", "cache", "reranker", "database"]:
+                health = await check_component_health(component)
+                components_health[component] = health
+            
+            health_status["components"] = components_health
+        except ImportError:
+            health_status["components"] = {"error": "Health monitoring not available"}
+    
+    return health_status

@@ -111,7 +111,7 @@ def get_openai_embeddings(input_data: str, model: str, app_config: Optional[Dict
         logging.error("OpenAI Embeddings (single): API key not found or is empty")
         raise ValueError("OpenAI Embeddings (single): API Key Not Provided/Found or is empty")
 
-    logging.debug(f"OpenAI Embeddings (single): Using API Key: {api_key[:5]}...{api_key[-5:]}")
+    logging.debug("OpenAI Embeddings (single): Using configured API key")
     logging.debug(f"OpenAI Embeddings (single): Raw input data (first 100 chars): {str(input_data)[:100]}...")
     logging.debug(f"OpenAI Embeddings (single): Using model: {model}")
 
@@ -187,7 +187,7 @@ def get_openai_embeddings_batch(texts: List[str], model: str, app_config: Option
         raise ValueError("OpenAI Embeddings (batch): API Key Not Provided/Found or is empty")
 
     logging.debug(f"OpenAI Embeddings (batch): Processing {len(texts)} texts.")
-    logging.debug(f"OpenAI Embeddings (batch): Using API Key: {api_key[:5]}...{api_key[-5:]}")
+    logging.debug("OpenAI Embeddings (batch): Using configured API key")
     logging.debug(f"OpenAI Embeddings (batch): Using model: {model}")
 
     headers = {
@@ -308,8 +308,7 @@ def chat_with_openai(
         logging.error("OpenAI: API key is missing.")
         raise ChatConfigurationError(provider="openai", message="OpenAI API Key is required but not found.")
 
-    log_key_display = f"{final_api_key[:5]}...{final_api_key[-5:]}" if final_api_key and len(final_api_key) > 9 else "Key Provided"
-    logging.debug(f"OpenAI: Using API Key: {log_key_display}")
+    logging.debug("OpenAI: Using configured API key")
 
     # Resolve parameters: User-provided > Function arg default > Config default > Hardcoded default
     final_model = model if model is not None else openai_config.get('model', 'gpt-4o-mini')
@@ -479,8 +478,7 @@ def chat_with_anthropic(
     if not final_api_key:
         raise ChatConfigurationError(provider="anthropic", message="Anthropic API Key is required.")
 
-    log_key = f"{final_api_key[:5]}...{final_api_key[-5:]}" if final_api_key and len(final_api_key) > 9 else "Key Provided"
-    logging.debug(f"Anthropic: Using API Key: {log_key}")
+    logging.debug("Anthropic: Using configured API key")
 
     current_model = model or anthropic_config.get('model', 'claude-3-haiku-20240307')
     current_temp = temp if temp is not None else float(anthropic_config.get('temperature', 0.7))
@@ -676,7 +674,7 @@ def chat_with_cohere(
     final_api_key = api_key or cohere_config.get('api_key')
     if not final_api_key:
         raise ChatAuthenticationError(provider="cohere", message="Cohere API key is missing.")
-    logging.debug(f"Cohere: Using API Key: {final_api_key[:5]}...{final_api_key[-5:]}")
+    logging.debug("Cohere: Using configured API key")
 
     final_model = model or cohere_config.get('model', 'command-r')
     api_base_url = cohere_config.get('api_base_url', 'https://api.cohere.com').rstrip('/')
@@ -992,9 +990,7 @@ def chat_with_deepseek(
         raise ChatConfigurationError(provider="deepseek", message="DeepSeek API Key required.")
 
     # ... (logging key, model, temp, streaming, top_p setup) ...
-    log_key = f"{final_api_key[:5]}...{final_api_key[-5:]}" if final_api_key and len(
-        final_api_key) > 9 else "Key Provided"
-    logging.debug(f"DeepSeek: Using API Key: {log_key}")
+    logging.debug("DeepSeek: Using configured API key")
     current_model = model or deepseek_config.get('model', 'deepseek-chat')  # Or deepseek-coder
     current_temp = temp if temp is not None else float(deepseek_config.get('temperature', 0.1))
     current_top_p = topp  # Deepseek uses top_p
@@ -1307,9 +1303,7 @@ def chat_with_groq(
         raise ChatConfigurationError(provider="groq", message="Groq API Key required.")
 
     # ... (logging key, model, temp, streaming setup as before) ...
-    log_key = f"{final_api_key[:5]}...{final_api_key[-5:]}" if final_api_key and len(
-        final_api_key) > 9 else "Key Provided"
-    logging.debug(f"Groq: Using API Key: {log_key}")
+    logging.debug("Groq: Using configured API key")
 
     current_model = model or groq_config.get('model', 'llama3-8b-8192')
     current_temp = temp if temp is not None else float(groq_config.get('temperature', 0.2))
@@ -1417,8 +1411,7 @@ def chat_with_huggingface(
 
     final_api_key = api_key or hf_config.get('api_key')
     if final_api_key:
-        log_key_display = f"{final_api_key[:5]}...{final_api_key[-5:]}" if len(final_api_key) > 9 else "Key Provided"
-        logging.debug(f"HuggingFace: Using API Key: {log_key_display}")
+        logging.debug("HuggingFace: Using configured API key")
     else:
         logging.warning("HuggingFace: API key is missing. Public Inference API or unsecured TGI assumed.")
 
@@ -1634,9 +1627,7 @@ def chat_with_mistral(
         raise ChatConfigurationError(provider="mistral", message="Mistral API Key required.")
 
     # ... (logging key, model, temp, streaming, top_p setup) ...
-    log_key = f"{final_api_key[:5]}...{final_api_key[-5:]}" if final_api_key and len(
-        final_api_key) > 9 else "Key Provided"
-    logging.debug(f"Mistral: Using API Key: {log_key}")
+    logging.debug("Mistral: Using configured API key")
     current_model = model or mistral_config.get('model', 'mistral-large-latest')  # or mistral-small, mistral-medium
     current_temp = temp if temp is not None else float(
         mistral_config.get('temperature', 0.1))  # Mistral defaults to 0.7
@@ -1879,8 +1870,7 @@ def chat_with_moonshot(
         logging.error("Moonshot: API key is missing.")
         raise ChatConfigurationError(provider="moonshot", message="Moonshot API Key is required but not found.")
     
-    log_key_display = f"{final_api_key[:5]}...{final_api_key[-5:]}" if final_api_key and len(final_api_key) > 9 else "Key Provided"
-    logging.debug(f"Moonshot: Using API Key: {log_key_display}")
+    logging.debug("Moonshot: Using configured API key")
     
     # Resolve parameters: User-provided > Function arg default > Config default > Hardcoded default
     final_model = model if model is not None else moonshot_config.get('model', 'moonshot-v1-8k')
@@ -2123,8 +2113,7 @@ def chat_with_zai(
         logging.error("Z.AI: API key is missing.")
         raise ChatConfigurationError(provider="zai", message="Z.AI API Key is required but not found.")
     
-    log_key_display = f"{final_api_key[:5]}...{final_api_key[-5:]}" if final_api_key and len(final_api_key) > 9 else "Key Provided"
-    logging.debug(f"Z.AI: Using API Key: {log_key_display}")
+    logging.debug("Z.AI: Using configured API key")
     
     # Resolve parameters
     current_model = model or zai_config.get('model', 'glm-4.5-flash')
