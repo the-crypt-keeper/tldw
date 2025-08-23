@@ -18,6 +18,8 @@ from starlette import status
 #
 # Local Imports
 from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
+from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
+from tldw_Server_API.app.core.Character_Chat.character_rate_limiter import get_character_rate_limiter
 from tldw_Server_API.app.api.v1.schemas.character_schemas import CharacterResponse, CharacterImportResponse, \
     CharacterCreate, CharacterUpdate, DeletionResponse
 from tldw_Server_API.app.api.v1.schemas.world_book_schemas import (
@@ -74,12 +76,22 @@ def _convert_db_char_to_response_model(char_dict_from_db: Dict[str, Any]) -> Cha
              tags=["Characters"], status_code=status.HTTP_201_CREATED)
 async def import_character_from_file_endpoint(
         character_file: UploadFile = File(..., description="Character card file (PNG, WEBP, JSON, MD)."),
-        db: CharactersRAGDB = Depends(get_chacha_db_for_user)
+        db: CharactersRAGDB = Depends(get_chacha_db_for_user),
+        current_user: User = Depends(get_request_user)
 ):
     try:
         file_content_bytes = await character_file.read()
         if not file_content_bytes:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty.")
+
+        # Check rate limits
+        rate_limiter = get_character_rate_limiter()
+        await rate_limiter.check_rate_limit(current_user.id, "character_import")
+        rate_limiter.check_import_size(len(file_content_bytes))
+        
+        # Check character count limit
+        existing_chars = db.list_character_cards(limit=10000)  # Get count
+        await rate_limiter.check_character_limit(current_user.id, len(existing_chars))
 
         logger.info(f"API: Attempting to import character from file: {character_file.filename}")
 
@@ -156,13 +168,32 @@ async def list_all_characters(  # Renamed from list_characters to avoid conflict
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 
+@router.get("/rate-limit-status", summary="Get rate limit status", tags=["Characters"])
+async def get_rate_limit_status(
+    current_user: User = Depends(get_request_user)
+):
+    """Get current rate limit usage statistics for the authenticated user."""
+    rate_limiter = get_character_rate_limiter()
+    stats = await rate_limiter.get_usage_stats(current_user.id)
+    return stats
+
+
 @router.post("/", response_model=CharacterResponse, status_code=status.HTTP_201_CREATED, summary="Create character",
              tags=["Characters"])
 async def create_new_character_endpoint(
         character_data: CharacterCreate,
-        db: CharactersRAGDB = Depends(get_chacha_db_for_user)
+        db: CharactersRAGDB = Depends(get_chacha_db_for_user),
+        current_user: User = Depends(get_request_user)
 ):
     try:
+        # Check rate limits
+        rate_limiter = get_character_rate_limiter()
+        await rate_limiter.check_rate_limit(current_user.id, "character_create")
+        
+        # Check character count limit
+        existing_chars = db.list_character_cards(limit=10000)
+        await rate_limiter.check_character_limit(current_user.id, len(existing_chars))
+        
         # The Pydantic model CharacterCreate ensures 'name' is present.
         # The interop function create_new_character_from_data handles image_base64 etc.
         # and calls db.add_character_card.

@@ -1,4 +1,5 @@
 # tldw_Server_API/app/core/DB_Management/ChaChaNotes_DB_Deps.py
+import asyncio
 import json
 import threading
 from pathlib import Path
@@ -92,8 +93,6 @@ def _get_chacha_db_path_for_user(user_id: int) -> Path:
         raise IOError(f"Could not initialize ChaChaNotes storage directory for user {user_id}.") from e
     return db_file
 
-# This function should be made async, and ran inside an executor.
-# FIXME - require _ensure_default_character to become async def and be awaited within get_chacha_db_for_user
 def _ensure_default_character(db_instance: CharactersRAGDB) -> Optional[int]:
     """
     Checks if the default character exists in the DB, creates it if not.
@@ -201,7 +200,8 @@ async def get_chacha_db_for_user(
             db_instance = CharactersRAGDB(db_path=str(db_path), client_id=str(current_user.id))
 
             # +++ Ensure default character exists after DB instance is created +++
-            default_char_id = _ensure_default_character(db_instance)
+            # Run synchronous function in thread pool to avoid blocking async context
+            default_char_id = await asyncio.to_thread(_ensure_default_character, db_instance)
             if default_char_id is None:
                 # This is a problem, the application might not function correctly without a default.
                 logging.error(f"Failed to ensure default character for user {user_id}. This might impact functionality.")
