@@ -12,13 +12,16 @@ import os
 import shutil
 from typing import Optional
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks, Request
 from fastapi.responses import FileResponse
 from loguru import logger
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from ....core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from ....core.Chatbooks.chatbook_service import ChatbookService
-from ....core.Chatbooks.chatbook_models import ContentType, ConflictResolution
+from ....core.Chatbooks.chatbook_models import ContentType, ConflictResolution, ExportStatus
+from ....core.Chatbooks.quota_manager import QuotaManager
 from ....core.AuthNZ.User_DB_Handling import User
 from ..API_Deps.auth_deps import get_current_user
 from ..API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user as get_chacha_db
@@ -39,6 +42,9 @@ from ..schemas.chatbook_schemas import (
 
 router = APIRouter(prefix="/chatbooks", tags=["chatbooks"])
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 
 def get_chatbook_service(
     user: User = Depends(get_current_user),
@@ -49,9 +55,11 @@ def get_chatbook_service(
 
 
 @router.post("/export", response_model=CreateChatbookResponse)
+@limiter.limit("5/minute")  # Rate limit: 5 exports per minute
 async def create_chatbook(
-    request: CreateChatbookRequest,
+    request_data: CreateChatbookRequest,
     background_tasks: BackgroundTasks,
+    request: Request,
     service: ChatbookService = Depends(get_chatbook_service),
     user: User = Depends(get_current_user)
 ):
@@ -71,30 +79,43 @@ async def create_chatbook(
         CreateChatbookResponse with job ID (async) or file path (sync)
     """
     try:
+        # Initialize quota manager
+        quota_manager = QuotaManager(str(user.id), getattr(user, 'tier', 'free'))
+        
+        # Check export quota
+        allowed, message = await quota_manager.check_export_quota()
+        if not allowed:
+            raise HTTPException(status_code=429, detail=message)
+        
+        # Check concurrent jobs quota
+        allowed, message = await quota_manager.check_concurrent_jobs()
+        if not allowed:
+            raise HTTPException(status_code=429, detail=message)
+        
         # Convert content selections to use string enums
         content_selections = {}
-        for content_type, ids in request.content_selections.items():
+        for content_type, ids in request_data.content_selections.items():
             if isinstance(content_type, str):
                 content_type = ContentType(content_type)
             content_selections[content_type] = ids
         
         # Create chatbook
         success, message, result = await service.create_chatbook(
-            name=request.name,
-            description=request.description,
+            name=request_data.name,
+            description=request_data.description,
             content_selections=content_selections,
-            author=request.author,
-            include_media=request.include_media,
-            media_quality=request.media_quality,
-            include_embeddings=request.include_embeddings,
-            include_generated_content=request.include_generated_content,
-            tags=request.tags,
-            categories=request.categories,
-            async_mode=request.async_mode
+            author=request_data.author,
+            include_media=request_data.include_media,
+            media_quality=request_data.media_quality,
+            include_embeddings=request_data.include_embeddings,
+            include_generated_content=request_data.include_generated_content,
+            tags=request_data.tags,
+            categories=request_data.categories,
+            async_mode=request_data.async_mode
         )
         
         if success:
-            if request.async_mode:
+            if request_data.async_mode:
                 # Async mode - return job ID
                 return CreateChatbookResponse(
                     success=True,
@@ -114,16 +135,20 @@ async def create_chatbook(
         else:
             raise HTTPException(status_code=400, detail=message)
             
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error creating chatbook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error creating chatbook for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while creating the chatbook")
 
 
 @router.post("/import", response_model=ImportChatbookResponse)
+@limiter.limit("5/minute")  # Rate limit: 5 imports per minute
 async def import_chatbook(
     background_tasks: BackgroundTasks,
+    request: Request,
     file: UploadFile = File(...),
-    request: ImportChatbookRequest = Depends(),
+    import_request: ImportChatbookRequest = Depends(),
     service: ChatbookService = Depends(get_chatbook_service),
     user: User = Depends(get_current_user)
 ):
@@ -145,19 +170,56 @@ async def import_chatbook(
         ImportChatbookResponse with job ID (async) or import results (sync)
     """
     try:
-        # Save uploaded file to temp location
+        # Initialize quota manager
+        quota_manager = QuotaManager(str(user.id), getattr(user, 'tier', 'free'))
+        
+        # Check import quota
+        allowed, message = await quota_manager.check_import_quota()
+        if not allowed:
+            raise HTTPException(status_code=429, detail=message)
+        
+        # Check concurrent jobs quota
+        allowed, message = await quota_manager.check_concurrent_jobs()
+        if not allowed:
+            raise HTTPException(status_code=429, detail=message)
+        
+        # Validate file
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No filename provided")
+        
+        # Sanitize filename - extract only the basename and remove dangerous characters
+        import os
+        import re
+        safe_filename = os.path.basename(file.filename)
+        safe_filename = re.sub(r'[^a-zA-Z0-9._\-]', '_', safe_filename)
+        
+        # Validate file extension
+        if not safe_filename.lower().endswith(('.zip', '.chatbook')):
+            raise HTTPException(status_code=400, detail="Invalid file type. Only .zip or .chatbook files are allowed")
+        
+        # Check file size
+        file.file.seek(0, 2)  # Seek to end
+        file_size = file.file.tell()
+        file.file.seek(0)  # Reset to beginning
+        
+        # Check file size quota
+        allowed, message = await quota_manager.check_file_size(file_size)
+        if not allowed:
+            raise HTTPException(status_code=413, detail=message)
+        
+        # Save uploaded file to temp location with sanitized name
         temp_dir = Path(f"/tmp/tldw/{user.id}/uploads")
         temp_dir.mkdir(parents=True, exist_ok=True)
         
-        temp_file = temp_dir / f"import_{file.filename}"
+        temp_file = temp_dir / f"import_{safe_filename}"
         with open(temp_file, 'wb') as f:
             shutil.copyfileobj(file.file, f)
         
         # Convert content selections if provided
         content_selections = None
-        if request.content_selections:
+        if import_request.content_selections:
             content_selections = {}
-            for content_type, ids in request.content_selections.items():
+            for content_type, ids in import_request.content_selections.items():
                 if isinstance(content_type, str):
                     content_type = ContentType(content_type)
                 content_selections[content_type] = ids
@@ -166,15 +228,15 @@ async def import_chatbook(
         success, message, result = await service.import_chatbook(
             file_path=str(temp_file),
             content_selections=content_selections,
-            conflict_resolution=request.conflict_resolution,
-            prefix_imported=request.prefix_imported,
-            import_media=request.import_media,
-            import_embeddings=request.import_embeddings,
-            async_mode=request.async_mode
+            conflict_resolution=import_request.conflict_resolution,
+            prefix_imported=import_request.prefix_imported,
+            import_media=import_request.import_media,
+            import_embeddings=import_request.import_embeddings,
+            async_mode=request_data.async_mode
         )
         
         if success:
-            if request.async_mode:
+            if request_data.async_mode:
                 # Async mode - return job ID
                 return ImportChatbookResponse(
                     success=True,
@@ -191,12 +253,14 @@ async def import_chatbook(
         else:
             raise HTTPException(status_code=400, detail=message)
             
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error importing chatbook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error importing chatbook for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while importing the chatbook")
     finally:
         # Cleanup uploaded file if not async
-        if not request.async_mode and temp_file.exists():
+        if not request_data.async_mode and temp_file.exists():
             try:
                 temp_file.unlink()
             except:
@@ -204,7 +268,9 @@ async def import_chatbook(
 
 
 @router.post("/preview", response_model=PreviewChatbookResponse)
+@limiter.limit("10/minute")  # Rate limit: 10 previews per minute
 async def preview_chatbook(
+    request: Request,
     file: UploadFile = File(...),
     service: ChatbookService = Depends(get_chatbook_service),
     user: User = Depends(get_current_user)
@@ -224,11 +290,33 @@ async def preview_chatbook(
         PreviewChatbookResponse with manifest information
     """
     try:
-        # Save uploaded file to temp location
+        # Validate file
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="No filename provided")
+        
+        # Sanitize filename
+        import os
+        import re
+        safe_filename = os.path.basename(file.filename)
+        safe_filename = re.sub(r'[^a-zA-Z0-9._\-]', '_', safe_filename)
+        
+        # Validate file extension
+        if not safe_filename.lower().endswith(('.zip', '.chatbook')):
+            raise HTTPException(status_code=400, detail="Invalid file type. Only .zip or .chatbook files are allowed")
+        
+        # Check file size (limit to 100MB for preview)
+        file.file.seek(0, 2)
+        file_size = file.file.tell()
+        file.file.seek(0)
+        
+        if file_size > 100 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large. Maximum size is 100MB")
+        
+        # Save uploaded file to temp location with sanitized name
         temp_dir = Path(f"/tmp/tldw/{user.id}/uploads")
         temp_dir.mkdir(parents=True, exist_ok=True)
         
-        temp_file = temp_dir / f"preview_{file.filename}"
+        temp_file = temp_dir / f"preview_{safe_filename}"
         with open(temp_file, 'wb') as f:
             shutil.copyfileobj(file.file, f)
         
@@ -274,9 +362,11 @@ async def preview_chatbook(
         else:
             return PreviewChatbookResponse(error=error)
             
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error previewing chatbook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error previewing chatbook for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while previewing the chatbook")
 
 
 @router.get("/export/jobs", response_model=ListExportJobsResponse)
@@ -327,9 +417,11 @@ async def list_export_jobs(
         
         return ListExportJobsResponse(jobs=job_responses, total=total)
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error listing export jobs: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error listing export jobs for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while retrieving export jobs")
 
 
 @router.get("/export/jobs/{job_id}", response_model=ExportJobResponse)
@@ -375,8 +467,8 @@ async def get_export_job(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting export job: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting export job {job_id} for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while retrieving the export job")
 
 
 @router.get("/import/jobs", response_model=ListImportJobsResponse)
@@ -481,17 +573,19 @@ async def get_import_job(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/download/{filename}")
+@router.get("/download/{job_id}")
+@limiter.limit("20/minute")  # Rate limit: 20 downloads per minute
 async def download_chatbook(
-    filename: str,
+    job_id: str,
+    request: Request,
     service: ChatbookService = Depends(get_chatbook_service),
     user: User = Depends(get_current_user)
 ):
     """
-    Download an exported chatbook file.
+    Download an exported chatbook file by job ID.
     
     Args:
-        filename: The chatbook filename
+        job_id: The export job ID
         service: Chatbook service instance
         user: Current authenticated user
         
@@ -499,29 +593,53 @@ async def download_chatbook(
         FileResponse with the chatbook file
     """
     try:
-        # Construct file path
-        file_path = Path(f"/tmp/tldw/{user.id}/chatbooks/{filename}")
+        # Validate job_id format (UUID)
+        import re
+        if not re.match(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', job_id.lower()):
+            raise HTTPException(status_code=400, detail="Invalid job ID format")
         
-        # Verify file exists and belongs to user
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="File not found")
+        # Get job from service (validates ownership)
+        job = service.get_export_job(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Export job not found")
         
-        # Verify the file is in the user's directory
-        if not str(file_path).startswith(f"/tmp/tldw/{user.id}/"):
+        # Verify job belongs to current user (double check)
+        if job.user_id != str(user.id):
             raise HTTPException(status_code=403, detail="Access denied")
         
-        # Return file
+        # Verify job is completed
+        if job.status != ExportStatus.COMPLETED:
+            raise HTTPException(status_code=400, detail=f"Export job is {job.status.value}, not completed")
+        
+        # Get secure file path from job
+        if not job.output_path:
+            raise HTTPException(status_code=404, detail="Export file not found")
+        
+        file_path = Path(job.output_path)
+        
+        # Verify file exists and is within secure storage
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(status_code=404, detail="Export file no longer exists")
+        
+        # Get filename from path
+        filename = file_path.name
+        
+        # Return file with security headers
         return FileResponse(
             path=str(file_path),
             filename=filename,
-            media_type="application/zip"
+            media_type="application/zip",
+            headers={
+                "X-Content-Type-Options": "nosniff",
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error downloading chatbook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error downloading chatbook {filename} for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while downloading the file")
 
 
 @router.post("/cleanup", response_model=CleanupExpiredExportsResponse)

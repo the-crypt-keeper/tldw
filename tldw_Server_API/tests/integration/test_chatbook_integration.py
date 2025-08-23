@@ -44,7 +44,7 @@ def test_db():
 @pytest.fixture
 def chatbook_service(test_db):
     """Create ChatbookService with test database."""
-    return ChatbookService(test_db, user_id="test_user")
+    return ChatbookService(user_id="test_user", db=test_db)
 
 
 @pytest.fixture
@@ -380,8 +380,8 @@ class TestMultiUserScenarios:
         db1 = CharactersRAGDB(":memory:", "user1")
         db2 = CharactersRAGDB(":memory:", "user2")
         
-        service1 = ChatbookService(db1, "user1")
-        service2 = ChatbookService(db2, "user2")
+        service1 = ChatbookService(user_id="user1", db=db1)
+        service2 = ChatbookService(user_id="user2", db=db2)
         
         # User 1 creates content
         dict_service1 = ChatDictionaryService(db1)

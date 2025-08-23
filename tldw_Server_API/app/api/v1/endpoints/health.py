@@ -19,6 +19,7 @@ from tldw_Server_API.app.core.Evaluations.evaluation_manager import EvaluationMa
 from tldw_Server_API.app.core.Evaluations.metrics import get_metrics
 from tldw_Server_API.app.core.Evaluations.audit_logger import audit_logger
 from tldw_Server_API.app.core.Security.secret_manager import secret_manager
+from tldw_Server_API.app.core.Evaluations.connection_pool import get_connection_health, get_connection_stats
 
 #######################################################################################################################
 #
@@ -369,6 +370,25 @@ async def evaluation_service_health() -> Dict[str, Any]:
         }
         health["status"] = "degraded"
         logger.error(f"Evaluation database health check failed: {e}")
+    
+    # Check connection pool health
+    try:
+        pool_health = get_connection_health()
+        health["components"]["connection_pool"] = pool_health
+        
+        # Degrade overall health if connection pool is unhealthy
+        if pool_health["status"] == "unhealthy":
+            health["status"] = "degraded"
+        elif pool_health["status"] == "degraded" and health["status"] == "healthy":
+            health["status"] = "degraded"
+            
+    except Exception as e:
+        health["components"]["connection_pool"] = {
+            "status": "error",
+            "error": str(e)
+        }
+        health["status"] = "degraded"
+        logger.error(f"Connection pool health check failed: {e}")
     
     # Check circuit breakers
     try:

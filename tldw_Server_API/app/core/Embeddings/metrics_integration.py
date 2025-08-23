@@ -9,10 +9,8 @@ import asyncio
 from loguru import logger
 from tldw_Server_API.app.core.Metrics.metrics_logger import (
     log_counter, 
-    log_histogram, 
-    log_gauge,
-    log_function_performance,
-    log_memory_usage
+    log_histogram,
+    log_resource_usage
 )
 
 
@@ -66,14 +64,14 @@ class EmbeddingMetrics:
     
     def update_cache_size(self, size: int):
         """Update current cache size"""
-        log_gauge(
+        log_histogram(
             f"{self.metrics_prefix}_cache_size",
             size
         )
     
     def update_cache_memory(self, memory_bytes: int):
         """Update cache memory usage"""
-        log_gauge(
+        log_histogram(
             f"{self.metrics_prefix}_cache_memory_bytes",
             memory_bytes
         )
@@ -100,14 +98,14 @@ class EmbeddingMetrics:
     
     def update_models_in_memory(self, count: int):
         """Update number of models in memory"""
-        log_gauge(
+        log_histogram(
             f"{self.metrics_prefix}_models_in_memory",
             count
         )
     
     def update_model_memory_usage(self, model: str, memory_gb: float):
         """Update memory usage for a model"""
-        log_gauge(
+        log_histogram(
             f"{self.metrics_prefix}_model_memory_gb",
             memory_gb,
             labels={"model": model}
@@ -138,7 +136,7 @@ class EmbeddingMetrics:
     
     def update_rate_limit_usage(self, user_id: str, usage_percent: float):
         """Update rate limit usage percentage"""
-        log_gauge(
+        log_histogram(
             f"{self.metrics_prefix}_rate_limit_usage_percent",
             usage_percent,
             labels={"user_id": user_id[:8]}  # Use prefix for privacy
@@ -147,12 +145,12 @@ class EmbeddingMetrics:
     # Connection pool metrics
     def update_pool_connections(self, provider: str, active: int, idle: int):
         """Update connection pool stats"""
-        log_gauge(
+        log_histogram(
             f"{self.metrics_prefix}_pool_active_connections",
             active,
             labels={"provider": provider}
         )
-        log_gauge(
+        log_histogram(
             f"{self.metrics_prefix}_pool_idle_connections",
             idle,
             labels={"provider": provider}
@@ -161,7 +159,7 @@ class EmbeddingMetrics:
     # DLQ metrics
     def update_dlq_size(self, size: int):
         """Update dead letter queue size"""
-        log_gauge(
+        log_histogram(
             f"{self.metrics_prefix}_dlq_size",
             size
         )
@@ -181,7 +179,7 @@ class EmbeddingMetrics:
     def update_circuit_breaker_state(self, provider: str, state: str):
         """Update circuit breaker state"""
         state_value = {"closed": 0, "open": 1, "half_open": 2}.get(state.lower(), -1)
-        log_gauge(
+        log_histogram(
             f"{self.metrics_prefix}_circuit_breaker_state",
             state_value,
             labels={"provider": provider}
@@ -233,10 +231,9 @@ class EmbeddingMetrics:
         return decorator
     
     # Resource tracking
-    def log_resource_usage(self):
+    def log_resource_usage_stats(self):
         """Log current resource usage"""
-        log_memory_usage()
-        log_function_performance("embeddings_module")
+        log_resource_usage()
     
     # Aggregated metrics
     def get_summary_metrics(self) -> Dict[str, Any]:
@@ -341,7 +338,7 @@ async def collect_periodic_metrics(interval_seconds: int = 60):
     while True:
         try:
             # Collect resource usage
-            metrics.log_resource_usage()
+            metrics.log_resource_usage_stats()
             
             # You can add more periodic collections here
             # e.g., checking connection pool status, cache size, etc.

@@ -21,11 +21,15 @@ import shutil
 import zipfile
 import hashlib
 import asyncio
+import aiofiles
+import aiofiles.os
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Set
 from uuid import uuid4
 from loguru import logger
+from contextlib import asynccontextmanager
 
 from .chatbook_models import (
     ChatbookManifest, ChatbookContent, ContentItem, ContentType,
@@ -49,15 +53,24 @@ class ChatbookService:
         self.user_id = user_id
         self.db = db
         
-        # User-specific temporary directory
-        self.temp_dir = Path(f"/tmp/tldw/{user_id}/chatbooks")
-        self.temp_dir.mkdir(parents=True, exist_ok=True)
+        # Secure user-specific directory using application data path
+        # Get base path from environment or use secure default
+        import os
+        base_data_dir = Path(os.environ.get('TLDW_USER_DATA_PATH', '/var/lib/tldw/user_data'))
         
-        # Track jobs (in production, use Redis or database)
-        self.export_jobs: Dict[str, ExportJob] = {}
-        self.import_jobs: Dict[str, ImportJob] = {}
+        # Create secure user-specific directory with restricted permissions
+        self.user_data_dir = base_data_dir / 'users' / str(user_id) / 'chatbooks'
+        self.user_data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         
-        # Initialize job tracking tables if needed
+        # Separate directories for exports and imports
+        self.export_dir = self.user_data_dir / 'exports'
+        self.import_dir = self.user_data_dir / 'imports'
+        self.temp_dir = self.user_data_dir / 'temp'
+        
+        for directory in [self.export_dir, self.import_dir, self.temp_dir]:
+            directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        
+        # Initialize job tracking tables in database
         self._init_job_tables()
     
     def _init_job_tables(self):
@@ -163,14 +176,30 @@ class ChatbookService:
             
             return True, f"Export job started: {job_id}", job_id
         else:
-            # Run synchronously
-            return self._create_chatbook_sync(
+            # Run asynchronously
+            return await self._create_chatbook_async(
                 name, description, content_selections,
                 author, include_media, media_quality, include_embeddings,
                 include_generated_content, tags, categories
             )
     
-    def _create_chatbook_sync(
+    @asynccontextmanager
+    async def _transaction_context(self):
+        """Context manager for database transactions."""
+        # Start transaction
+        conn = self.db.get_connection()
+        try:
+            conn.execute("BEGIN TRANSACTION")
+            yield conn
+            conn.execute("COMMIT")
+        except Exception as e:
+            conn.execute("ROLLBACK")
+            logger.error(f"Transaction rolled back: {e}")
+            raise
+        finally:
+            conn.close()
+    
+    async def _create_chatbook_async(
         self,
         name: str,
         description: str,
@@ -190,10 +219,10 @@ class ChatbookService:
             Tuple of (success, message, file_path)
         """
         try:
-            # Create working directory
+            # Create working directory in secure temp location
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            work_dir = self.temp_dir / f"export_{timestamp}"
-            work_dir.mkdir(parents=True, exist_ok=True)
+            work_dir = self.temp_dir / f"export_{timestamp}_{uuid4().hex[:8]}"
+            work_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
             
             # Initialize manifest
             manifest = ChatbookManifest(
@@ -259,27 +288,29 @@ class ChatbookService:
             manifest.total_dictionaries = len(content.dictionaries)
             manifest.total_documents = len(content.generated_documents)
             
-            # Write manifest
+            # Write manifest asynchronously
             manifest_path = work_dir / "manifest.json"
-            with open(manifest_path, 'w', encoding='utf-8') as f:
-                json.dump(manifest.to_dict(), f, indent=2, ensure_ascii=False)
+            async with aiofiles.open(manifest_path, 'w', encoding='utf-8') as f:
+                await f.write(json.dumps(manifest.to_dict(), indent=2, ensure_ascii=False))
             
-            # Create README
-            self._create_readme(work_dir, manifest)
+            # Create README asynchronously
+            await self._create_readme_async(work_dir, manifest)
             
-            # Create archive
-            output_filename = f"{name.replace(' ', '_')}_{timestamp}.zip"
-            output_path = self.temp_dir / output_filename
-            self._create_zip_archive(work_dir, output_path)
+            # Create archive in secure export directory
+            safe_name = "".join(c if c.isalnum() or c in "_-" else "_" for c in name)
+            output_filename = f"{safe_name}_{timestamp}_{uuid4().hex[:8]}.zip"
+            output_path = self.export_dir / output_filename
+            await self._create_zip_archive_async(work_dir, output_path)
             
             # Update manifest with file size
             manifest.total_size_bytes = output_path.stat().st_size
             
-            # Cleanup working directory
-            shutil.rmtree(work_dir)
+            # Cleanup working directory asynchronously
+            await asyncio.to_thread(shutil.rmtree, work_dir)
             
-            # Generate download URL (in production, use signed URLs)
-            download_url = f"/api/v1/chatbooks/download/{output_filename}"
+            # Store file path in job record (will be retrieved by job_id)
+            # No direct filename access for security
+            download_url = None  # Will be generated from job_id
             
             return True, f"Chatbook created successfully", str(output_path)
             
@@ -412,13 +443,30 @@ class ChatbookService:
         Synchronously import a chatbook.
         """
         try:
-            # Extract chatbook
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            extract_dir = self.temp_dir / f"import_{timestamp}"
+            # Validate file first
+            if not self._validate_zip_file(file_path):
+                return False, "Invalid or potentially malicious archive file", None
             
-            # Extract archive
+            # Extract chatbook to secure temp location
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            extract_dir = self.temp_dir / f"import_{timestamp}_{uuid4().hex[:8]}"
+            extract_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+            
+            # Extract archive with size limits
             with zipfile.ZipFile(file_path, 'r') as zf:
-                zf.extractall(extract_dir)
+                # Check total uncompressed size
+                total_size = sum(zinfo.file_size for zinfo in zf.filelist)
+                if total_size > 500 * 1024 * 1024:  # 500MB limit
+                    return False, "Archive too large (>500MB uncompressed)", None
+                
+                # Extract with path validation
+                for member in zf.namelist():
+                    # Prevent path traversal
+                    if os.path.isabs(member) or ".." in member:
+                        return False, f"Unsafe path in archive: {member}", None
+                    
+                    # Extract individual file
+                    zf.extract(member, extract_dir)
             
             # Load manifest
             manifest_path = extract_dir / "manifest.json"
@@ -1438,8 +1486,44 @@ class ChatbookService:
             
             counter += 1
     
+    async def _create_readme_async(self, work_dir: Path, manifest: ChatbookManifest):
+        """Create README file for the chatbook asynchronously."""
+        readme_path = work_dir / "README.md"
+        
+        content = []
+        content.append(f"# {manifest.name}\n\n")
+        content.append(f"{manifest.description}\n\n")
+        
+        if manifest.author:
+            content.append(f"**Author:** {manifest.author}\n\n")
+        
+        content.append(f"**Created:** {manifest.created_at.strftime('%Y-%m-%d %H:%M')}\n\n")
+        content.append("## Contents\n\n")
+        
+        if manifest.total_conversations > 0:
+            content.append(f"- **Conversations:** {manifest.total_conversations}\n")
+        if manifest.total_notes > 0:
+            content.append(f"- **Notes:** {manifest.total_notes}\n")
+        if manifest.total_characters > 0:
+            content.append(f"- **Characters:** {manifest.total_characters}\n")
+        if manifest.total_world_books > 0:
+            content.append(f"- **World Books:** {manifest.total_world_books}\n")
+        if manifest.total_dictionaries > 0:
+            content.append(f"- **Dictionaries:** {manifest.total_dictionaries}\n")
+        if manifest.total_documents > 0:
+            content.append(f"- **Generated Documents:** {manifest.total_documents}\n")
+        
+        if manifest.tags:
+            content.append(f"\n## Tags\n\n{', '.join(manifest.tags)}\n")
+        
+        content.append("\n## License\n\n")
+        content.append(manifest.license or "See individual content files for licensing information.")
+        
+        async with aiofiles.open(readme_path, 'w', encoding='utf-8') as f:
+            await f.write(''.join(content))
+    
     def _create_readme(self, work_dir: Path, manifest: ChatbookManifest):
-        """Create README file for the chatbook."""
+        """Create README file for the chatbook (sync version for backwards compatibility)."""
         readme_path = work_dir / "README.md"
         
         with open(readme_path, 'w', encoding='utf-8') as f:
@@ -1472,10 +1556,95 @@ class ChatbookService:
             f.write("\n## License\n\n")
             f.write(manifest.license or "See individual content files for licensing information.")
     
+    def _validate_zip_file(self, file_path: str) -> bool:
+        """
+        Validate a ZIP file for safety and integrity.
+        
+        Args:
+            file_path: Path to the ZIP file
+            
+        Returns:
+            True if valid and safe, False otherwise
+        """
+        try:
+            # Check file exists and has reasonable size
+            file_path_obj = Path(file_path)
+            if not file_path_obj.exists():
+                return False
+            
+            file_size = file_path_obj.stat().st_size
+            if file_size > 100 * 1024 * 1024:  # 100MB compressed limit
+                logger.warning(f"ZIP file too large: {file_size} bytes")
+                return False
+            
+            # Verify it's actually a ZIP file (check magic bytes)
+            with open(file_path, 'rb') as f:
+                magic = f.read(4)
+                if magic[:2] != b'PK':  # ZIP magic number
+                    logger.warning("File is not a valid ZIP archive")
+                    return False
+            
+            # Test ZIP integrity
+            with zipfile.ZipFile(file_path, 'r') as zf:
+                # Check for path traversal attempts
+                for name in zf.namelist():
+                    if os.path.isabs(name) or ".." in name or name.startswith("/"):
+                        logger.warning(f"Unsafe path in ZIP: {name}")
+                        return False
+                
+                # Test CRC integrity
+                result = zf.testzip()
+                if result is not None:
+                    logger.warning(f"ZIP file corrupt: {result}")
+                    return False
+            
+            return True
+            
+        except (zipfile.BadZipFile, OSError) as e:
+            logger.error(f"Invalid ZIP file: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Error validating ZIP file: {e}")
+            return False
+    
+    async def _create_zip_archive_async(self, work_dir: Path, output_path: Path):
+        """Create ZIP archive of the chatbook asynchronously with compression limits."""
+        def _create_archive():
+            with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+                total_size = 0
+                for file_path in work_dir.rglob('*'):
+                    if file_path.is_file():
+                        # Check individual file size
+                        file_size = file_path.stat().st_size
+                        if file_size > 50 * 1024 * 1024:  # 50MB per file limit
+                            logger.warning(f"Skipping large file: {file_path} ({file_size} bytes)")
+                            continue
+                        
+                        total_size += file_size
+                        if total_size > 500 * 1024 * 1024:  # 500MB total limit
+                            raise ValueError("Archive size exceeds 500MB limit")
+                        
+                        arcname = file_path.relative_to(work_dir)
+                        zf.write(file_path, arcname)
+        
+        # Run in thread pool to avoid blocking
+        await asyncio.to_thread(_create_archive)
+    
     def _create_zip_archive(self, work_dir: Path, output_path: Path):
-        """Create ZIP archive of the chatbook."""
-        with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        """Create ZIP archive of the chatbook with compression limits (sync version)."""
+        with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+            total_size = 0
             for file_path in work_dir.rglob('*'):
                 if file_path.is_file():
+                    # Check individual file size
+                    file_size = file_path.stat().st_size
+                    if file_size > 50 * 1024 * 1024:  # 50MB per file limit
+                        logger.warning(f"Skipping large file: {file_path} ({file_size} bytes)")
+                        continue
+                    
+                    total_size += file_size
+                    if total_size > 500 * 1024 * 1024:  # 500MB total limit
+                        raise ValueError("Archive size exceeds 500MB limit")
+                    
                     arcname = file_path.relative_to(work_dir)
                     zf.write(file_path, arcname)

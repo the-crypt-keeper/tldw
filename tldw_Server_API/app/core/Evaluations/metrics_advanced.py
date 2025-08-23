@@ -503,5 +503,34 @@ class AdvancedEvaluationMetrics:
             logger.error(f"Failed to push metrics to gateway: {e}")
 
 
-# Global instance
-advanced_metrics = AdvancedEvaluationMetrics()
+# Global instance - use singleton pattern to avoid duplicate registration
+_advanced_metrics_instance = None
+
+def get_advanced_metrics():
+    """Get or create the global advanced metrics instance."""
+    global _advanced_metrics_instance
+    if _advanced_metrics_instance is None:
+        try:
+            _advanced_metrics_instance = AdvancedEvaluationMetrics()
+        except ValueError as e:
+            # If metrics are already registered (e.g., during reload), create without registry
+            if "Duplicated timeseries" in str(e):
+                logger.warning("Metrics already registered, creating instance without new registry")
+                _advanced_metrics_instance = type('DummyMetrics', (), {
+                    'enabled': False,
+                    'track_evaluation_cost': lambda *args, **kwargs: None,
+                    'track_user_activity': lambda *args, **kwargs: None,
+                    'track_error': lambda *args, **kwargs: None,
+                    'record_slo_violation': lambda *args, **kwargs: None,
+                    'track_business_event': lambda *args, **kwargs: None,
+                    'track_webhook_delivery': lambda *args, **kwargs: None,
+                    'get_metrics_summary': lambda: {},
+                    'export_metrics': lambda format='json': {} if format == 'json' else '',
+                    'push_to_gateway': lambda *args, **kwargs: None,
+                })()
+            else:
+                raise
+    return _advanced_metrics_instance
+
+# Create the global instance
+advanced_metrics = get_advanced_metrics()

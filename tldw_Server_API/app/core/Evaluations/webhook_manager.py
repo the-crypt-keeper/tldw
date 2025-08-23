@@ -11,13 +11,28 @@ import hashlib
 import asyncio
 import aiohttp
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
 import sqlite3
 from pathlib import Path
 from loguru import logger
 import secrets
+
+# Import security enhancements
+from tldw_Server_API.app.core.Evaluations.webhook_security import (
+    webhook_validator,
+    WebhookPermissionManager,
+    WebhookValidationResult
+)
+from tldw_Server_API.app.core.Evaluations.config_manager import get_config
+from tldw_Server_API.app.core.Evaluations.audit_logger import (
+    audit_logger,
+    AuditEventType,
+    AuditSeverity
+)
+from tldw_Server_API.app.core.Evaluations.metrics import get_metrics
+from tldw_Server_API.app.core.Evaluations.connection_pool import get_connection
 
 
 class WebhookEvent(Enum):
@@ -50,7 +65,7 @@ class WebhookManager:
     
     def __init__(self, db_path: Optional[str] = None):
         """
-        Initialize webhook manager.
+        Initialize webhook manager with enhanced security.
         
         Args:
             db_path: Path to database
@@ -63,17 +78,25 @@ class WebhookManager:
         self.db_path = str(db_path)
         self._init_database()
         
-        # Delivery configuration
-        self.max_retries = 3
-        self.retry_delays = [1, 5, 15]  # seconds
-        self.timeout = 30  # seconds
+        # Load delivery configuration from external config
+        delivery_config = get_config("webhooks.delivery", {})
+        self.max_retries = delivery_config.get("max_retries", 3)
+        self.retry_delays = delivery_config.get("retry_delays", [1, 5, 15])
+        self.timeout = delivery_config.get("timeout_seconds", 30)
+        self.batch_size = delivery_config.get("batch_size", 10)
+        
+        # Security components
+        self.permission_manager = WebhookPermissionManager(self.db_path)
+        
+        # Metrics
+        self.metrics = get_metrics()
         
         # Background task for retries
         self._retry_task = None
     
     def _init_database(self):
         """Initialize webhook tables."""
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             # These tables are created in the migration
             # but we ensure they exist here for standalone usage
             conn.execute("""
@@ -125,41 +148,100 @@ class WebhookManager:
         user_id: str,
         url: str,
         events: List[WebhookEvent],
-        secret: Optional[str] = None
+        secret: Optional[str] = None,
+        skip_validation: bool = False
     ) -> Dict[str, Any]:
         """
-        Register a webhook for a user.
+        Register a webhook for a user with enhanced security validation.
         
         Args:
             user_id: User identifier
             url: Webhook URL
             events: List of events to subscribe to
             secret: Optional secret for HMAC signature (generated if not provided)
+            skip_validation: Skip URL validation (for testing)
             
         Returns:
-            Webhook registration details
+            Webhook registration details with validation results
+            
+        Raises:
+            ValueError: If validation fails or permissions are insufficient
         """
-        # Generate secret if not provided
-        if not secret:
-            secret = secrets.token_hex(32)
-        
-        # Convert events to JSON
-        events_json = json.dumps([e.value for e in events])
+        start_time = asyncio.get_event_loop().time()
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            # Check permissions first
+            has_permission, permission_error = await self.permission_manager.check_webhook_permissions(
+                user_id=user_id,
+                url=url,
+                action="register"
+            )
+            
+            if not has_permission:
+                audit_logger.log_event(
+                    event_type=AuditEventType.WEBHOOK_REGISTER,
+                    action="Webhook registration denied - permission check failed",
+                    user_id=user_id,
+                    outcome="failure",
+                    severity=AuditSeverity.MEDIUM,
+                    details={
+                        "url": url[:100] + "..." if len(url) > 100 else url,
+                        "error": permission_error,
+                        "events": [e.value for e in events]
+                    }
+                )
+                raise ValueError(f"Registration denied: {permission_error}")
+            
+            # URL security validation
+            validation_result = None
+            if not skip_validation:
+                validation_result = await webhook_validator.validate_webhook_url(
+                    url=url,
+                    user_id=user_id,
+                    check_connectivity=True
+                )
+                
+                if not validation_result.valid:
+                    error_messages = [error.message for error in validation_result.errors]
+                    audit_logger.log_event(
+                        event_type=AuditEventType.WEBHOOK_REGISTER,
+                        action="Webhook registration failed - URL validation errors",
+                        user_id=user_id,
+                        outcome="failure",
+                        severity=AuditSeverity.HIGH,
+                        details={
+                            "url": url[:100] + "..." if len(url) > 100 else url,
+                            "validation_errors": error_messages,
+                            "security_score": validation_result.security_score
+                        }
+                    )
+                    raise ValueError(f"URL validation failed: {'; '.join(error_messages)}")
+            
+            # Generate secret if not provided
+            if not secret:
+                secret = secrets.token_hex(32)
+            
+            # Convert events to JSON
+            events_json = json.dumps([e.value for e in events])
+            
+            # Register webhook in database
+            with get_connection() as conn:
                 cursor = conn.cursor()
                 
                 # Check if webhook already exists
                 cursor.execute("""
-                    SELECT id, secret FROM webhook_registrations
+                    SELECT id, secret, events FROM webhook_registrations
                     WHERE user_id = ? AND url = ?
                 """, (user_id, url))
                 
                 existing = cursor.fetchone()
+                webhook_id = None
                 
                 if existing:
                     webhook_id = existing[0]
+                    existing_secret = existing[1]
+                    existing_events = existing[2]
+                    
                     # Update existing webhook
                     cursor.execute("""
                         UPDATE webhook_registrations
@@ -167,46 +249,159 @@ class WebhookManager:
                         WHERE id = ?
                     """, (events_json, webhook_id))
                     
+                    # Use existing secret if not provided
+                    if not secret:
+                        secret = existing_secret
+                    
+                    action = "Updated"
                     logger.info(f"Updated webhook {webhook_id} for user {user_id}")
                 else:
                     # Create new webhook
                     cursor.execute("""
-                        INSERT INTO webhook_registrations (user_id, url, secret, events)
-                        VALUES (?, ?, ?, ?)
-                    """, (user_id, url, secret, events_json))
+                        INSERT INTO webhook_registrations (
+                            user_id, url, secret, events, 
+                            retry_count, timeout_seconds
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                    """, (
+                        user_id, url, secret, events_json,
+                        self.max_retries, self.timeout
+                    ))
                     
                     webhook_id = cursor.lastrowid
+                    action = "Registered"
                     logger.info(f"Registered webhook {webhook_id} for user {user_id}")
                 
                 conn.commit()
             
-            return {
+            # Record metrics
+            processing_time = asyncio.get_event_loop().time() - start_time
+            self.metrics.record_webhook_delivery(
+                event_type="registration",
+                outcome="success",
+                response_time=processing_time
+            )
+            
+            # Audit log successful registration
+            audit_logger.log_event(
+                event_type=AuditEventType.WEBHOOK_REGISTER,
+                action=f"Webhook {action.lower()} successfully",
+                user_id=user_id,
+                resource_id=str(webhook_id),
+                resource_type="webhook",
+                outcome="success",
+                severity=AuditSeverity.LOW,
+                details={
+                    "url": url[:100] + "..." if len(url) > 100 else url,
+                    "events": [e.value for e in events],
+                    "security_score": validation_result.security_score if validation_result else None,
+                    "processing_time_ms": int(processing_time * 1000)
+                }
+            )
+            
+            # Prepare response
+            response = {
                 "webhook_id": webhook_id,
                 "url": url,
                 "events": [e.value for e in events],
                 "secret": secret if not existing else "***hidden***",
-                "active": True
+                "active": True,
+                "action": action.lower()
             }
             
-        except Exception as e:
-            logger.error(f"Failed to register webhook: {e}")
+            # Include validation results if available
+            if validation_result:
+                response["validation"] = {
+                    "security_score": validation_result.security_score,
+                    "warnings": [w.to_dict() for w in validation_result.warnings],
+                    "connectivity": validation_result.metadata.get("connectivity", {})
+                }
+            
+            return response
+            
+        except ValueError:
+            # Re-raise validation errors
             raise
+        except Exception as e:
+            # Log unexpected errors
+            processing_time = asyncio.get_event_loop().time() - start_time
+            self.metrics.record_webhook_delivery(
+                event_type="registration",
+                outcome="failure",
+                response_time=processing_time
+            )
+            
+            audit_logger.log_event(
+                event_type=AuditEventType.WEBHOOK_REGISTER,
+                action="Webhook registration failed - system error",
+                user_id=user_id,
+                outcome="failure",
+                severity=AuditSeverity.HIGH,
+                details={
+                    "url": url[:100] + "..." if len(url) > 100 else url,
+                    "error": str(e),
+                    "processing_time_ms": int(processing_time * 1000)
+                }
+            )
+            
+            logger.error(f"Failed to register webhook: {e}")
+            raise ValueError(f"Webhook registration failed: {str(e)}")
     
-    async def unregister_webhook(self, user_id: str, url: str) -> bool:
+    async def unregister_webhook(self, user_id: str, url: str) -> Dict[str, Any]:
         """
-        Unregister a webhook.
+        Unregister a webhook with permission checks.
         
         Args:
             user_id: User identifier
             url: Webhook URL
             
         Returns:
-            True if unregistered successfully
+            Dict with operation result and details
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            # Check permissions
+            has_permission, permission_error = await self.permission_manager.check_webhook_permissions(
+                user_id=user_id,
+                url=url,
+                action="delete"
+            )
+            
+            if not has_permission:
+                audit_logger.log_event(
+                    event_type=AuditEventType.WEBHOOK_UNREGISTER,
+                    action="Webhook unregistration denied - permission check failed",
+                    user_id=user_id,
+                    outcome="failure",
+                    severity=AuditSeverity.MEDIUM,
+                    details={
+                        "url": url[:100] + "..." if len(url) > 100 else url,
+                        "error": permission_error
+                    }
+                )
+                return {
+                    "success": False,
+                    "error": f"Unregistration denied: {permission_error}"
+                }
+            
+            # Perform unregistration
+            with get_connection() as conn:
                 cursor = conn.cursor()
                 
+                # Get webhook details before unregistering
+                cursor.execute("""
+                    SELECT id, events FROM webhook_registrations
+                    WHERE user_id = ? AND url = ? AND active = 1
+                """, (user_id, url))
+                
+                webhook_data = cursor.fetchone()
+                if not webhook_data:
+                    return {
+                        "success": False,
+                        "error": "Webhook not found or already inactive"
+                    }
+                
+                webhook_id, events_json = webhook_data
+                
+                # Deactivate webhook
                 cursor.execute("""
                     UPDATE webhook_registrations
                     SET active = 0, updated_at = CURRENT_TIMESTAMP
@@ -215,14 +410,52 @@ class WebhookManager:
                 
                 if cursor.rowcount > 0:
                     conn.commit()
-                    logger.info(f"Unregistered webhook for user {user_id}: {url}")
-                    return True
+                    
+                    # Audit log successful unregistration
+                    audit_logger.log_event(
+                        event_type=AuditEventType.WEBHOOK_UNREGISTER,
+                        action="Webhook unregistered successfully",
+                        user_id=user_id,
+                        resource_id=str(webhook_id),
+                        resource_type="webhook",
+                        outcome="success",
+                        severity=AuditSeverity.LOW,
+                        details={
+                            "url": url[:100] + "..." if len(url) > 100 else url,
+                            "events": json.loads(events_json) if events_json else []
+                        }
+                    )
+                    
+                    logger.info(f"Unregistered webhook {webhook_id} for user {user_id}: {url}")
+                    return {
+                        "success": True,
+                        "webhook_id": webhook_id,
+                        "message": "Webhook unregistered successfully"
+                    }
                 
-                return False
+                return {
+                    "success": False,
+                    "error": "Failed to update webhook status"
+                }
                 
         except Exception as e:
+            audit_logger.log_event(
+                event_type=AuditEventType.WEBHOOK_UNREGISTER,
+                action="Webhook unregistration failed - system error",
+                user_id=user_id,
+                outcome="failure",
+                severity=AuditSeverity.MEDIUM,
+                details={
+                    "url": url[:100] + "..." if len(url) > 100 else url,
+                    "error": str(e)
+                }
+            )
+            
             logger.error(f"Failed to unregister webhook: {e}")
-            return False
+            return {
+                "success": False,
+                "error": f"Unregistration failed: {str(e)}"
+            }
     
     async def send_webhook(
         self,
@@ -271,7 +504,7 @@ class WebhookManager:
         event: WebhookEvent
     ) -> List[Dict[str, Any]]:
         """Get active webhooks for user and event."""
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             cursor.execute("""
@@ -399,7 +632,7 @@ class WebhookManager:
         signature: str
     ) -> int:
         """Create delivery record in database."""
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             cursor.execute("""
@@ -424,7 +657,7 @@ class WebhookManager:
         error_message: Optional[str] = None
     ):
         """Update delivery record."""
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             cursor.execute("""
@@ -448,7 +681,7 @@ class WebhookManager:
         error: Optional[str] = None
     ):
         """Update webhook statistics."""
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             if success:
@@ -487,7 +720,7 @@ class WebhookManager:
         Returns:
             List of webhook status information
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             if url:
@@ -543,7 +776,7 @@ class WebhookManager:
             Test result
         """
         # Get webhook details
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             cursor.execute("""

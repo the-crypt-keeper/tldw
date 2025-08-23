@@ -24,6 +24,7 @@ import datetime
 import json
 import logging
 import os
+import sqlite3
 import time
 import uuid
 from collections import deque
@@ -121,6 +122,19 @@ from tldw_Server_API.app.core.Chat.chat_helpers import (
     prepare_llm_messages,
     extract_system_message,
     extract_response_content,
+)
+from tldw_Server_API.app.core.Chat.chat_exceptions import (
+    set_request_id,
+    get_request_id,
+    ChatModuleException,
+    ChatAuthenticationError,
+    ChatValidationError,
+    ChatDatabaseError,
+    ChatProviderError,
+    ChatRateLimitError,
+    handle_database_error,
+    ErrorHandler,
+    ChatErrorCode,
 )
 from tldw_Server_API.app.api.v1.schemas.chat_validators import (
     validate_conversation_id,
@@ -275,10 +289,13 @@ async def _save_message_turn_to_db(
                     validation_time=image_processing_time
                 )
     except Exception as e_proc:
-        logger.error(
-            "Error processing message content in executor for DB save. conv=%s err_type=%s err=%s",
-            conversation_id, type(e_proc).__name__, e_proc, exc_info=True
+        error = ChatDatabaseError(
+            message=f"Failed to process message content for saving",
+            operation="message_content_processing",
+            details={"conversation_id": conversation_id, "role": role},
+            cause=e_proc
         )
+        error.log()
         return None
 
     if not text_parts and not images: # Issue 1 Fix
@@ -319,10 +336,26 @@ async def _save_message_turn_to_db(
                 metrics.track_message_saved(conversation_id, role)
                 return result
     except (InputError, ConflictError, CharactersRAGDBError) as e_db:
-        logger.error("DB error saving message for conv=%s: Type=%s, Msg='%s'", conversation_id, type(e_db).__name__, e_db)
+        error = ChatDatabaseError(
+            message=f"Database error saving message",
+            operation="save_message",
+            details={
+                "conversation_id": conversation_id,
+                "error_type": type(e_db).__name__,
+                "sender": db_payload.get("sender")
+            },
+            cause=e_db
+        )
+        error.log()
         return None
     except Exception as e_unexpected_db:
-        logger.error("Unexpected DB error saving message for conv=%s: %s", conversation_id, e_unexpected_db, exc_info=True)
+        error = ChatModuleException(
+            code=ChatErrorCode.INT_UNEXPECTED_ERROR,
+            message=f"Unexpected error saving message to database",
+            details={"conversation_id": conversation_id},
+            cause=e_unexpected_db
+        )
+        error.log(level="critical")
         return None
 
 
@@ -352,8 +385,8 @@ async def create_chat_completion(
 ):
     current_loop = asyncio.get_running_loop()
     
-    # Generate unique request ID for tracking
-    request_id = str(uuid.uuid4())
+    # Generate unique request ID for tracking and set it in context
+    request_id = set_request_id()
     
     # Wrap database with async wrapper for better performance
     async_db = create_async_db(chat_db)
@@ -943,11 +976,60 @@ async def create_chat_completion(
             
             return JSONResponse(content=encoded_payload)
 
-    # --- Exception Handling --- Issue 8 Fix: Mask internal details in 5xx
+    # --- Exception Handling --- Improved with structured error handling
     except HTTPException as e_http:
-        if e_http.status_code >= 500: logger.error(f"HTTPException (Server Error): {e_http.status_code} - {e_http.detail}", exc_info=True)
-        else: logger.warning(f"HTTPException (Client Error): {e_http.status_code} - {e_http.detail}")
+        # Log with request context
+        if e_http.status_code >= 500:
+            logger.error(
+                f"HTTPException (Server Error): {e_http.status_code} - {e_http.detail}",
+                extra={"request_id": request_id, "status_code": e_http.status_code},
+                exc_info=True
+            )
+        else:
+            logger.warning(
+                f"HTTPException (Client Error): {e_http.status_code} - {e_http.detail}",
+                extra={"request_id": request_id, "status_code": e_http.status_code}
+            )
         raise e_http # Re-raise, details are assumed to be client-safe or intentionally set
+
+    except ChatModuleException as e_chat:
+        # Our custom exceptions with structured error handling
+        e_chat.log()
+        
+        # Map to appropriate HTTP status codes
+        status_map = {
+            ChatErrorCode.AUTH_MISSING_TOKEN: status.HTTP_401_UNAUTHORIZED,
+            ChatErrorCode.AUTH_INVALID_TOKEN: status.HTTP_401_UNAUTHORIZED,
+            ChatErrorCode.AUTH_EXPIRED_TOKEN: status.HTTP_401_UNAUTHORIZED,
+            ChatErrorCode.AUTH_INSUFFICIENT_PERMISSIONS: status.HTTP_403_FORBIDDEN,
+            ChatErrorCode.VAL_INVALID_REQUEST: status.HTTP_400_BAD_REQUEST,
+            ChatErrorCode.VAL_MESSAGE_TOO_LONG: status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            ChatErrorCode.VAL_FILE_TOO_LARGE: status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            ChatErrorCode.DB_NOT_FOUND: status.HTTP_404_NOT_FOUND,
+            ChatErrorCode.RATE_LIMIT_EXCEEDED: status.HTTP_429_TOO_MANY_REQUESTS,
+            ChatErrorCode.EXT_PROVIDER_ERROR: status.HTTP_502_BAD_GATEWAY,
+            ChatErrorCode.INT_CONFIGURATION_ERROR: status.HTTP_503_SERVICE_UNAVAILABLE,
+        }
+        
+        http_status = status_map.get(e_chat.code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # Log audit event if service available
+        if audit_service and context:
+            await audit_service.log_event(
+                event_type=AuditEventType.API_ERROR,
+                context=context,
+                action="chat_error",
+                result="failure",
+                metadata={
+                    "error_code": e_chat.code.value,
+                    "request_id": request_id
+                }
+            )
+        
+        raise HTTPException(
+            status_code=http_status,
+            detail=e_chat.to_response_dict()
+        )
 
     except (ChatAuthenticationError, ChatRateLimitError, ChatBadRequestError, ChatConfigurationError, ChatProviderError, ChatAPIError) as e_chat:
         # Log audit event for chat error
@@ -998,8 +1080,29 @@ async def create_chat_completion(
         raise HTTPException(status_code=err_status, detail=client_detail)
 
     except Exception as e_final:
-        logger.critical(f"Unexpected Critical Error in /completions: {type(e_final).__name__} - {str(e_final)}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected internal server error occurred.")
+        # Create a structured error for unexpected exceptions
+        unexpected_error = ChatModuleException(
+            code=ChatErrorCode.INT_UNEXPECTED_ERROR,
+            message=f"Unexpected error in chat completion endpoint",
+            details={
+                "error_type": type(e_final).__name__,
+                "request_id": request_id,
+                "conversation_id": final_conversation_id if 'final_conversation_id' in locals() else None
+            },
+            cause=e_final,
+            user_message="An unexpected error occurred. Please try again or contact support if the issue persists."
+        )
+        unexpected_error.log(level="critical")
+        
+        # Send alert for critical errors
+        if hasattr(e_final, '__module__') and 'sqlite' not in e_final.__module__:
+            # Don't alert for database errors, they're handled separately
+            logger.critical(f"ALERT: Critical error in chat module - Request ID: {request_id}")
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=unexpected_error.to_response_dict()
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1952,8 +2055,15 @@ async def get_prompt_config(
                     (doc_type.value,)
                 )
                 is_custom = cursor.fetchone() is not None
-        except:
-            pass
+        except sqlite3.OperationalError as e:
+            logger.warning(f"Database operational error checking custom prompts: {e}")
+            is_custom = False  # Safe default
+        except sqlite3.DatabaseError as e:
+            logger.error(f"Database error checking custom prompts for doc_type={doc_type.value}: {e}")
+            is_custom = False  # Safe default
+        except Exception as e:
+            logger.error(f"Unexpected error checking custom prompts: {type(e).__name__}: {e}", exc_info=True)
+            is_custom = False  # Safe default
         
         return PromptConfigResponse(
             document_type=document_type,

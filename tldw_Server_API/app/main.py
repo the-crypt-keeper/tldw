@@ -68,6 +68,9 @@ from tldw_Server_API.app.api.v1.endpoints.evals import router as evaluation_rout
 # OpenAI-compatible Evaluation Endpoint (NEW)
 from tldw_Server_API.app.api.v1.endpoints.evals_openai import router as openai_evals_router
 #
+# Benchmark Endpoint
+from tldw_Server_API.app.api.v1.endpoints.benchmark_api import router as benchmark_router
+#
 # Sync Endpoint
 from tldw_Server_API.app.api.v1.endpoints.sync import router as sync_router
 #
@@ -478,6 +481,9 @@ app.include_router(evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluati
 
 # Router for OpenAI-compatible Evaluation endpoint (NEW)
 app.include_router(openai_evals_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
+
+# Router for Benchmark endpoint (NEW)
+app.include_router(benchmark_router, prefix=f"{API_V1_PREFIX}", tags=["benchmarks"])
 
 # Router for Configuration Info endpoint (for documentation)
 from tldw_Server_API.app.api.v1.endpoints.config_info import router as config_info_router

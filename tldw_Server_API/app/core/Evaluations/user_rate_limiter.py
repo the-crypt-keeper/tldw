@@ -17,6 +17,8 @@ from pathlib import Path
 
 # Import configuration management
 from tldw_Server_API.app.core.Evaluations.config_manager import get_rate_limit_config, get_config
+# Import connection pool
+from tldw_Server_API.app.core.Evaluations.connection_pool import get_connection
 
 
 class UserTier(Enum):
@@ -140,7 +142,7 @@ class UserRateLimiter:
     
     def _init_database(self):
         """Initialize rate limiting tables."""
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             # User rate limits table (created in migration)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS user_rate_limits (
@@ -245,7 +247,7 @@ class UserRateLimiter:
                 return cached["config"]
         
         # Query database
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT tier, evaluations_per_minute, batch_evaluations_per_minute,
@@ -320,7 +322,7 @@ class UserRateLimiter:
         now = datetime.now(timezone.utc)
         minute_ago = now - timedelta(minutes=1)
         
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             # Count requests in last minute
@@ -373,7 +375,7 @@ class UserRateLimiter:
         """Check daily usage limits."""
         today = datetime.now(timezone.utc).date()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             # Get today's usage
@@ -434,7 +436,7 @@ class UserRateLimiter:
         now = datetime.now(timezone.utc)
         today = now.date()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             # Record in tracking table
             conn.execute("""
                 INSERT INTO rate_limit_tracking (user_id, endpoint, timestamp, tokens_used, cost)
@@ -507,7 +509,7 @@ class UserRateLimiter:
                     if hasattr(config, key):
                         setattr(config, key, value)
             
-            with sqlite3.connect(self.db_path) as conn:
+            with get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     UPDATE user_rate_limits
@@ -566,7 +568,7 @@ class UserRateLimiter:
         config = await self._get_user_config(user_id)
         today = datetime.now(timezone.utc).date()
         
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             cursor = conn.cursor()
             
             # Get today's usage

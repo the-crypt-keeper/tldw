@@ -19,6 +19,9 @@ from loguru import logger
 import asyncio
 import threading
 
+# Import connection pool
+from tldw_Server_API.app.core.Evaluations.connection_pool import get_connection
+
 
 class AuditEventType(Enum):
     """Types of audit events."""
@@ -111,7 +114,7 @@ class AuditLogger:
     
     def _init_database(self):
         """Initialize audit logging tables."""
-        with sqlite3.connect(self.db_path) as conn:
+        with get_connection() as conn:
             # Audit events table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS audit_events (
@@ -158,12 +161,9 @@ class AuditLogger:
     @contextmanager
     def get_connection(self):
         """Context manager for database connections."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-        finally:
-            conn.close()
+        with get_connection() as pooled_conn:
+            pooled_conn.connection.row_factory = sqlite3.Row
+            yield pooled_conn.connection
     
     def log_event(
         self,

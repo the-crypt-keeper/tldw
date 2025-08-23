@@ -42,7 +42,7 @@ def mock_db():
 @pytest.fixture
 def service(mock_db):
     """Create a ChatbookService instance with mocked database."""
-    return ChatbookService(mock_db, user_id="test_user")
+    return ChatbookService(user_id="test_user", db=mock_db)
 
 
 @pytest.fixture
@@ -94,7 +94,7 @@ class TestChatbookService:
     
     def test_init_creates_tables(self, mock_db):
         """Test that initialization creates necessary tables."""
-        service = ChatbookService(mock_db, "test_user")
+        service = ChatbookService(user_id="test_user", db=mock_db)
         
         # Should create export and import job tables
         assert mock_db.execute_query.call_count >= 2

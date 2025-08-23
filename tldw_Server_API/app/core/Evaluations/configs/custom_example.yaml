@@ -1,0 +1,30 @@
+# Example custom benchmark configuration
+name: custom_mc_benchmark
+description: Custom multiple choice benchmark example
+evaluation_type: multiple_choice
+
+# Dataset source can be:
+# - Local file: /path/to/dataset.json
+# - URL: https://example.com/dataset.jsonl
+# - HuggingFace: huggingface://username/dataset-name
+dataset_source: /path/to/your/dataset.json
+dataset_format: json  # json, jsonl, csv, huggingface
+
+# Map your dataset fields to standard fields
+field_mappings:
+  question: question_text  # Your field name -> standard field
+  choices: answer_options   # List of choices
+  correct_answer: correct   # Correct answer (letter or index)
+  category: subject        # Optional category field
+
+# Evaluation parameters specific to the evaluation type
+evaluation_params:
+  num_choices: 4
+  require_reasoning: false
+
+# Optional metadata
+metadata:
+  author: Your Name
+  version: 1.0
+  created: 2024-01-01
+  notes: This is an example custom benchmark configuration

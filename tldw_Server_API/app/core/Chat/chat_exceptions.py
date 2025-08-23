@@ -360,7 +360,7 @@ def sanitize_error_message(error: Exception) -> str:
     error_str = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '[ip]', error_str)
     
     # Remove potential secrets (anything that looks like a key/token)
-    error_str = re.sub(r'\b[A-Za-z0-9]{20,}\b', '[redacted]', error_str)
+    error_str = re.sub(r'\b[A-Za-z0-9_\-]{20,}\b', '[redacted]', error_str)
     
     # Truncate if too long
     if len(error_str) > 200:

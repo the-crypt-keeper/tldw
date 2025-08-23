@@ -1,0 +1,157 @@
+# SimpleQA Benchmark Configuration
+# OpenAI's benchmark for measuring short-form factuality in LLMs
+name: simpleqa
+description: OpenAI SimpleQA - Measuring short-form factuality in large language models
+evaluation_type: simpleqa
+dataset_source: https://github.com/openai/simple-evals  # Or HuggingFace: openai/simple-qa
+dataset_format: jsonl
+
+# Field mappings for dataset
+field_mappings:
+  question: question  # The fact-seeking question
+  answer: answer      # The ground truth answer
+  topic: topic        # Topic/category (optional)
+  metadata: metadata  # Additional metadata
+
+# Evaluation parameters
+evaluation_params:
+  # Grading model to use for evaluation
+  grading_model: openai  # or anthropic, etc.
+  
+  # Strict grading follows OpenAI's original criteria
+  strict_grading: true
+  
+  # Temperature for grading model
+  grading_temperature: 0.0
+  
+  # Model parameters for generating answers
+  generation_params:
+    max_tokens: 50  # SimpleQA expects short answers
+    temperature: 0.0  # Deterministic for factuality
+    top_p: 1.0
+    stop_sequences: ["\n\n"]
+  
+  # Prompt template for the model
+  prompt_template: |
+    Answer the following question with a brief, factual response:
+    
+    Question: {question}
+    Answer:
+  
+  # Alternative zero-shot chain-of-thought template
+  cot_prompt_template: |
+    Answer the following question. Think step by step if needed, but provide a clear, brief answer at the end.
+    
+    Question: {question}
+    Answer:
+
+# Grading configuration
+grading:
+  # Three categories for SimpleQA
+  categories:
+    - correct      # Factually accurate answer
+    - incorrect    # Contains factual errors
+    - not_attempted  # Model refuses or says "I don't know"
+  
+  # Scoring weights (optional)
+  scoring:
+    correct: 1.0
+    incorrect: 0.0
+    not_attempted: 0.0  # Can be adjusted if you want to penalize less
+  
+  # Phrases that indicate non-attempt
+  non_attempt_indicators:
+    - "i don't know"
+    - "i do not know"
+    - "i cannot answer"
+    - "i can't answer"
+    - "i'm not sure"
+    - "unable to answer"
+    - "insufficient information"
+
+# Topics covered in SimpleQA
+topics:
+  - history
+  - science
+  - technology
+  - art
+  - geography
+  - literature
+  - sports
+  - entertainment
+  - politics
+  - economics
+  - philosophy
+  - mathematics
+  - biology
+  - chemistry
+  - physics
+
+# Sampling configuration
+sampling:
+  # Total questions in full dataset: 4,326
+  max_questions: null  # Use all questions
+  
+  # Random sampling
+  random_sample: false
+  random_seed: 42
+  
+  # Filter by topics (optional)
+  filter_topics: []  # Empty means all topics
+  
+  # Stratified sampling by topic
+  stratified: false
+  questions_per_topic: null
+
+# Output configuration
+output:
+  # Include detailed grading explanations
+  include_explanations: true
+  
+  # Save individual question results
+  save_per_question: true
+  
+  # Fields to include in output
+  output_fields:
+    - question
+    - model_answer
+    - expected_answer
+    - grade
+    - explanation
+    - topic
+    - score
+
+# Metadata
+metadata:
+  version: "1.0"
+  release_date: "2024-10"
+  paper: "https://openai.com/index/introducing-simpleqa/"
+  dataset_size: 4326
+  authors: "OpenAI"
+  
+  description: |
+    SimpleQA is a benchmark designed to measure the ability of language models
+    to answer short, fact-seeking questions. The dataset contains 4,326 questions
+    that are adversarially collected against GPT-4, ensuring they are challenging
+    for frontier models.
+  
+  key_features:
+    - "Short, fact-seeking questions"
+    - "Single, indisputable answers"
+    - "Adversarially collected"
+    - "Wide topic coverage"
+    - "High quality through dual verification"
+  
+  evaluation_notes: |
+    - Questions are graded as correct, incorrect, or not_attempted
+    - Grading uses an LLM classifier comparing predicted vs ground truth
+    - The benchmark is intentionally challenging (GPT-4o scores <40%)
+    - Fast to run due to short questions and answers
+    - Low variance with 4,326 questions
+  
+  usage_tips:
+    - "Use temperature 0 for deterministic, factual responses"
+    - "Keep max_tokens low as answers should be brief"
+    - "Consider using chain-of-thought prompting for complex questions"
+    - "Monitor both accuracy and attempt rate"
+    - "Analyze performance by topic to identify weaknesses"

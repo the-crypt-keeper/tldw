@@ -35,160 +35,234 @@ class EvaluationMetrics:
             logger.warning("Prometheus client not installed. Metrics collection disabled.")
             logger.info("Install with: pip install prometheus-client")
             return
-            
-        # Request metrics
-        self.request_counter = Counter(
-            'evaluation_requests_total',
-            'Total number of evaluation requests',
-            ['endpoint', 'method', 'status']
-        )
         
-        self.request_duration = Histogram(
-            'evaluation_request_duration_seconds',
-            'Request duration in seconds',
-            ['endpoint', 'method'],
-            buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0)
-        )
+        # Try to get existing metrics or create new ones
+        # This prevents duplicate registration errors
+        from prometheus_client import REGISTRY
+        
+        # Request metrics
+        try:
+            self.request_counter = Counter(
+                'evaluation_requests_total',
+                'Total number of evaluation requests',
+                ['endpoint', 'method', 'status']
+            )
+        except ValueError:
+            # Metric already exists, get it from registry
+            self.request_counter = REGISTRY._names_to_collectors['evaluation_requests_total']
+        
+        try:
+            self.request_duration = Histogram(
+                'evaluation_request_duration_seconds',
+                'Request duration in seconds',
+                ['endpoint', 'method'],
+                buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0)
+            )
+        except ValueError:
+            self.request_duration = REGISTRY._names_to_collectors['evaluation_request_duration_seconds']
         
         # Evaluation-specific metrics
-        self.evaluation_counter = Counter(
-            'evaluations_total',
-            'Total number of evaluations',
-            ['type', 'provider', 'status']
-        )
+        try:
+            self.evaluation_counter = Counter(
+                'evaluations_total',
+                'Total number of evaluations',
+                ['type', 'provider', 'status']
+            )
+        except ValueError:
+            self.evaluation_counter = REGISTRY._names_to_collectors['evaluations_total']
         
-        self.evaluation_duration = Histogram(
-            'evaluation_duration_seconds',
-            'Evaluation processing time',
-            ['type', 'provider'],
-            buckets=(0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0)
-        )
+        try:
+            self.evaluation_duration = Histogram(
+                'evaluation_duration_seconds',
+                'Evaluation processing time',
+                ['type', 'provider'],
+                buckets=(0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0)
+            )
+        except ValueError:
+            self.evaluation_duration = REGISTRY._names_to_collectors['evaluation_duration_seconds']
         
-        self.evaluation_score = Histogram(
-            'evaluation_scores',
-            'Distribution of evaluation scores',
-            ['type', 'metric'],
-            buckets=(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
-        )
+        try:
+            self.evaluation_score = Histogram(
+                'evaluation_scores',
+                'Distribution of evaluation scores',
+                ['type', 'metric'],
+                buckets=(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+            )
+        except ValueError:
+            self.evaluation_score = REGISTRY._names_to_collectors['evaluation_scores']
         
         # Circuit breaker metrics
-        self.circuit_breaker_state = Gauge(
-            'circuit_breaker_state',
-            'Circuit breaker state (0=closed, 1=open, 2=half-open)',
-            ['provider']
-        )
+        try:
+            self.circuit_breaker_state = Gauge(
+                'circuit_breaker_state',
+                'Circuit breaker state (0=closed, 1=open, 2=half-open)',
+                ['provider']
+            )
+        except ValueError:
+            self.circuit_breaker_state = REGISTRY._names_to_collectors['circuit_breaker_state']
         
-        self.circuit_breaker_failures = Counter(
-            'circuit_breaker_failures_total',
-            'Total circuit breaker failures',
-            ['provider', 'error_type']
-        )
+        try:
+            self.circuit_breaker_failures = Counter(
+                'circuit_breaker_failures_total',
+                'Total circuit breaker failures',
+                ['provider', 'error_type']
+            )
+        except ValueError:
+            self.circuit_breaker_failures = REGISTRY._names_to_collectors['circuit_breaker_failures_total']
         
         # Resource metrics
-        self.active_evaluations = Gauge(
-            'active_evaluations',
-            'Number of currently active evaluations',
-            ['type']
-        )
+        try:
+            self.active_evaluations = Gauge(
+                'active_evaluations',
+                'Number of currently active evaluations',
+                ['type']
+            )
+        except ValueError:
+            self.active_evaluations = REGISTRY._names_to_collectors['active_evaluations']
         
-        self.database_connections = Gauge(
-            'evaluation_database_connections',
-            'Number of active database connections'
-        )
+        try:
+            self.database_connections = Gauge(
+                'evaluation_database_connections',
+                'Number of active database connections'
+            )
+        except ValueError:
+            self.database_connections = REGISTRY._names_to_collectors['evaluation_database_connections']
         
         # Rate limiting metrics
-        self.rate_limit_violations = Counter(
-            'rate_limit_violations_total',
-            'Total rate limit violations',
-            ['user_tier', 'limit_type', 'endpoint']
-        )
+        try:
+            self.rate_limit_violations = Counter(
+                'rate_limit_violations_total',
+                'Total rate limit violations',
+                ['user_tier', 'limit_type', 'endpoint']
+            )
+        except ValueError:
+            self.rate_limit_violations = REGISTRY._names_to_collectors['rate_limit_violations_total']
         
-        self.rate_limit_usage = Histogram(
-            'rate_limit_usage_ratio',
-            'Rate limit usage as percentage of limit',
-            ['user_tier', 'limit_type'],
+        try:
+            self.rate_limit_usage = Histogram(
+                'rate_limit_usage_ratio',
+                'Rate limit usage as percentage of limit',
+                ['user_tier', 'limit_type'],
             buckets=(0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1.0)
-        )
+            )
+        except ValueError:
+            self.rate_limit_usage = REGISTRY._names_to_collectors['rate_limit_usage_ratio']
         
         # Security metrics
-        self.authentication_attempts = Counter(
-            'authentication_attempts_total',
-            'Total authentication attempts',
-            ['outcome', 'method']
-        )
+        try:
+            self.authentication_attempts = Counter(
+                'authentication_attempts_total',
+                'Total authentication attempts',
+                ['outcome', 'method']
+            )
+        except ValueError:
+            self.authentication_attempts = REGISTRY._names_to_collectors['authentication_attempts_total']
         
-        self.suspicious_activities = Counter(
-            'suspicious_activities_total',
-            'Total suspicious activities detected',
-            ['activity_type', 'severity']
-        )
+        try:
+            self.suspicious_activities = Counter(
+                'suspicious_activities_total',
+                'Total suspicious activities detected',
+                ['activity_type', 'severity']
+            )
+        except ValueError:
+            self.suspicious_activities = REGISTRY._names_to_collectors['suspicious_activities_total']
         
         # Webhook metrics
-        self.webhook_deliveries = Counter(
-            'webhook_deliveries_total',
-            'Total webhook delivery attempts',
-            ['event_type', 'outcome']
-        )
+        try:
+            self.webhook_deliveries = Counter(
+                'webhook_deliveries_total',
+                'Total webhook delivery attempts',
+                ['event_type', 'outcome']
+            )
+        except ValueError:
+            self.webhook_deliveries = REGISTRY._names_to_collectors['webhook_deliveries_total']
         
-        self.webhook_response_time = Histogram(
-            'webhook_response_time_seconds',
-            'Webhook delivery response time',
-            ['event_type'],
-            buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
-        )
+        try:
+            self.webhook_response_time = Histogram(
+                'webhook_response_time_seconds',
+                'Webhook delivery response time',
+                ['event_type'],
+                buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
+            )
+        except ValueError:
+            self.webhook_response_time = REGISTRY._names_to_collectors['webhook_response_time_seconds']
         
         # Cache and database metrics
-        self.embedding_cache_hits = Counter(
-            'embedding_cache_hits_total',
-            'Total embedding cache hits',
-            ['provider']
-        )
+        try:
+            self.embedding_cache_hits = Counter(
+                'embedding_cache_hits_total',
+                'Total embedding cache hits',
+                ['provider']
+            )
+        except ValueError:
+            self.embedding_cache_hits = REGISTRY._names_to_collectors['embedding_cache_hits_total']
         
-        self.embedding_cache_misses = Counter(
-            'embedding_cache_misses_total',
-            'Total embedding cache misses',
-            ['provider']
-        )
+        try:
+            self.embedding_cache_misses = Counter(
+                'embedding_cache_misses_total',
+                'Total embedding cache misses',
+                ['provider']
+            )
+        except ValueError:
+            self.embedding_cache_misses = REGISTRY._names_to_collectors['embedding_cache_misses_total']
         
         # Additional database metrics
-        self.database_query_duration = Histogram(
-            'database_query_duration_seconds',
-            'Database query execution time',
-            ['operation', 'table'],
-            buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0)
-        )
+        try:
+            self.database_query_duration = Histogram(
+                'database_query_duration_seconds',
+                'Database query execution time',
+                ['operation', 'table'],
+                buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0)
+            )
+        except ValueError:
+            self.database_query_duration = REGISTRY._names_to_collectors['database_query_duration_seconds']
         
-        self.database_errors = Counter(
-            'database_errors_total',
-            'Total database errors',
-            ['operation', 'error_type']
-        )
+        try:
+            self.database_errors = Counter(
+                'database_errors_total',
+                'Total database errors',
+                ['operation', 'error_type']
+            )
+        except ValueError:
+            self.database_errors = REGISTRY._names_to_collectors['database_errors_total']
         
         # User tier metrics
-        self.user_tier_distribution = Gauge(
-            'user_tier_distribution',
-            'Number of users by tier',
-            ['tier']
-        )
+        try:
+            self.user_tier_distribution = Gauge(
+                'user_tier_distribution',
+                'Number of users by tier',
+                ['tier']
+            )
+        except ValueError:
+            self.user_tier_distribution = REGISTRY._names_to_collectors['user_tier_distribution']
         
-        self.evaluation_cost = Counter(
-            'evaluation_cost_total',
+        try:
+            self.evaluation_cost = Counter(
+                'evaluation_cost_total',
             'Total evaluation costs',
             ['user_tier', 'provider', 'evaluation_type']
-        )
+            )
+        except ValueError:
+            self.evaluation_cost = REGISTRY._names_to_collectors['evaluation_cost_total']
         
         # Error metrics
-        self.error_counter = Counter(
-            'evaluation_errors_total',
-            'Total evaluation errors',
-            ['type', 'error_category']
-        )
+        try:
+            self.error_counter = Counter(
+                'evaluation_errors_total',
+                'Total evaluation errors',
+                ['type', 'error_category']
+            )
+        except ValueError:
+            self.error_counter = REGISTRY._names_to_collectors['evaluation_errors_total']
         
         # Service info
-        self.service_info = Info(
-            'evaluation_service',
-            'Evaluation service information'
-        )
+        try:
+            self.service_info = Info(
+                'evaluation_service',
+                'Evaluation service information'
+            )
+        except ValueError:
+            self.service_info = REGISTRY._names_to_collectors['evaluation_service']
         
         self.service_info.info({
             'version': '1.0.0',
