@@ -15,6 +15,9 @@ from loguru import logger
 import asyncio
 from pathlib import Path
 
+# Import configuration management
+from tldw_Server_API.app.core.Evaluations.config_manager import get_rate_limit_config, get_config
+
 
 class UserTier(Enum):
     """User subscription tiers."""
@@ -39,8 +42,24 @@ class RateLimitConfig:
     
     @classmethod
     def for_tier(cls, tier: UserTier) -> "RateLimitConfig":
-        """Get default configuration for a tier."""
-        configs = {
+        """Get configuration for a tier from external config."""
+        # Try to get configuration from external config first
+        tier_config = get_rate_limit_config(tier.value)
+        
+        if tier_config:
+            return cls(
+                tier=tier,
+                evaluations_per_minute=tier_config.evaluations_per_minute,
+                batch_evaluations_per_minute=tier_config.batch_evaluations_per_minute,
+                evaluations_per_day=tier_config.evaluations_per_day,
+                total_tokens_per_day=tier_config.total_tokens_per_day,
+                burst_size=tier_config.burst_size,
+                max_cost_per_day=tier_config.max_cost_per_day,
+                max_cost_per_month=tier_config.max_cost_per_month
+            )
+        
+        # Fallback to hardcoded defaults if external config not available
+        fallback_configs = {
             UserTier.FREE: cls(
                 tier=UserTier.FREE,
                 evaluations_per_minute=10,
@@ -83,7 +102,7 @@ class RateLimitConfig:
             ),
             UserTier.CUSTOM: cls(
                 tier=UserTier.CUSTOM,
-                evaluations_per_minute=10,  # Default to FREE tier values
+                evaluations_per_minute=10,
                 batch_evaluations_per_minute=2,
                 evaluations_per_day=100,
                 total_tokens_per_day=100_000,
@@ -92,7 +111,9 @@ class RateLimitConfig:
                 max_cost_per_month=10.0
             )
         }
-        return configs.get(tier, configs[UserTier.FREE])
+        
+        logger.warning(f"Using fallback configuration for tier {tier.value}")
+        return fallback_configs.get(tier, fallback_configs[UserTier.FREE])
 
 
 class UserRateLimiter:

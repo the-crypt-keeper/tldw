@@ -296,6 +296,86 @@ def rollback_003_drop_api_keys_table(conn: sqlite3.Connection) -> None:
     logger.info("Rollback 003: Dropped api_keys table")
 
 
+def migration_011_add_enhanced_auth_tables(conn: sqlite3.Connection) -> None:
+    """Create tables for enhanced authentication features"""
+    
+    # Password reset tokens table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT UNIQUE NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            used_at TIMESTAMP,
+            ip_address TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens(user_id)")
+    
+    # Failed attempts table for lockout tracking
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS failed_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            identifier TEXT NOT NULL,
+            attempt_type TEXT NOT NULL,
+            attempt_count INTEGER DEFAULT 1,
+            window_start TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(identifier, attempt_type)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_failed_attempts_identifier ON failed_attempts(identifier)")
+    
+    # Account lockouts table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS account_lockouts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            identifier TEXT UNIQUE NOT NULL,
+            locked_until TIMESTAMP NOT NULL,
+            reason TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_lockouts_identifier ON account_lockouts(identifier)")
+    
+    # Token blacklist table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS token_blacklist (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            jti TEXT UNIQUE NOT NULL,
+            user_id INTEGER,
+            token_type TEXT,
+            revoked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP NOT NULL,
+            reason TEXT,
+            revoked_by INTEGER,
+            ip_address TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_blacklist_jti ON token_blacklist(jti)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_blacklist_expires ON token_blacklist(expires_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_blacklist_user ON token_blacklist(user_id)")
+    
+    # Add email verification timestamp to users if not exists
+    cursor = conn.execute("PRAGMA table_info(users)")
+    columns = [row[1] for row in cursor.fetchall()]
+    
+    if 'email_verified_at' not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP")
+        logger.info("Added email_verified_at column to users table")
+    
+    if 'is_verified' not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0")
+        logger.info("Added is_verified column to users table")
+    
+    conn.commit()
+    logger.info("Migration 011: Created enhanced authentication tables")
+
+
 #######################################################################################################################
 #
 # Migration Registry

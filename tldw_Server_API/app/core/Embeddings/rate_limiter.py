@@ -310,3 +310,67 @@ def check_user_rate_limit(
     """
     limiter = get_rate_limiter()
     return limiter.check_rate_limit(user_id, cost, ip_address)
+
+
+# Async extensions for rate limiting
+import asyncio
+
+
+class AsyncRateLimiter:
+    """Async wrapper for UserRateLimiter"""
+    
+    def __init__(self, rate_limiter: Optional[UserRateLimiter] = None):
+        self.rate_limiter = rate_limiter or get_rate_limiter()
+        self.executor = None
+    
+    async def check_rate_limit_async(
+        self,
+        user_id: str,
+        cost: int = 1,
+        ip_address: Optional[str] = None
+    ) -> tuple[bool, Optional[int]]:
+        """
+        Async version of check_rate_limit.
+        
+        Args:
+            user_id: User identifier
+            cost: Cost of the request
+            ip_address: IP address of the request
+            
+        Returns:
+            Tuple of (allowed, retry_after_seconds)
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self.executor,
+            self.rate_limiter.check_rate_limit,
+            user_id,
+            cost,
+            ip_address
+        )
+    
+    async def record_usage_async(self, user_id: str, cost: int = 1):
+        """Record usage asynchronously (for post-processing)"""
+        # This is handled in check_rate_limit, but provided for compatibility
+        pass
+    
+    async def get_user_usage_async(self, user_id: str) -> Dict[str, any]:
+        """Get user usage statistics asynchronously"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self.executor,
+            self.rate_limiter.get_user_usage,
+            user_id
+        )
+
+
+# Global async rate limiter
+_async_rate_limiter: Optional[AsyncRateLimiter] = None
+
+
+def get_async_rate_limiter() -> AsyncRateLimiter:
+    """Get or create the global async rate limiter."""
+    global _async_rate_limiter
+    if _async_rate_limiter is None:
+        _async_rate_limiter = AsyncRateLimiter()
+    return _async_rate_limiter

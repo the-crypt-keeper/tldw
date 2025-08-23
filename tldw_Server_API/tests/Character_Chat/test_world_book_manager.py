@@ -200,17 +200,21 @@ class TestWorldBookService:
         # Mock active world books and entries
         mock_conn = mock_db.get_connection().__enter__()
         mock_cursor = mock_conn.execute.return_value
-        mock_cursor.fetchall.side_effect = [
-            [{"id": 1, "name": "Test World", "token_budget": 500}],  # Active world books
-            [{"id": 1, "world_book_id": 1, "keywords": '["sword","blade"]',
-              "content": "A legendary sword", "priority": 100, "enabled": 1, "metadata": '{}'},
-             {"id": 2, "world_book_id": 1, "keywords": '["magic"]',
-              "content": "Magic is powerful", "priority": 50, "enabled": 1, "metadata": '{}'}]
+        
+        # Mock get_world_book call
+        mock_cursor.fetchone.return_value = {"id": 1, "name": "Test World", "token_budget": 500, "enabled": 1}
+        
+        # Mock get_entries call
+        mock_cursor.fetchall.return_value = [
+            {"id": 1, "world_book_id": 1, "keywords": '["sword","blade"]',
+             "content": "A legendary sword", "priority": 100, "enabled": 1, "metadata": '{}'},
+            {"id": 2, "world_book_id": 1, "keywords": '["magic"]',
+             "content": "Magic is powerful", "priority": 50, "enabled": 1, "metadata": '{}'}
         ]
         
         processed_text, stats = service.process_context(
-            text="The hero found a magical sword",
-            character_id=None,
+            text="The hero found a magic sword",  # Use "magic" not "magical" for exact match
+            world_book_ids=[1],  # Specify which world book to use
             token_budget=1000
         )
         
@@ -238,17 +242,15 @@ class TestWorldBookService:
         # Mock to return entries
         mock_conn = mock_db.get_connection().__enter__()
         mock_cursor = mock_conn.execute.return_value
-        mock_cursor.fetchall.side_effect = [
-            [{"id": 1, "name": "Test", "token_budget": 500}],
-            []  # No entries from DB, we'll set them directly
-        ]
+        mock_cursor.fetchone.return_value = {"id": 1, "name": "Test", "token_budget": 500, "enabled": 1}
+        mock_cursor.fetchall.return_value = []
         
         # Set entries directly for testing
         service._entry_cache = {1: entries}
         
         processed_text, stats = service.process_context(
             text="This is a test",
-            character_id=None,
+            world_book_ids=[1],
             token_budget=1000
         )
         
@@ -283,18 +285,23 @@ class TestWorldBookService:
         # First entry triggers second entry
         mock_conn = mock_db.get_connection().__enter__()
         mock_cursor = mock_conn.execute.return_value
-        mock_cursor.fetchall.side_effect = [
-            [{"id": 1, "name": "Test", "token_budget": 500, "recursive_scanning": 1}],
-            [{"id": 1, "keywords": '["hero"]', "content": "The hero has a sword",
-              "priority": 100, "enabled": 1, "metadata": '{}'},
-             {"id": 2, "keywords": '["sword"]', "content": "The sword is magical",
-              "priority": 50, "enabled": 1, "metadata": '{}'}]
+        
+        # Mock get_world_book
+        mock_cursor.fetchone.return_value = {"id": 1, "name": "Test", "token_budget": 500, "recursive_scanning": 1, "enabled": 1}
+        
+        # Mock get_entries
+        mock_cursor.fetchall.return_value = [
+            {"id": 1, "keywords": '["hero"]', "content": "The hero has a sword",
+             "priority": 100, "enabled": 1, "metadata": '{}'},
+            {"id": 2, "keywords": '["sword"]', "content": "The sword is magical",
+             "priority": 50, "enabled": 1, "metadata": '{}'}
         ]
         
         processed_text, stats = service.process_context(
             text="Story about a hero",
-            character_id=None,
-            token_budget=1000
+            world_book_ids=[1],
+            token_budget=1000,
+            recursive_scanning=True
         )
         
         # Should match "hero" first, then "sword" from the hero entry

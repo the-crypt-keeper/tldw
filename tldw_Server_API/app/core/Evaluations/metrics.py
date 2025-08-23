@@ -96,6 +96,48 @@ class EvaluationMetrics:
             'Number of active database connections'
         )
         
+        # Rate limiting metrics
+        self.rate_limit_violations = Counter(
+            'rate_limit_violations_total',
+            'Total rate limit violations',
+            ['user_tier', 'limit_type', 'endpoint']
+        )
+        
+        self.rate_limit_usage = Histogram(
+            'rate_limit_usage_ratio',
+            'Rate limit usage as percentage of limit',
+            ['user_tier', 'limit_type'],
+            buckets=(0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1.0)
+        )
+        
+        # Security metrics
+        self.authentication_attempts = Counter(
+            'authentication_attempts_total',
+            'Total authentication attempts',
+            ['outcome', 'method']
+        )
+        
+        self.suspicious_activities = Counter(
+            'suspicious_activities_total',
+            'Total suspicious activities detected',
+            ['activity_type', 'severity']
+        )
+        
+        # Webhook metrics
+        self.webhook_deliveries = Counter(
+            'webhook_deliveries_total',
+            'Total webhook delivery attempts',
+            ['event_type', 'outcome']
+        )
+        
+        self.webhook_response_time = Histogram(
+            'webhook_response_time_seconds',
+            'Webhook delivery response time',
+            ['event_type'],
+            buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
+        )
+        
+        # Cache and database metrics
         self.embedding_cache_hits = Counter(
             'embedding_cache_hits_total',
             'Total embedding cache hits',
@@ -108,11 +150,31 @@ class EvaluationMetrics:
             ['provider']
         )
         
-        # Rate limiting metrics
-        self.rate_limit_hits = Counter(
-            'rate_limit_hits_total',
-            'Total rate limit hits',
-            ['endpoint', 'client_type']
+        # Additional database metrics
+        self.database_query_duration = Histogram(
+            'database_query_duration_seconds',
+            'Database query execution time',
+            ['operation', 'table'],
+            buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0)
+        )
+        
+        self.database_errors = Counter(
+            'database_errors_total',
+            'Total database errors',
+            ['operation', 'error_type']
+        )
+        
+        # User tier metrics
+        self.user_tier_distribution = Gauge(
+            'user_tier_distribution',
+            'Number of users by tier',
+            ['tier']
+        )
+        
+        self.evaluation_cost = Counter(
+            'evaluation_cost_total',
+            'Total evaluation costs',
+            ['user_tier', 'provider', 'evaluation_type']
         )
         
         # Error metrics
@@ -243,6 +305,110 @@ class EvaluationMetrics:
             return
             
         self.database_connections.set(count)
+    
+    def record_rate_limit_violation(self, user_tier: str, limit_type: str, endpoint: str):
+        """Record a rate limit violation"""
+        if not self.enabled:
+            return
+            
+        self.rate_limit_violations.labels(
+            user_tier=user_tier,
+            limit_type=limit_type,
+            endpoint=endpoint
+        ).inc()
+    
+    def record_rate_limit_usage(self, user_tier: str, limit_type: str, usage_ratio: float):
+        """Record rate limit usage ratio"""
+        if not self.enabled:
+            return
+            
+        self.rate_limit_usage.labels(
+            user_tier=user_tier,
+            limit_type=limit_type
+        ).observe(usage_ratio)
+    
+    def record_authentication(self, outcome: str, method: str):
+        """Record authentication attempt"""
+        if not self.enabled:
+            return
+            
+        self.authentication_attempts.labels(
+            outcome=outcome,
+            method=method
+        ).inc()
+    
+    def record_suspicious_activity(self, activity_type: str, severity: str):
+        """Record suspicious activity"""
+        if not self.enabled:
+            return
+            
+        self.suspicious_activities.labels(
+            activity_type=activity_type,
+            severity=severity
+        ).inc()
+    
+    def record_webhook_delivery(self, event_type: str, outcome: str, response_time: float):
+        """Record webhook delivery metrics"""
+        if not self.enabled:
+            return
+            
+        self.webhook_deliveries.labels(
+            event_type=event_type,
+            outcome=outcome
+        ).inc()
+        
+        if response_time > 0:
+            self.webhook_response_time.labels(
+                event_type=event_type
+            ).observe(response_time)
+    
+    def record_database_query(self, operation: str, table: str, duration: float, success: bool = True, error_type: str = None):
+        """Record database query metrics"""
+        if not self.enabled:
+            return
+            
+        self.database_query_duration.labels(
+            operation=operation,
+            table=table
+        ).observe(duration)
+        
+        if not success and error_type:
+            self.database_errors.labels(
+                operation=operation,
+                error_type=error_type
+            ).inc()
+    
+    def update_user_tier_distribution(self, tier_counts: Dict[str, int]):
+        """Update user tier distribution"""
+        if not self.enabled:
+            return
+            
+        for tier, count in tier_counts.items():
+            self.user_tier_distribution.labels(tier=tier).set(count)
+    
+    def record_evaluation_cost(self, user_tier: str, provider: str, evaluation_type: str, cost: float):
+        """Record evaluation cost"""
+        if not self.enabled:
+            return
+            
+        self.evaluation_cost.labels(
+            user_tier=user_tier,
+            provider=provider,
+            evaluation_type=evaluation_type
+        ).inc(cost)
+    
+    def get_health_metrics(self) -> Dict[str, Any]:
+        """Get system health metrics for monitoring"""
+        if not self.enabled:
+            return {"metrics_enabled": False}
+        
+        # This would typically query the metrics registry for current values
+        # For simplicity, we'll return basic health info
+        return {
+            "metrics_enabled": True,
+            "prometheus_registry_metrics": len(list(REGISTRY._collector_to_names.keys())),
+            "last_updated": datetime.utcnow().isoformat()
+        }
     
     def get_metrics(self) -> bytes:
         """Generate Prometheus metrics output"""

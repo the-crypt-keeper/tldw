@@ -1,0 +1,326 @@
+# Evaluations Module Configuration
+# This file contains externalized configuration for the evaluations system
+# allowing runtime configuration changes without code modifications
+
+# Rate Limiting Configuration
+rate_limiting:
+  # User tier definitions and limits
+  tiers:
+    free:
+      evaluations_per_minute: 10
+      batch_evaluations_per_minute: 2
+      evaluations_per_day: 100
+      total_tokens_per_day: 100000
+      burst_size: 5
+      max_cost_per_day: 1.0
+      max_cost_per_month: 10.0
+      description: "Free tier with basic usage limits"
+      
+    basic:
+      evaluations_per_minute: 30
+      batch_evaluations_per_minute: 5
+      evaluations_per_day: 1000
+      total_tokens_per_day: 1000000
+      burst_size: 10
+      max_cost_per_day: 10.0
+      max_cost_per_month: 100.0
+      description: "Basic paid tier with increased limits"
+      
+    premium:
+      evaluations_per_minute: 100
+      batch_evaluations_per_minute: 20
+      evaluations_per_day: 10000
+      total_tokens_per_day: 10000000
+      burst_size: 25
+      max_cost_per_day: 100.0
+      max_cost_per_month: 1000.0
+      description: "Premium tier for power users"
+      
+    enterprise:
+      evaluations_per_minute: 500
+      batch_evaluations_per_minute: 100
+      evaluations_per_day: 100000
+      total_tokens_per_day: 100000000
+      burst_size: 100
+      max_cost_per_day: 1000.0
+      max_cost_per_month: 10000.0
+      description: "Enterprise tier with high limits"
+      
+    custom:
+      evaluations_per_minute: 10
+      batch_evaluations_per_minute: 2
+      evaluations_per_day: 100
+      total_tokens_per_day: 100000
+      burst_size: 5
+      max_cost_per_day: 1.0
+      max_cost_per_month: 10.0
+      description: "Custom tier (configured per user)"
+  
+  # Global rate limiting settings
+  global:
+    # Default tier for new users
+    default_tier: "free"
+    
+    # Grace period for new users (in days)
+    new_user_grace_period: 7
+    grace_tier: "basic"
+    
+    # Rate limit enforcement settings
+    enable_burst_protection: true
+    burst_window_seconds: 10
+    
+    # Violation handling
+    violation_penalty_minutes: 5  # Time to wait after violation
+    max_violations_per_hour: 3
+    auto_tier_downgrade_violations: 10  # Violations before auto-downgrade
+    
+    # IP-based rate limiting (for unauthenticated requests)
+    ip_requests_per_minute: 20
+    ip_requests_per_hour: 200
+    
+    # Suspicious activity thresholds
+    suspicious_requests_per_minute: 100
+    suspicious_error_rate_threshold: 0.5  # 50% error rate
+    suspicious_unique_endpoints_threshold: 20
+
+# Circuit Breaker Configuration
+circuit_breakers:
+  # Provider-specific configurations
+  providers:
+    openai:
+      failure_threshold: 3
+      success_threshold: 2
+      timeout_seconds: 30.0
+      recovery_timeout_seconds: 60.0
+      expected_exceptions:
+        - "RateLimitError"
+        - "APIError"
+        - "TimeoutError"
+    
+    anthropic:
+      failure_threshold: 3
+      success_threshold: 2
+      timeout_seconds: 45.0
+      recovery_timeout_seconds: 60.0
+      expected_exceptions:
+        - "RateLimitError"
+        - "APIError"
+        - "TimeoutError"
+    
+    google:
+      failure_threshold: 5
+      success_threshold: 3
+      timeout_seconds: 30.0
+      recovery_timeout_seconds: 90.0
+      expected_exceptions:
+        - "ResourceExhausted"
+        - "DeadlineExceeded"
+    
+    cohere:
+      failure_threshold: 4
+      success_threshold: 2
+      timeout_seconds: 25.0
+      recovery_timeout_seconds: 45.0
+      expected_exceptions:
+        - "RateLimitError"
+        - "APIError"
+    
+    local:
+      failure_threshold: 5
+      success_threshold: 2
+      timeout_seconds: 60.0
+      recovery_timeout_seconds: 30.0
+      expected_exceptions:
+        - "ConnectionError"
+        - "TimeoutError"
+    
+    default:
+      failure_threshold: 5
+      success_threshold: 2
+      timeout_seconds: 30.0
+      recovery_timeout_seconds: 60.0
+      expected_exceptions:
+        - "Exception"
+
+# Webhook Configuration
+webhooks:
+  # Delivery settings
+  delivery:
+    max_retries: 3
+    retry_delays: [1, 5, 15]  # seconds between retries
+    timeout_seconds: 30
+    batch_size: 10  # Max webhooks to deliver concurrently
+    
+  # Security settings
+  security:
+    require_https: false  # Set to true in production
+    allowed_domains: []  # Empty means all domains allowed
+    blocked_domains:
+      - "localhost"
+      - "127.0.0.1"
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+      - "192.168.0.0/16"
+    max_url_length: 2048
+    validate_ssl_certificates: true
+    
+  # Rate limiting for webhook registrations
+  registration_limits:
+    per_user_max: 10  # Max webhooks per user
+    per_url_max: 1    # Max registrations per URL
+    global_max: 1000  # Total webhooks across all users
+
+# Database Configuration
+database:
+  # Connection settings
+  connection:
+    # Future: connection pool settings for aiosqlite migration
+    pool_size: 10
+    max_overflow: 20
+    pool_timeout: 30
+    pool_recycle: 3600  # 1 hour
+    
+  # Query performance settings
+  query:
+    timeout_seconds: 30
+    slow_query_threshold: 1.0  # Log queries taking longer than 1 second
+    
+  # Cleanup and maintenance
+  maintenance:
+    audit_log_retention_days: 90
+    evaluation_history_retention_days: 365
+    cleanup_frequency_hours: 24
+    vacuum_frequency_days: 7
+    
+  # Backup settings
+  backup:
+    enabled: true
+    frequency_hours: 6
+    retention_days: 30
+    compression: true
+
+# Security Configuration
+security:
+  # Input validation
+  validation:
+    max_text_length: 100000  # 100KB
+    max_contexts: 20
+    max_context_length: 20000  # 20KB per context
+    max_batch_size: 100
+    max_request_size_mb: 10
+    
+  # API key management
+  api_keys:
+    require_rotation: false
+    rotation_warning_days: 30
+    min_key_length: 16
+    
+  # Audit logging
+  audit:
+    log_all_requests: true
+    log_request_bodies: false  # Set to true for debugging
+    log_response_bodies: false
+    mask_sensitive_fields: true
+    retention_days: 90
+    
+  # Suspicious activity detection
+  anomaly_detection:
+    enabled: true
+    large_request_threshold_mb: 5
+    high_frequency_threshold: 100  # requests per minute
+    unusual_pattern_detection: true
+
+# Performance Configuration
+performance:
+  # Caching settings
+  cache:
+    evaluation_results_ttl: 3600  # 1 hour
+    user_tier_cache_ttl: 300  # 5 minutes
+    config_cache_ttl: 60  # 1 minute
+    
+  # Async processing
+  async:
+    max_workers: 4
+    queue_size: 100
+    timeout_seconds: 300  # 5 minutes
+    
+  # Resource limits
+  resources:
+    max_memory_mb: 1024  # 1GB
+    max_cpu_percent: 80
+    max_open_files: 1000
+
+# Monitoring and Alerting
+monitoring:
+  # Metrics collection
+  metrics:
+    enabled: true
+    prometheus_port: 9090
+    collection_interval: 15  # seconds
+    
+  # Health check settings
+  health_checks:
+    interval_seconds: 30
+    timeout_seconds: 5
+    failure_threshold: 3
+    
+  # Alerting thresholds
+  alerts:
+    high_error_rate: 0.1  # 10%
+    high_latency_seconds: 10.0
+    low_success_rate: 0.9  # 90%
+    memory_usage_percent: 80
+    cpu_usage_percent: 80
+    
+  # Log levels
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    structured: true
+    json_format: true
+    include_request_id: true
+
+# Environment-specific overrides
+environments:
+  development:
+    rate_limiting:
+      global:
+        enable_burst_protection: false
+      tiers:
+        free:
+          evaluations_per_minute: 100
+          evaluations_per_day: 1000
+    security:
+      validation:
+        max_text_length: 1000000  # 1MB for testing
+    monitoring:
+      logging:
+        level: "DEBUG"
+        
+  testing:
+    rate_limiting:
+      global:
+        enable_burst_protection: false
+      tiers:
+        free:
+          evaluations_per_minute: 1000
+          evaluations_per_day: 10000
+    database:
+      maintenance:
+        audit_log_retention_days: 1
+    
+  production:
+    webhooks:
+      security:
+        require_https: true
+        validate_ssl_certificates: true
+    security:
+      audit:
+        log_all_requests: false
+        mask_sensitive_fields: true
+    monitoring:
+      logging:
+        level: "WARNING"
+    database:
+      backup:
+        enabled: true
+        frequency_hours: 4
