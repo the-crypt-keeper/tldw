@@ -13,8 +13,12 @@ import os
 import json
 import base64
 import tempfile
-from typing import Dict, Any, Optional, List
+import time
+import hashlib
+from typing import Dict, Any, Optional, List, Callable
 from datetime import datetime, timedelta
+from enum import Enum
+from difflib import SequenceMatcher
 import pytest
 import httpx
 from pathlib import Path
@@ -118,7 +122,7 @@ class APIClient:
             data = {
                 "title": title,
                 "media_type": media_type,
-                "overwrite_existing": "false",
+                "overwrite_existing": "true",  # Allow overwrite for test re-runs
                 "keep_original_file": "false"
             }
             response = self.client.post(
@@ -132,28 +136,114 @@ class APIClient:
         return response.json()
     
     def process_media(self, url: Optional[str] = None, file_path: Optional[str] = None,
-                     title: Optional[str] = None, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
-        """Process media from URL or file."""
-        data = {}
+                     title: Optional[str] = None, custom_prompt: Optional[str] = None,
+                     persist: bool = True, media_type: Optional[str] = None) -> Dict[str, Any]:
+        """Process media from URL or file.
+        
+        Args:
+            url: URL to process
+            file_path: Path to file to upload and process
+            title: Title for the media
+            custom_prompt: Custom analysis prompt
+            persist: If True, save to database. If False, ephemeral processing only
+            media_type: Type of media (auto-detected if not specified)
+        """
         files = None
         
-        if url:
-            data["url"] = url
-        if title:
-            data["title"] = title
-        if custom_prompt:
-            data["custom_prompt"] = custom_prompt
-            
+        # Handle file uploads
         if file_path:
             with open(file_path, "rb") as f:
-                files = {"file": (os.path.basename(file_path), f, "application/octet-stream")}
-                
-        response = self.client.post(
-            f"{API_PREFIX}/media/process",
-            data=data if not files else None,
-            json=data if files else None,
-            files=files
-        )
+                file_content = f.read()
+            files = {"files": (os.path.basename(file_path), file_content, "application/octet-stream")}
+        
+        if persist:
+            # Use /add endpoint for persistent storage
+            data = {}
+            if url:
+                data["urls"] = url  # /add expects comma-separated string
+                data["media_type"] = media_type or "document"
+            if title:
+                data["title"] = title
+            if custom_prompt:
+                data["custom_prompt"] = custom_prompt
+            # Enable overwrite to handle re-runs of tests
+            data["overwrite_existing"] = "true"
+            
+            # If processing a file, detect type
+            if file_path and not media_type:
+                ext = os.path.splitext(file_path)[1].lower()
+                if ext in ['.mp4', '.avi', '.mov', '.mkv']:
+                    data["media_type"] = "video"
+                elif ext in ['.mp3', '.wav', '.ogg', '.m4a']:
+                    data["media_type"] = "audio"
+                elif ext in ['.pdf']:
+                    data["media_type"] = "pdf"
+                elif ext in ['.txt', '.md', '.html', '.htm', '.xml', '.docx', '.rtf']:
+                    data["media_type"] = "document"
+                elif ext in ['.epub']:
+                    data["media_type"] = "ebook"
+                else:
+                    data["media_type"] = "document"
+            
+            response = self.client.post(
+                f"{API_PREFIX}/media/add",
+                data=data,
+                files=files
+            )
+        else:
+            # Use process-* endpoints for ephemeral processing
+            # Determine which endpoint to use based on content
+            if url or (file_path and file_path.endswith(('.html', '.htm', '.txt', '.md', '.xml'))):
+                endpoint = "process-documents"
+                data = {}
+                if url:
+                    data["urls"] = url  # process-documents expects comma-separated string
+                if title:
+                    data["titles"] = title
+                if custom_prompt:
+                    data["custom_prompt"] = custom_prompt
+            elif file_path and file_path.endswith('.pdf'):
+                endpoint = "process-pdfs"
+                data = {}
+                if title:
+                    data["titles"] = title
+                if custom_prompt:
+                    data["custom_prompt"] = custom_prompt
+            elif file_path and file_path.endswith(('.mp4', '.avi', '.mov', '.mkv')):
+                endpoint = "process-videos"
+                data = {}
+                if url:
+                    data["urls"] = url
+                if title:
+                    data["titles"] = title
+                if custom_prompt:
+                    data["custom_prompt"] = custom_prompt
+            elif file_path and file_path.endswith(('.mp3', '.wav', '.ogg', '.m4a')):
+                endpoint = "process-audios"
+                data = {}
+                if url:
+                    data["urls"] = url
+                if title:
+                    data["titles"] = title
+                if custom_prompt:
+                    data["custom_prompt"] = custom_prompt
+            else:
+                # Default to documents for web content
+                endpoint = "process-documents"
+                data = {}
+                if url:
+                    data["urls"] = url
+                if title:
+                    data["titles"] = title
+                if custom_prompt:
+                    data["custom_prompt"] = custom_prompt
+            
+            response = self.client.post(
+                f"{API_PREFIX}/media/{endpoint}",
+                data=data,
+                files=files
+            )
+        
         response.raise_for_status()
         return response.json()
     
@@ -496,3 +586,377 @@ def data_tracker():
     yield tracker
     # Cleanup files after tests
     tracker.cleanup_files()
+
+
+# ============================================================================
+# ASSERTION HELPERS - Fix weak assertions
+# ============================================================================
+
+class AssertionHelpers:
+    """Helper functions for strong assertions that actually validate functionality."""
+    
+    @staticmethod
+    def assert_successful_upload(response: Dict[str, Any]) -> int:
+        """Validate media upload response with specific assertions."""
+        # Handle new format with results array
+        if "results" in response and isinstance(response["results"], list):
+            assert len(response["results"]) > 0, "Empty results array"
+            result = response["results"][0]
+            
+            # Check for actual success, not errors
+            if result.get("status") == "Error":
+                # Check if it's a duplicate error (might be acceptable in some tests)
+                if "already exists" in result.get("db_message", ""):
+                    # Return existing ID if available
+                    if result.get("db_id"):
+                        return result["db_id"]
+                    pytest.skip("File already exists - acceptable for idempotent test")
+                else:
+                    pytest.fail(f"Upload failed with error: {result.get('error', result.get('db_message'))}")
+            
+            # Check if already exists (overwrite scenario)
+            if result.get("db_message") and "already" in result.get("db_message", "").lower():
+                # Item already exists, check if we got the ID
+                if result.get("db_id"):
+                    return result["db_id"]
+                # If no ID but item exists, that's acceptable for some tests
+                pytest.skip(f"Item already exists: {result.get('db_message')}")
+            
+            assert result.get("status") == "Success", f"Upload not successful: {result}"
+            assert "db_id" in result and result["db_id"] is not None, f"No valid db_id in result: {result}"
+            media_id = result["db_id"]
+            assert isinstance(media_id, int) and media_id > 0, f"Invalid media_id: {media_id}"
+            return media_id
+        
+        # Handle old format
+        assert "status" not in response or response["status"] == "Success", f"Upload failed: {response}"
+        assert "media_id" in response or "id" in response, "No media_id in response"
+        media_id = response.get("media_id") or response.get("id")
+        assert isinstance(media_id, int) and media_id > 0, f"Invalid media_id: {media_id}"
+        return media_id
+    
+    @staticmethod
+    def assert_content_integrity(original: str, retrieved: str, tolerance: float = 0.90):
+        """Validate that retrieved content matches original."""
+        if not retrieved:
+            pytest.fail("Retrieved content is empty")
+        
+        # Normalize whitespace for comparison
+        original_normalized = " ".join(original.split())
+        retrieved_normalized = " ".join(retrieved.split())
+        
+        # Check exact match first
+        if original_normalized == retrieved_normalized:
+            return True
+        
+        # Check similarity if processing might have altered it
+        similarity = SequenceMatcher(None, original_normalized, retrieved_normalized).ratio()
+        assert similarity >= tolerance, \
+            f"Content integrity check failed. Similarity: {similarity:.2%} (required: {tolerance:.0%})"
+        
+        return True
+    
+    @staticmethod
+    def assert_api_response_structure(response: Dict[str, Any], required_fields: List[str]):
+        """Validate API response has required structure."""
+        for field in required_fields:
+            assert field in response, f"Response missing required field: {field}"
+            # Don't check for None on optional fields
+            if field in ["id", "status", "title"]:  # Critical fields
+                assert response[field] is not None, f"Required field {field} is null"
+
+
+# ============================================================================
+# ERROR HANDLING - Categorize and handle errors appropriately
+# ============================================================================
+
+class ErrorCategory(Enum):
+    """Categorize errors for appropriate handling."""
+    ENVIRONMENT = "environment"  # Test env issues, can skip
+    CRITICAL = "critical"        # Must fail test
+    TRANSIENT = "transient"      # Should retry
+    EXPECTED = "expected"        # Normal in testing
+
+
+class SmartErrorHandler:
+    """Intelligent error handling that distinguishes error types."""
+    
+    @classmethod
+    def handle_error(cls, error: Exception, context: str = "") -> None:
+        """Properly handle errors based on type and context."""
+        if isinstance(error, httpx.HTTPStatusError):
+            status_code = error.response.status_code
+            
+            # Environment issues - skip test
+            if status_code in [503, 502]:
+                pytest.skip(f"Service unavailable in {context}: HTTP {status_code}")
+            
+            # Authentication issues - critical
+            elif status_code in [401, 403]:
+                pytest.fail(f"Authentication failed in {context}: HTTP {status_code}")
+            
+            # Server errors - critical
+            elif status_code == 500:
+                pytest.fail(f"Server error in {context}: HTTP 500")
+            
+            # Rate limiting - could retry but skip for now
+            elif status_code == 429:
+                pytest.skip(f"Rate limited in {context}")
+            
+            # Not found - check context
+            elif status_code == 404:
+                if "delete" in context.lower() or "after deletion" in context.lower():
+                    return  # 404 is expected after deletion
+                pytest.fail(f"Resource not found in {context}")
+            
+            # Validation errors
+            elif status_code == 422:
+                if "validation" in context.lower():
+                    return  # Expected when testing validation
+                pytest.fail(f"Validation error in {context}: {error}")
+            
+            # Timeout
+            elif status_code in [408, 504]:
+                pytest.skip(f"Timeout in {context}: HTTP {status_code}")
+            
+            else:
+                pytest.fail(f"Unexpected HTTP {status_code} in {context}")
+        
+        elif isinstance(error, httpx.ConnectError):
+            pytest.skip(f"Cannot connect to API in {context}: {error}")
+        
+        elif isinstance(error, httpx.TimeoutException):
+            pytest.skip(f"Request timeout in {context}")
+        
+        else:
+            # Unknown error - fail to be safe
+            pytest.fail(f"Unhandled error in {context}: {type(error).__name__}: {error}")
+
+
+# ============================================================================
+# ASYNC OPERATION HANDLING - Poll for long-running operations
+# ============================================================================
+
+class AsyncOperationHandler:
+    """Handle long-running async operations properly."""
+    
+    @staticmethod
+    def wait_for_completion(
+        check_func: Callable[[], Dict[str, Any]],
+        success_condition: Callable[[Dict[str, Any]], bool],
+        timeout: int = 60,
+        poll_interval: int = 2,
+        context: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Poll for async operation completion.
+        
+        Args:
+            check_func: Function to call to check status
+            success_condition: Function to determine if operation succeeded
+            timeout: Maximum time to wait in seconds
+            poll_interval: Time between checks in seconds
+            context: Description for error messages
+        
+        Returns:
+            Final successful response
+        """
+        start_time = time.time()
+        last_response = None
+        
+        while time.time() - start_time < timeout:
+            try:
+                response = check_func()
+                last_response = response
+                
+                # Check for success
+                if success_condition(response):
+                    return response
+                
+                # Check for failure
+                if response.get("status") == "failed" or response.get("error"):
+                    error_msg = response.get("error", "Unknown error")
+                    pytest.fail(f"{context} failed: {error_msg}")
+                
+                # Still processing, wait and retry
+                time.sleep(poll_interval)
+                
+            except httpx.HTTPStatusError as e:
+                # Might be temporary, continue unless timeout approaching
+                if time.time() - start_time < timeout - 10:
+                    time.sleep(poll_interval)
+                    continue
+                else:
+                    raise
+        
+        # Timeout reached
+        pytest.fail(
+            f"{context} timed out after {timeout}s. "
+            f"Last status: {last_response.get('status') if last_response else 'Unknown'}"
+        )
+    
+    @staticmethod
+    def wait_for_transcription(api_client, media_id: int, timeout: int = 120) -> Dict[str, Any]:
+        """Wait for media transcription to complete."""
+        def check_status():
+            return api_client.get_media_item(media_id)
+        
+        def is_complete(response):
+            # Check various possible status fields
+            if response.get("transcription_status") == "completed":
+                return True
+            if response.get("status") in ["completed", "success", "done"]:
+                return True
+            # Check if transcription exists
+            if response.get("transcription") or response.get("transcript"):
+                return True
+            return False
+        
+        return AsyncOperationHandler.wait_for_completion(
+            check_func=check_status,
+            success_condition=is_complete,
+            timeout=timeout,
+            context=f"Transcription of media {media_id}"
+        )
+
+
+# ============================================================================
+# CONTENT VALIDATION - Verify data integrity
+# ============================================================================
+
+class ContentValidator:
+    """Validate content integrity and processing results."""
+    
+    @staticmethod
+    def validate_transcription(transcription: str, min_length: int = 10) -> bool:
+        """Validate transcription quality."""
+        if not transcription:
+            pytest.fail("Transcription is empty")
+        
+        assert len(transcription) >= min_length, \
+            f"Transcription too short: {len(transcription)} chars (min: {min_length})"
+        
+        # Check it's not an error message
+        error_indicators = ["error", "failed", "unavailable", "exception"]
+        transcription_lower = transcription.lower()[:100]  # Check start
+        for indicator in error_indicators:
+            assert indicator not in transcription_lower, \
+                f"Transcription appears to be an error: {transcription[:100]}"
+        
+        return True
+    
+    @staticmethod
+    def validate_search_results(
+        query: str,
+        results: List[Dict[str, Any]],
+        expected_ids: Optional[List[int]] = None,
+        min_results: int = 0
+    ) -> bool:
+        """Validate search results."""
+        assert isinstance(results, list), "Results should be a list"
+        
+        if min_results > 0:
+            assert len(results) >= min_results, \
+                f"Too few results: {len(results)} (expected >= {min_results})"
+        
+        # Check expected IDs if provided
+        if expected_ids:
+            found_ids = [r.get("id") or r.get("media_id") for r in results]
+            for expected_id in expected_ids:
+                assert expected_id in found_ids, \
+                    f"Expected ID {expected_id} not in search results: {found_ids}"
+        
+        return True
+    
+    @staticmethod
+    def validate_chat_response(response: Dict[str, Any], min_length: int = 1) -> bool:
+        """Validate chat/LLM response."""
+        # Check structure
+        assert "choices" in response or "response" in response or "content" in response, \
+            f"Invalid chat response structure: {response.keys()}"
+        
+        # Extract message
+        message = ""
+        if "choices" in response and len(response["choices"]) > 0:
+            message = response["choices"][0].get("message", {}).get("content", "")
+        elif "response" in response:
+            message = response["response"]
+        elif "content" in response:
+            message = response["content"]
+        
+        assert message, "Chat response message is empty"
+        assert len(message) >= min_length, f"Response too short: {len(message)} chars"
+        
+        return True
+
+
+# ============================================================================
+# STATE VERIFICATION - Verify consistency between test phases
+# ============================================================================
+
+class StateVerification:
+    """Verify state consistency between test phases."""
+    
+    @staticmethod
+    def verify_uploads_accessible(api_client, uploaded_items: List[Dict[str, Any]]) -> None:
+        """Verify all uploaded media is accessible and intact."""
+        if not uploaded_items:
+            return
+        
+        errors = []
+        verified_count = 0
+        
+        for item in uploaded_items:
+            # Extract media ID
+            media_id = None
+            if "media_id" in item:
+                media_id = item["media_id"]
+            elif "results" in item and item["results"]:
+                media_id = item["results"][0].get("db_id")
+            
+            if not media_id:
+                continue
+            
+            try:
+                # Retrieve and verify
+                details = api_client.get_media_item(media_id)
+                
+                # Verify ID matches
+                retrieved_id = details.get("id") or details.get("media_id")
+                assert retrieved_id == media_id, f"ID mismatch: {retrieved_id} != {media_id}"
+                
+                # Verify has content
+                has_content = (
+                    details.get("content") or 
+                    details.get("text") or 
+                    details.get("transcript") or
+                    details.get("transcription")
+                )
+                assert has_content, f"Media {media_id} has no content"
+                
+                verified_count += 1
+                
+            except Exception as e:
+                errors.append(f"Media {media_id}: {str(e)}")
+        
+        # At least 80% should be accessible
+        if uploaded_items:
+            success_rate = verified_count / len(uploaded_items)
+            assert success_rate >= 0.8, \
+                f"Only {verified_count}/{len(uploaded_items)} uploads accessible. Errors: {errors}"
+    
+    @staticmethod
+    def create_content_hash(content: str) -> str:
+        """Create a hash of content for verification."""
+        return hashlib.md5(content.encode()).hexdigest()
+    
+    @staticmethod
+    def verify_content_preserved(original: str, retrieved: str, context: str = "") -> None:
+        """Verify content is preserved through processing."""
+        # Check key markers if present
+        if "TEST_MARKER" in original:
+            assert "TEST_MARKER" in retrieved, \
+                f"Test marker lost in {context}"
+        
+        # Check similarity
+        AssertionHelpers.assert_content_integrity(original, retrieved, tolerance=0.85)

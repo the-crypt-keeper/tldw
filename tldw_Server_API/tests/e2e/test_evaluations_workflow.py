@@ -18,7 +18,10 @@ import uuid
 
 from tldw_Server_API.tests.e2e.fixtures import (
     api_client, authenticated_client, data_tracker,
-    test_user_credentials
+    test_user_credentials,
+    # Import helper classes
+    AssertionHelpers, SmartErrorHandler, AsyncOperationHandler,
+    ContentValidator, StateVerification
 )
 from tldw_Server_API.tests.e2e.test_data import TestDataGenerator
 
@@ -88,11 +91,13 @@ class TestEvaluationWorkflow:
                 }
             }
             
-            response = self.client.client.post("/api/v1/evals", json=eval_data)
-            
-            if response.status_code == 201:
+            try:
+                response = self.client.client.post("/api/v1/evals", json=eval_data)
+                response.raise_for_status()
+                
                 result = response.json()
-                assert "id" in result
+                # Use proper assertions
+                AssertionHelpers.assert_api_response_structure(result, ["id", "object", "name", "eval_type"])
                 assert result["object"] == "evaluation"
                 assert result["name"] == eval_data["name"]
                 assert result["eval_type"] == "model_graded"
@@ -104,8 +109,9 @@ class TestEvaluationWorkflow:
                 TestEvaluationWorkflow.eval_id = result["id"]
                 
                 print(f"✓ Created evaluation: {result['id']}")
-            else:
-                print(f"Evaluation creation failed: {response.status_code} - {response.text}")
+                
+            except httpx.HTTPStatusError as e:
+                SmartErrorHandler.handle_error(e, "evaluation creation")
     
     
     def test_list_openai_evaluations(self):

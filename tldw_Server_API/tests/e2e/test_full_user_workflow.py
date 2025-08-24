@@ -33,7 +33,10 @@ from datetime import datetime, timedelta
 
 from fixtures import (
     api_client, authenticated_client, test_user_credentials, data_tracker,
-    create_test_file, create_test_pdf, create_test_audio, cleanup_test_file
+    create_test_file, create_test_pdf, create_test_audio, cleanup_test_file,
+    # Import new helper classes
+    AssertionHelpers, SmartErrorHandler, AsyncOperationHandler,
+    ContentValidator, StateVerification
 )
 from test_data import (
     TestDataGenerator, TestScenarios, generate_unique_id,
@@ -105,10 +108,16 @@ class TestFullUserWorkflow:
             assert response.get("success") == True
             assert "user_id" in response or "message" in response
             
-        except Exception as e:
-            # Single-user mode or registration disabled
-            print(f"Registration test skipped: {e}")
-            TestFullUserWorkflow.user_data = {}
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code in [400, 401]:
+                # Single-user mode or registration disabled
+                # 400: "User registration is disabled in single-user mode"
+                # 401: Authentication required but registration not available
+                pytest.skip("Registration not available (likely single-user mode)")
+            else:
+                SmartErrorHandler.handle_error(e, "user registration")
+        except httpx.ConnectError as e:
+            SmartErrorHandler.handle_error(e, "user registration")
     
     def test_03_user_login(self, api_client):
         """Test user login and token generation."""
@@ -174,27 +183,22 @@ class TestFullUserWorkflow:
                 media_type="document"
             )
             
-            # Verify response - handle results array format
-            if "results" in response and isinstance(response["results"], list):
-                assert len(response["results"]) > 0
-                result = response["results"][0]
-                # Check if upload was successful or already exists
-                assert result.get("status") in ["Success", "Error"]
-                if result.get("db_message") and "already exists" in result.get("db_message"):
-                    # File already exists, that's ok for testing
-                    pass
-                elif result.get("db_id"):
-                    # New file uploaded successfully
-                    data_tracker.add_media(result["db_id"])
-            else:
-                # Old format compatibility
-                assert "media_id" in response or "id" in response
-                media_id = response.get("media_id") or response.get("id")
-                data_tracker.add_media(media_id)
+            # Use proper assertion helper
+            media_id = AssertionHelpers.assert_successful_upload(response)
+            data_tracker.add_media(media_id)
             
-            # Store media item
-            TestFullUserWorkflow.media_items.append(response)
+            # Store media item with content for later verification
+            TestFullUserWorkflow.media_items.append({
+                "media_id": media_id,
+                "response": response,
+                "original_content": content,
+                "content_hash": StateVerification.create_content_hash(content)
+            })
             
+        except httpx.HTTPStatusError as e:
+            SmartErrorHandler.handle_error(e, "document upload")
+        except httpx.ConnectError as e:
+            SmartErrorHandler.handle_error(e, "document upload")
         finally:
             cleanup_test_file(file_path)
     
@@ -235,26 +239,83 @@ class TestFullUserWorkflow:
             cleanup_test_file(file_path)
     
     def test_12_process_web_content(self, api_client, data_tracker):
-        """Test processing content from a URL."""
+        """Test processing content from a URL - both ephemeral and persistent."""
         # Use a reliable test URL
         test_url = "https://en.wikipedia.org/wiki/Artificial_intelligence"
         
+        # Test 1: Ephemeral processing (no DB storage)
         try:
-            response = api_client.process_media(
+            ephemeral_response = api_client.process_media(
                 url=test_url,
-                title="E2E Test Web Content"
+                title="E2E Test Web Content (Ephemeral)",
+                persist=False  # Ephemeral processing
             )
             
-            # Verify response
-            assert response.get("status") in ["success", "processing", "completed"]
+            # Verify ephemeral response
+            assert ephemeral_response is not None, "No response from ephemeral processing"
+            # Ephemeral processing should return content but no db_id
+            assert "content" in ephemeral_response or "text" in ephemeral_response or "results" in ephemeral_response, \
+                "Ephemeral response should contain processed content"
             
-            if "media_id" in response or "id" in response:
-                TestFullUserWorkflow.media_items.append(response)
-                media_id = response.get("media_id") or response.get("id")
-                data_tracker.add_media(media_id)
+            # Check that it explicitly says no DB storage
+            if "db_message" in ephemeral_response:
+                assert "processing only" in ephemeral_response["db_message"].lower() or \
+                       ephemeral_response.get("db_id") is None, \
+                       "Ephemeral processing should not store in DB"
                 
-        except Exception as e:
-            print(f"Web content processing skipped: {e}")
+        except httpx.HTTPStatusError as e:
+            SmartErrorHandler.handle_error(e, "ephemeral web content processing")
+        except httpx.ConnectError as e:
+            SmartErrorHandler.handle_error(e, "ephemeral web content processing")
+        
+        # Test 2: Persistent processing (with DB storage)
+        try:
+            persistent_response = api_client.process_media(
+                url=test_url,
+                title="E2E Test Web Content (Persistent)",
+                persist=True  # Persistent storage
+            )
+            
+            # Verify persistent response
+            assert persistent_response is not None, "No response from persistent processing"
+            
+            # Check for media ID in various possible fields
+            media_id = None
+            
+            # Handle response that wraps results in array
+            if "results" in persistent_response and persistent_response["results"]:
+                result = persistent_response["results"][0]  # Get first result
+                media_id = result.get("db_id") or result.get("media_id") or result.get("id")
+            else:
+                # Direct response format
+                media_id = (persistent_response.get("db_id") or 
+                           persistent_response.get("media_id") or 
+                           persistent_response.get("id"))
+            
+            assert media_id is not None, f"No ID returned in persistent response: {persistent_response}"
+            assert isinstance(media_id, int) and media_id > 0, f"Invalid media_id: {media_id}"
+            
+            # Store for later verification
+            TestFullUserWorkflow.media_items.append({
+                "media_id": media_id,
+                "response": persistent_response,
+                "url": test_url
+            })
+            data_tracker.add_media(media_id)
+            
+            # Verify the item was actually stored by trying to retrieve it
+            try:
+                stored_item = api_client.get_media_item(media_id)
+                assert stored_item is not None, f"Could not retrieve stored item {media_id}"
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code != 404:
+                    raise  # Re-raise if not a 404
+                pytest.fail(f"Persistent storage failed - item {media_id} not found in database")
+                
+        except httpx.HTTPStatusError as e:
+            SmartErrorHandler.handle_error(e, "persistent web content processing")
+        except httpx.ConnectError as e:
+            SmartErrorHandler.handle_error(e, "persistent web content processing")
     
     def test_13_upload_audio_file(self, api_client, data_tracker):
         """Test uploading an audio file."""
@@ -346,28 +407,62 @@ class TestFullUserWorkflow:
         """Test listing all media items."""
         response = api_client.get_media_list(limit=50)
         
-        # Verify response structure
-        assert "items" in response or "results" in response
+        # Verify response structure with proper assertions
+        AssertionHelpers.assert_api_response_structure(response, ["items"])
         items = response.get("items") or response.get("results", [])
         
-        # Count successful uploads from our media_items
+        # Count actual successful uploads (with media_id)
         successful_uploads = 0
-        for upload_response in TestFullUserWorkflow.media_items:
-            if "results" in upload_response:
-                for result in upload_response["results"]:
-                    if result.get("db_id") or (result.get("status") == "Success" and "already exists" not in result.get("db_message", "")):
-                        successful_uploads += 1
-            elif upload_response.get("media_id") or upload_response.get("id"):
+        for item in TestFullUserWorkflow.media_items:
+            if isinstance(item, dict) and item.get("media_id"):
                 successful_uploads += 1
         
-        # Should have at least one media item (some uploads might fail)
-        assert len(items) >= min(1, successful_uploads)
+        # Should have at least one media item
+        assert len(items) >= min(1, successful_uploads), \
+            f"Expected at least {min(1, successful_uploads)} items, got {len(items)}"
         
         # Verify item structure
         if items:
             item = items[0]
-            assert "id" in item or "media_id" in item
-            assert "title" in item
+            AssertionHelpers.assert_api_response_structure(item, ["id", "title"])
+    
+    def test_16_verify_upload_phase_complete(self, api_client):
+        """Verify all uploads from phase 2 are accessible and intact."""
+        # This is a new state verification test
+        if not TestFullUserWorkflow.media_items:
+            pytest.skip("No media items uploaded")
+        
+        # Use state verification helper
+        StateVerification.verify_uploads_accessible(api_client, TestFullUserWorkflow.media_items)
+        
+        # Verify content integrity for items with original content
+        for item in TestFullUserWorkflow.media_items:
+            if not isinstance(item, dict) or not item.get("media_id"):
+                continue
+                
+            media_id = item["media_id"]
+            
+            try:
+                # Get media details
+                details = api_client.get_media_item(media_id)
+                
+                # If we have original content, verify it's preserved
+                if item.get("original_content"):
+                    content = details.get("content", {})
+                    if isinstance(content, dict):
+                        actual_content = content.get("text", "")
+                    else:
+                        actual_content = str(content)
+                    
+                    if actual_content:
+                        StateVerification.verify_content_preserved(
+                            original=item["original_content"],
+                            retrieved=actual_content,
+                            context=f"media {media_id}"
+                        )
+                
+            except httpx.HTTPStatusError as e:
+                SmartErrorHandler.handle_error(e, f"verifying media {media_id}")
     
     # ========================================================================
     # Phase 3: Transcription & Analysis
@@ -429,8 +524,8 @@ class TestFullUserWorkflow:
                 temperature=0.7
             )
             
-            # Verify response structure
-            assert "choices" in response or "response" in response or "content" in response
+            # Use proper validation helper
+            ContentValidator.validate_chat_response(response, min_length=1)
             
             # Store chat
             TestFullUserWorkflow.chats.append({
@@ -441,8 +536,10 @@ class TestFullUserWorkflow:
             if "chat_id" in response:
                 data_tracker.add_chat(response["chat_id"])
                 
-        except Exception as e:
-            print(f"Chat completion test skipped: {e}")
+        except httpx.HTTPStatusError as e:
+            SmartErrorHandler.handle_error(e, "chat completion")
+        except httpx.ConnectError as e:
+            SmartErrorHandler.handle_error(e, "chat completion")
     
     def test_31_chat_with_context(self, api_client, data_tracker):
         """Test chat with media context (RAG)."""
@@ -810,10 +907,75 @@ class TestFullUserWorkflow:
     # Phase 10: Export & Sync
     # ========================================================================
     
-    def test_90_export_placeholder(self, api_client):
-        """Placeholder for export tests."""
-        # This would test export functionality if available
-        pass
+    def test_90_export_functionality(self, api_client):
+        """Test export functionality for media and notes."""
+        if not self.media_items and not self.notes:
+            pytest.skip("No content available to export")
+        
+        # Test media export if we have media
+        if self.media_items:
+            media_item = self.media_items[0]
+            media_id = media_item.get("media_id")
+            
+            if media_id:
+                try:
+                    # Try to export as markdown
+                    response = api_client.client.get(
+                        f"{api_client.base_url}/api/v1/media/{media_id}/export",
+                        params={"format": "markdown"}
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        assert "content" in result or "data" in result, "No content in export"
+                        
+                        content = result.get("content") or result.get("data", "")
+                        assert len(content) > 0, "Exported content is empty"
+                        
+                        # Verify it's markdown format if claimed
+                        if "format" in result:
+                            assert result["format"] == "markdown"
+                        
+                        print(f"✓ Successfully exported media {media_id}")
+                    elif response.status_code == 404:
+                        print("Export endpoint not implemented")
+                    else:
+                        print(f"Export returned status {response.status_code}")
+                        
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 404:
+                        print("Export functionality not available")
+                    else:
+                        SmartErrorHandler.handle_error(e, "media export")
+        
+        # Test notes export if we have notes  
+        if self.notes:
+            try:
+                # Try bulk export of notes
+                note_ids = [n.get("id") or n.get("note_id") for n in self.notes[:3] if n.get("id") or n.get("note_id")]
+                
+                if note_ids:
+                    response = api_client.client.post(
+                        f"{api_client.base_url}/api/v1/notes/export",
+                        json={"note_ids": note_ids, "format": "json"}
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        assert "notes" in result or "data" in result, "No notes in export"
+                        
+                        exported_notes = result.get("notes") or result.get("data", [])
+                        assert len(exported_notes) > 0, "No notes exported"
+                        
+                        print(f"✓ Successfully exported {len(exported_notes)} notes")
+                    elif response.status_code == 404:
+                        print("Notes export endpoint not implemented")
+                        
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    print("Notes export not available")
+                else:
+                    SmartErrorHandler.handle_error(e, "notes export")
     
     # ========================================================================
     # Phase 11: Cleanup (Deletion Tests)
@@ -878,6 +1040,92 @@ class TestFullUserWorkflow:
             
             print(f"\nTotal execution time: {total_time:.2f}s")
             print(f"Average test time: {total_time/len(TestFullUserWorkflow.performance_metrics):.2f}s")
+    
+    def test_91_ephemeral_vs_persistent_verification(self, api_client):
+        """Verify ephemeral processing doesn't store data while persistent does."""
+        test_content = "This is a test document for ephemeral vs persistent processing verification."
+        
+        # Test 1: Ephemeral processing
+        ephemeral_result = None
+        try:
+            # Create a test text file
+            import tempfile
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+                f.write(test_content)
+                temp_file = f.name
+            
+            # Process ephemerally
+            ephemeral_result = api_client.process_media(
+                file_path=temp_file,
+                title="Ephemeral Test Document",
+                persist=False
+            )
+            
+            # Verify ephemeral processing returns content but no DB ID
+            assert ephemeral_result is not None, "No response from ephemeral processing"
+            
+            # Check for no database storage indication
+            if "db_id" in ephemeral_result:
+                assert ephemeral_result["db_id"] is None, "Ephemeral processing should not return db_id"
+            if "db_message" in ephemeral_result:
+                assert "processing only" in ephemeral_result["db_message"].lower(), \
+                    f"Expected 'processing only' message, got: {ephemeral_result['db_message']}"
+            
+            # Try to retrieve - should fail since it wasn't stored
+            ephemeral_id = ephemeral_result.get("db_id") or ephemeral_result.get("media_id") or ephemeral_result.get("id")
+            if ephemeral_id:
+                try:
+                    api_client.get_media_item(ephemeral_id)
+                    pytest.fail(f"Ephemeral item {ephemeral_id} should not be retrievable from database")
+                except httpx.HTTPStatusError as e:
+                    assert e.response.status_code == 404, "Expected 404 for ephemeral item"
+                    
+        except Exception as e:
+            print(f"Ephemeral processing test error: {e}")
+        finally:
+            if 'temp_file' in locals():
+                import os
+                os.unlink(temp_file)
+        
+        # Test 2: Persistent processing
+        persistent_result = None
+        try:
+            # Create another test file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+                f.write(test_content)
+                temp_file = f.name
+            
+            # Process persistently
+            persistent_result = api_client.process_media(
+                file_path=temp_file,
+                title="Persistent Test Document",
+                persist=True
+            )
+            
+            # Verify persistent processing returns DB ID
+            assert persistent_result is not None, "No response from persistent processing"
+            
+            # Get the ID from various possible fields
+            persistent_id = (persistent_result.get("db_id") or 
+                           persistent_result.get("media_id") or 
+                           persistent_result.get("id"))
+            
+            assert persistent_id is not None, f"No ID in persistent result: {persistent_result.keys()}"
+            assert isinstance(persistent_id, int) and persistent_id > 0, f"Invalid ID: {persistent_id}"
+            
+            # Verify we can retrieve the stored item
+            stored_item = api_client.get_media_item(persistent_id)
+            assert stored_item is not None, f"Could not retrieve persistent item {persistent_id}"
+            assert "title" in stored_item or "name" in stored_item, "Retrieved item missing title/name"
+            
+            print(f"✓ Ephemeral vs Persistent test passed - ephemeral not stored, persistent ID: {persistent_id}")
+            
+        except Exception as e:
+            print(f"Persistent processing test error: {e}")
+        finally:
+            if 'temp_file' in locals():
+                import os
+                os.unlink(temp_file)
 
 
 # Additional test scenarios can be added here

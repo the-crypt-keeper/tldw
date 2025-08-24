@@ -1,0 +1,902 @@
+openapi: 3.0.3
+info:
+  title: TLDW Server Chatbook API
+  description: |
+    API for managing chatbooks - portable archives of conversations, notes, and other content.
+    
+    Chatbooks provide a way to backup, share, and migrate content between servers or accounts.
+    They are ZIP archives containing JSON metadata and content files.
+  version: 1.0.0
+  contact:
+    name: TLDW Server Team
+    url: https://github.com/tldw_server
+    email: support@tldw-server.com
+  license:
+    name: AGPL-3.0
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+  - url: https://api.tldw-server.com/api/v1
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Export
+    description: Create and manage chatbook exports
+  - name: Import
+    description: Import and preview chatbooks
+  - name: Jobs
+    description: Monitor export/import job status
+
+paths:
+  /chatbooks/export:
+    post:
+      tags:
+        - Export
+      summary: Create a new chatbook
+      description: Export selected content to a chatbook file
+      operationId: createChatbook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatbookRequest'
+      responses:
+        '200':
+          description: Chatbook created successfully (sync mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateChatbookResponse'
+        '202':
+          description: Export job started (async mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateChatbookResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /chatbooks/import:
+    post:
+      tags:
+        - Import
+      summary: Import a chatbook
+      description: Import content from an uploaded chatbook file
+      operationId: importChatbook
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Chatbook file to import
+                options:
+                  type: string
+                  format: json
+                  description: JSON string with import options
+                  example: '{"conflict_resolution": "skip", "prefix_imported": true}'
+      responses:
+        '200':
+          description: Chatbook imported successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportChatbookResponse'
+        '202':
+          description: Import job started (async mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportChatbookResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /chatbooks/preview:
+    post:
+      tags:
+        - Import
+      summary: Preview chatbook contents
+      description: Preview the contents of a chatbook without importing
+      operationId: previewChatbook
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Chatbook file to preview
+      responses:
+        '200':
+          description: Chatbook preview retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewChatbookResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /chatbooks/export/jobs:
+    get:
+      tags:
+        - Jobs
+      summary: List export jobs
+      description: Get a list of export jobs for the authenticated user
+      operationId: listExportJobs
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/OrderBy'
+        - $ref: '#/components/parameters/OrderDesc'
+      responses:
+        '200':
+          description: Export jobs retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListExportJobsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /chatbooks/export/jobs/{job_id}:
+    get:
+      tags:
+        - Jobs
+      summary: Get export job status
+      description: Get detailed status of a specific export job
+      operationId: getExportJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Export job details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - Jobs
+      summary: Cancel export job
+      description: Cancel a running export job
+      operationId: cancelExportJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Export job cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Export job cancelled successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
+  /chatbooks/import/jobs:
+    get:
+      tags:
+        - Jobs
+      summary: List import jobs
+      description: Get a list of import jobs for the authenticated user
+      operationId: listImportJobs
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/OrderBy'
+        - $ref: '#/components/parameters/OrderDesc'
+      responses:
+        '200':
+          description: Import jobs retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListImportJobsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /chatbooks/import/jobs/{job_id}:
+    get:
+      tags:
+        - Jobs
+      summary: Get import job status
+      description: Get detailed status of a specific import job
+      operationId: getImportJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Import job details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportJobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - Jobs
+      summary: Cancel import job
+      description: Cancel a running import job
+      operationId: cancelImportJob
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Import job cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Import job cancelled successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /chatbooks/download/{job_id}:
+    get:
+      tags:
+        - Export
+      summary: Download exported chatbook
+      description: Download the chatbook file from a completed export job
+      operationId: downloadChatbook
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Chatbook file
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          description: Export has expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /chatbooks/cleanup:
+    post:
+      tags:
+        - Jobs
+      summary: Clean up expired exports
+      description: Remove expired export files to free storage
+      operationId: cleanupExpiredExports
+      responses:
+        '200':
+          description: Cleanup completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupExpiredExportsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    JobId:
+      name: job_id
+      in: path
+      required: true
+      description: Unique job identifier
+      schema:
+        type: string
+        example: cb_export_20240115_abc123
+    
+    StatusFilter:
+      name: status
+      in: query
+      description: Filter by job status
+      schema:
+        type: string
+        enum: [pending, in_progress, completed, failed, cancelled, expired]
+    
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of results
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
+    
+    Offset:
+      name: offset
+      in: query
+      description: Number of results to skip
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    
+    OrderBy:
+      name: order_by
+      in: query
+      description: Field to sort by
+      schema:
+        type: string
+        enum: [created_at, completed_at, name, size]
+        default: created_at
+    
+    OrderDesc:
+      name: order_desc
+      in: query
+      description: Sort in descending order
+      schema:
+        type: boolean
+        default: true
+
+  schemas:
+    ContentType:
+      type: string
+      enum:
+        - conversation
+        - note
+        - character
+        - media
+        - embedding
+        - prompt
+        - evaluation
+        - world_book
+        - dictionary
+        - generated_document
+
+    ConflictResolution:
+      type: string
+      enum:
+        - skip
+        - overwrite
+        - rename
+        - merge
+      default: skip
+
+    ExportStatus:
+      type: string
+      enum:
+        - pending
+        - in_progress
+        - completed
+        - failed
+        - cancelled
+        - expired
+
+    ImportStatus:
+      type: string
+      enum:
+        - pending
+        - validating
+        - in_progress
+        - completed
+        - failed
+        - cancelled
+
+    CreateChatbookRequest:
+      type: object
+      required:
+        - name
+        - description
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Weekly Backup - Week 4
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          example: Regular weekly backup of all content
+        content_selections:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            conversation: ["conv123", "conv456"]
+            note: ["note789"]
+        author:
+          type: string
+          example: Jane Doe
+        include_media:
+          type: boolean
+          default: false
+        media_quality:
+          type: string
+          enum: [thumbnail, compressed, original]
+          default: compressed
+        include_embeddings:
+          type: boolean
+          default: false
+        include_generated_content:
+          type: boolean
+          default: true
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["backup", "weekly"]
+        categories:
+          type: array
+          items:
+            type: string
+          example: ["work", "research"]
+        async_mode:
+          type: boolean
+          default: false
+
+    ImportChatbookRequest:
+      type: object
+      properties:
+        content_selections:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        conflict_resolution:
+          $ref: '#/components/schemas/ConflictResolution'
+        prefix_imported:
+          type: boolean
+          default: false
+        import_media:
+          type: boolean
+          default: true
+        import_embeddings:
+          type: boolean
+          default: false
+        async_mode:
+          type: boolean
+          default: false
+
+    CreateChatbookResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        job_id:
+          type: string
+          description: Job ID if async mode
+        file_path:
+          type: string
+          description: File path if sync mode
+        download_url:
+          type: string
+          description: Download URL if sync mode
+
+    ImportChatbookResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        job_id:
+          type: string
+        imported_items:
+          type: object
+          additionalProperties:
+            type: integer
+          example:
+            conversation: 5
+            note: 10
+            character: 2
+
+    ContentItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          $ref: '#/components/schemas/ContentType'
+        title:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        tags:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+        file_path:
+          type: string
+        checksum:
+          type: string
+
+    ChatbookManifestResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          example: "1.0"
+        name:
+          type: string
+        description:
+          type: string
+        author:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        export_id:
+          type: string
+        content_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentItemResponse'
+        include_media:
+          type: boolean
+        include_embeddings:
+          type: boolean
+        include_generated_content:
+          type: boolean
+        media_quality:
+          type: string
+        total_conversations:
+          type: integer
+        total_notes:
+          type: integer
+        total_characters:
+          type: integer
+        total_media_items:
+          type: integer
+        total_world_books:
+          type: integer
+        total_dictionaries:
+          type: integer
+        total_documents:
+          type: integer
+        total_size_bytes:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        categories:
+          type: array
+          items:
+            type: string
+        language:
+          type: string
+          default: en
+        license:
+          type: string
+
+    PreviewChatbookResponse:
+      type: object
+      properties:
+        manifest:
+          $ref: '#/components/schemas/ChatbookManifestResponse'
+        error:
+          type: string
+
+    ExportJobResponse:
+      type: object
+      required:
+        - job_id
+        - status
+        - chatbook_name
+        - created_at
+      properties:
+        job_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/ExportStatus'
+        chatbook_name:
+          type: string
+        output_path:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+        total_items:
+          type: integer
+        processed_items:
+          type: integer
+        file_size_bytes:
+          type: integer
+        download_url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    ImportJobResponse:
+      type: object
+      required:
+        - job_id
+        - status
+        - chatbook_path
+        - created_at
+      properties:
+        job_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/ImportStatus'
+        chatbook_path:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+        progress_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+        total_items:
+          type: integer
+        processed_items:
+          type: integer
+        successful_items:
+          type: integer
+        failed_items:
+          type: integer
+        skipped_items:
+          type: integer
+        conflicts:
+          type: array
+          items:
+            type: object
+        warnings:
+          type: array
+          items:
+            type: string
+
+    ListExportJobsResponse:
+      type: object
+      required:
+        - jobs
+        - total
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExportJobResponse'
+        total:
+          type: integer
+
+    ListImportJobsResponse:
+      type: object
+      required:
+        - jobs
+        - total
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportJobResponse'
+        total:
+          type: integer
+
+    CleanupExpiredExportsResponse:
+      type: object
+      required:
+        - deleted_count
+        - message
+      properties:
+        deleted_count:
+          type: integer
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+        - error_type
+      properties:
+        detail:
+          type: string
+        error_type:
+          type: string
+        job_id:
+          type: string
+        suggestions:
+          type: array
+          items:
+            type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: Invalid content selection format
+            error_type: ValidationError
+            suggestions:
+              - Use format {"conversation": ["id1", "id2"]}
+              - Leave empty to export all content
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: Authentication required
+            error_type: AuthenticationError
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: Job not found
+            error_type: NotFoundError
+
+    Conflict:
+      description: Operation conflicts with current state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: Job is already completed
+            error_type: ConflictError
+
+    PayloadTooLarge:
+      description: Request payload too large
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: File size exceeds 100MB limit
+            error_type: PayloadTooLargeError
+            suggestions:
+              - Reduce content selection
+              - Exclude media files
+              - Split into multiple exports
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: Rate limit exceeded. Try again in 60 seconds.
+            error_type: RateLimitError
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: An unexpected error occurred
+            error_type: InternalServerError

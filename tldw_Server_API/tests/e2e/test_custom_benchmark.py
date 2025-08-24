@@ -17,7 +17,10 @@ import uuid
 
 from tldw_Server_API.tests.e2e.fixtures import (
     api_client, authenticated_client, data_tracker,
-    test_user_credentials
+    test_user_credentials,
+    # Import helper classes
+    AssertionHelpers, SmartErrorHandler, AsyncOperationHandler,
+    ContentValidator, StateVerification
 )
 
 
@@ -191,23 +194,25 @@ class TestCustomBenchmark:
             }
         }
         
-        response = self.client.client.post("/api/v1/evals", json=eval_data)
-        
-        if response.status_code == 201:
+        try:
+            response = self.client.client.post("/api/v1/evals", json=eval_data)
+            response.raise_for_status()
+            
             result = response.json()
-            assert "id" in result
-            assert result["name"] == self.benchmark_name
-            assert result["eval_type"] == "model_graded"
+            # Use proper assertions
+            AssertionHelpers.assert_api_response_structure(result, ["id"])
+            assert result.get("name") == self.benchmark_name
+            assert result.get("eval_type") == "model_graded"
             
             # Track for cleanup and later tests
             self.tracker.track("evaluation", result["id"])
             TestCustomBenchmark.eval_id = result["id"]  # Store as class variable
             
             print(f"✓ Created custom benchmark: {result['id']}")
-        else:
-            print(f"Custom benchmark creation failed: {response.status_code}")
-            # Store eval_id as None if creation failed
+            
+        except httpx.HTTPStatusError as e:
             TestCustomBenchmark.eval_id = None
+            SmartErrorHandler.handle_error(e, "custom benchmark creation")
     
     @patch('tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls.chat_with_openai')
     def test_run_benchmark_with_all_correct_responses(self, mock_chat):
@@ -353,6 +358,31 @@ class TestCustomBenchmark:
                 print("No runs found yet (may still be processing)")
         else:
             print(f"Failed to get benchmark runs: {response.status_code}")
+            
+    def test_wait_for_benchmark_completion(self):
+        """Wait for benchmark runs to complete using async handler."""
+        if TestCustomBenchmark.run_id is None:
+            pytest.skip("No run ID available")
+        
+        try:
+            # Wait for the run to complete
+            result = AsyncOperationHandler.wait_for_completion(
+                check_func=lambda: self.client.client.get(
+                    f"/api/v1/evals/{TestCustomBenchmark.eval_id}/runs/{TestCustomBenchmark.run_id}"
+                ).json(),
+                success_condition=lambda r: r.get("status") == "completed",
+                timeout=60,
+                context=f"Benchmark run {TestCustomBenchmark.run_id}"
+            )
+            
+            # Validate completed run has results
+            assert "score" in result or "overall_score" in result, \
+                "Completed run missing score"
+            
+            print(f"✓ Benchmark run completed with score: {result.get('score', result.get('overall_score'))}")
+            
+        except Exception as e:
+            SmartErrorHandler.handle_error(e, "waiting for benchmark completion")
     
     def test_benchmark_results_aggregation(self):
         """Test that benchmark results are properly aggregated by category."""
