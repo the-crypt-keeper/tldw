@@ -5,26 +5,42 @@
 import asyncio
 import json
 import os
-from typing import AsyncGenerator # Add this import
+from typing import AsyncGenerator, Optional # Add this import
 #
 # Third-party libraries
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from fastapi.responses import StreamingResponse, Response # Add Response
 from starlette import status # For status codes
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 #
 # Local imports
 from tldw_Server_API.app.api.v1.schemas.audio_schemas import OpenAISpeechRequest
+from tldw_Server_API.app.core.config import AUTH_BEARER_PREFIX
+from tldw_Server_API.app.core.Auth.auth_utils import (
+    extract_bearer_token,
+    validate_api_token,
+    get_expected_api_token,
+    is_authentication_required
+)
 # from your_project.services.tts_service import TTSService, get_tts_service
 
 # For logging (if you use the same logger as in your PDF endpoint)
 import logging # or from your_project.utils import logger
 logger = logging.getLogger(__name__)
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 
 router = APIRouter(
     prefix="/v1/audio", # Standard OpenAI prefix
     tags=["TTS (OpenAI Compatible)"],
-    responses={404: {"description": "Not found"}},
+    responses={
+        404: {"description": "Not found"},
+        401: {"description": "Unauthorized"},
+        429: {"description": "Rate limit exceeded"}
+    },
 )
 
 
@@ -51,35 +67,67 @@ _openai_mappings = { # Load this from a JSON file later
     }
 }
 
-# Dummy TTSService for now
-class DummyTTSService:
-    async def generate_audio_stream(self, request: OpenAISpeechRequest, internal_model_id: str) -> AsyncGenerator[bytes, None]:
-        logger.info(f"TTSService (dummy): Generating for model '{request.model}' (internal: {internal_model_id}), voice '{request.voice}'")
-        logger.info(f"Input: {request.input[:50]}...")
-        # Simulate audio chunks
-        for i in range(3):
-            await asyncio.sleep(0.1) # Simulate work
-            yield f"audio_chunk_{i}_for_{request.input[:10]}.{request.response_format}".encode()
-        # Simulate closing/finalizing stream if needed by some formats
-        if request.response_format in ["wav", "mp3"] and not request.stream: # Non-streamed needs a full file
-            yield b"--final_boundary_for_non_streamed--" # Placeholder
+# Import the real TTS service
+from tldw_Server_API.app.core.TTS.tts_generation import TTSService, get_tts_service as get_real_tts_service
 
-async def get_tts_service() -> DummyTTSService: # Later, this will return the real TTSService
-    return DummyTTSService()
+async def get_tts_service() -> TTSService:
+    """Get the TTS service instance."""
+    return await get_real_tts_service()
 
 # --- End of Placeholder ---
 
 
 @router.post("/speech", summary="Generates audio from text input.")
+@limiter.limit("10/minute")  # Rate limit: 10 requests per minute per IP
 async def create_speech(
     request_data: OpenAISpeechRequest, # FastAPI will parse JSON body into this
     client_request: Request, # To check for client disconnects
-    tts_service: DummyTTSService = Depends(get_tts_service),
-    # FIXME - add check for user
+    tts_service: TTSService = Depends(get_tts_service),
+    authorization: Optional[str] = Header(None),
 ):
     """
     Generates audio from the input text.
+    
+    Requires authentication via Bearer token in Authorization header.
+    Rate limited to 10 requests per minute per IP address.
     """
+    
+    # Authentication check
+    if is_authentication_required():
+        # Extract and validate token
+        token = extract_bearer_token(authorization)
+        if not token:
+            logger.warning("TTS request without authentication token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required. Please provide a valid Bearer token.",
+                headers={"WWW-Authenticate": f"{AUTH_BEARER_PREFIX}"},
+            )
+        
+        # Validate the token
+        expected_token = get_expected_api_token()
+        if not validate_api_token(token, expected_token):
+            logger.warning(f"TTS request with invalid token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token.",
+                headers={"WWW-Authenticate": f"{AUTH_BEARER_PREFIX}"},
+            )
+    
+    # Input validation
+    if not request_data.input or len(request_data.input.strip()) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Input text cannot be empty."
+        )
+    
+    # Limit input length to prevent abuse
+    MAX_INPUT_LENGTH = 4096  # Maximum characters
+    if len(request_data.input) > MAX_INPUT_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Input text exceeds maximum length of {MAX_INPUT_LENGTH} characters."
+        )
     logger.info(f"Received speech request: model={request_data.model}, voice={request_data.voice}, format={request_data.response_format}")
 
     # 1. Map OpenAI model name to your internal backend identifier

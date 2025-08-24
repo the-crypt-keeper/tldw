@@ -136,13 +136,15 @@ class TestChatbookIntegration:
     
     def test_create_export_job(self, service):
         """Test creating an export job with real database."""
-        job_id = service.create_export_job(
+        result = service.create_export_job(
             name="Test Export",
             description="Test export job",
             content_types=["conversations", "notes"]
         )
         
-        assert job_id is not None
+        assert result is not None
+        assert "job_id" in result
+        job_id = result["job_id"]
         assert len(job_id) == 36  # UUID format
         
         # Verify job was saved to database
@@ -231,17 +233,22 @@ class TestChatbookIntegration:
     def test_list_export_jobs(self, service):
         """Test listing export jobs from real database."""
         # Create a few jobs
-        job_id1 = service.create_export_job(
-            chatbook_name="Export 1",
-            options={}
+        result1 = service.create_export_job(
+            name="Export 1",
+            description="First export",
+            content_types=["conversations"]
         )
-        job_id2 = service.create_export_job(
-            chatbook_name="Export 2",
-            options={}
+        job_id1 = result1["job_id"]
+        
+        result2 = service.create_export_job(
+            name="Export 2",
+            description="Second export",
+            content_types=["notes"]
         )
+        job_id2 = result2["job_id"]
         
         # List jobs
-        jobs = service.list_export_jobs("test_user")
+        jobs = service.list_export_jobs()
         
         assert len(jobs) >= 2
         job_ids = [job["job_id"] for job in jobs]
@@ -251,10 +258,12 @@ class TestChatbookIntegration:
     def test_get_export_job_status(self, service):
         """Test getting export job status from real database."""
         # Create a job
-        job_id = service.create_export_job(
-            chatbook_name="Status Test",
-            options={}
+        result = service.create_export_job(
+            name="Status Test",
+            description="Testing status",
+            content_types=["conversations"]
         )
+        job_id = result["job_id"]
         
         # Get status
         status = service.get_export_job_status(job_id)
@@ -283,7 +292,7 @@ class TestChatbookIntegration:
         """, ("old2", "test_user", "completed", "Old 2", str(old_file2)))
         
         # Clean old exports
-        count = service.clean_old_exports(days=7)
+        count = service.clean_old_exports(days_old=7)
         
         assert count == 2
         assert not old_file1.exists()
@@ -292,18 +301,18 @@ class TestChatbookIntegration:
     def test_get_statistics(self, service):
         """Test getting statistics from real database."""
         # Create some test data
-        service.create_export_job(chatbook_name="Export 1", options={})
-        service.create_export_job(chatbook_name="Export 2", options={})
+        service.create_export_job(name="Export 1", description="Test 1", content_types=[])
+        service.create_export_job(name="Export 2", description="Test 2", content_types=[])
         
         # Get statistics
         stats = service.get_statistics()
         
-        assert "export_stats" in stats
-        assert "import_stats" in stats
+        assert "exports" in stats
+        assert "imports" in stats
         
         # Check export stats
-        if "pending" in stats["export_stats"]:
-            assert stats["export_stats"]["pending"] >= 2
+        if "pending" in stats["exports"]:
+            assert stats["exports"]["pending"] >= 2
     
     @pytest.mark.asyncio
     async def test_export_import_roundtrip(self, service, tmp_path):
@@ -376,14 +385,16 @@ class TestChatbookIntegration:
     def test_cancel_export_job(self, service):
         """Test cancelling an export job."""
         # Create a job
-        job_id = service.create_export_job(
-            chatbook_name="Cancel Test",
-            options={}
+        result = service.create_export_job(
+            name="Cancel Test",
+            description="Testing cancellation",
+            content_types=[]
         )
+        job_id = result["job_id"]
         
         # Cancel it
-        result = service.cancel_export_job(job_id)
-        assert result is True
+        cancel_result = service.cancel_export_job(job_id)
+        assert cancel_result is True
         
         # Check status
         job = service.get_export_job(job_id)

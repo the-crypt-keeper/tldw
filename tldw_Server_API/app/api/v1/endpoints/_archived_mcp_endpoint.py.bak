@@ -12,14 +12,14 @@ from fastapi import APIRouter, WebSocket, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from tldw_Server_API.app.core.MCP import (
+from tldw_Server_API.app.core.MCP_unified import (
     get_mcp_server,
     MCPServer,
     MCPTool,
     MCPContext,
     mcp_tool
 )
-from tldw_Server_API.app.core.MCP.mcp_auth import (
+from tldw_Server_API.app.core.MCP_unified.mcp_auth import (
     auth_manager,
     MCPAuthRequest,
     MCPAuthResponse,

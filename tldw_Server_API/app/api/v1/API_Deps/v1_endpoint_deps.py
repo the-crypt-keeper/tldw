@@ -27,7 +27,10 @@ async def verify_token(Token: str = Header(None)):  # Token is the API key itsel
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authentication token.")
 
     if settings.get("SINGLE_USER_MODE"):
-        expected_token = settings.get("SINGLE_USER_API_KEY")
+        # Get the API key from AuthNZ settings which is the canonical source
+        from tldw_Server_API.app.core.AuthNZ.settings import get_settings as get_auth_settings
+        auth_settings = get_auth_settings()
+        expected_token = auth_settings.SINGLE_USER_API_KEY
         if not expected_token:  # This means settings are not properly loaded or key is missing
             logger.critical("SINGLE_USER_API_KEY is not configured in settings for single-user mode.")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

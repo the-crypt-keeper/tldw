@@ -11,8 +11,19 @@ e2e/
 ├── fixtures.py                 # Shared fixtures and utilities
 ├── test_data.py                # Test data generators
 ├── test_full_user_workflow.py  # Main workflow tests
+├── E2E_TEST_DOCUMENTATION.md   # Comprehensive test documentation
+├── EXTENDING_TESTS.md          # Guide for extending test coverage
+├── TEST_PATTERNS.md            # Common patterns and best practices
 └── README.md                   # This file
 ```
+
+## Documentation
+
+For detailed information about the E2E test suite:
+
+- **[E2E Test Documentation](./E2E_TEST_DOCUMENTATION.md)** - Comprehensive guide covering all aspects of the test suite including architecture, authentication, troubleshooting, and test coverage matrix
+- **[Extending Tests Guide](./EXTENDING_TESTS.md)** - Step-by-step instructions for adding new tests, including templates, examples, and integration checklists
+- **[Test Patterns](./TEST_PATTERNS.md)** - Common patterns, best practices, and reusable code snippets used throughout the test suite
 
 ## Running the Tests
 

@@ -337,6 +337,7 @@ class ExportJob:
     file_size_bytes: Optional[int] = None
     download_url: Optional[str] = None
     expires_at: Optional[datetime] = None
+    metadata: Optional[Dict[str, Any]] = field(default_factory=dict)  # For storing additional data
     
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -355,7 +356,8 @@ class ExportJob:
             "processed_items": self.processed_items,
             "file_size_bytes": self.file_size_bytes,
             "download_url": self.download_url,
-            "expires_at": self.expires_at.isoformat() if self.expires_at else None
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "metadata": self.metadata
         }
 
 

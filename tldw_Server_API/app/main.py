@@ -82,11 +82,9 @@ from tldw_Server_API.app.api.v1.endpoints.users import router as users_router
 ## Trash Endpoint
 #from tldw_Server_API.app.api.v1.endpoints.trash import router as trash_router
 #
-# MCP Endpoint (Original)
-from tldw_Server_API.app.api.v1.endpoints.mcp_endpoint import router as mcp_router
-#
-# MCP v2 Endpoint (New Modular Version)
-from tldw_Server_API.app.api.v1.endpoints.mcp_v2_endpoint import router as mcp_v2_router
+# MCP Unified Endpoint (Production-ready, secure implementation)
+from tldw_Server_API.app.api.v1.endpoints.mcp_unified_endpoint import router as mcp_unified_router
+# Note: Old MCP endpoints have been archived due to security vulnerabilities
 #
 # Chatbooks Endpoint
 from tldw_Server_API.app.api.v1.endpoints.chatbooks import router as chatbooks_router
@@ -188,16 +186,17 @@ async def lifespan(app: FastAPI):
         logger.error(f"App Startup: Failed to initialize auth services: {e}")
         # Continue startup even if auth services fail (for backward compatibility)
     
-    # Initialize MCP v2 Server
-    logger.info("App Startup: Initializing MCP v2 server...")
+    # Initialize MCP Unified Server (secure, production-ready)
+    logger.info("App Startup: Initializing MCP Unified server...")
     try:
-        from tldw_Server_API.app.core.MCP_v2 import get_mcp_server
+        from tldw_Server_API.app.core.MCP_unified import get_mcp_server
         mcp_server = get_mcp_server()
         await mcp_server.initialize()
-        logger.info("App Startup: MCP v2 server initialized successfully")
+        logger.info("App Startup: MCP Unified server initialized successfully")
     except Exception as e:
-        logger.error(f"App Startup: Failed to initialize MCP v2 server: {e}")
-        # Continue startup even if MCP v2 fails (for backward compatibility)
+        logger.error(f"App Startup: Failed to initialize MCP Unified server: {e}")
+        logger.warning("Ensure MCP_JWT_SECRET and MCP_API_KEY_SALT environment variables are set")
+        # Continue startup even if MCP fails (for backward compatibility)
     
     # Initialize Chat Module Components
     logger.info("App Startup: Initializing Chat module components...")
@@ -251,6 +250,23 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"App Startup: Failed to initialize rate limiter: {e}")
     
+    # Initialize TTS Service
+    logger.info("App Startup: Initializing TTS service...")
+    try:
+        from tldw_Server_API.app.core.TTS.tts_generation import get_tts_service
+        from tldw_Server_API.app.core.Utils.Utils import load_comprehensive_config
+        
+        # Load TTS configuration
+        tts_config = load_comprehensive_config()
+        
+        # Initialize the TTS service with configuration
+        tts_service = await get_tts_service(app_config=tts_config)
+        logger.info("App Startup: TTS service initialized successfully")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize TTS service: {e}")
+        logger.warning("TTS functionality will be unavailable")
+        # Continue startup even if TTS fails (for backward compatibility)
+    
     # Initialize Unified Audit Service
     try:
         from tldw_Server_API.app.core.Audit.unified_audit_service import get_unified_audit_service
@@ -289,13 +305,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"App Shutdown: Error shutting down session manager: {e}")
     
-    # Shutdown MCP v2 server
+    # Shutdown MCP Unified server
     try:
         if 'mcp_server' in locals():
             await mcp_server.shutdown()
-            logger.info("App Shutdown: MCP v2 server shutdown")
+            logger.info("App Shutdown: MCP Unified server shutdown")
     except Exception as e:
-        logger.error(f"App Shutdown: Error shutting down MCP v2 server: {e}")
+        logger.error(f"App Shutdown: Error shutting down MCP Unified server: {e}")
+    
+    # Shutdown TTS Service
+    try:
+        from tldw_Server_API.app.core.TTS.tts_generation import close_tts_resources
+        await close_tts_resources()
+        logger.info("App Shutdown: TTS service shutdown complete")
+    except Exception as e:
+        logger.error(f"App Shutdown: Error shutting down TTS service: {e}")
     
     # Shutdown Chat Module Components
     logger.info("App Shutdown: Cleaning up Chat module components...")
@@ -497,10 +521,9 @@ app.include_router(sync_router, prefix=f"{API_V1_PREFIX}/sync", tags=["sync"])
 app.include_router(tools_router, prefix=f"{API_V1_PREFIX}/tools", tags=["tools"])
 
 
-# Router for MCP (Model Context Protocol) endpoint
-app.include_router(mcp_router, prefix=f"{API_V1_PREFIX}", tags=["MCP"])
-# Router for MCP v2 (New Modular Version)
-app.include_router(mcp_v2_router, prefix=f"{API_V1_PREFIX}", tags=["MCP v2"])
+# Router for MCP Unified (Secure, production-ready implementation)
+app.include_router(mcp_unified_router, prefix=f"{API_V1_PREFIX}", tags=["MCP Unified"])
+# Note: Old MCP routers have been archived due to security vulnerabilities
 
 # Router for Chatbooks - import/export functionality
 app.include_router(chatbooks_router, prefix=f"{API_V1_PREFIX}", tags=["chatbooks"])
