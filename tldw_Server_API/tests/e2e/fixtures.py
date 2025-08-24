@@ -22,7 +22,7 @@ from pathlib import Path
 # Configuration
 BASE_URL = os.getenv("E2E_TEST_BASE_URL", "http://localhost:8000")
 API_PREFIX = "/api/v1"
-TEST_TIMEOUT = 30  # seconds for each request
+TEST_TIMEOUT = 120  # seconds for each request (increased for video transcription)
 
 
 class APIClient:
@@ -41,9 +41,11 @@ class APIClient:
         self.refresh_token = refresh_token
         # In single-user mode, use X-API-KEY header
         # Also add Token header for some endpoints that expect it (case-sensitive)
+        # Add Bearer authorization for OpenAI-compatible endpoints
         self.client.headers.update({
             "X-API-KEY": token,
-            "Token": token  # Some endpoints expect this (capital T)
+            "Token": token,  # Some endpoints expect this (capital T)
+            "Authorization": f"Bearer {token}"  # For OpenAI-compatible endpoints
         })
     
     def clear_auth(self):
@@ -217,8 +219,8 @@ class APIClient:
         response.raise_for_status()
         return response.json()
     
-    def update_note(self, note_id: int, title: Optional[str] = None, 
-                   content: Optional[str] = None) -> Dict[str, Any]:
+    def update_note(self, note_id: str, title: Optional[str] = None, 
+                   content: Optional[str] = None, version: int = 1) -> Dict[str, Any]:
         """Update an existing note."""
         data = {}
         if title:
@@ -226,7 +228,9 @@ class APIClient:
         if content:
             data["content"] = content
             
-        response = self.client.put(f"{API_PREFIX}/notes/{note_id}", json=data)
+        # Add expected version header for optimistic locking
+        headers = {"expected-version": str(version)}
+        response = self.client.put(f"{API_PREFIX}/notes/{note_id}", json=data, headers=headers)
         response.raise_for_status()
         return response.json()
     
@@ -449,6 +453,17 @@ class TestDataTracker:
         self.character_ids: List[int] = []
         self.chat_ids: List[str] = []
         self.files: List[str] = []
+        # Generic resource tracking
+        from collections import defaultdict
+        self.resources = defaultdict(list)
+    
+    def track(self, resource_type: str, resource_id: str, metadata: Dict[str, Any] = None):
+        """Track a created resource for cleanup."""
+        self.resources[resource_type].append({
+            'id': resource_id,
+            'created_at': datetime.now(),
+            'metadata': metadata or {}
+        })
     
     def add_media(self, media_id: int):
         self.media_ids.append(media_id)

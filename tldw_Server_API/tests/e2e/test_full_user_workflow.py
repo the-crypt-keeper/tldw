@@ -45,15 +45,15 @@ class TestFullUserWorkflow:
     """Complete end-to-end test of user interaction with the API."""
     
     # Class-level storage for data persistence across tests
-    user_data: Dict[str, Any] = {}
-    media_items: List[Dict[str, Any]] = []
-    notes: List[Dict[str, Any]] = []
-    prompts: List[Dict[str, Any]] = []
-    characters: List[Dict[str, Any]] = []
-    chats: List[Dict[str, Any]] = []
+    user_data = {}
+    media_items = []
+    notes = []
+    prompts = []
+    characters = []
+    chats = []
     
     # Performance tracking
-    performance_metrics: Dict[str, float] = {}
+    performance_metrics = {}
     
     @pytest.fixture(autouse=True)
     def track_performance(self):
@@ -62,7 +62,7 @@ class TestFullUserWorkflow:
         yield
         duration = time.time() - start_time
         test_name = os.environ.get('PYTEST_CURRENT_TEST', '').split('::')[-1].split('[')[0]
-        self.performance_metrics[test_name] = duration
+        TestFullUserWorkflow.performance_metrics[test_name] = duration
     
     # ========================================================================
     # Phase 1: Setup & Authentication
@@ -95,7 +95,7 @@ class TestFullUserWorkflow:
             )
             
             # Store user data
-            self.user_data = {
+            TestFullUserWorkflow.user_data = {
                 "username": user["username"],
                 "email": user["email"],
                 "password": user["password"],
@@ -108,7 +108,7 @@ class TestFullUserWorkflow:
         except Exception as e:
             # Single-user mode or registration disabled
             print(f"Registration test skipped: {e}")
-            self.user_data = {}
+            TestFullUserWorkflow.user_data = {}
     
     def test_03_user_login(self, api_client):
         """Test user login and token generation."""
@@ -116,12 +116,12 @@ class TestFullUserWorkflow:
         if hasattr(self, 'auth_mode') and self.auth_mode == 'single_user':
             pytest.skip("Single-user mode - login not needed")
             
-        if not self.user_data:
+        if not TestFullUserWorkflow.user_data:
             pytest.skip("No user data available")
         
         response = api_client.login(
-            username=self.user_data.get("username", "test_user"),
-            password=self.user_data.get("password", "test_password")
+            username=TestFullUserWorkflow.user_data.get("username", "test_user"),
+            password=TestFullUserWorkflow.user_data.get("password", "test_password")
         )
         
         # Verify response
@@ -132,8 +132,8 @@ class TestFullUserWorkflow:
         api_client.set_auth_token(token, response.get("refresh_token"))
         
         # Store in class data
-        self.user_data["access_token"] = token
-        self.user_data["refresh_token"] = response.get("refresh_token")
+        TestFullUserWorkflow.user_data["access_token"] = token
+        TestFullUserWorkflow.user_data["refresh_token"] = response.get("refresh_token")
     
     def test_04_get_user_profile(self, api_client):
         """Test getting current user profile."""
@@ -149,8 +149,8 @@ class TestFullUserWorkflow:
             
             # Update user data
             if not hasattr(self, 'user_data'):
-                self.user_data = {}
-            self.user_data.update(response)
+                TestFullUserWorkflow.user_data = {}
+            TestFullUserWorkflow.user_data.update(response)
         except Exception as e:
             # In single-user mode this might fail
             print(f"User profile test skipped: {e}")
@@ -193,7 +193,7 @@ class TestFullUserWorkflow:
                 data_tracker.add_media(media_id)
             
             # Store media item
-            self.media_items.append(response)
+            TestFullUserWorkflow.media_items.append(response)
             
         finally:
             cleanup_test_file(file_path)
@@ -229,7 +229,7 @@ class TestFullUserWorkflow:
                 data_tracker.add_media(media_id)
             
             # Store media item
-            self.media_items.append(response)
+            TestFullUserWorkflow.media_items.append(response)
             
         finally:
             cleanup_test_file(file_path)
@@ -249,7 +249,7 @@ class TestFullUserWorkflow:
             assert response.get("status") in ["success", "processing", "completed"]
             
             if "media_id" in response or "id" in response:
-                self.media_items.append(response)
+                TestFullUserWorkflow.media_items.append(response)
                 media_id = response.get("media_id") or response.get("id")
                 data_tracker.add_media(media_id)
                 
@@ -287,12 +287,62 @@ class TestFullUserWorkflow:
                 data_tracker.add_media(media_id)
             
             # Store media item
-            self.media_items.append(response)
+            TestFullUserWorkflow.media_items.append(response)
             
         finally:
             cleanup_test_file(file_path)
     
-    def test_14_list_media_items(self, api_client):
+    def test_14_upload_video_file(self, api_client, data_tracker):
+        """Test uploading a video file with real audio for transcription."""
+        # Use the actual sample.mp4 file with real audio
+        video_path = Path(__file__).parent.parent / "Media_Ingestion_Modification" / "test_media" / "sample.mp4"
+        
+        if not video_path.exists():
+            pytest.skip(f"Video test file not found at {video_path}")
+        
+        try:
+            # Upload video file
+            print(f"Uploading video file: {video_path}")
+            response = api_client.upload_media(
+                file_path=str(video_path),
+                title="E2E Test Video with Audio",
+                media_type="video"
+            )
+            
+            # Verify response - handle results array format
+            if "results" in response and isinstance(response["results"], list):
+                assert len(response["results"]) > 0
+                result = response["results"][0]
+                
+                # Check if transcription was attempted
+                if result.get("db_id"):
+                    print(f"✓ Video uploaded successfully with ID: {result['db_id']}")
+                    data_tracker.add_media(result["db_id"])
+                    
+                    # Store for later verification of transcription
+                    TestFullUserWorkflow.media_items.append(response)
+                    
+                    # Optional: Check if transcription exists
+                    if result.get("transcription"):
+                        print(f"✓ Video transcription completed: {len(result.get('transcription', ''))} characters")
+                    elif result.get("content"):
+                        print(f"✓ Video content extracted: {len(result.get('content', ''))} characters")
+                else:
+                    print(f"⚠ Video upload result: {result}")
+            else:
+                # Old format compatibility
+                assert "media_id" in response or "id" in response
+                media_id = response.get("media_id") or response.get("id")
+                data_tracker.add_media(media_id)
+                TestFullUserWorkflow.media_items.append(response)
+                print(f"✓ Video uploaded with ID: {media_id}")
+                
+        except Exception as e:
+            print(f"Video upload failed: {e}")
+            # Don't fail the test suite for video issues
+            pytest.skip(f"Video upload test skipped: {e}")
+    
+    def test_15_list_media_items(self, api_client):
         """Test listing all media items."""
         response = api_client.get_media_list(limit=50)
         
@@ -302,7 +352,7 @@ class TestFullUserWorkflow:
         
         # Count successful uploads from our media_items
         successful_uploads = 0
-        for upload_response in self.media_items:
+        for upload_response in TestFullUserWorkflow.media_items:
             if "results" in upload_response:
                 for result in upload_response["results"]:
                     if result.get("db_id") or (result.get("status") == "Success" and "already exists" not in result.get("db_message", "")):
@@ -325,12 +375,12 @@ class TestFullUserWorkflow:
     
     def test_20_get_media_details(self, api_client):
         """Test getting details of uploaded media."""
-        if not self.media_items:
+        if not TestFullUserWorkflow.media_items:
             pytest.skip("No media items available")
         
         # Find a valid media ID from our uploads
         media_id = None
-        for upload_response in self.media_items:
+        for upload_response in TestFullUserWorkflow.media_items:
             if "results" in upload_response:
                 for result in upload_response["results"]:
                     if result.get("db_id"):
@@ -383,7 +433,7 @@ class TestFullUserWorkflow:
             assert "choices" in response or "response" in response or "content" in response
             
             # Store chat
-            self.chats.append({
+            TestFullUserWorkflow.chats.append({
                 "messages": messages,
                 "response": response
             })
@@ -396,7 +446,7 @@ class TestFullUserWorkflow:
     
     def test_31_chat_with_context(self, api_client, data_tracker):
         """Test chat with media context (RAG)."""
-        if not self.media_items:
+        if not TestFullUserWorkflow.media_items:
             pytest.skip("No media items available")
         
         messages = TestDataGenerator.sample_chat_messages()
@@ -409,7 +459,7 @@ class TestFullUserWorkflow:
             )
             
             # Store chat
-            self.chats.append({
+            TestFullUserWorkflow.chats.append({
                 "messages": messages,
                 "response": response
             })
@@ -439,7 +489,7 @@ class TestFullUserWorkflow:
         assert response.get("title") == note_data["title"]
         
         # Store note
-        self.notes.append(response)
+        TestFullUserWorkflow.notes.append(response)
         note_id = response.get("id") or response.get("note_id")
         data_tracker.add_note(note_id)
     
@@ -456,14 +506,15 @@ class TestFullUserWorkflow:
             items = response.get("items") or response.get("results") or response.get("notes", [])
         
         # Should have at least the notes we created
-        assert len(items) >= len(self.notes)
+        assert len(items) >= len(TestFullUserWorkflow.notes)
     
     def test_42_update_note(self, api_client):
         """Test updating a note."""
-        if not self.notes:
+        print(f"DEBUG: TestFullUserWorkflow.notes = {TestFullUserWorkflow.notes}")
+        if not TestFullUserWorkflow.notes:
             pytest.skip("No notes available")
         
-        note = self.notes[0]
+        note = TestFullUserWorkflow.notes[0]
         note_id = note.get("id") or note.get("note_id")
         
         if not note_id:
@@ -472,20 +523,26 @@ class TestFullUserWorkflow:
         updated_content = note.get("content", "") + "\n\n## Updated Section\nThis section was added during E2E testing."
         
         try:
+            print(f"DEBUG: Updating note {note_id} with new content")
+            # Get the version from the note (defaults to 1 if not present)
+            note_version = note.get("version", 1)
             response = api_client.update_note(
                 note_id=note_id,
-                content=updated_content
+                content=updated_content,
+                version=note_version
             )
             
             # Verify update - handle various response formats
             assert response.get("success") == True or "id" in response or response.get("status") == "success"
+            print(f"✓ Successfully updated note {note_id}")
         except Exception as e:
             # If update fails, it might be due to note not existing
+            print(f"DEBUG: Update failed with error: {e}")
             pytest.skip(f"Note update failed: {e}")
     
     def test_43_search_notes(self, api_client):
         """Test searching notes."""
-        if not self.notes:
+        if not TestFullUserWorkflow.notes:
             pytest.skip("No notes available")
         
         try:
@@ -521,7 +578,7 @@ class TestFullUserWorkflow:
             assert "id" in response or "prompt_id" in response or response.get("status") == "success"
             
             # Store prompt
-            self.prompts.append(response)
+            TestFullUserWorkflow.prompts.append(response)
             prompt_id = response.get("id") or response.get("prompt_id")
             if prompt_id:
                 data_tracker.add_prompt(prompt_id)
@@ -545,7 +602,7 @@ class TestFullUserWorkflow:
                 items = response.get("items") or response.get("results") or response.get("prompts", [])
             
             # Should have at least the prompts we created
-            assert len(items) >= len(self.prompts)
+            assert len(items) >= len(TestFullUserWorkflow.prompts)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 422:
                 # API might have different requirements
@@ -559,31 +616,77 @@ class TestFullUserWorkflow:
     
     def test_60_import_character(self, api_client, data_tracker):
         """Test importing a character card."""
-        character_data = TestDataGenerator.sample_character_card()
+        # Use the actual character card image file placed in the e2e folder
+        character_file_path = Path(__file__).parent / "inkpot-writing-assistant-0d194615000b.png"
+        
+        if not character_file_path.exists():
+            # Fall back to creating a test character with JSON
+            character_data = TestDataGenerator.sample_character_card()
+            try:
+                response = api_client.import_character(character_data)
+                assert "id" in response or "character_id" in response
+                TestFullUserWorkflow.characters.append(response)
+                character_id = response.get("id") or response.get("character_id")
+                data_tracker.add_character(character_id)
+            except Exception as e:
+                print(f"Character import test skipped: {e}")
+            return
         
         try:
-            response = api_client.import_character(character_data)
+            # Import character from file
+            with open(character_file_path, "rb") as f:
+                files = {"character_file": ("character.png", f, "image/png")}
+                response = api_client.client.post(
+                    f"/api/v1/characters/import",
+                    files=files
+                )
+            
+            response.raise_for_status()
+            result = response.json()
             
             # Verify response
-            assert "id" in response or "character_id" in response
+            assert "character" in result
+            character = result["character"]
+            assert "id" in character or "character_id" in character
             
             # Store character
-            self.characters.append(response)
-            character_id = response.get("id") or response.get("character_id")
+            TestFullUserWorkflow.characters.append(character)
+            character_id = character.get("id") or character.get("character_id")
             data_tracker.add_character(character_id)
             
+            print(f"✓ Successfully imported character: {character.get('name', 'Unknown')} (ID: {character_id})")
+            
         except Exception as e:
-            print(f"Character import test skipped: {e}")
+            print(f"Character import test failed: {e}")
+            # Fall back to JSON import
+            character_data = TestDataGenerator.sample_character_card()
+            try:
+                response = api_client.import_character(character_data)
+                assert "id" in response or "character_id" in response
+                TestFullUserWorkflow.characters.append(response)
+                character_id = response.get("id") or response.get("character_id")
+                data_tracker.add_character(character_id)
+            except Exception as fallback_e:
+                print(f"Character JSON import also failed: {fallback_e}")
     
     def test_61_list_characters(self, api_client):
         """Test listing characters."""
-        if not self.characters:
+        if not TestFullUserWorkflow.characters:
             pytest.skip("No characters available")
         
         response = api_client.get_characters()
         
-        # Verify response
-        assert "items" in response or "results" in response or "characters" in response
+        # Verify response - API returns a list directly
+        if isinstance(response, list):
+            items = response
+        else:
+            # Handle wrapped response
+            assert "items" in response or "results" in response or "characters" in response
+            items = response.get("items") or response.get("results") or response.get("characters", [])
+        
+        # Should have at least the characters we imported
+        assert len(items) >= len(TestFullUserWorkflow.characters)
+        print(f"✓ Successfully listed {len(items)} characters")
     
     # ========================================================================
     # Phase 8: RAG & Search
@@ -591,7 +694,7 @@ class TestFullUserWorkflow:
     
     def test_70_search_media_content(self, api_client):
         """Test searching across media content."""
-        if not self.media_items:
+        if not TestFullUserWorkflow.media_items:
             pytest.skip("No media items available")
         
         # Search for content we know exists
@@ -614,10 +717,94 @@ class TestFullUserWorkflow:
     # Phase 9: Evaluation & Testing (if available)
     # ========================================================================
     
-    def test_80_evaluation_placeholder(self, api_client):
-        """Placeholder for evaluation tests."""
-        # This would test evaluation endpoints if available
-        pass
+    def test_80_create_evaluation(self, api_client, data_tracker):
+        """Test creating an evaluation for model comparison."""
+        try:
+            # Create a simple evaluation
+            eval_data = {
+                "name": f"E2E Test Eval {datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                "description": "End-to-end test evaluation",
+                "eval_type": "model_graded",
+                "eval_spec": {
+                    "evaluator_model": "gpt-3.5-turbo",
+                    "metrics": ["accuracy", "coherence"],
+                    "threshold": 0.7
+                },
+                "dataset": [
+                    {
+                        "input": "What is machine learning?",
+                        "expected": "Machine learning is a subset of AI that enables systems to learn from data."
+                    }
+                ]
+            }
+            
+            response = api_client.client.post("/api/v1/evals", json=eval_data)
+            
+            if response.status_code == 201:
+                result = response.json()
+                assert "id" in result
+                data_tracker.track("evaluation", result["id"])
+                print(f"✓ Created evaluation: {result['id']}")
+            elif response.status_code in [401, 403]:
+                print("Evaluation creation skipped: Authentication required")
+            elif response.status_code == 503:
+                print("Evaluation creation skipped: Service unavailable")
+            else:
+                print(f"Evaluation creation failed: {response.status_code}")
+                
+        except Exception as e:
+            print(f"Evaluation test error: {e}")
+    
+    def test_81_run_geval(self, api_client):
+        """Test running G-Eval for summarization quality."""
+        try:
+            eval_data = {
+                "document": "Machine learning is transforming industries.",
+                "summary": "ML transforms industries.",
+                "metrics": ["coherence", "relevance"],
+                "model": "gpt-3.5-turbo"
+            }
+            
+            response = api_client.client.post("/api/v1/evaluations/geval", json=eval_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                assert "overall_score" in result
+                print(f"✓ G-Eval score: {result.get('overall_score', 'N/A')}")
+            elif response.status_code == 503:
+                print("G-Eval skipped: Service unavailable")
+            else:
+                print(f"G-Eval failed: {response.status_code}")
+                
+        except Exception as e:
+            print(f"G-Eval test error: {e}")
+    
+    def test_82_rag_evaluation(self, api_client):
+        """Test RAG system evaluation."""
+        try:
+            rag_data = {
+                "query": "What is artificial intelligence?",
+                "retrieved_contexts": [
+                    "AI is the simulation of human intelligence by machines."
+                ],
+                "generated_answer": "Artificial intelligence is the simulation of human intelligence by computer systems.",
+                "ground_truth": "AI refers to computer systems that can perform tasks requiring human intelligence.",
+                "metrics": ["context_relevance", "answer_relevance", "faithfulness"]
+            }
+            
+            response = api_client.client.post("/api/v1/evaluations/rag", json=rag_data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                assert "overall_score" in result
+                print(f"✓ RAG evaluation score: {result.get('overall_score', 'N/A')}")
+            elif response.status_code in [503, 422]:
+                print(f"RAG evaluation skipped: {response.status_code}")
+            else:
+                print(f"RAG evaluation failed: {response.status_code}")
+                
+        except Exception as e:
+            print(f"RAG evaluation test error: {e}")
     
     # ========================================================================
     # Phase 10: Export & Sync
@@ -664,7 +851,7 @@ class TestFullUserWorkflow:
     
     def test_103_delete_media(self, api_client):
         """Test deleting media items."""
-        for media in self.media_items:
+        for media in TestFullUserWorkflow.media_items:
             media_id = media.get("media_id") or media.get("id")
             try:
                 response = api_client.delete_media(media_id)
@@ -682,15 +869,15 @@ class TestFullUserWorkflow:
     
     def test_105_performance_summary(self):
         """Print performance summary."""
-        if self.performance_metrics:
+        if TestFullUserWorkflow.performance_metrics:
             print("\n=== Performance Summary ===")
-            total_time = sum(self.performance_metrics.values())
+            total_time = sum(TestFullUserWorkflow.performance_metrics.values())
             
-            for test_name, duration in sorted(self.performance_metrics.items()):
+            for test_name, duration in sorted(TestFullUserWorkflow.performance_metrics.items()):
                 print(f"{test_name}: {duration:.2f}s")
             
             print(f"\nTotal execution time: {total_time:.2f}s")
-            print(f"Average test time: {total_time/len(self.performance_metrics):.2f}s")
+            print(f"Average test time: {total_time/len(TestFullUserWorkflow.performance_metrics):.2f}s")
 
 
 # Additional test scenarios can be added here

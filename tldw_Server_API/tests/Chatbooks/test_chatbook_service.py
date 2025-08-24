@@ -293,7 +293,7 @@ class TestChatbookService:
                 {
                     "id": "conv1",
                     "type": "conversation",
-                    "name": "Test Conversation",
+                    "title": "Test Conversation",
                     "created_at": "2024-01-01T00:00:00"
                 }
             ]
@@ -303,6 +303,8 @@ class TestChatbookService:
                 zf.writestr('content/conversations/conversation_conv1.json', json.dumps({
                     "id": "conv1",
                     "name": "Test Conversation",  # Service expects 'name', not 'title'
+                    "character_id": 1,  # Add required character_id field
+                    "created_at": "2024-01-01T00:00:00",
                     "messages": []
                 }))
             
@@ -334,7 +336,7 @@ class TestChatbookService:
                 {
                     "id": "char1",
                     "type": "character",
-                    "name": "New Character",
+                    "title": "New Character",
                     "created_at": "2024-01-01T00:00:00"
                 }
             ]
@@ -343,7 +345,11 @@ class TestChatbookService:
                 # Use correct path structure
                 zf.writestr('content/characters/character_char1.json', json.dumps({
                     "id": "char1",
-                    "name": "New Character"
+                    "name": "New Character",
+                    "description": "A test character",
+                    "personality": "Friendly",
+                    "scenario": "Testing",
+                    "system_prompt": "You are a test character"
                 }))
             
             mock_db.execute_query.side_effect = [
@@ -374,7 +380,7 @@ class TestChatbookService:
                 {
                     "id": "note1",
                     "type": "note",
-                    "name": "Test Note",
+                    "title": "Test Note",
                     "created_at": "2024-01-01T00:00:00"
                 }
             ]

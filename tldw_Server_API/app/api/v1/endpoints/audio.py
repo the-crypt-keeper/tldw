@@ -81,7 +81,7 @@ async def get_tts_service() -> TTSService:
 @limiter.limit("10/minute")  # Rate limit: 10 requests per minute per IP
 async def create_speech(
     request_data: OpenAISpeechRequest, # FastAPI will parse JSON body into this
-    client_request: Request, # To check for client disconnects
+    request: Request, # Required for rate limiter and to check for client disconnects
     tts_service: TTSService = Depends(get_tts_service),
     authorization: Optional[str] = Header(None),
 ):
@@ -171,7 +171,7 @@ async def create_speech(
     async def audio_chunk_generator():
         try:
             async for audio_chunk_bytes in tts_service.generate_audio_stream(request_data, internal_model_id):
-                if await client_request.is_disconnected():
+                if await request.is_disconnected():
                     logger.info("Client disconnected, stopping audio generation.")
                     break
                 yield audio_chunk_bytes

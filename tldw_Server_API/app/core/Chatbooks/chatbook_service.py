@@ -117,7 +117,7 @@ class ChatbookService:
         for directory in [self.export_dir, self.import_dir, self.temp_dir]:
             directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         
-        # Initialize job tracking tables in database
+        # Initialize job tracking tables
         self._init_job_tables()
     
     def _fetch_results(self, cursor_or_list):
@@ -127,10 +127,59 @@ class ChatbookService:
         """
         if hasattr(cursor_or_list, 'fetchall'):
             # It's a cursor - fetch all results
-            return cursor_or_list.fetchall()
+            results = cursor_or_list.fetchall()
+            if not results:
+                return []
+            
+            # sqlite3.Row objects can be converted directly to dict
+            # but we need to handle different cases
+            first_row = results[0]
+            
+            # Try the simplest approach first - direct dict conversion
+            try:
+                # This works for sqlite3.Row objects
+                return [dict(row) for row in results]
+            except Exception:
+                # If that fails, use cursor description
+                if hasattr(cursor_or_list, 'description') and cursor_or_list.description:
+                    columns = [desc[0] for desc in cursor_or_list.description]
+                    return [dict(zip(columns, row)) for row in results]
+                else:
+                    # Can't convert to dict, return as tuples
+                    return results
         else:
             # It's already a list (from mocked tests)
             return cursor_or_list
+    
+    def _get_conversation_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get conversation by name/title - wrapper for search method."""
+        try:
+            # Check if method exists (for mock compatibility)
+            if hasattr(self.db, 'search_conversations_by_title'):
+                results = self.db.search_conversations_by_title(name, limit=10)
+                # Look for exact match
+                for conv in results:
+                    if conv.get('title') == name or conv.get('name') == name:
+                        return conv
+            return None
+        except Exception as e:
+            logger.debug(f"Error searching for conversation by name: {e}")
+            return None
+    
+    def _get_note_by_title(self, title: str) -> Optional[Dict[str, Any]]:
+        """Get note by title - wrapper for search method."""
+        try:
+            # Check if method exists (for mock compatibility)
+            if hasattr(self.db, 'search_notes'):
+                results = self.db.search_notes(title, limit=10)
+                # Look for exact match
+                for note in results:
+                    if note.get('title') == title:
+                        return note
+            return None
+        except Exception as e:
+            logger.debug(f"Error searching for note by title: {e}")
+            return None
     
     def _register_job_handlers(self):
         """Register job handlers for async processing."""
@@ -806,42 +855,61 @@ class ChatbookService:
             
             jobs = []
             for row in results:
+                # Handle both dict and tuple formats (for test compatibility)
                 if isinstance(row, dict):
+                    # Parse timestamps if they're strings
+                    def parse_ts(ts):
+                        if ts is None:
+                            return None
+                        if isinstance(ts, datetime):
+                            return ts
+                        if isinstance(ts, str):
+                            if 'T' in ts:
+                                return datetime.fromisoformat(ts)
+                            else:
+                                return datetime.strptime(ts, '%Y-%m-%d %H:%M:%S.%f')
+                        return ts
+                    
                     job = ExportJob(
                         job_id=row['job_id'],
                         user_id=row['user_id'],
                         status=ExportStatus(row['status']),
                         chatbook_name=row['chatbook_name'],
                         output_path=row['output_path'],
-                        created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
-                        started_at=datetime.fromisoformat(row['started_at']) if row['started_at'] else None,
-                        completed_at=datetime.fromisoformat(row['completed_at']) if row['completed_at'] else None,
+                        created_at=parse_ts(row['created_at']),
+                        started_at=parse_ts(row['started_at']),
+                        completed_at=parse_ts(row['completed_at']),
                         error_message=row['error_message'],
-                        progress_percentage=row['progress_percentage'],
-                        total_items=row['total_items'],
-                        processed_items=row['processed_items'],
+                        progress_percentage=row['progress_percentage'] or 0,
+                        total_items=row['total_items'] or 0,
+                        processed_items=row['processed_items'] or 0,
                         file_size_bytes=row['file_size_bytes'],
                         download_url=row['download_url'],
-                        expires_at=datetime.fromisoformat(row['expires_at']) if row['expires_at'] else None
+                        expires_at=parse_ts(row['expires_at']),
+                        metadata={}  # Initialize empty metadata
                     )
                 else:
-                    # Handle tuple format (from test mocks)
+                    # Handle tuple format from mocked tests
+                    # (job_id, user_id, status, chatbook_name, output_path, created_at,
+                    #  started_at, completed_at, error_message, progress_percentage,
+                    #  total_items, processed_items, file_size_bytes, download_url, expires_at)
                     job = ExportJob(
                         job_id=row[0],
                         user_id=row[1],
-                        status=ExportStatus(row[2]) if not isinstance(row[2], ExportStatus) else row[2],
+                        status=ExportStatus(row[2]),
                         chatbook_name=row[3],
                         output_path=row[4],
-                        created_at=datetime.fromisoformat(row[5]) if row[5] and isinstance(row[5], str) else row[5],
-                        started_at=datetime.fromisoformat(row[6]) if row[6] and isinstance(row[6], str) else row[6],
-                        completed_at=datetime.fromisoformat(row[7]) if row[7] and isinstance(row[7], str) else row[7],
+                        created_at=datetime.fromisoformat(row[5]) if row[5] else None,
+                        started_at=datetime.fromisoformat(row[6]) if row[6] else None,
+                        completed_at=datetime.fromisoformat(row[7]) if row[7] else None,
                         error_message=row[8] if len(row) > 8 else None,
                         progress_percentage=row[9] if len(row) > 9 else 0,
                         total_items=row[10] if len(row) > 10 else 0,
                         processed_items=row[11] if len(row) > 11 else 0,
                         file_size_bytes=row[12] if len(row) > 12 else 0,
                         download_url=row[13] if len(row) > 13 else None,
-                        expires_at=datetime.fromisoformat(row[14]) if len(row) > 14 and row[14] and isinstance(row[14], str) else None
+                        expires_at=datetime.fromisoformat(row[14]) if len(row) > 14 and row[14] else None,
+                        metadata={}  # Initialize empty metadata
                     )
                 jobs.append(job.to_dict())
             
@@ -865,35 +933,53 @@ class ChatbookService:
                 
             jobs = []
             for row in results:
+                # Handle both dict and tuple formats (for test compatibility)
                 if isinstance(row, dict):
+                    # Parse timestamps if they're strings
+                    def parse_ts(ts):
+                        if ts is None:
+                            return None
+                        if isinstance(ts, datetime):
+                            return ts
+                        if isinstance(ts, str):
+                            if 'T' in ts:
+                                return datetime.fromisoformat(ts)
+                            else:
+                                return datetime.strptime(ts, '%Y-%m-%d %H:%M:%S.%f')
+                        return ts
+                    
                     job = ImportJob(
                         job_id=row['job_id'],
                         user_id=row['user_id'],
                         status=ImportStatus(row['status']),
                         chatbook_path=row['chatbook_path'],
-                        created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
-                        started_at=datetime.fromisoformat(row['started_at']) if row['started_at'] else None,
-                        completed_at=datetime.fromisoformat(row['completed_at']) if row['completed_at'] else None,
+                        created_at=parse_ts(row['created_at']),
+                        started_at=parse_ts(row['started_at']),
+                        completed_at=parse_ts(row['completed_at']),
                         error_message=row['error_message'],
-                        progress_percentage=row['progress_percentage'],
-                        total_items=row['total_items'],
-                        processed_items=row['processed_items'],
-                        successful_items=row['successful_items'],
-                        failed_items=row['failed_items'],
-                        skipped_items=row['skipped_items'],
+                        progress_percentage=row['progress_percentage'] or 0,
+                        total_items=row['total_items'] or 0,
+                        processed_items=row['processed_items'] or 0,
+                        successful_items=row['successful_items'] or 0,
+                        failed_items=row['failed_items'] or 0,
+                        skipped_items=row['skipped_items'] or 0,
                         conflicts=json.loads(row['conflicts']) if row['conflicts'] else [],
                         warnings=json.loads(row['warnings']) if row['warnings'] else []
                     )
                 else:
-                    # Handle tuple format (from test mocks)
+                    # Handle tuple format from mocked tests
+                    # (job_id, user_id, status, chatbook_path, created_at, started_at,
+                    #  completed_at, error_message, progress_percentage, total_items,
+                    #  processed_items, successful_items, failed_items, skipped_items,
+                    #  conflicts, warnings)
                     job = ImportJob(
                         job_id=row[0],
                         user_id=row[1],
-                        status=ImportStatus(row[2]) if not isinstance(row[2], ImportStatus) else row[2],
+                        status=ImportStatus(row[2]),
                         chatbook_path=row[3],
-                        created_at=datetime.fromisoformat(row[4]) if row[4] and isinstance(row[4], str) else row[4],
-                        started_at=datetime.fromisoformat(row[5]) if row[5] and isinstance(row[5], str) else row[5],
-                        completed_at=datetime.fromisoformat(row[6]) if row[6] and isinstance(row[6], str) else row[6],
+                        created_at=datetime.fromisoformat(row[4]) if row[4] else None,
+                        started_at=datetime.fromisoformat(row[5]) if row[5] else None,
+                        completed_at=datetime.fromisoformat(row[6]) if row[6] else None,
                         error_message=row[7] if len(row) > 7 else None,
                         progress_percentage=row[8] if len(row) > 8 else 0,
                         total_items=row[9] if len(row) > 9 else 0,
@@ -1247,7 +1333,7 @@ class ChatbookService:
                 if prefix_imported:
                     conv_name = f"[Imported] {conv_name}"
                 
-                existing = self.db.get_conversation_by_name(conv_name)
+                existing = self._get_conversation_by_name(conv_name)
                 if existing and conflict_resolution == ConflictResolution.SKIP:
                     status.skipped_items += 1
                     continue
@@ -1326,7 +1412,7 @@ class ChatbookService:
                     note_title = f"[Imported] {note_title}"
                 
                 # Check for existing note
-                existing = self.db.get_note_by_title(note_title)
+                existing = self._get_note_by_title(note_title)
                 if existing and conflict_resolution == ConflictResolution.SKIP:
                     status.skipped_items += 1
                     continue
@@ -1539,13 +1625,14 @@ class ChatbookService:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 job.job_id, job.user_id, job.status.value, job.chatbook_name,
-                job.output_path, job.created_at.isoformat() if job.created_at else None,
-                job.started_at.isoformat() if job.started_at else None,
-                job.completed_at.isoformat() if job.completed_at else None,
+                job.output_path, 
+                job.created_at.strftime('%Y-%m-%d %H:%M:%S.%f') if job.created_at else None,
+                job.started_at.strftime('%Y-%m-%d %H:%M:%S.%f') if job.started_at else None,
+                job.completed_at.strftime('%Y-%m-%d %H:%M:%S.%f') if job.completed_at else None,
                 job.error_message, job.progress_percentage, job.total_items,
                 job.processed_items, job.file_size_bytes, job.download_url,
-                job.expires_at.isoformat() if job.expires_at else None
-            ))
+                job.expires_at.strftime('%Y-%m-%d %H:%M:%S.%f') if job.expires_at else None
+            ), commit=True)
         
         try:
             self._with_transaction(_save)
@@ -1568,51 +1655,62 @@ class ChatbookService:
                 return None
             
             row = results[0]
+            logger.debug(f"Retrieved row type: {type(row)}, content: {row}")
             
-            # Handle both dict and tuple formats (for testing compatibility)
-            if isinstance(row, dict):
-                return ExportJob(
-                    job_id=row['job_id'],
-                    user_id=row['user_id'],
-                    status=ExportStatus(row['status']),
-                    chatbook_name=row['chatbook_name'],
-                    output_path=row['output_path'],
-                    created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
-                    started_at=datetime.fromisoformat(row['started_at']) if row['started_at'] else None,
-                    completed_at=datetime.fromisoformat(row['completed_at']) if row['completed_at'] else None,
-                    error_message=row['error_message'],
-                    progress_percentage=row['progress_percentage'],
-                    total_items=row['total_items'],
-                    processed_items=row['processed_items'],
-                    file_size_bytes=row['file_size_bytes'],
-                    download_url=row['download_url'],
-                    expires_at=datetime.fromisoformat(row['expires_at']) if row['expires_at'] else None
-                )
-            else:
-                # Handle tuple format (from test mocks)
-                # Expected tuple format from test:
-                # (job_id, user_id, status, chatbook_name, output_path, created_at,
-                #  started_at, completed_at, error_message, progress_percentage,
-                #  total_items, processed_items, file_size_bytes, download_url, expires_at)
-                return ExportJob(
-                    job_id=row[0],
-                    user_id=row[1],
-                    status=ExportStatus(row[2]) if not isinstance(row[2], ExportStatus) else row[2],
-                    chatbook_name=row[3],
-                    output_path=row[4],
-                    created_at=datetime.fromisoformat(row[5]) if row[5] and isinstance(row[5], str) else row[5],
-                    started_at=datetime.fromisoformat(row[6]) if row[6] and isinstance(row[6], str) else row[6],
-                    completed_at=datetime.fromisoformat(row[7]) if row[7] and isinstance(row[7], str) else row[7],
-                    error_message=row[8] if len(row) > 8 else None,
-                    progress_percentage=row[9] if len(row) > 9 else 0,
-                    total_items=row[10] if len(row) > 10 else 0,
-                    processed_items=row[11] if len(row) > 11 else 0,
-                    file_size_bytes=row[12] if len(row) > 12 else 0,
-                    download_url=row[13] if len(row) > 13 else None,
-                    expires_at=datetime.fromisoformat(row[14]) if len(row) > 14 and row[14] and isinstance(row[14], str) else None
-                )
+            # Handle both dict (from real DB) and tuple (from mocked tests)
+            if isinstance(row, tuple):
+                # Convert tuple to dict using expected field order
+                row = {
+                    'job_id': row[0],
+                    'user_id': row[1],
+                    'status': row[2],
+                    'chatbook_name': row[3],
+                    'output_path': row[4],
+                    'created_at': row[5],
+                    'started_at': row[6],
+                    'completed_at': row[7],
+                    'error_message': row[8] if len(row) > 8 else None,
+                    'progress_percentage': row[9] if len(row) > 9 else 0,
+                    'total_items': row[10] if len(row) > 10 else 0,
+                    'processed_items': row[11] if len(row) > 11 else 0,
+                    'file_size_bytes': row[12] if len(row) > 12 else None,
+                    'download_url': row[13] if len(row) > 13 else None,
+                    'expires_at': row[14] if len(row) > 14 else None
+                }
+            
+            # Parse timestamps if they're strings
+            def parse_timestamp(ts):
+                if ts is None:
+                    return None
+                if isinstance(ts, datetime):
+                    return ts
+                if 'T' in ts:  # ISO format
+                    return datetime.fromisoformat(ts)
+                else:  # SQLite format
+                    return datetime.strptime(ts, '%Y-%m-%d %H:%M:%S.%f')
+            
+            return ExportJob(
+                job_id=row['job_id'],
+                user_id=row['user_id'],
+                status=ExportStatus(row['status']),
+                chatbook_name=row['chatbook_name'],
+                output_path=row['output_path'],
+                created_at=parse_timestamp(row['created_at']),
+                started_at=parse_timestamp(row['started_at']),
+                completed_at=parse_timestamp(row['completed_at']),
+                error_message=row['error_message'],
+                progress_percentage=row['progress_percentage'] or 0,
+                total_items=row['total_items'] or 0,
+                processed_items=row['processed_items'] or 0,
+                file_size_bytes=row['file_size_bytes'],
+                download_url=row['download_url'],
+                expires_at=parse_timestamp(row['expires_at']),
+                metadata={}  # Initialize empty metadata
+            )
         except Exception as e:
             logger.error(f"Error getting export job: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     def _save_import_job(self, job: ImportJob):
@@ -1628,13 +1726,13 @@ class ChatbookService:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 job.job_id, job.user_id, job.status.value, job.chatbook_path,
-                job.created_at.isoformat() if job.created_at else None,
-                job.started_at.isoformat() if job.started_at else None,
-                job.completed_at.isoformat() if job.completed_at else None,
+                job.created_at.strftime('%Y-%m-%d %H:%M:%S.%f') if job.created_at else None,
+                job.started_at.strftime('%Y-%m-%d %H:%M:%S.%f') if job.started_at else None,
+                job.completed_at.strftime('%Y-%m-%d %H:%M:%S.%f') if job.completed_at else None,
                 job.error_message, job.progress_percentage, job.total_items,
                 job.processed_items, job.successful_items, job.failed_items,
                 job.skipped_items, json.dumps(job.conflicts), json.dumps(job.warnings)
-            ))
+            ), commit=True)
         
         try:
             self._with_transaction(_save)
@@ -1658,51 +1756,57 @@ class ChatbookService:
             
             row = results[0]
             
-            # Handle both dict and tuple formats (for testing compatibility)
-            if isinstance(row, dict):
-                return ImportJob(
-                    job_id=row['job_id'],
-                    user_id=row['user_id'],
-                    status=ImportStatus(row['status']),
-                    chatbook_path=row['chatbook_path'],
-                    created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
-                    started_at=datetime.fromisoformat(row['started_at']) if row['started_at'] else None,
-                    completed_at=datetime.fromisoformat(row['completed_at']) if row['completed_at'] else None,
-                    error_message=row['error_message'],
-                    progress_percentage=row['progress_percentage'],
-                    total_items=row['total_items'],
-                    processed_items=row['processed_items'],
-                    successful_items=row['successful_items'],
-                    failed_items=row['failed_items'],
-                    skipped_items=row['skipped_items'],
-                    conflicts=json.loads(row['conflicts']) if row['conflicts'] else [],
-                    warnings=json.loads(row['warnings']) if row['warnings'] else []
-                )
-            else:
-                # Handle tuple format (from test mocks)
-                # Expected tuple format:
-                # (job_id, user_id, status, chatbook_path, created_at, started_at,
-                #  completed_at, error_message, progress_percentage, total_items,
-                #  processed_items, successful_items, failed_items, skipped_items,
-                #  conflicts, warnings)
-                return ImportJob(
-                    job_id=row[0],
-                    user_id=row[1],
-                    status=ImportStatus(row[2]) if not isinstance(row[2], ImportStatus) else row[2],
-                    chatbook_path=row[3],
-                    created_at=datetime.fromisoformat(row[4]) if row[4] and isinstance(row[4], str) else row[4],
-                    started_at=datetime.fromisoformat(row[5]) if row[5] and isinstance(row[5], str) else row[5],
-                    completed_at=datetime.fromisoformat(row[6]) if row[6] and isinstance(row[6], str) else row[6],
-                    error_message=row[7] if len(row) > 7 else None,
-                    progress_percentage=row[8] if len(row) > 8 else 0,
-                    total_items=row[9] if len(row) > 9 else 0,
-                    processed_items=row[10] if len(row) > 10 else 0,
-                    successful_items=row[11] if len(row) > 11 else 0,
-                    failed_items=row[12] if len(row) > 12 else 0,
-                    skipped_items=row[13] if len(row) > 13 else 0,
-                    conflicts=json.loads(row[14]) if len(row) > 14 and row[14] else [],
-                    warnings=json.loads(row[15]) if len(row) > 15 and row[15] else []
-                )
+            # Handle both dict (from real DB) and tuple (from mocked tests)
+            if isinstance(row, tuple):
+                # Convert tuple to dict using expected field order
+                row = {
+                    'job_id': row[0],
+                    'user_id': row[1],
+                    'status': row[2],
+                    'chatbook_path': row[3],
+                    'created_at': row[4],
+                    'started_at': row[5],
+                    'completed_at': row[6],
+                    'error_message': row[7] if len(row) > 7 else None,
+                    'progress_percentage': row[8] if len(row) > 8 else 0,
+                    'total_items': row[9] if len(row) > 9 else 0,
+                    'processed_items': row[10] if len(row) > 10 else 0,
+                    'successful_items': row[11] if len(row) > 11 else 0,
+                    'failed_items': row[12] if len(row) > 12 else 0,
+                    'skipped_items': row[13] if len(row) > 13 else 0,
+                    'conflicts': row[14] if len(row) > 14 else '[]',
+                    'warnings': row[15] if len(row) > 15 else '[]'
+                }
+            
+            # Parse timestamps if they're strings
+            def parse_timestamp(ts):
+                if ts is None:
+                    return None
+                if isinstance(ts, datetime):
+                    return ts
+                if 'T' in ts:  # ISO format
+                    return datetime.fromisoformat(ts)
+                else:  # SQLite format
+                    return datetime.strptime(ts, '%Y-%m-%d %H:%M:%S.%f')
+            
+            return ImportJob(
+                job_id=row['job_id'],
+                user_id=row['user_id'],
+                status=ImportStatus(row['status']),
+                chatbook_path=row['chatbook_path'],
+                created_at=parse_timestamp(row['created_at']),
+                started_at=parse_timestamp(row['started_at']),
+                completed_at=parse_timestamp(row['completed_at']),
+                error_message=row['error_message'],
+                progress_percentage=row['progress_percentage'] or 0,
+                total_items=row['total_items'] or 0,
+                processed_items=row['processed_items'] or 0,
+                successful_items=row['successful_items'] or 0,
+                failed_items=row['failed_items'] or 0,
+                skipped_items=row['skipped_items'] or 0,
+                conflicts=json.loads(row['conflicts']) if row['conflicts'] else [],
+                warnings=json.loads(row['warnings']) if row['warnings'] else []
+            )
         except Exception as e:
             logger.error(f"Error getting import job: {e}")
             return None

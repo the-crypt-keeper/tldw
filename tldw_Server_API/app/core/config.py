@@ -220,7 +220,8 @@ def load_settings():
     # Use a fixed ID for the single user's database path and cache key
     single_user_fixed_id = int(os.getenv("SINGLE_USER_FIXED_ID", "0")) # Ensure it's an int
     # API Key for accessing the single-user instance
-    single_user_api_key = os.getenv("API_KEY", "default-secret-key-for-single-user")
+    # Check both SINGLE_USER_API_KEY (AuthNZ standard) and API_KEY (legacy) environment variables
+    single_user_api_key = os.getenv("SINGLE_USER_API_KEY") or os.getenv("API_KEY", "default-secret-key-for-single-user")
 
     # --- Multi-User Settings (JWT) ---
     jwt_secret_key = os.getenv("JWT_SECRET_KEY", "a_very_insecure_default_secret_key_for_dev_only")
