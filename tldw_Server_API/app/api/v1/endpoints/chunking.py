@@ -85,19 +85,63 @@ async def process_text_for_chunking_json(
     """
     logger.info(f"Received chunking request for '{request_data.file_name}'. Method: {request_data.options.method if request_data.options else 'default from library'}.")
 
-    # Prepare effective chunking options
-    effective_options = default_chunk_options_from_lib.copy()
-    if request_data.options:
-        request_options_dict = request_data.options.model_dump(exclude_unset=True) # Only use fields explicitly set by client
-        # Special handling for nested llm_options
-        if 'llm_options_for_internal_steps' in request_options_dict and request_options_dict['llm_options_for_internal_steps'] is not None:
-            # If llm_options are provided, update them carefully
-            # Assuming direct update is fine if Pydantic model is structured well
-            pass # Pydantic's model_dump should handle this nesting.
-        effective_options.update(request_options_dict)
-        logger.debug(f"Request options provided: {request_options_dict}")
-    else: # No options provided in request, log that we are using library defaults
-        logger.debug(f"No request options provided. Using default library options: {effective_options}")
+    # Check if a template was specified
+    template_used = False
+    if request_data.options and request_data.options.template_name:
+        # Import necessary modules for template support
+        import json
+        from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
+        from tldw_Server_API.app.core.Chunking.templates import TemplateProcessor, ChunkingTemplate, TemplateStage
+        import os
+        
+        try:
+            # Get database instance
+            db_path = os.environ.get('TLDW_DB_PATH', 'Databases/Media_DB_v2.db')
+            db = MediaDatabase(
+                db_path=db_path,
+                client_id='api_client'
+            )
+            
+            # Get template from database
+            template_data = db.get_chunking_template(name=request_data.options.template_name)
+            if template_data:
+                logger.info(f"Using chunking template: {request_data.options.template_name}")
+                template_used = True
+                
+                # Parse template JSON and prepare options
+                template_config = json.loads(template_data['template_json'])
+                
+                # Start with template's chunking config
+                effective_options = template_config.get('chunking', {}).get('config', {}).copy()
+                effective_options['method'] = template_config.get('chunking', {}).get('method', 'words')
+                
+                # Allow explicit request options to override template defaults
+                request_options_dict = request_data.options.model_dump(exclude_unset=True)
+                # Remove template_name from override options
+                request_options_dict.pop('template_name', None)
+                effective_options.update(request_options_dict)
+                
+                logger.debug(f"Template-based effective options: {effective_options}")
+            else:
+                logger.warning(f"Template '{request_data.options.template_name}' not found, falling back to regular options")
+        except Exception as e:
+            logger.error(f"Error loading template: {e}")
+            # Fall back to regular processing
+    
+    if not template_used:
+        # Prepare effective chunking options (original logic)
+        effective_options = default_chunk_options_from_lib.copy()
+        if request_data.options:
+            request_options_dict = request_data.options.model_dump(exclude_unset=True) # Only use fields explicitly set by client
+            # Special handling for nested llm_options
+            if 'llm_options_for_internal_steps' in request_options_dict and request_options_dict['llm_options_for_internal_steps'] is not None:
+                # If llm_options are provided, update them carefully
+                # Assuming direct update is fine if Pydantic model is structured well
+                pass # Pydantic's model_dump should handle this nesting.
+            effective_options.update(request_options_dict)
+            logger.debug(f"Request options provided: {request_options_dict}")
+        else: # No options provided in request, log that we are using library defaults
+            logger.debug(f"No request options provided. Using default library options: {effective_options}")
 
 
     # Type conversions for max_size and overlap are now better handled by Pydantic model's field_validators

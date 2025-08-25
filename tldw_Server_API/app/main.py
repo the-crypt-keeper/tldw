@@ -31,8 +31,9 @@ from tldw_Server_API.app.api.v1.endpoints.characters_endpoint import router as c
 # Metrics Endpoint
 from tldw_Server_API.app.api.v1.endpoints.metrics import router as metrics_router
 #
-# Chunking Endpoint
+# Chunking Endpoints
 from tldw_Server_API.app.api.v1.endpoints.chunking import chunking_router as chunking_router
+from tldw_Server_API.app.api.v1.endpoints.chunking_templates import router as chunking_templates_router
 #
 # Embedding Endpoint (v5 enhanced version with circuit breaker)
 from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced import router as embeddings_router
@@ -267,6 +268,19 @@ async def lifespan(app: FastAPI):
         logger.warning("TTS functionality will be unavailable")
         # Continue startup even if TTS fails (for backward compatibility)
     
+    # Initialize Chunking Templates
+    logger.info("App Startup: Initializing chunking templates...")
+    try:
+        from tldw_Server_API.app.core.Chunking.template_initialization import ensure_templates_initialized
+        
+        if ensure_templates_initialized():
+            logger.info("App Startup: Chunking templates initialized successfully")
+        else:
+            logger.warning("App Startup: Chunking templates initialization incomplete")
+    except Exception as e:
+        logger.error(f"App Startup: Failed to initialize chunking templates: {e}")
+        # Continue startup even if template initialization fails
+    
     # Initialize Unified Audit Service
     try:
         from tldw_Server_API.app.core.Audit.unified_audit_service import get_unified_audit_service
@@ -468,6 +482,9 @@ app.include_router(metrics_router, prefix=f"{API_V1_PREFIX}", tags=["metrics"])
 
 # Router for Chunking Endpoint
 app.include_router(chunking_router, prefix=f"{API_V1_PREFIX}/chunking", tags=["chunking"])
+
+# Router for Chunking Templates
+app.include_router(chunking_templates_router, prefix=f"{API_V1_PREFIX}", tags=["chunking templates"])
 
 
 # Router for Embedding Endpoint (OpenAI-compatible path)

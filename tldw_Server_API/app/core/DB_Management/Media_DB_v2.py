@@ -3868,6 +3868,430 @@ class MediaDatabase:
             else:
                 raise
 
+    # =========================================================================
+    # Chunking Templates Methods
+    # =========================================================================
+    
+    def create_chunking_template(self, 
+                                name: str,
+                                template_json: str,
+                                description: Optional[str] = None,
+                                is_builtin: bool = False,
+                                tags: Optional[List[str]] = None,
+                                user_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Create a new chunking template.
+        
+        Args:
+            name: Template name (must be unique among non-deleted templates)
+            template_json: JSON string containing template configuration
+            description: Optional template description
+            is_builtin: Whether this is a built-in template (cannot be modified/deleted)
+            tags: Optional list of tags for categorization
+            user_id: Optional user ID for ownership tracking
+            
+        Returns:
+            Dictionary containing created template information
+            
+        Raises:
+            DatabaseError: If template creation fails
+            InputError: If name already exists
+        """
+        import uuid as uuid_module
+        
+        template_uuid = str(uuid_module.uuid4())
+        tags_json = json.dumps(tags) if tags else None
+        
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if name already exists
+            cursor.execute("""
+                SELECT COUNT(*) FROM ChunkingTemplates 
+                WHERE name = ? AND deleted = 0
+            """, (name,))
+            
+            if cursor.fetchone()[0] > 0:
+                raise InputError(f"Template with name '{name}' already exists")
+            
+            # Validate JSON
+            try:
+                json.loads(template_json)
+            except json.JSONDecodeError as e:
+                raise InputError(f"Invalid template JSON: {e}")
+            
+            # Insert template
+            cursor.execute("""
+                INSERT INTO ChunkingTemplates (
+                    uuid, name, description, template_json, is_builtin, tags,
+                    created_at, updated_at, last_modified, version, client_id, 
+                    user_id, deleted
+                ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), 
+                         datetime('now'), 1, ?, ?, 0)
+            """, (template_uuid, name, description, template_json, is_builtin, 
+                  tags_json, self.client_id, user_id))
+            
+            template_id = cursor.lastrowid
+            conn.commit()
+            
+            logger.info(f"Created chunking template '{name}' with UUID {template_uuid}")
+            
+            return {
+                'id': template_id,
+                'uuid': template_uuid,
+                'name': name,
+                'description': description,
+                'template_json': template_json,
+                'is_builtin': is_builtin,
+                'tags': tags,
+                'user_id': user_id,
+                'version': 1
+            }
+    
+    def get_chunking_template(self, 
+                             template_id: Optional[int] = None,
+                             name: Optional[str] = None,
+                             uuid: Optional[str] = None,
+                             include_deleted: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        Get a chunking template by ID, name, or UUID.
+        
+        Args:
+            template_id: Template database ID
+            name: Template name
+            uuid: Template UUID
+            include_deleted: Whether to include soft-deleted templates
+            
+        Returns:
+            Template dictionary or None if not found
+        """
+        if not any([template_id, name, uuid]):
+            raise InputError("Must provide template_id, name, or uuid")
+        
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = "SELECT * FROM ChunkingTemplates WHERE "
+            params = []
+            conditions = []
+            
+            if template_id:
+                conditions.append("id = ?")
+                params.append(template_id)
+            if name:
+                conditions.append("name = ?")
+                params.append(name)
+            if uuid:
+                conditions.append("uuid = ?")
+                params.append(uuid)
+                
+            query += " OR ".join(conditions)
+            
+            if not include_deleted:
+                query += " AND deleted = 0"
+            
+            cursor.execute(query, params)
+            row = cursor.fetchone()
+            
+            if row:
+                return {
+                    'id': row['id'],
+                    'uuid': row['uuid'],
+                    'name': row['name'],
+                    'description': row['description'],
+                    'template_json': row['template_json'],
+                    'is_builtin': bool(row['is_builtin']),
+                    'tags': json.loads(row['tags']) if row['tags'] else [],
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at'],
+                    'version': row['version'],
+                    'user_id': row['user_id'],
+                    'deleted': bool(row['deleted'])
+                }
+            
+            return None
+    
+    def list_chunking_templates(self,
+                               include_builtin: bool = True,
+                               include_custom: bool = True,
+                               tags: Optional[List[str]] = None,
+                               user_id: Optional[str] = None,
+                               include_deleted: bool = False) -> List[Dict[str, Any]]:
+        """
+        List all chunking templates with optional filtering.
+        
+        Args:
+            include_builtin: Include built-in templates
+            include_custom: Include custom templates
+            tags: Filter by tags (templates must have at least one matching tag)
+            user_id: Filter by user ID
+            include_deleted: Include soft-deleted templates
+            
+        Returns:
+            List of template dictionaries
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            conditions = []
+            params = []
+            
+            if not include_deleted:
+                conditions.append("deleted = 0")
+            
+            # Filter by builtin status
+            builtin_conditions = []
+            if include_builtin:
+                builtin_conditions.append("is_builtin = 1")
+            if include_custom:
+                builtin_conditions.append("is_builtin = 0")
+            
+            if builtin_conditions:
+                conditions.append(f"({' OR '.join(builtin_conditions)})")
+            
+            # Filter by user
+            if user_id:
+                conditions.append("user_id = ?")
+                params.append(user_id)
+            
+            # Build query
+            query = "SELECT * FROM ChunkingTemplates"
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            query += " ORDER BY is_builtin DESC, name ASC"
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            
+            templates = []
+            for row in rows:
+                template = {
+                    'id': row['id'],
+                    'uuid': row['uuid'],
+                    'name': row['name'],
+                    'description': row['description'],
+                    'template_json': row['template_json'],
+                    'is_builtin': bool(row['is_builtin']),
+                    'tags': json.loads(row['tags']) if row['tags'] else [],
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at'],
+                    'version': row['version'],
+                    'user_id': row['user_id']
+                }
+                
+                # Filter by tags if specified
+                if tags:
+                    template_tags = template['tags']
+                    if not any(tag in template_tags for tag in tags):
+                        continue
+                
+                templates.append(template)
+            
+            return templates
+    
+    def update_chunking_template(self,
+                                template_id: Optional[int] = None,
+                                name: Optional[str] = None,
+                                uuid: Optional[str] = None,
+                                template_json: Optional[str] = None,
+                                description: Optional[str] = None,
+                                tags: Optional[List[str]] = None) -> bool:
+        """
+        Update a chunking template (cannot update built-in templates).
+        
+        Args:
+            template_id: Template ID to update
+            name: Template name to update
+            uuid: Template UUID to update
+            template_json: New template JSON configuration
+            description: New description
+            tags: New tags list
+            
+        Returns:
+            True if updated, False if not found or is built-in
+            
+        Raises:
+            InputError: If trying to update a built-in template
+            DatabaseError: If update fails
+        """
+        # Get existing template
+        template = self.get_chunking_template(
+            template_id=template_id, 
+            name=name, 
+            uuid=uuid
+        )
+        
+        if not template:
+            return False
+        
+        if template['is_builtin']:
+            raise InputError("Cannot modify built-in templates")
+        
+        # Validate new JSON if provided
+        if template_json:
+            try:
+                json.loads(template_json)
+            except json.JSONDecodeError as e:
+                raise InputError(f"Invalid template JSON: {e}")
+        
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Build update query
+            updates = []
+            params = []
+            
+            if template_json is not None:
+                updates.append("template_json = ?")
+                params.append(template_json)
+            
+            if description is not None:
+                updates.append("description = ?")
+                params.append(description)
+            
+            if tags is not None:
+                updates.append("tags = ?")
+                params.append(json.dumps(tags))
+            
+            if updates:
+                updates.extend([
+                    "updated_at = datetime('now')",
+                    "last_modified = datetime('now')",
+                    "version = version + 1",
+                    "client_id = ?"
+                ])
+                params.append(self.client_id)
+                params.append(template['id'])
+                
+                query = f"""
+                    UPDATE ChunkingTemplates 
+                    SET {', '.join(updates)}
+                    WHERE id = ? AND deleted = 0
+                """
+                
+                cursor.execute(query, params)
+                conn.commit()
+                
+                logger.info(f"Updated chunking template ID {template['id']}")
+                return True
+            
+            return False
+    
+    def delete_chunking_template(self,
+                                template_id: Optional[int] = None,
+                                name: Optional[str] = None,
+                                uuid: Optional[str] = None,
+                                hard_delete: bool = False) -> bool:
+        """
+        Delete a chunking template (soft delete by default).
+        
+        Args:
+            template_id: Template ID to delete
+            name: Template name to delete
+            uuid: Template UUID to delete
+            hard_delete: Permanently delete instead of soft delete
+            
+        Returns:
+            True if deleted, False if not found
+            
+        Raises:
+            InputError: If trying to delete a built-in template
+        """
+        # Get existing template
+        template = self.get_chunking_template(
+            template_id=template_id,
+            name=name,
+            uuid=uuid
+        )
+        
+        if not template:
+            return False
+        
+        if template['is_builtin']:
+            raise InputError("Cannot delete built-in templates")
+        
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            if hard_delete:
+                cursor.execute(
+                    "DELETE FROM ChunkingTemplates WHERE id = ?",
+                    (template['id'],)
+                )
+                logger.info(f"Hard deleted chunking template ID {template['id']}")
+            else:
+                cursor.execute("""
+                    UPDATE ChunkingTemplates 
+                    SET deleted = 1, 
+                        updated_at = datetime('now'),
+                        last_modified = datetime('now'),
+                        client_id = ?
+                    WHERE id = ?
+                """, (self.client_id, template['id']))
+                logger.info(f"Soft deleted chunking template ID {template['id']}")
+            
+            conn.commit()
+            return True
+    
+    def seed_builtin_templates(self, templates: List[Dict[str, Any]]) -> int:
+        """
+        Seed built-in templates into the database.
+        
+        Args:
+            templates: List of template dictionaries to seed
+            
+        Returns:
+            Number of templates seeded
+        """
+        count = 0
+        
+        for template in templates:
+            # Check if template already exists
+            existing = self.get_chunking_template(
+                name=template['name'],
+                include_deleted=True
+            )
+            
+            if not existing:
+                try:
+                    self.create_chunking_template(
+                        name=template['name'],
+                        template_json=json.dumps(template.get('template', template)),
+                        description=template.get('description', ''),
+                        is_builtin=True,
+                        tags=template.get('tags', [])
+                    )
+                    count += 1
+                    logger.info(f"Seeded built-in template: {template['name']}")
+                except Exception as e:
+                    logger.error(f"Failed to seed template {template['name']}: {e}")
+            elif existing['deleted']:
+                # Restore deleted built-in template
+                with self.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE ChunkingTemplates
+                        SET deleted = 0,
+                            template_json = ?,
+                            description = ?,
+                            tags = ?,
+                            updated_at = datetime('now'),
+                            last_modified = datetime('now'),
+                            client_id = ?
+                        WHERE id = ?
+                    """, (
+                        json.dumps(template.get('template', template)),
+                        template.get('description', ''),
+                        json.dumps(template.get('tags', [])),
+                        self.client_id,
+                        existing['id']
+                    ))
+                    conn.commit()
+                    count += 1
+                    logger.info(f"Restored built-in template: {template['name']}")
+        
+        return count
+
 
 # =========================================================================
 # Standalone Functions (REQUIRE db_instance passed explicitly)

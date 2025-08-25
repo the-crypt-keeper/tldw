@@ -960,3 +960,264 @@ class StateVerification:
         
         # Check similarity
         AssertionHelpers.assert_content_integrity(original, retrieved, tolerance=0.85)
+
+
+# ============================================================================
+# NEGATIVE TEST HELPERS - Generate and validate malicious inputs
+# ============================================================================
+
+class NegativeTestHelper:
+    """Helper for generating and testing malicious/invalid inputs."""
+    
+    @staticmethod
+    def generate_malicious_payload(payload_type: str) -> List[str]:
+        """Generate malicious payloads of a specific type."""
+        from tldw_Server_API.tests.e2e.test_data import TestDataGenerator
+        payloads = TestDataGenerator.malicious_payloads()
+        return payloads.get(payload_type, [])
+    
+    @staticmethod
+    def generate_corrupted_file(file_type: str) -> bytes:
+        """Generate corrupted file data for a specific format."""
+        from tldw_Server_API.tests.e2e.test_data import TestDataGenerator
+        corrupted_data = TestDataGenerator.generate_corrupted_file_data()
+        return corrupted_data.get(file_type, b"CORRUPTED")
+    
+    @staticmethod
+    def validate_sanitization(original: str, sanitized: str, payload_type: str) -> bool:
+        """Validate that a malicious payload was properly sanitized."""
+        if payload_type == 'sql_injection':
+            dangerous_patterns = ["DROP", "DELETE", "UNION", "SELECT", "--"]
+            for pattern in dangerous_patterns:
+                if pattern.upper() in sanitized.upper():
+                    return False
+                    
+        elif payload_type == 'xss':
+            dangerous_patterns = ["<script", "onerror", "javascript:", "<iframe"]
+            for pattern in dangerous_patterns:
+                if pattern.lower() in sanitized.lower():
+                    return False
+                    
+        elif payload_type == 'path_traversal':
+            if ".." in sanitized or "etc/passwd" in sanitized:
+                return False
+                
+        return True
+    
+    @staticmethod
+    def generate_boundary_value(value_type: str, boundary: str):
+        """Generate boundary test values."""
+        from tldw_Server_API.tests.e2e.test_data import TestDataGenerator
+        boundaries = TestDataGenerator.boundary_values()
+        
+        if value_type in boundaries:
+            return boundaries[value_type].get(boundary)
+        return None
+
+
+# ============================================================================
+# CONCURRENT TEST HELPERS - Manage parallel operations
+# ============================================================================
+
+class ConcurrentTestManager:
+    """Manager for concurrent test operations."""
+    
+    def __init__(self, max_workers: int = 10):
+        self.max_workers = max_workers
+        self.results = []
+        self.errors = []
+        
+    def run_parallel(
+        self,
+        func: Callable,
+        args_list: List[tuple],
+        timeout: int = 30
+    ) -> Dict[str, Any]:
+        """Run function with different arguments in parallel."""
+        import concurrent.futures
+        
+        results = {
+            'successful': [],
+            'failed': [],
+            'timing': [],
+            'race_conditions': []
+        }
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_args = {
+                executor.submit(func, *args): args
+                for args in args_list
+            }
+            
+            for future in concurrent.futures.as_completed(future_to_args):
+                start_time = time.time()
+                args = future_to_args[future]
+                
+                try:
+                    result = future.result(timeout=timeout)
+                    duration = time.time() - start_time
+                    results['successful'].append({
+                        'args': args,
+                        'result': result,
+                        'duration': duration
+                    })
+                except Exception as e:
+                    duration = time.time() - start_time
+                    results['failed'].append({
+                        'args': args,
+                        'error': str(e),
+                        'duration': duration
+                    })
+                
+                results['timing'].append(duration)
+        
+        # Detect race conditions
+        self._detect_race_conditions(results)
+        
+        return results
+    
+    def _detect_race_conditions(self, results: Dict[str, Any]) -> None:
+        """Detect potential race conditions in results."""
+        # Check for duplicate IDs
+        all_ids = []
+        for item in results['successful']:
+            if 'result' in item and isinstance(item['result'], dict):
+                id_val = item['result'].get('id') or item['result'].get('media_id')
+                if id_val:
+                    all_ids.append(id_val)
+        
+        if len(all_ids) != len(set(all_ids)):
+            results['race_conditions'].append('Duplicate IDs detected')
+        
+        # Check for inconsistent states
+        if len(results['successful']) > 0 and len(results['failed']) > 0:
+            # Analyze failure patterns
+            error_types = {}
+            for failure in results['failed']:
+                error = failure.get('error', 'Unknown')
+                error_types[error] = error_types.get(error, 0) + 1
+            
+            # If same operation sometimes succeeds and sometimes fails, might be race
+            if len(error_types) > 2:
+                results['race_conditions'].append('Inconsistent operation results')
+    
+    def measure_throughput(
+        self,
+        func: Callable,
+        duration_seconds: int = 10,
+        target_rps: float = 10.0
+    ) -> Dict[str, float]:
+        """Measure throughput of a function over time."""
+        start_time = time.time()
+        end_time = start_time + duration_seconds
+        
+        successful = 0
+        failed = 0
+        response_times = []
+        
+        while time.time() < end_time:
+            request_start = time.time()
+            
+            try:
+                func()
+                successful += 1
+            except:
+                failed += 1
+            
+            response_time = time.time() - request_start
+            response_times.append(response_time)
+            
+            # Maintain target RPS
+            sleep_time = max(0, (1.0 / target_rps) - response_time)
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+        
+        total_time = time.time() - start_time
+        total_requests = successful + failed
+        
+        return {
+            'total_requests': total_requests,
+            'successful': successful,
+            'failed': failed,
+            'rps': total_requests / total_time if total_time > 0 else 0,
+            'avg_response_time': sum(response_times) / len(response_times) if response_times else 0,
+            'min_response_time': min(response_times) if response_times else 0,
+            'max_response_time': max(response_times) if response_times else 0,
+            'p95_response_time': sorted(response_times)[int(len(response_times) * 0.95)] if response_times else 0,
+            'success_rate': successful / total_requests if total_requests > 0 else 0
+        }
+
+
+# ============================================================================
+# TEST DATA CORRUPTOR - Generate invalid test data
+# ============================================================================
+
+class TestDataCorruptor:
+    """Generate corrupted or invalid test data."""
+    
+    @staticmethod
+    def corrupt_json(valid_json: str) -> str:
+        """Corrupt valid JSON in various ways."""
+        import random
+        
+        corruption_methods = [
+            lambda s: s[:-1],  # Remove closing brace
+            lambda s: s.replace('"', "'"),  # Single quotes
+            lambda s: s.replace(':', ''),  # Remove colons
+            lambda s: s.replace(',', ',,'),  # Double commas
+            lambda s: s + "extra",  # Extra content
+            lambda s: "undefined" + s,  # Undefined reference
+        ]
+        
+        method = random.choice(corruption_methods)
+        return method(valid_json)
+    
+    @staticmethod
+    def corrupt_file(file_data: bytes, corruption_type: str = 'truncate') -> bytes:
+        """Corrupt file data in various ways."""
+        if corruption_type == 'truncate':
+            return file_data[:len(file_data)//2]
+        elif corruption_type == 'null_bytes':
+            return b'\x00' * 100 + file_data
+        elif corruption_type == 'random':
+            import random
+            corrupted = bytearray(file_data)
+            for i in range(min(100, len(corrupted))):
+                corrupted[random.randint(0, len(corrupted)-1)] = random.randint(0, 255)
+            return bytes(corrupted)
+        elif corruption_type == 'empty':
+            return b''
+        else:
+            return file_data + b'CORRUPTED'
+    
+    @staticmethod
+    def generate_malformed_multipart() -> bytes:
+        """Generate malformed multipart form data."""
+        boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        
+        # Missing boundary terminator
+        malformed = f"""------{boundary}
+Content-Disposition: form-data; name="file"; filename="test.txt"
+Content-Type: text/plain
+
+Test content without proper boundary end""".encode()
+        
+        return malformed
+    
+    @staticmethod
+    def generate_invalid_encoding(text: str) -> bytes:
+        """Generate text with invalid encoding."""
+        # Mix encodings incorrectly
+        try:
+            # UTF-8 with invalid sequences
+            return text.encode('utf-8') + b'\xff\xfe' + text.encode('utf-16')
+        except:
+            return b'\xff\xfe\xff\xfe'
+
+
+# Test markers would be defined in pytest.ini or pyproject.toml
+# For now, commenting out to avoid errors
+# pytest.mark.negative = pytest.mark.negative
+# pytest.mark.concurrent = pytest.mark.concurrent
+# pytest.mark.security = pytest.mark.security
+# pytest.mark.slow = pytest.mark.slow

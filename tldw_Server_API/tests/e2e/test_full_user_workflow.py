@@ -74,9 +74,14 @@ class TestFullUserWorkflow:
     def test_01_health_check(self, api_client):
         """Test API health check endpoint."""
         response = api_client.health_check()
-        assert response.get("status") == "healthy"
-        assert "timestamp" in response
-        assert "auth_mode" in response
+        
+        # Strengthen assertions - verify actual values, not just presence
+        assert response.get("status") == "healthy", f"Expected healthy status, got: {response.get('status')}"
+        assert "timestamp" in response, "Response missing timestamp"
+        assert isinstance(response.get("timestamp"), str), f"Timestamp should be string, got: {type(response.get('timestamp'))}"
+        assert "auth_mode" in response, "Response missing auth_mode"
+        assert response.get("auth_mode") in ["single_user", "multi_user"], f"Invalid auth_mode: {response.get('auth_mode')}"
+        
         # Store auth mode for later tests
         self.auth_mode = response.get("auth_mode", "multi_user")
     
@@ -105,8 +110,13 @@ class TestFullUserWorkflow:
                 "user_id": response.get("user_id")
             }
             
-            assert response.get("success") == True
-            assert "user_id" in response or "message" in response
+            # Strengthen assertions
+            assert response.get("success") == True, f"Registration failed: {response}"
+            if "user_id" in response:
+                assert isinstance(response["user_id"], (int, str)), f"Invalid user_id type: {type(response['user_id'])}"
+                assert response["user_id"], "user_id is empty"
+            else:
+                assert "message" in response, "Response missing both user_id and message"
             
         except httpx.HTTPStatusError as e:
             if e.response.status_code in [400, 401]:
@@ -217,6 +227,7 @@ class TestFullUserWorkflow:
             )
             
             # Verify response - handle results array format
+            media_id = None
             if "results" in response and isinstance(response["results"], list):
                 assert len(response["results"]) > 0
                 result = response["results"][0]
@@ -225,15 +236,20 @@ class TestFullUserWorkflow:
                     # Mock PDF isn't valid, skip tracking
                     pass
                 elif result.get("db_id"):
-                    data_tracker.add_media(result["db_id"])
+                    media_id = result["db_id"]
+                    data_tracker.add_media(media_id)
             else:
                 # Old format compatibility
                 assert "media_id" in response or "id" in response
                 media_id = response.get("media_id") or response.get("id")
                 data_tracker.add_media(media_id)
             
-            # Store media item
-            TestFullUserWorkflow.media_items.append(response)
+            # Store media item only if we have a valid ID
+            if media_id:
+                TestFullUserWorkflow.media_items.append({
+                    "media_id": media_id,
+                    "response": response
+                })
             
         finally:
             cleanup_test_file(file_path)
@@ -332,6 +348,7 @@ class TestFullUserWorkflow:
             )
             
             # Verify response - handle results array format
+            media_id = None
             if "results" in response and isinstance(response["results"], list):
                 assert len(response["results"]) > 0
                 result = response["results"][0]
@@ -340,15 +357,20 @@ class TestFullUserWorkflow:
                     # FFmpeg conversion failed, skip tracking
                     pass
                 elif result.get("db_id"):
-                    data_tracker.add_media(result["db_id"])
+                    media_id = result["db_id"]
+                    data_tracker.add_media(media_id)
             else:
                 # Old format compatibility
                 assert "media_id" in response or "id" in response
                 media_id = response.get("media_id") or response.get("id")
                 data_tracker.add_media(media_id)
             
-            # Store media item
-            TestFullUserWorkflow.media_items.append(response)
+            # Store media item only if we have a valid ID
+            if media_id:
+                TestFullUserWorkflow.media_items.append({
+                    "media_id": media_id,
+                    "response": response
+                })
             
         finally:
             cleanup_test_file(file_path)
@@ -371,17 +393,22 @@ class TestFullUserWorkflow:
             )
             
             # Verify response - handle results array format
+            media_id = None
             if "results" in response and isinstance(response["results"], list):
                 assert len(response["results"]) > 0
                 result = response["results"][0]
                 
                 # Check if transcription was attempted
                 if result.get("db_id"):
-                    print(f"✓ Video uploaded successfully with ID: {result['db_id']}")
-                    data_tracker.add_media(result["db_id"])
+                    media_id = result["db_id"]
+                    print(f"✓ Video uploaded successfully with ID: {media_id}")
+                    data_tracker.add_media(media_id)
                     
-                    # Store for later verification of transcription
-                    TestFullUserWorkflow.media_items.append(response)
+                    # Store for later verification of transcription - with consistent structure
+                    TestFullUserWorkflow.media_items.append({
+                        "media_id": media_id,
+                        "response": response
+                    })
                     
                     # Optional: Check if transcription exists
                     if result.get("transcription"):
@@ -395,7 +422,10 @@ class TestFullUserWorkflow:
                 assert "media_id" in response or "id" in response
                 media_id = response.get("media_id") or response.get("id")
                 data_tracker.add_media(media_id)
-                TestFullUserWorkflow.media_items.append(response)
+                TestFullUserWorkflow.media_items.append({
+                    "media_id": media_id,
+                    "response": response
+                })
                 print(f"✓ Video uploaded with ID: {media_id}")
                 
         except Exception as e:

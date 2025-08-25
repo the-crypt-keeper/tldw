@@ -11,6 +11,7 @@
 # FIXME
 #
 # Imports
+import os
 import re
 import sqlite3
 from math import ceil
@@ -1512,6 +1513,27 @@ async def _save_uploaded_files(
 
             # --- Extension Validation ---
             file_extension = Path(original_filename).suffix.lower()
+            
+            # Block dangerous/executable file types for security
+            BLOCKED_EXTENSIONS = {
+                '.exe', '.bat', '.cmd', '.com', '.scr', '.vbs', '.vbe', '.js', '.jse', 
+                '.ws', '.wsf', '.wsc', '.wsh', '.ps1', '.ps1xml', '.ps2', '.ps2xml', 
+                '.psc1', '.psc2', '.msh', '.msh1', '.msh2', '.mshxml', '.msh1xml', 
+                '.msh2xml', '.scf', '.lnk', '.inf', '.reg', '.dll', '.app', '.sh',
+                '.csh', '.ksh', '.bash', '.zsh', '.fish', '.bat', '.cmd', '.jar',
+                '.msi', '.dmg', '.pkg', '.deb', '.rpm', '.appimage', '.snap'
+            }
+            
+            if file_extension in BLOCKED_EXTENSIONS:
+                logger.warning(f"Rejecting potentially dangerous file type '{file_extension}' for file '{original_filename}'")
+                file_handling_errors.append({
+                    "original_filename": original_filename,
+                    "input_ref": input_ref,
+                    "status": "Error",
+                    "error": f"File type '{file_extension}' is not allowed for security reasons"
+                })
+                continue # Skip to the next file
+            
             if normalized_allowed_extensions and file_extension not in normalized_allowed_extensions:
                 logger.warning(f"Skipping file '{original_filename}' due to disallowed extension '{file_extension}'. Allowed: {allowed_extensions}")
                 file_handling_errors.append({
@@ -1557,6 +1579,32 @@ async def _save_uploaded_files(
                  # Clean up zero-byte file if created by mistake (though 'wb' should handle it)
                  if local_file_path.exists(): local_file_path.unlink(missing_ok=True)
                  continue # Skip to the next file
+            
+            # Check file size based on media type - different limits for different types
+            # Media files (audio/video) can be much larger
+            file_ext_lower = file_extension.lower()
+            if file_ext_lower in ['.mp4', '.mkv', '.avi', '.mov', '.flv', '.webm', '.wmv', '.mpg', '.mpeg']:
+                # Video files: 10GB default
+                MAX_FILE_SIZE = int(os.getenv('MAX_VIDEO_UPLOAD_SIZE', 10 * 1024 * 1024 * 1024))
+            elif file_ext_lower in ['.mp3', '.aac', '.flac', '.wav', '.ogg', '.m4a', '.wma']:
+                # Audio files: 2GB default
+                MAX_FILE_SIZE = int(os.getenv('MAX_AUDIO_UPLOAD_SIZE', 2 * 1024 * 1024 * 1024))
+            elif file_ext_lower in ['.pdf', '.epub']:
+                # PDF/ebooks: 500MB default
+                MAX_FILE_SIZE = int(os.getenv('MAX_DOCUMENT_UPLOAD_SIZE', 500 * 1024 * 1024))
+            else:
+                # Other files (text, etc): 100MB default
+                MAX_FILE_SIZE = int(os.getenv('MAX_UPLOAD_SIZE', 100 * 1024 * 1024))
+            
+            if len(content) > MAX_FILE_SIZE:
+                logger.warning(f"Uploaded file '{original_filename}' exceeds size limit ({len(content)} > {MAX_FILE_SIZE} bytes). Skipping save.")
+                file_handling_errors.append({
+                    "original_filename": original_filename,
+                    "input_ref": input_ref,
+                    "status": "Error",
+                    "error": f"File size ({len(content)} bytes) exceeds maximum allowed size ({MAX_FILE_SIZE} bytes) for {file_ext_lower} files"
+                })
+                continue # Skip to the next file
 
             # Write content to the secure path
             with open(local_file_path, "wb") as buffer:
@@ -2468,6 +2516,26 @@ async def add_media(
 
             # --- 4. Save Uploaded Files ---
             saved_files_info, file_save_errors = await _save_uploaded_files(files or [], temp_dir_path, validator=file_validator_instance,)
+            
+            # Check for file errors and return appropriate HTTP errors immediately
+            for err_info in file_save_errors:
+                error_msg = err_info.get("error", "")
+                if "exceeds maximum allowed size" in error_msg:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=error_msg
+                    )
+                elif "not allowed for security reasons" in error_msg:
+                    raise HTTPException(
+                        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                        detail=error_msg
+                    )
+                elif "empty" in error_msg.lower():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=error_msg
+                    )
+            
             # Adapt file saving errors to the standard result format
             for err_info in file_save_errors:
                  results.append({

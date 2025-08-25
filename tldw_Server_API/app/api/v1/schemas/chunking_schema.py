@@ -49,6 +49,10 @@ class LLMOptionsForChunkerInternalSteps(BaseModel):
 
 
 class ChunkingOptionsRequest(BaseModel):
+    # Template-based chunking (takes precedence over other options if specified)
+    template_name: Optional[str] = Field(None, 
+                                        description="Name of a chunking template to use. If specified, template settings override individual parameters.")
+    
     # Core Chunking Method & Basic Parameters
     method: Optional[str] = Field(default_chunk_options_from_lib.get('method'),
                                   description="Chunking method (e.g., 'words', 'sentences', 'json', 'semantic', 'xml', 'ebook_chapters', 'rolling_summarize').")

