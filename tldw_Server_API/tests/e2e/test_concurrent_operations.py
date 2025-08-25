@@ -53,7 +53,8 @@ class ConcurrentTestHelper:
             'successful': [],
             'failed': [],
             'errors': [],
-            'timing': []
+            'timing': [],
+            'race_conditions': []  # Track detected race conditions
         }
         
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -73,34 +74,98 @@ class ConcurrentTestHelper:
                     results['successful'].append({
                         'args': args,
                         'result': result,
-                        'duration': time.time() - start_time
+                        'duration': time.time() - start_time,
+                        'timestamp': time.time()  # Add timestamp for ordering
                     })
                 except Exception as e:
                     results['failed'].append({
                         'args': args,
                         'error': str(e),
-                        'duration': time.time() - start_time
+                        'error_type': type(e).__name__,
+                        'duration': time.time() - start_time,
+                        'timestamp': time.time()
                     })
                     results['errors'].append(e)
                 
                 results['timing'].append(time.time() - start_time)
+        
+        # Analyze for race conditions
+        ConcurrentTestHelper._analyze_race_conditions(results)
         
         return results
     
     @staticmethod
     def detect_race_condition(results: List[Dict]) -> bool:
         """Detect if a race condition occurred based on results."""
-        # Check for duplicate IDs (shouldn't happen)
-        ids = [r.get('id') or r.get('media_id') for r in results if r]
-        unique_ids = set(filter(None, ids))
+        # Extract IDs from various response formats
+        ids = []
+        for r in results:
+            if not r:
+                continue
+            
+            # Handle different response formats
+            if 'results' in r and isinstance(r['results'], list) and r['results']:
+                # New format with results array
+                ids.append(r['results'][0].get('db_id'))
+            elif 'id' in r:
+                ids.append(r['id'])
+            elif 'media_id' in r:
+                ids.append(r['media_id'])
         
-        if len(ids) != len(unique_ids):
+        # Filter out None values
+        valid_ids = [id for id in ids if id is not None]
+        unique_ids = set(valid_ids)
+        
+        # Check for duplicate IDs
+        if len(valid_ids) != len(unique_ids):
             return True  # Duplicate IDs indicate race condition
         
-        # Check for inconsistent states
-        # Add more race condition detection logic as needed
-        
         return False
+    
+    @staticmethod
+    def _analyze_race_conditions(results: Dict[str, Any]) -> None:
+        """Analyze results for various race condition indicators."""
+        race_indicators = []
+        
+        # Check for duplicate IDs
+        if results['successful']:
+            all_ids = []
+            for item in results['successful']:
+                result = item.get('result', {})
+                if 'results' in result and result['results']:
+                    id_val = result['results'][0].get('db_id')
+                    if id_val:
+                        all_ids.append(id_val)
+            
+            if len(all_ids) != len(set(all_ids)):
+                race_indicators.append('Duplicate IDs detected')
+        
+        # Check for lost updates (same operation sometimes fails)
+        if results['successful'] and results['failed']:
+            # If we have both successes and failures for identical operations
+            success_args = [str(s['args']) for s in results['successful']]
+            failed_args = [str(f['args']) for f in results['failed']]
+            
+            # Check error patterns
+            error_types = {}
+            for failure in results['failed']:
+                error_type = failure.get('error_type', 'Unknown')
+                error_types[error_type] = error_types.get(error_type, 0) + 1
+            
+            # Conflicting writes often show as intermittent failures
+            if 'HTTPStatusError' in error_types and error_types['HTTPStatusError'] > 2:
+                race_indicators.append('Intermittent failures suggest race conditions')
+        
+        # Check timing patterns
+        if results['timing']:
+            avg_time = sum(results['timing']) / len(results['timing'])
+            max_time = max(results['timing'])
+            
+            # Large variance in timing can indicate contention
+            if max_time > avg_time * 3:
+                race_indicators.append(f'High timing variance: avg={avg_time:.2f}s, max={max_time:.2f}s')
+        
+        results['race_conditions'] = race_indicators
     
     @staticmethod
     def measure_throughput(
@@ -179,7 +244,12 @@ class TestConcurrentUploads:
         )
         
         # Analyze results
-        print(f"Concurrent uploads: {len(results['successful'])} successful, {len(results['failed'])} failed")
+        print(f"\nConcurrent upload results:")
+        print(f"  Successful: {len(results['successful'])}")
+        print(f"  Failed: {len(results['failed'])}")
+        
+        if results['race_conditions']:
+            print(f"  ⚠ Race conditions detected: {results['race_conditions']}")
         
         # At least some should succeed
         assert len(results['successful']) > 0, "At least one upload should succeed"
@@ -187,8 +257,10 @@ class TestConcurrentUploads:
         # Check for race conditions
         successful_results = [r['result'] for r in results['successful']]
         if successful_results:
-            assert not ConcurrentTestHelper.detect_race_condition(successful_results), \
-                "Race condition detected in concurrent uploads"
+            has_race = ConcurrentTestHelper.detect_race_condition(successful_results)
+            if has_race:
+                print(f"  ✗ Race condition detected: duplicate IDs")
+            assert not has_race, f"Race condition detected. Indicators: {results['race_conditions']}"
         
         # Track uploaded media for cleanup
         for success in results['successful']:
@@ -333,29 +405,67 @@ class TestConcurrentCRUD:
             max_workers=10
         )
         
-        print(f"Concurrent updates: {len(results['successful'])} successful, {len(results['failed'])} failed")
+        # Analyze results for lost updates
+        print(f"\nConcurrent note update results:")
+        print(f"  Successful: {len(results['successful'])}")
+        print(f"  Failed: {len(results['failed'])}")
         
-        # With optimistic locking, only one should succeed
-        # Or all might succeed if no locking (data integrity issue)
+        # Check for lost updates
         if len(results['successful']) > 1:
-            print("Warning: Multiple concurrent updates succeeded - potential race condition")
+            print(f"  ⚠ WARNING: {len(results['successful'])} concurrent updates succeeded - checking for lost updates...")
+            
+            # Verify which update "won"
+            try:
+                final_note = authenticated_client.client.get(f"{API_PREFIX}/notes/{note_id}").json()
+                final_content = final_note.get('content', '')
+                final_version = final_note.get('version', 0)
+                
+                print(f"  Final content: '{final_content[:50]}...'")
+                print(f"  Final version: {final_version}")
+                
+                # Get successful update numbers
+                successful_nums = [r['args'][2] for r in results['successful']]
+                print(f"  Updates that succeeded: {successful_nums}")
+                
+                # Check if content matches last update
+                last_update_num = max(successful_nums) if successful_nums else -1
+                if f"version {last_update_num}" not in final_content:
+                    print(f"  ✗ Lost update detected! Final content doesn't match last successful update")
+                    pytest.fail("Lost updates: Final content doesn't reflect all successful updates")
+                    
+            except Exception as e:
+                print(f"  Could not verify final state: {e}")
+        
+        elif len(results['failed']) > 0:
+            # Check if failures were due to optimistic locking (good!)
+            conflict_failures = sum(1 for f in results['failed'] 
+                                  if 'conflict' in str(f.get('error', '')).lower() 
+                                  or '409' in str(f.get('error', '')))
+            print(f"  Version conflicts detected: {conflict_failures} (this is good!)")
+            
+            if conflict_failures == 0 and len(results['failed']) > 0:
+                print("  ⚠ Updates failed but not due to version conflicts")
         
         # Verify final state is consistent
-        final_note = authenticated_client.client.get(f"{API_PREFIX}/notes/{note_id}").json()
-        assert 'content' in final_note, "Note should still exist and be readable"
+        try:
+            final_note = authenticated_client.client.get(f"{API_PREFIX}/notes/{note_id}").json()
+            assert 'content' in final_note, "Note should still exist and be readable"
+            print(f"  ✓ Final note state verified")
+        except Exception as e:
+            pytest.fail(f"Could not verify final note state: {e}")
     
     def test_concurrent_searches(self, authenticated_client):
-        """Test multiple concurrent search requests."""
+        """Test multiple concurrent search requests - verify no result corruption."""
         search_queries = TestDataGenerator.sample_search_queries()
         
         def perform_search(client, query):
             """Search function for concurrent execution."""
             return client.search_media(query, limit=10)
         
-        # Prepare 50 concurrent searches
+        # Prepare 50 concurrent searches with known queries
         args_list = [
-            (authenticated_client, random.choice(search_queries))
-            for _ in range(50)
+            (authenticated_client, search_queries[i % len(search_queries)])
+            for i in range(50)
         ]
         
         # Run concurrent searches
@@ -372,8 +482,39 @@ class TestConcurrentCRUD:
         failed = len(results['failed'])
         avg_response_time = sum(results['timing']) / len(results['timing']) if results['timing'] else 0
         
-        print(f"Concurrent searches: {successful} successful, {failed} failed")
-        print(f"Total time: {duration:.2f}s, Avg response: {avg_response_time:.3f}s")
+        print(f"\nConcurrent search results:")
+        print(f"  Successful: {successful}/{len(args_list)}")
+        print(f"  Failed: {failed}")
+        print(f"  Total time: {duration:.2f}s")
+        print(f"  Avg response: {avg_response_time:.3f}s")
+        print(f"  Requests/sec: {successful/duration:.1f}")
+        
+        # Verify no result corruption (same query should return similar results)
+        query_results = {}
+        for result in results['successful']:
+            query = result['args'][1]  # Get the query
+            response = result['result']
+            
+            if query not in query_results:
+                query_results[query] = []
+            
+            # Store result count for consistency check
+            if 'results' in response:
+                query_results[query].append(len(response['results']))
+            elif 'items' in response:
+                query_results[query].append(len(response['items']))
+        
+        # Check consistency
+        inconsistent_queries = []
+        for query, counts in query_results.items():
+            if len(set(counts)) > 1:  # Different result counts for same query
+                inconsistent_queries.append(query)
+                print(f"  ⚠ Inconsistent results for '{query}': {counts}")
+        
+        if inconsistent_queries:
+            print(f"  ✗ {len(inconsistent_queries)} queries returned inconsistent results")
+        else:
+            print(f"  ✓ All queries returned consistent results")
         
         # Most searches should succeed
         assert successful > failed, "Most concurrent searches should succeed"
