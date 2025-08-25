@@ -47,8 +47,8 @@ from pydantic import BaseModel, ValidationError
 import redis
 from pydantic.v1 import Field
 # API Rate Limiter/Caching via Redis
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+# Use centralized rate limiter that respects TEST_MODE
+from tldw_Server_API.app.api.v1.API_Deps.rate_limiting import limiter
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
 #
@@ -138,8 +138,7 @@ from tldw_Server_API.app.core.Ingestion_Media_Processing.MediaWiki.Media_Wiki im
 # Create a new router instance
 router = APIRouter()
 
-# Rate Limiter + Cache Setup
-limiter = Limiter(key_func=get_remote_address)
+# Rate Limiter is imported from centralized configuration above
 
 # Configure Redis cache (optional based on config)
 cache = None

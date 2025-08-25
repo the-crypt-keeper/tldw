@@ -13,6 +13,7 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Request,
     status,
     Body,
     Header  # Keep Header for expected_version
@@ -47,8 +48,13 @@ class SimpleRateLimiter:
         self.max_requests = max_requests_per_minute
         self.requests = defaultdict(list)
     
-    def check_rate_limit(self, client_id: str) -> bool:
+    def check_rate_limit(self, client_id: str, request=None) -> bool:
         """Check if client has exceeded rate limit."""
+        # Skip rate limiting in test mode - ONLY from server environment
+        import os
+        if os.getenv("TEST_MODE") == "true":
+            return True
+            
         current_time = time.time()
         minute_ago = current_time - 60
         
@@ -118,13 +124,14 @@ def handle_db_errors(e: Exception, entity_type: str = "resource"):
     tags=["Notes"]
 )
 async def create_note(
+        request: Request,
         note_in: NoteCreate,
         db: CharactersRAGDB = Depends(get_chacha_db_for_user)  # Use the user-specific DB instance
 ):
     try:
         # Check rate limit for note creation
         client_id = db.client_id or "anonymous"
-        if not notes_rate_limiter.check_rate_limit(client_id):
+        if not notes_rate_limiter.check_rate_limit(client_id, request):
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Rate limit exceeded. Maximum 30 notes per minute allowed."

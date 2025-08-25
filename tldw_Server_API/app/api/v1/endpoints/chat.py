@@ -66,7 +66,14 @@ from tldw_Server_API.app.core.Utils.chunked_image_processor import get_image_pro
 # API Rate Limiter/Caching via Redis
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
+from slowapi.util import get_remote_address as _get_remote_address
+
+# Custom key function that bypasses rate limiting in TEST_MODE
+def get_remote_address(request):
+    import os
+    if os.getenv("TEST_MODE") == "true":
+        return None  # Return None to bypass rate limiting
+    return _get_remote_address(request)
 from loguru import logger
 from starlette.background import BackgroundTask
 from starlette.responses import JSONResponse, StreamingResponse

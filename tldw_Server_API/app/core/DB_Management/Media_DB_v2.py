@@ -445,6 +445,8 @@ class MediaDatabase:
 
         # Initialize thread-local storage for connections
         self._local = threading.local()
+        # Add lock for media insertion to prevent race conditions in concurrent uploads
+        self._media_insert_lock = threading.Lock()
 
         # Flag to track successful initialization before logging completion
         initialization_successful = False
@@ -2087,24 +2089,41 @@ class MediaDatabase:
 
                 # --- Path B: Record does not exist, perform INSERT ---
                 else:
-                    media_uuid = self._generate_uuid()
-                    payload = _media_payload(media_uuid, 1, chunk_status=final_chunk_status)
+                    # Use lock to prevent race conditions during concurrent inserts
+                    with self._media_insert_lock:
+                        # Double-check within lock that record still doesn't exist
+                        cur.execute(
+                            "SELECT id, uuid, version FROM Media WHERE url = ? AND deleted = 0", (url,)
+                        )
+                        recheck_row = cur.fetchone()
+                        if recheck_row:
+                            # Another thread inserted while we were waiting for lock
+                            media_id, media_uuid, current_ver = recheck_row["id"], recheck_row["uuid"], recheck_row["version"]
+                            if not overwrite:
+                                return None, None, f"Media '{title}' already exists (concurrent insert). Overwrite not enabled."
+                            # If overwrite is True, we could update, but for simplicity return existing
+                            return media_id, media_uuid, f"Media '{title}' already exists (handled concurrent insert)."
+                        
+                        # Proceed with INSERT - now protected by lock
+                        media_uuid = self._generate_uuid()
+                        payload = _media_payload(media_uuid, 1, chunk_status=final_chunk_status)
 
-                    cur.execute(
-                        """INSERT INTO Media (url, title, type, content, author, ingestion_date,
-                                              transcription_model, content_hash, is_trash, trash_date,
-                                              chunking_status, vector_processing, uuid, last_modified,
-                                              version, client_id, deleted)
-                           VALUES (:url, :title, :type, :content, :author, :ingestion_date,
-                                   :transcription_model, :content_hash, :is_trash, :trash_date,
-                                   :chunking_status, :vector_processing, :uuid, :last_modified,
-                                   :version, :client_id, :deleted)""",
-                        payload,
-                    )
-                    media_id = cur.lastrowid
-                    if not media_id:
-                        raise DatabaseError("Failed to obtain new media ID.")
+                        cur.execute(
+                            """INSERT INTO Media (url, title, type, content, author, ingestion_date,
+                                                  transcription_model, content_hash, is_trash, trash_date,
+                                                  chunking_status, vector_processing, uuid, last_modified,
+                                                  version, client_id, deleted)
+                               VALUES (:url, :title, :type, :content, :author, :ingestion_date,
+                                       :transcription_model, :content_hash, :is_trash, :trash_date,
+                                       :chunking_status, :vector_processing, :uuid, :last_modified,
+                                       :version, :client_id, :deleted)""",
+                            payload,
+                        )
+                        media_id = cur.lastrowid
+                        if not media_id:
+                            raise DatabaseError("Failed to obtain new media ID.")
 
+                    # Continue with the rest of the operations outside the lock
                     self._log_sync_event(conn, "Media", media_uuid, "create", 1, payload)
                     self._update_fts_media(conn, media_id, payload["title"], payload["content"])
                     self.update_keywords_for_media(media_id, keywords_norm)

@@ -1,0 +1,21 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.11, pytest-8.4.1, pluggy-1.6.0 -- /Users/appledev/Working/tldw_server/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /Users/appledev/Working/tldw_server
+configfile: pyproject.toml
+plugins: hypothesis-6.138.0, asyncio-1.1.0, xdist-3.8.0, anyio-4.10.0, mock-3.14.1
+asyncio: mode=Mode.AUTO, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 108 items
+
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestConcurrentUploads::test_concurrent_uploads_same_file FAILED [  0%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestConcurrentUploads::test_rapid_successive_uploads PASSED [  1%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestConcurrentUploads::test_upload_during_processing PASSED [  2%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestConcurrentCRUD::test_concurrent_note_updates PASSED [  3%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestConcurrentCRUD::test_concurrent_searches FAILED [  4%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestConcurrentCRUD::test_create_update_delete_race PASSED [  5%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestConcurrentCRUD::test_concurrent_character_chat_sessions SKIPPED [  6%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestLoadPatterns::test_burst_traffic PASSED [  7%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestLoadPatterns::test_sustained_load FAILED [  8%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestLoadPatterns::test_mixed_workload PASSED [  9%]
+tldw_Server_API/tests/e2e/test_concurrent_operations.py::TestLoadPatterns::test_gradual_ramp_up 

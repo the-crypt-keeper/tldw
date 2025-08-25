@@ -39,6 +39,8 @@ class APIClient:
         self.refresh_token: Optional[str] = None
         self.user_id: Optional[int] = None
         
+        # Note: TEST_MODE must be set on the server, not passed as header
+        
     def set_auth_token(self, token: str, refresh_token: Optional[str] = None):
         """Set authentication tokens."""
         self.token = token
@@ -390,9 +392,10 @@ class APIClient:
     # RAG/Search endpoints
     def search_media(self, query: str, limit: int = 10) -> Dict[str, Any]:
         """Search media content."""
-        response = self.client.get(
+        response = self.client.post(
             f"{API_PREFIX}/media/search",
-            params={"query": query, "limit": limit}
+            json={"query": query},
+            params={"limit": limit}
         )
         response.raise_for_status()
         return response.json()
