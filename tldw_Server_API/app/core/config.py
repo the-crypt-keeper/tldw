@@ -160,6 +160,40 @@ RAG_SERVICE_CONFIG = {
     }
 }
 
+# Configuration for speaker diarization
+DIARIZATION_CONFIG = {
+    # VAD (Voice Activity Detection) settings
+    "vad_threshold": 0.5,  # Silero VAD confidence threshold
+    "segment_duration": 30,  # Maximum segment duration in seconds
+    "speech_pad_ms": 400,  # Padding around speech segments in milliseconds
+    
+    # Embedding model settings
+    "embedding_model": "speechbrain/spkrec-ecapa-voxceleb",
+    "embedding_batch_size": 32,
+    "embedding_device": "auto",  # auto, cpu, cuda, or cuda:0
+    
+    # Clustering settings
+    "clustering_method": "spectral",  # spectral or agglomerative
+    "num_speakers": None,  # None for automatic detection
+    "min_speakers": 1,
+    "max_speakers": 10,
+    
+    # Post-processing settings
+    "min_segment_duration": 0.5,  # Minimum segment duration in seconds
+    "merge_threshold": 0.5,  # Threshold for merging adjacent segments
+    "overlap_detection": True,  # Enable overlap detection
+    "overlap_confidence_threshold": 0.7,
+    
+    # Performance settings
+    "num_threads": 4,  # Number of threads for processing
+    "use_auth_token": None,  # HuggingFace auth token if needed
+    "cache_dir": None,  # Directory for model cache
+    
+    # Output settings
+    "include_embeddings": False,  # Include embeddings in output
+    "include_vad_scores": False,  # Include VAD scores in output
+}
+
 
 def load_openai_mappings() -> Dict:
     # Determine path relative to this file.

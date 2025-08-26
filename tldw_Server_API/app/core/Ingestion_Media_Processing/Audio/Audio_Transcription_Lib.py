@@ -39,8 +39,17 @@ from transformers import AutoProcessor, Qwen2AudioForConditionalGeneration
 import sounddevice as sd
 import wave
 
-#from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Diarization_Lib_v2 import audio_diarization, \
-#    combine_transcription_and_diarization, DiarizationError
+# Import diarization module (optional dependency)
+try:
+    from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Diarization_Lib import (
+        DiarizationService, 
+        DiarizationError
+    )
+    DIARIZATION_AVAILABLE = True
+except ImportError:
+    DIARIZATION_AVAILABLE = False
+    DiarizationService = None
+    DiarizationError = Exception  # Fallback to base Exception
 #
 # Import Local
 from tldw_Server_API.app.core.Utils.Utils import sanitize_filename, logging
@@ -172,49 +181,96 @@ def perform_transcription(
 
         # --- Perform Diarization and Combination (if requested) ---
         if diarize:
-            final_segments = None
-            pass
-            # FIXME
-            # try:
-            #     # Define path to your diarization config
-            #     # Resolve path relative to current file or use absolute path
-            #     base_dir = Path(__file__).parent.resolve()  # Or wherever your config lives
-            #     diarization_config_path = base_dir / 'models' / 'pyannote_diarization_config.yaml'  # ADJUST PATH AS NEEDED
-            #
-            #     logging.info(f"Performing diarization using config: {diarization_config_path}...")
-            #     diarization_segments = audio_diarization(
-            #         audio_file_path=audio_file_path,
-            #         config_path=diarization_config_path
-            #         # Optionally pass num_speakers, min_speakers, max_speakers here if known
-            #     )
-            #
-            #     logging.info("Combining transcription and diarization results...")
-            #     final_segments = combine_transcription_and_diarization(
-            #         # FIXME
-            #         transcription_segments=adapted_transcription_segments,  # Use adapted segments
-            #         diarization_segments=diarization_segments
-            #     )
-            #     logging.info("Diarization and combination successful.")
-
-                # FIXME
-            # except (DiarizationError, FileNotFoundError) as e:
-            #     logging.error(f"Diarization or combination failed for {audio_file_path}: {e}")
-            #     # Decide how to handle diarization failure: return transcription only? or error?
-            #     # Option 1: Return transcription with warning
-            #     logging.warning("Proceeding with transcription only due to diarization error.")
-            #     final_segments = adapted_transcription_segments  # Fallback to transcription segments
-            #     # Add a warning marker maybe?
-            #     if final_segments:
-            #         final_segments[0]['text'] = f"[Warning: Diarization failed ({e})] " + final_segments[0]['text']
-            #
-            #     # Option 2: Treat as overall failure for this step
-            #     # return audio_file_path, None # Or raise the error
-
-            # Return the combined (or fallback) segments
-            return audio_file_path, final_segments
-
+            logging.info(f"Processing with diarization for {audio_file_path}")
+            
+            # Check if diarization is available
+            if not DIARIZATION_AVAILABLE:
+                logging.warning("Diarization requested but not available. Install with: pip install tldw-server[diarization]")
+                logging.info("Falling back to regular transcription without diarization")
+                diarize = False  # Fall back to regular transcription
+                
+            else:
+                # Check if diarized file already exists
+                if os.path.exists(diarized_json_path) and not overwrite:
+                    logging.info(f"Diarized file already exists (overwrite=False): {diarized_json_path}")
+                    try:
+                        with open(diarized_json_path, 'r', encoding='utf-8') as file:
+                            loaded_data = json.load(file)
+                        if isinstance(loaded_data, dict) and "segments" in loaded_data:
+                            segments = loaded_data["segments"]
+                        elif isinstance(loaded_data, list):
+                            segments = loaded_data
+                        else:
+                            raise ValueError("Diarized JSON structure is not valid")
+                        
+                        # Basic validation
+                        if isinstance(segments, list) and all(isinstance(s, dict) and 'Text' in s for s in segments):
+                            logging.debug(f"Loaded valid diarized segments from existing file.")
+                            return audio_file_path, segments
+                        else:
+                            logging.warning(f"Existing diarized file {diarized_json_path} has invalid format")
+                    except (json.JSONDecodeError, ValueError, TypeError, KeyError) as e:
+                        logging.warning(f"Failed to read/parse existing diarized file: {e}")
+                        # Continue to regenerate
+                
+                # First, get the transcription segments
+                logging.info(f"Generating transcription for diarization")
+                _, transcription_segments = re_generate_transcription(
+                    audio_file_path,
+                    transcription_model,
+                    vad_use,
+                    selected_source_lang=transcription_language
+                )
+                
+                if transcription_segments is None:
+                    logging.error(f"Transcription generation failed for {audio_file_path}")
+                    return audio_file_path, None
+                
+                # Now perform diarization
+                try:
+                    logging.info(f"Performing speaker diarization...")
+                    diarization_service = DiarizationService()
+                    
+                    if not diarization_service.is_available:
+                        logging.warning("Diarization service is not available (missing dependencies)")
+                        logging.info("Returning transcription without speaker labels")
+                        return audio_file_path, transcription_segments
+                    
+                    # Perform diarization with transcription segments
+                    diarized_segments = diarization_service.diarize(
+                        audio_path=audio_file_path,
+                        transcription_segments=transcription_segments
+                    )
+                    
+                    if diarized_segments and 'segments' in diarized_segments:
+                        final_segments = diarized_segments['segments']
+                        
+                        # Save diarized results
+                        with open(diarized_json_path, 'w', encoding='utf-8') as f:
+                            json.dump({'segments': final_segments}, f, ensure_ascii=False, indent=2)
+                        
+                        logging.info(f"Diarization successful. Saved to {diarized_json_path}")
+                        return audio_file_path, final_segments
+                    else:
+                        logging.warning("Diarization returned no segments")
+                        return audio_file_path, transcription_segments
+                        
+                except DiarizationError as e:
+                    logging.error(f"Diarization failed for {audio_file_path}: {e}")
+                    logging.warning("Proceeding with transcription only due to diarization error.")
+                    # Add a warning to the first segment if possible
+                    if transcription_segments:
+                        transcription_segments[0]['Text'] = f"[Note: Speaker diarization failed] " + transcription_segments[0].get('Text', '')
+                    return audio_file_path, transcription_segments
+                    
+                except Exception as e:
+                    logging.error(f"Unexpected error during diarization: {e}", exc_info=True)
+                    return audio_file_path, transcription_segments
+        
+        # If we get here and diarize was set to False (either originally or as fallback), continue with regular path
+        
         # 4. Handle Non-Diarized Path
-        else:
+        if not diarize:
             logging.info(f"Processing without diarization for {audio_file_path}")
             # Check if non-diarized JSON exists
             if os.path.exists(segments_json_path) and not overwrite:

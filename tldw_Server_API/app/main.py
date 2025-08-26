@@ -255,7 +255,7 @@ async def lifespan(app: FastAPI):
     logger.info("App Startup: Initializing TTS service...")
     try:
         from tldw_Server_API.app.core.TTS.tts_generation import get_tts_service
-        from tldw_Server_API.app.core.Utils.Utils import load_comprehensive_config
+        from tldw_Server_API.app.core.config import load_comprehensive_config
         
         # Load TTS configuration
         tts_config = load_comprehensive_config()

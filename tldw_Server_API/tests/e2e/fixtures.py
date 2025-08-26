@@ -27,6 +27,8 @@ from pathlib import Path
 BASE_URL = os.getenv("E2E_TEST_BASE_URL", "http://localhost:8000")
 API_PREFIX = "/api/v1"
 TEST_TIMEOUT = 120  # seconds for each request (increased for video transcription)
+RATE_LIMIT_RETRY_DELAY = float(os.getenv("E2E_RATE_LIMIT_DELAY", "0.5"))  # Delay after rate limit
+MAX_RETRIES = int(os.getenv("E2E_MAX_RETRIES", "3"))  # Max retries for rate limit errors
 
 
 class APIClient:
@@ -40,6 +42,22 @@ class APIClient:
         self.user_id: Optional[int] = None
         
         # Note: TEST_MODE must be set on the server, not passed as header
+    
+    def _handle_rate_limit(self, func: Callable, *args, **kwargs) -> Any:
+        """Handle rate limiting with retry logic."""
+        for attempt in range(MAX_RETRIES):
+            try:
+                return func(*args, **kwargs)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    if attempt < MAX_RETRIES - 1:
+                        # Exponential backoff with jitter
+                        delay = RATE_LIMIT_RETRY_DELAY * (2 ** attempt) + (time.time() % 0.1)
+                        print(f"Rate limited, retrying in {delay:.2f}s (attempt {attempt + 1}/{MAX_RETRIES})")
+                        time.sleep(delay)
+                        continue
+                raise
+        return func(*args, **kwargs)
         
     def set_auth_token(self, token: str, refresh_token: Optional[str] = None):
         """Set authentication tokens."""
@@ -274,16 +292,24 @@ class APIClient:
     def chat_completion(self, messages: List[Dict[str, str]], 
                         model: str = "gpt-3.5-turbo",
                         temperature: float = 0.7,
+                        character_id: Optional[int] = None,
+                        conversation_id: Optional[str] = None,
                         stream: bool = False) -> Dict[str, Any]:
-        """Send chat completion request."""
+        """Send chat completion request with optional character context."""
+        data = {
+            "messages": messages,
+            "model": model,
+            "temperature": temperature,
+            "stream": stream
+        }
+        if character_id is not None:
+            data["character_id"] = str(character_id)  # API expects string
+        if conversation_id is not None:
+            data["conversation_id"] = conversation_id
+        
         response = self.client.post(
             f"{API_PREFIX}/chat/completions",
-            json={
-                "messages": messages,
-                "model": model,
-                "temperature": temperature,
-                "stream": stream
-            }
+            json=data
         )
         response.raise_for_status()
         return response.json()
@@ -291,40 +317,49 @@ class APIClient:
     # Notes endpoints
     def create_note(self, title: str, content: str, keywords: Optional[List[str]] = None) -> Dict[str, Any]:
         """Create a new note."""
-        data = {
-            "title": title,
-            "content": content
-        }
-        if keywords:
-            data["keywords"] = keywords
-            
-        response = self.client.post(f"{API_PREFIX}/notes/", json=data)
-        response.raise_for_status()
-        return response.json()
+        def _create():
+            data = {
+                "title": title,
+                "content": content
+            }
+            if keywords:
+                data["keywords"] = keywords
+                
+            response = self.client.post(f"{API_PREFIX}/notes/", json=data)
+            response.raise_for_status()
+            return response.json()
+        
+        return self._handle_rate_limit(_create)
     
     def get_notes(self, limit: int = 50, offset: int = 0) -> Dict[str, Any]:
         """Get list of notes."""
-        response = self.client.get(
-            f"{API_PREFIX}/notes/",
-            params={"limit": limit, "offset": offset}
-        )
-        response.raise_for_status()
-        return response.json()
+        def _get():
+            response = self.client.get(
+                f"{API_PREFIX}/notes/",
+                params={"limit": limit, "offset": offset}
+            )
+            response.raise_for_status()
+            return response.json()
+        
+        return self._handle_rate_limit(_get)
     
     def update_note(self, note_id: str, title: Optional[str] = None, 
                    content: Optional[str] = None, version: int = 1) -> Dict[str, Any]:
         """Update an existing note."""
-        data = {}
-        if title:
-            data["title"] = title
-        if content:
-            data["content"] = content
-            
-        # Add expected version header for optimistic locking
-        headers = {"expected-version": str(version)}
-        response = self.client.put(f"{API_PREFIX}/notes/{note_id}", json=data, headers=headers)
-        response.raise_for_status()
-        return response.json()
+        def _update():
+            data = {}
+            if title:
+                data["title"] = title
+            if content:
+                data["content"] = content
+                
+            # Add expected version header for optimistic locking
+            headers = {"expected-version": str(version)}
+            response = self.client.put(f"{API_PREFIX}/notes/{note_id}", json=data, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        
+        return self._handle_rate_limit(_update)
     
     def delete_note(self, note_id: int) -> Dict[str, Any]:
         """Delete a note."""
@@ -383,6 +418,22 @@ class APIClient:
         response.raise_for_status()
         return response.json()
     
+    def get_character(self, character_id: int) -> Dict[str, Any]:
+        """Get a specific character by ID."""
+        response = self.client.get(f"{API_PREFIX}/characters/{character_id}")
+        response.raise_for_status()
+        return response.json()
+    
+    def update_character(self, character_id: int, expected_version: int, **kwargs) -> Dict[str, Any]:
+        """Update a character with optimistic locking."""
+        response = self.client.put(
+            f"{API_PREFIX}/characters/{character_id}",
+            json=kwargs,
+            params={"expected_version": expected_version}
+        )
+        response.raise_for_status()
+        return response.json()
+    
     def delete_character(self, character_id: int) -> Dict[str, Any]:
         """Delete a character."""
         response = self.client.delete(f"{API_PREFIX}/characters/{character_id}")
@@ -392,10 +443,36 @@ class APIClient:
     # RAG/Search endpoints
     def search_media(self, query: str, limit: int = 10) -> Dict[str, Any]:
         """Search media content."""
+        def _search():
+            response = self.client.post(
+                f"{API_PREFIX}/media/search",
+                json={"query": query},
+                params={"limit": limit}
+            )
+            response.raise_for_status()
+            return response.json()
+        
+        return self._handle_rate_limit(_search)
+    
+    def rag_simple_search(self, query: str, databases: List[str] = None, **kwargs) -> Dict[str, Any]:
+        """Perform simple RAG search."""
+        data = {
+            "query": query,
+            "databases": databases or ["media"],
+            **kwargs
+        }
         response = self.client.post(
-            f"{API_PREFIX}/media/search",
-            json={"query": query},
-            params={"limit": limit}
+            f"{API_PREFIX}/rag/simple/search",
+            json=data
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def rag_advanced_search(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform advanced RAG search with full configuration."""
+        response = self.client.post(
+            f"{API_PREFIX}/rag/search",
+            json=config
         )
         response.raise_for_status()
         return response.json()
@@ -1217,6 +1294,135 @@ Test content without proper boundary end""".encode()
         except:
             return b'\xff\xfe\xff\xfe'
 
+
+# ============================================================================
+# STRONG ASSERTION HELPERS - Enhanced validation with exact value checking
+# ============================================================================
+
+class StrongAssertionHelpers:
+    """Enhanced assertion helpers with strict value checking."""
+    
+    @staticmethod
+    def assert_exact_value(actual, expected, field_name="field"):
+        """Assert exact value match with helpful error message."""
+        assert actual == expected, \
+            f"{field_name}: expected '{expected}', got '{actual}'"
+    
+    @staticmethod
+    def assert_value_in_range(value, min_val, max_val, field_name="value"):
+        """Assert numeric value is within range."""
+        assert isinstance(value, (int, float)), \
+            f"{field_name} must be numeric, got {type(value).__name__}"
+        assert min_val <= value <= max_val, \
+            f"{field_name} {value} not in range [{min_val}, {max_val}]"
+    
+    @staticmethod
+    def assert_non_empty_string(value, field_name="field", min_length=1):
+        """Assert string is non-empty with minimum length."""
+        assert isinstance(value, str), \
+            f"{field_name} must be string, got {type(value).__name__}"
+        assert len(value) >= min_length, \
+            f"{field_name} too short: {len(value)} < {min_length}"
+    
+    @staticmethod
+    def assert_valid_timestamp(timestamp_str, field_name="timestamp"):
+        """Assert valid ISO format timestamp."""
+        from datetime import datetime
+        try:
+            datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        except (ValueError, AttributeError) as e:
+            pytest.fail(f"Invalid {field_name}: {timestamp_str} - {e}")
+    
+    @staticmethod
+    def assert_character_response(character_data):
+        """Validate character response structure and values."""
+        required = ["id", "name", "version"]
+        for field in required:
+            assert field in character_data, f"Missing required field: {field}"
+        
+        # Type validation
+        assert isinstance(character_data["id"], int), \
+            f"ID must be int, got {type(character_data['id']).__name__}"
+        assert isinstance(character_data["name"], str), \
+            f"Name must be string, got {type(character_data['name']).__name__}"
+        assert isinstance(character_data["version"], int), \
+            f"Version must be int, got {type(character_data['version']).__name__}"
+        
+        # Value validation
+        assert character_data["id"] > 0, f"Invalid ID: {character_data['id']}"
+        assert len(character_data["name"]) > 0, "Name is empty"
+        assert character_data["version"] >= 1, f"Invalid version: {character_data['version']}"
+        
+        # Optional fields validation when present
+        if "tags" in character_data:
+            assert isinstance(character_data["tags"], list), \
+                f"Tags must be list, got {type(character_data['tags']).__name__}"
+        if "description" in character_data:
+            assert isinstance(character_data["description"], str), \
+                f"Description must be string, got {type(character_data['description']).__name__}"
+    
+    @staticmethod
+    def assert_rag_result_quality(result, query_terms=None):
+        """Validate RAG search result quality and structure."""
+        assert "content" in result, "Result missing 'content'"
+        
+        # Content validation
+        content = result["content"]
+        assert isinstance(content, str), f"Content must be string, got {type(content).__name__}"
+        assert len(content) > 10, f"Content too short: {len(content)} chars"
+        
+        # Score validation if present
+        if "score" in result:
+            score = result["score"]
+            assert isinstance(score, (int, float)), \
+                f"Score must be numeric, got {type(score).__name__}"
+            assert 0.0 <= score <= 1.0, f"Score out of range: {score}"
+        
+        # Source validation if present
+        if "source" in result:
+            source = result["source"]
+            assert isinstance(source, dict), \
+                f"Source must be dict, got {type(source).__name__}"
+            assert "type" in source, "Source missing 'type'"
+            assert source["type"] in ["media", "note", "character", "chat"], \
+                f"Invalid source type: {source['type']}"
+            if "id" in source:
+                assert isinstance(source["id"], (int, str)), \
+                    f"Source ID must be int or string, got {type(source['id']).__name__}"
+        
+        # Relevance check if query terms provided
+        if query_terms:
+            content_lower = content.lower()
+            has_term = any(term.lower() in content_lower for term in query_terms)
+            if not has_term and result.get("score", 0) > 0.5:
+                print(f"Warning: High score {result.get('score')} but no query terms found in content")
+    
+    @staticmethod
+    def assert_chat_response_quality(response, min_length=10):
+        """Validate chat response quality and structure."""
+        assert "choices" in response, "Response missing 'choices'"
+        choices = response["choices"]
+        assert isinstance(choices, list), f"Choices must be list, got {type(choices).__name__}"
+        assert len(choices) > 0, "No choices in response"
+        
+        # Validate first choice
+        choice = choices[0]
+        assert isinstance(choice, dict), f"Choice must be dict, got {type(choice).__name__}"
+        assert "message" in choice, "Choice missing 'message'"
+        
+        # Validate message
+        message = choice["message"]
+        assert isinstance(message, dict), f"Message must be dict, got {type(message).__name__}"
+        assert "role" in message, "Message missing 'role'"
+        assert "content" in message, "Message missing 'content'"
+        
+        # Validate content
+        content = message["content"]
+        assert isinstance(content, str), f"Content must be string, got {type(content).__name__}"
+        assert len(content) >= min_length, \
+            f"Response too short: {len(content)} < {min_length}"
+        
+        return content
 
 # Test markers would be defined in pytest.ini or pyproject.toml
 # For now, commenting out to avoid errors
