@@ -12,6 +12,10 @@ The RAG (Retrieval-Augmented Generation) module provides intelligent search and 
 - **Hybrid Search**: Combines keyword (FTS5) and vector similarity search
 - **Smart Caching**: Semantic cache with adaptive thresholds
 - **Document Reranking**: Multiple strategies for relevance optimization
+- **Security Features**: PII detection, content filtering, and access control
+- **Batch Processing**: Efficient handling of multiple queries simultaneously
+- **User Feedback**: Collect and analyze user feedback to improve search quality
+- **Citation Generation**: Automatic citation extraction from search results
 - **Production Ready**: Optional resilience features (circuit breakers, retries, fallbacks)
 - **Performance Monitoring**: Built-in metrics and timing analysis
 
@@ -50,9 +54,18 @@ RAG/
 │   ├── database_retrievers.py # Database retrieval
 │   ├── query_expansion.py     # Query enhancement
 │   ├── semantic_cache.py      # Caching layer
+│   ├── advanced_cache.py      # Advanced caching strategies
 │   ├── advanced_reranking.py  # Document reranking
 │   ├── resilience.py          # Fault tolerance
 │   ├── performance_monitor.py # Performance tracking
+│   ├── metrics_collector.py   # Comprehensive metrics
+│   ├── security_filters.py   # PII detection & content filtering
+│   ├── batch_processing.py   # Batch query handling
+│   ├── feedback_system.py    # User feedback collection
+│   ├── citations.py          # Citation generation
+│   ├── parent_retrieval.py   # Parent document retrieval
+│   ├── generation.py         # Answer generation
+│   ├── health_check.py      # Health monitoring
 │   ├── config.py              # Configuration
 │   ├── types.py               # Type definitions
 │   └── ... (additional modules)
@@ -167,6 +180,7 @@ config = {
 - `expand_query()` - Enhance query with variations
 - `check_cache()` - Check semantic cache
 - `retrieve_documents()` - Fetch from databases
+- `filter_by_keywords()` - Filter documents by keywords
 - `optimize_chromadb_search()` - Vector search optimization
 - `process_tables()` - Extract and process tables
 - `rerank_documents()` - Reorder by relevance
@@ -199,7 +213,9 @@ The RAG module is exposed through FastAPI endpoints:
 
 - `POST /api/v1/rag/search/simple` - Simple search interface
 - `POST /api/v1/rag/search/complex` - Advanced search with full options
-- `GET /api/v1/rag/health` - Health check endpoint
+- `GET /api/v1/rag/health` - Health check endpoint with component status
+- `GET /api/v1/rag/pipelines` - List available pipeline presets
+- `GET /api/v1/rag/capabilities` - Get detailed service capabilities
 
 See [RAG API Documentation](/Docs/API-related/RAG_API_Documentation.md) for details.
 
@@ -217,6 +233,85 @@ python -m pytest tests/RAG/test_rag_refactored.py -v
 python -m pytest tests/RAG/ --cov=app.core.RAG --cov-report=html
 ```
 
+## Advanced Features
+
+### Security & Privacy
+
+The RAG module includes comprehensive security features:
+
+```python
+from tldw_Server_API.app.core.RAG.rag_service.security_filters import SecurityFilter
+
+# Enable PII detection and filtering
+security_filter = SecurityFilter()
+filtered_docs = await security_filter.filter_documents(
+    documents,
+    detect_pii=True,
+    redact_sensitive=True
+)
+```
+
+Features:
+- PII detection (emails, SSNs, credit cards, etc.)
+- Content filtering based on sensitivity levels
+- Access control enforcement
+- Audit logging for compliance
+
+### Batch Processing
+
+Process multiple queries efficiently:
+
+```python
+from tldw_Server_API.app.core.RAG.rag_service.batch_processing import BatchProcessor
+
+processor = BatchProcessor(max_concurrent=5)
+batch_results = await processor.process_batch(
+    queries=["query1", "query2", "query3"],
+    pipeline=standard_pipeline,
+    priority=PriorityLevel.HIGH
+)
+```
+
+Features:
+- Concurrent query processing
+- Priority-based scheduling
+- Resource management
+- Partial failure handling
+
+### Feedback System
+
+Collect and utilize user feedback:
+
+```python
+from tldw_Server_API.app.core.RAG.rag_service.feedback_system import FeedbackCollector
+
+collector = FeedbackCollector()
+await collector.record_feedback(
+    query_id="...",
+    relevance_score=4,
+    helpful=True,
+    user_id="..."
+)
+
+# Use feedback to improve future searches
+improved_results = await collector.apply_feedback_boost(results, query)
+```
+
+### Citation Generation
+
+Automatically extract citations from search results:
+
+```python
+from tldw_Server_API.app.core.RAG.rag_service.citations import CitationGenerator
+
+generator = CitationGenerator()
+citations = await generator.generate_citations(
+    documents,
+    style="apa",  # or "mla", "chicago"
+    include_metadata=True
+)
+```
+
 ## Performance
 
 Typical pipeline execution times (on standard hardware):
@@ -224,6 +319,7 @@ Typical pipeline execution times (on standard hardware):
 - Standard pipeline: ~200-300ms (with cache miss)
 - Standard pipeline: ~20-30ms (with cache hit)
 - Quality pipeline: ~500-800ms
+- Batch processing: ~100ms per query (concurrent)
 
 ## Migration from Old Architecture
 

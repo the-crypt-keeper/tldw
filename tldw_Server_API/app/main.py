@@ -292,6 +292,31 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"App Startup: Failed to initialize audit service: {e}")
     
+    # Display authentication mode and API key for single-user mode
+    try:
+        from tldw_Server_API.app.core.AuthNZ.settings import get_settings, is_single_user_mode
+        settings = get_settings()
+        
+        logger.info("=" * 60)
+        logger.info("🚀 TLDW Server Started Successfully")
+        logger.info("=" * 60)
+        
+        if is_single_user_mode():
+            logger.info(f"🔐 Authentication Mode: SINGLE USER")
+            logger.info(f"🔑 API Key: {settings.SINGLE_USER_API_KEY}")
+            logger.info("=" * 60)
+            logger.info("Use this API key in the X-API-KEY header for requests")
+        else:
+            logger.info(f"🔐 Authentication Mode: MULTI USER")
+            logger.info("JWT Bearer tokens required for authentication")
+            logger.info("=" * 60)
+        
+        logger.info(f"📍 API Documentation: http://127.0.0.1:8000/docs")
+        logger.info(f"🌐 WebUI: http://127.0.0.1:8000/webui/")
+        logger.info("=" * 60)
+    except Exception as e:
+        logger.error(f"Failed to display startup info: {e}")
+    
     yield
     
     # Shutdown: Clean up resources
@@ -397,6 +422,38 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Display API key information on startup for single user mode
+from tldw_Server_API.app.core.AuthNZ.settings import get_settings, is_single_user_mode
+
+@app.on_event("startup")
+async def display_startup_info():
+    """Display important startup information including API key in single user mode."""
+    if is_single_user_mode():
+        settings = get_settings()
+        api_key = settings.SINGLE_USER_API_KEY
+        
+        # Create a visually prominent display
+        logger.info("="*70)
+        logger.info("🚀 TLDW Server Started in SINGLE USER MODE")
+        logger.info("="*70)
+        logger.info("")
+        logger.info("📌 API Key for authentication:")
+        logger.info(f"   {api_key}")
+        logger.info("")
+        logger.info("🌐 Access URLs:")
+        logger.info("   WebUI:    http://localhost:8000/webui/")
+        logger.info("   API Docs: http://localhost:8000/docs")
+        logger.info("   ReDoc:    http://localhost:8000/redoc")
+        logger.info("")
+        logger.info("💡 The WebUI will automatically use this API key")
+        logger.info("="*70)
+    else:
+        logger.info("="*70)
+        logger.info("🚀 TLDW Server Started in MULTI-USER MODE")
+        logger.info("="*70)
+        logger.info("Authentication required via JWT tokens")
+        logger.info("="*70)
+
 # --- FIX: Add CORS Middleware ---
 # Import from config
 from tldw_Server_API.app.core.config import ALLOWED_ORIGINS, API_V1_PREFIX
@@ -420,6 +477,40 @@ add_csrf_protection(app)
 
 # Static files serving
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+# WebUI serving - Serve the WebUI from the same origin to avoid CORS issues
+WEBUI_DIR = BASE_DIR.parent / "WebUI"
+if WEBUI_DIR.exists():
+    # First, add a dynamic config endpoint for single user mode
+    @app.get("/webui/config.json", include_in_schema=False)
+    async def get_webui_config():
+        """Dynamically generate WebUI configuration with API key in single user mode."""
+        from tldw_Server_API.app.core.AuthNZ.settings import get_settings, is_single_user_mode
+        from fastapi.responses import JSONResponse
+        
+        config = {
+            "apiUrl": "",  # Empty means use same origin
+            "apiKey": "",  # Default empty
+            "_comment": "Auto-generated configuration"
+        }
+        
+        # In single user mode, include the API key
+        if is_single_user_mode():
+            settings = get_settings()
+            config["apiKey"] = settings.SINGLE_USER_API_KEY
+            config["mode"] = "single-user"
+            config["_comment"] = "Auto-configured for single user mode"
+        else:
+            config["mode"] = "multi-user"
+            config["_comment"] = "Multi-user mode - manual authentication required"
+        
+        return JSONResponse(content=config)
+    
+    # Mount the WebUI static files (except config.json which is handled dynamically)
+    app.mount("/webui", StaticFiles(directory=str(WEBUI_DIR), html=True), name="webui")
+    logger.info(f"WebUI mounted at /webui from {WEBUI_DIR}")
+else:
+    logger.warning(f"WebUI directory not found at {WEBUI_DIR}")
 
 # Favicon serving
 @app.get("/favicon.ico", include_in_schema=False)

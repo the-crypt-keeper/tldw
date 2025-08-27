@@ -12,7 +12,7 @@ Provides endpoints for:
 import os
 from datetime import datetime
 from typing import List, Optional, Dict, Any, AsyncGenerator
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status, Query, Security, Request
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status, Query, Security, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
@@ -87,19 +87,27 @@ eval_runner = EvaluationRunner(db_path)
 
 # ============= Authentication =============
 
-async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)) -> str:
+async def verify_api_key(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+    x_api_key: Optional[str] = Header(None, alias="X-API-KEY")
+) -> str:
     """
     Verify API key or JWT token based on authentication mode.
     
     Supports:
-    - Single-user mode: API key from environment or config
-    - Multi-user mode: JWT tokens
+    - Single-user mode: API key from environment or config (X-API-KEY header or Bearer token)
+    - Multi-user mode: JWT tokens (Bearer token)
     - OpenAI compatibility: sk- prefixed keys
     """
     settings = get_settings()
     
-    # Always require credentials for production security
-    if not credentials:
+    # Check for X-API-KEY header first (for single-user mode)
+    if settings.AUTH_MODE == "single_user" and x_api_key:
+        token = x_api_key
+    elif credentials:
+        token = credentials.credentials
+    else:
+        # No credentials provided
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {
@@ -108,8 +116,6 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
                 "code": "missing_credentials"
             }}
         )
-    
-    token = credentials.credentials
     
     # Remove Bearer prefix if present
     if token.startswith("Bearer "):

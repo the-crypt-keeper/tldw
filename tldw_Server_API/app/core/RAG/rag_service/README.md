@@ -12,6 +12,10 @@ This RAG service provides a **functional pipeline architecture** where pure func
 - **Multiple Data Sources**: Search across media files, notes, prompts, and character cards
 - **Hybrid Search**: Combines keyword (FTS5) and vector search for best results
 - **Smart Processing**: Document deduplication, reranking, and context optimization
+- **Security & Privacy**: PII detection, content filtering, and access control
+- **Batch Processing**: Handle multiple queries concurrently with priority scheduling
+- **User Feedback**: Collect relevance feedback to improve search quality
+- **Citation Management**: Automatic citation extraction and formatting
 - **Flexible Pipelines**: Pre-built pipelines or build your own
 - **Production Ready**: Optional resilience features (circuit breakers, retries)
 - **Performance**: Built-in caching, metrics, and efficient resource usage
@@ -24,11 +28,20 @@ rag_service/
 ├── database_retrievers.py      # Database retrieval strategies
 ├── query_expansion.py          # Query enhancement strategies
 ├── semantic_cache.py           # Semantic caching implementation
+├── advanced_cache.py          # Advanced caching strategies
 ├── advanced_reranking.py       # Document reranking strategies
+├── security_filters.py        # PII detection and content filtering
+├── batch_processing.py        # Batch query processing
+├── feedback_system.py         # User feedback collection
+├── citations.py              # Citation generation
+├── parent_retrieval.py       # Parent document retrieval
+├── generation.py             # Answer generation
 ├── table_serialization.py      # Table processing functionality
 ├── performance_monitor.py      # Performance monitoring
+├── metrics_collector.py      # Comprehensive metrics
 ├── resilience.py              # Fault tolerance (circuit breakers, retries)
 ├── observability.py           # Logging and tracing
+├── health_check.py           # Health monitoring
 ├── config.py                  # Configuration management
 ├── types.py                   # Type definitions
 └── utils.py                   # Helper utilities
@@ -115,6 +128,7 @@ result = await my_pipeline(context)
 
 #### Retrieval
 - `retrieve_documents()` - Fetch from configured databases
+- `filter_by_keywords()` - Keyword-based filtering
 - `optimize_chromadb_search()` - Optimize vector search
 
 #### Processing
@@ -390,6 +404,93 @@ result = await standard_pipeline(
         **config
     }
 )
+```
+
+## Advanced Features
+
+### Security Filtering
+
+Filter out sensitive content and PII:
+
+```python
+from rag_service.security_filters import SecurityFilter, SensitivityLevel
+
+filter = SecurityFilter()
+# Detect and redact PII
+filtered = await filter.filter_documents(
+    documents,
+    detect_pii=True,
+    redact_sensitive=True,
+    min_sensitivity=SensitivityLevel.INTERNAL
+)
+```
+
+### Batch Processing
+
+Process multiple queries efficiently:
+
+```python
+from rag_service.batch_processing import BatchProcessor, PriorityLevel
+
+processor = BatchProcessor(
+    max_concurrent=10,
+    timeout_per_query=5.0
+)
+results = await processor.process_batch(
+    queries=["query1", "query2", "query3"],
+    pipeline=standard_pipeline,
+    priority=PriorityLevel.HIGH
+)
+```
+
+### User Feedback Integration
+
+Collect and apply user feedback:
+
+```python
+from rag_service.feedback_system import FeedbackCollector, RelevanceScore
+
+collector = FeedbackCollector()
+# Record feedback
+await collector.record_feedback(
+    query_id="abc123",
+    document_id="doc456",
+    relevance=RelevanceScore.GOOD,
+    helpful=True
+)
+
+# Use feedback to boost relevance
+boosted = await collector.apply_feedback_boost(documents, query)
+```
+
+### Citation Generation
+
+Generate properly formatted citations:
+
+```python
+from rag_service.citations import CitationGenerator
+
+generator = CitationGenerator()
+citations = await generator.generate_citations(
+    documents,
+    style="apa",  # or "mla", "chicago"
+    include_metadata=True,
+    include_page_numbers=True
+)
+```
+
+### Health Monitoring
+
+Monitor RAG service health:
+
+```python
+from rag_service.health_check import HealthChecker
+
+checker = HealthChecker()
+health = await checker.check_health()
+print(f"Status: {health.status}")
+print(f"Latency: {health.avg_latency_ms}ms")
+print(f"Cache hit rate: {health.cache_hit_rate:.2%}")
 ```
 
 ## Extending the Service
