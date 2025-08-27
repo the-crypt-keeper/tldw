@@ -422,3 +422,695 @@ function initializeChatCompletionsTab() {
     background-color: #545b62;
 }
 </style>
+
+<!-- Characters Tab -->
+<div id="tabCharacters" class="tab-content">
+    <div class="endpoint-section" id="charactersCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/characters - Create Character</span>
+        </h2>
+        <p>Create a new character for roleplay or conversation.</p>
+        
+        <div class="form-group">
+            <label for="charactersCreate_name">Character Name <span class="required">*</span>:</label>
+            <input type="text" id="charactersCreate_name" placeholder="e.g., Assistant, Teacher, Expert">
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_description">Description:</label>
+            <textarea id="charactersCreate_description" rows="3" placeholder="Brief character description..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_personality">Personality:</label>
+            <textarea id="charactersCreate_personality" rows="3" placeholder="Character personality traits..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_system_prompt">System Prompt:</label>
+            <textarea id="charactersCreate_system_prompt" rows="5" placeholder="System instructions for the character...">You are a helpful AI assistant.</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_first_message">First Message:</label>
+            <textarea id="charactersCreate_first_message" rows="3" placeholder="Character's greeting or first message...">Hello! How can I assist you today?</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_tags">Tags (comma-separated):</label>
+            <input type="text" id="charactersCreate_tags" placeholder="e.g., helpful, technical, friendly">
+        </div>
+        
+        <button class="api-button" onclick="createCharacter()">
+            Create Character
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersCreate_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="charactersList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/characters - List Characters</span>
+        </h2>
+        <p>List all available characters.</p>
+        
+        <button class="api-button" onclick="listCharacters()">
+            List Characters
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersList_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="charactersGet">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/characters/{character_id} - Get Character</span>
+        </h2>
+        <p>Get details of a specific character.</p>
+        
+        <div class="form-group">
+            <label for="charactersGet_id">Character ID <span class="required">*</span>:</label>
+            <input type="text" id="charactersGet_id" placeholder="Enter character ID">
+        </div>
+        
+        <button class="api-button" onclick="getCharacter()">
+            Get Character
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersGet_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="charactersUpdate">
+        <h2>
+            <span class="endpoint-method put">PUT</span>
+            <span class="endpoint-path">/api/v1/characters/{character_id} - Update Character</span>
+        </h2>
+        <p>Update an existing character.</p>
+        
+        <div class="form-group">
+            <label for="charactersUpdate_id">Character ID <span class="required">*</span>:</label>
+            <input type="text" id="charactersUpdate_id" placeholder="Enter character ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersUpdate_payload">Update Data (JSON):</label>
+            <textarea id="charactersUpdate_payload" class="code-input" rows="15">{
+  "name": "Updated Character Name",
+  "description": "Updated description",
+  "personality": "Updated personality traits",
+  "system_prompt": "Updated system prompt",
+  "first_message": "Updated greeting message",
+  "tags": ["tag1", "tag2"]
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="updateCharacter()">
+            Update Character
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersUpdate_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="charactersDelete">
+        <h2>
+            <span class="endpoint-method delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/characters/{character_id} - Delete Character</span>
+        </h2>
+        <p>Delete a character.</p>
+        
+        <div class="form-group">
+            <label for="charactersDelete_id">Character ID <span class="required">*</span>:</label>
+            <input type="text" id="charactersDelete_id" placeholder="Enter character ID">
+        </div>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Delete this character?')) deleteCharacter()">
+            Delete Character
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersDelete_response">---</pre>
+    </div>
+</div>
+
+<!-- Conversations Tab -->
+<div id="tabConversations" class="tab-content">
+    <div class="endpoint-section" id="conversationsCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/conversations - Create Conversation</span>
+        </h2>
+        <p>Start a new conversation with a character or assistant.</p>
+        
+        <div class="form-group">
+            <label for="conversationsCreate_title">Conversation Title:</label>
+            <input type="text" id="conversationsCreate_title" placeholder="e.g., Technical Discussion, Project Planning">
+        </div>
+        
+        <div class="form-group">
+            <label for="conversationsCreate_character_id">Character ID (optional):</label>
+            <input type="text" id="conversationsCreate_character_id" placeholder="Character ID to use for this conversation">
+        </div>
+        
+        <div class="form-group">
+            <label for="conversationsCreate_system_prompt">System Prompt (optional):</label>
+            <textarea id="conversationsCreate_system_prompt" rows="3" placeholder="Override character's system prompt for this conversation"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="conversationsCreate_initial_message">Initial Message:</label>
+            <textarea id="conversationsCreate_initial_message" rows="3" placeholder="Your first message in the conversation"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="conversationsCreate_metadata">Metadata (JSON):</label>
+            <textarea id="conversationsCreate_metadata" class="code-input" rows="3">{}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="createConversation()">
+            Create Conversation
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="conversationsCreate_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="conversationsList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/conversations - List Conversations</span>
+        </h2>
+        <p>List all conversations with optional filtering.</p>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="conversationsList_character_id">Character ID (optional):</label>
+                    <input type="text" id="conversationsList_character_id" placeholder="Filter by character">
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="form-group">
+                    <label for="conversationsList_limit">Limit:</label>
+                    <input type="number" id="conversationsList_limit" value="20" min="1" max="100">
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="listConversations()">
+            List Conversations
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="conversationsList_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="conversationsGet">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/conversations/{conversation_id} - Get Conversation</span>
+        </h2>
+        <p>Get details and messages of a specific conversation.</p>
+        
+        <div class="form-group">
+            <label for="conversationsGet_id">Conversation ID <span class="required">*</span>:</label>
+            <input type="text" id="conversationsGet_id" placeholder="Enter conversation ID">
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="conversationsGet_include_messages" checked>
+                Include Messages
+            </label>
+        </div>
+        
+        <button class="api-button" onclick="getConversationDetails()">
+            Get Conversation
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="conversationsGet_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="conversationsChat">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/conversations/{conversation_id}/chat - Send Message</span>
+        </h2>
+        <p>Send a message to a conversation and get a response.</p>
+        
+        <div class="form-group">
+            <label for="conversationsChat_id">Conversation ID <span class="required">*</span>:</label>
+            <input type="text" id="conversationsChat_id" placeholder="Enter conversation ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="conversationsChat_message">Message <span class="required">*</span>:</label>
+            <textarea id="conversationsChat_message" rows="4" placeholder="Your message..."></textarea>
+        </div>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="conversationsChat_model">Model (optional):</label>
+                    <select id="conversationsChat_model">
+                        <option value="">Use default</option>
+                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                        <option value="gpt-4">GPT-4</option>
+                        <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                        <option value="claude-3-opus">Claude 3 Opus</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="column">
+                <div class="form-group">
+                    <label for="conversationsChat_temperature">Temperature:</label>
+                    <input type="number" id="conversationsChat_temperature" value="0.7" min="0" max="2" step="0.1">
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="conversationsChat_stream">
+                Stream Response
+            </label>
+        </div>
+        
+        <button class="api-button" onclick="sendConversationMessage()">
+            Send Message
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="conversationsChat_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="conversationsUpdate">
+        <h2>
+            <span class="endpoint-method put">PUT</span>
+            <span class="endpoint-path">/api/v1/conversations/{conversation_id} - Update Conversation</span>
+        </h2>
+        <p>Update conversation metadata or settings.</p>
+        
+        <div class="form-group">
+            <label for="conversationsUpdate_id">Conversation ID <span class="required">*</span>:</label>
+            <input type="text" id="conversationsUpdate_id" placeholder="Enter conversation ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="conversationsUpdate_payload">Update Data (JSON):</label>
+            <textarea id="conversationsUpdate_payload" class="code-input" rows="10">{
+  "title": "Updated Title",
+  "system_prompt": "Updated system prompt",
+  "metadata": {
+    "tags": ["important", "technical"]
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="updateConversation()">
+            Update Conversation
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="conversationsUpdate_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="conversationsDelete">
+        <h2>
+            <span class="endpoint-method delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/conversations/{conversation_id} - Delete Conversation</span>
+        </h2>
+        <p>Delete a conversation and all its messages.</p>
+        
+        <div class="form-group">
+            <label for="conversationsDelete_id">Conversation ID <span class="required">*</span>:</label>
+            <input type="text" id="conversationsDelete_id" placeholder="Enter conversation ID">
+        </div>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Delete this conversation and all its messages?')) deleteConversation()">
+            Delete Conversation
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="conversationsDelete_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="conversationsExport">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/conversations/{conversation_id}/export - Export Conversation</span>
+        </h2>
+        <p>Export a conversation in various formats.</p>
+        
+        <div class="form-group">
+            <label for="conversationsExport_id">Conversation ID <span class="required">*</span>:</label>
+            <input type="text" id="conversationsExport_id" placeholder="Enter conversation ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="conversationsExport_format">Format:</label>
+            <select id="conversationsExport_format">
+                <option value="json">JSON</option>
+                <option value="markdown">Markdown</option>
+                <option value="txt">Plain Text</option>
+            </select>
+        </div>
+        
+        <button class="api-button" onclick="exportConversation()">
+            Export Conversation
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="conversationsExport_response">---</pre>
+    </div>
+</div>
+
+<script>
+// Characters tab functions
+async function createCharacter() {
+    const responseEl = document.getElementById('charactersCreate_response');
+    try {
+        responseEl.textContent = 'Creating character...';
+        
+        const tags = document.getElementById('charactersCreate_tags').value;
+        const tagsArray = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
+        
+        const body = {
+            name: document.getElementById('charactersCreate_name').value,
+            description: document.getElementById('charactersCreate_description').value,
+            personality: document.getElementById('charactersCreate_personality').value,
+            system_prompt: document.getElementById('charactersCreate_system_prompt').value,
+            first_message: document.getElementById('charactersCreate_first_message').value,
+            tags: tagsArray
+        };
+        
+        const response = await apiClient.makeRequest('POST', '/api/v1/characters', { body });
+        responseEl.textContent = JSON.stringify(response, null, 2);
+        Toast.success('Character created successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to create character: ${error.message}`);
+    }
+}
+
+async function listCharacters() {
+    const responseEl = document.getElementById('charactersList_response');
+    try {
+        responseEl.textContent = 'Loading characters...';
+        const response = await apiClient.makeRequest('GET', '/api/v1/characters');
+        responseEl.textContent = JSON.stringify(response, null, 2);
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to list characters: ${error.message}`);
+    }
+}
+
+async function getCharacter() {
+    const responseEl = document.getElementById('charactersGet_response');
+    try {
+        const characterId = document.getElementById('charactersGet_id').value;
+        if (!characterId) {
+            throw new Error('Character ID is required');
+        }
+        
+        responseEl.textContent = 'Loading character...';
+        const response = await apiClient.makeRequest('GET', `/api/v1/characters/${characterId}`);
+        responseEl.textContent = JSON.stringify(response, null, 2);
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to get character: ${error.message}`);
+    }
+}
+
+async function updateCharacter() {
+    const responseEl = document.getElementById('charactersUpdate_response');
+    try {
+        const characterId = document.getElementById('charactersUpdate_id').value;
+        if (!characterId) {
+            throw new Error('Character ID is required');
+        }
+        
+        const payload = document.getElementById('charactersUpdate_payload').value;
+        const body = JSON.parse(payload);
+        
+        responseEl.textContent = 'Updating character...';
+        const response = await apiClient.makeRequest('PUT', `/api/v1/characters/${characterId}`, { body });
+        responseEl.textContent = JSON.stringify(response, null, 2);
+        Toast.success('Character updated successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to update character: ${error.message}`);
+    }
+}
+
+async function deleteCharacter() {
+    const responseEl = document.getElementById('charactersDelete_response');
+    try {
+        const characterId = document.getElementById('charactersDelete_id').value;
+        if (!characterId) {
+            throw new Error('Character ID is required');
+        }
+        
+        responseEl.textContent = 'Deleting character...';
+        const response = await apiClient.makeRequest('DELETE', `/api/v1/characters/${characterId}`);
+        responseEl.textContent = response ? JSON.stringify(response, null, 2) : 'Character deleted successfully';
+        Toast.success('Character deleted successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to delete character: ${error.message}`);
+    }
+}
+
+// Conversations tab functions
+async function createConversation() {
+    const responseEl = document.getElementById('conversationsCreate_response');
+    try {
+        responseEl.textContent = 'Creating conversation...';
+        
+        const metadata = document.getElementById('conversationsCreate_metadata').value;
+        
+        const body = {
+            title: document.getElementById('conversationsCreate_title').value,
+            initial_message: document.getElementById('conversationsCreate_initial_message').value
+        };
+        
+        // Add optional fields if provided
+        const characterId = document.getElementById('conversationsCreate_character_id').value;
+        if (characterId) body.character_id = characterId;
+        
+        const systemPrompt = document.getElementById('conversationsCreate_system_prompt').value;
+        if (systemPrompt) body.system_prompt = systemPrompt;
+        
+        if (metadata && metadata.trim() !== '{}') {
+            body.metadata = JSON.parse(metadata);
+        }
+        
+        const response = await apiClient.makeRequest('POST', '/api/v1/conversations', { body });
+        responseEl.textContent = JSON.stringify(response, null, 2);
+        Toast.success('Conversation created successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to create conversation: ${error.message}`);
+    }
+}
+
+async function listConversations() {
+    const responseEl = document.getElementById('conversationsList_response');
+    try {
+        responseEl.textContent = 'Loading conversations...';
+        
+        const params = new URLSearchParams();
+        const characterId = document.getElementById('conversationsList_character_id').value;
+        if (characterId) params.append('character_id', characterId);
+        
+        const limit = document.getElementById('conversationsList_limit').value;
+        if (limit) params.append('limit', limit);
+        
+        const queryString = params.toString();
+        const url = queryString ? `/api/v1/conversations?${queryString}` : '/api/v1/conversations';
+        
+        const response = await apiClient.makeRequest('GET', url);
+        responseEl.textContent = JSON.stringify(response, null, 2);
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to list conversations: ${error.message}`);
+    }
+}
+
+async function getConversationDetails() {
+    const responseEl = document.getElementById('conversationsGet_response');
+    try {
+        const conversationId = document.getElementById('conversationsGet_id').value;
+        if (!conversationId) {
+            throw new Error('Conversation ID is required');
+        }
+        
+        responseEl.textContent = 'Loading conversation...';
+        
+        const includeMessages = document.getElementById('conversationsGet_include_messages').checked;
+        const params = includeMessages ? '?include_messages=true' : '';
+        
+        const response = await apiClient.makeRequest('GET', `/api/v1/conversations/${conversationId}${params}`);
+        responseEl.textContent = JSON.stringify(response, null, 2);
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to get conversation: ${error.message}`);
+    }
+}
+
+async function sendConversationMessage() {
+    const responseEl = document.getElementById('conversationsChat_response');
+    try {
+        const conversationId = document.getElementById('conversationsChat_id').value;
+        if (!conversationId) {
+            throw new Error('Conversation ID is required');
+        }
+        
+        const message = document.getElementById('conversationsChat_message').value;
+        if (!message) {
+            throw new Error('Message is required');
+        }
+        
+        responseEl.textContent = 'Sending message...';
+        
+        const body = { message };
+        
+        // Add optional fields
+        const model = document.getElementById('conversationsChat_model').value;
+        if (model) body.model = model;
+        
+        const temperature = document.getElementById('conversationsChat_temperature').value;
+        if (temperature) body.temperature = parseFloat(temperature);
+        
+        const stream = document.getElementById('conversationsChat_stream').checked;
+        body.stream = stream;
+        
+        if (stream) {
+            // Handle streaming response
+            responseEl.textContent = 'Streaming response...\n';
+            const response = await fetch(`${apiClient.baseUrl}/api/v1/conversations/${conversationId}/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-KEY': apiClient.token
+                },
+                body: JSON.stringify(body)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') continue;
+                        
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (parsed.choices?.[0]?.delta?.content) {
+                                responseEl.textContent += parsed.choices[0].delta.content;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing SSE data:', e);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Handle non-streaming response
+            const response = await apiClient.makeRequest('POST', `/api/v1/conversations/${conversationId}/chat`, { body });
+            responseEl.textContent = JSON.stringify(response, null, 2);
+        }
+        
+        Toast.success('Message sent successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to send message: ${error.message}`);
+    }
+}
+
+async function updateConversation() {
+    const responseEl = document.getElementById('conversationsUpdate_response');
+    try {
+        const conversationId = document.getElementById('conversationsUpdate_id').value;
+        if (!conversationId) {
+            throw new Error('Conversation ID is required');
+        }
+        
+        const payload = document.getElementById('conversationsUpdate_payload').value;
+        const body = JSON.parse(payload);
+        
+        responseEl.textContent = 'Updating conversation...';
+        const response = await apiClient.makeRequest('PUT', `/api/v1/conversations/${conversationId}`, { body });
+        responseEl.textContent = JSON.stringify(response, null, 2);
+        Toast.success('Conversation updated successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to update conversation: ${error.message}`);
+    }
+}
+
+async function deleteConversation() {
+    const responseEl = document.getElementById('conversationsDelete_response');
+    try {
+        const conversationId = document.getElementById('conversationsDelete_id').value;
+        if (!conversationId) {
+            throw new Error('Conversation ID is required');
+        }
+        
+        responseEl.textContent = 'Deleting conversation...';
+        const response = await apiClient.makeRequest('DELETE', `/api/v1/conversations/${conversationId}`);
+        responseEl.textContent = response ? JSON.stringify(response, null, 2) : 'Conversation deleted successfully';
+        Toast.success('Conversation deleted successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to delete conversation: ${error.message}`);
+    }
+}
+
+async function exportConversation() {
+    const responseEl = document.getElementById('conversationsExport_response');
+    try {
+        const conversationId = document.getElementById('conversationsExport_id').value;
+        if (!conversationId) {
+            throw new Error('Conversation ID is required');
+        }
+        
+        const format = document.getElementById('conversationsExport_format').value;
+        
+        responseEl.textContent = 'Exporting conversation...';
+        const response = await apiClient.makeRequest('GET', `/api/v1/conversations/${conversationId}/export?format=${format}`);
+        
+        // Handle different formats
+        if (format === 'json') {
+            responseEl.textContent = JSON.stringify(response, null, 2);
+        } else {
+            responseEl.textContent = response;
+        }
+        
+        Toast.success('Conversation exported successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to export conversation: ${error.message}`);
+    }
+}
+</script>
