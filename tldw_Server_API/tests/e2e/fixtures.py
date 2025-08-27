@@ -29,6 +29,7 @@ API_PREFIX = "/api/v1"
 TEST_TIMEOUT = 120  # seconds for each request (increased for video transcription)
 RATE_LIMIT_RETRY_DELAY = float(os.getenv("E2E_RATE_LIMIT_DELAY", "0.5"))  # Delay after rate limit
 MAX_RETRIES = int(os.getenv("E2E_MAX_RETRIES", "3"))  # Max retries for rate limit errors
+SERVER_STARTUP_TIMEOUT = int(os.getenv("E2E_SERVER_STARTUP_TIMEOUT", "30"))  # Max time to wait for server
 
 
 class APIClient:
@@ -134,7 +135,8 @@ class APIClient:
             return {"username": "single_user", "id": 1}
     
     # Media endpoints
-    def upload_media(self, file_path: str, title: str, media_type: str = "document") -> Dict[str, Any]:
+    def upload_media(self, file_path: str, title: str, media_type: str = "document", 
+                     generate_embeddings: bool = False) -> Dict[str, Any]:
         """Upload a media file."""
         with open(file_path, "rb") as f:
             # The endpoint expects 'files' (plural) not 'file'
@@ -143,7 +145,8 @@ class APIClient:
                 "title": title,
                 "media_type": media_type,
                 "overwrite_existing": "true",  # Allow overwrite for test re-runs
-                "keep_original_file": "false"
+                "keep_original_file": "false",
+                "generate_embeddings": str(generate_embeddings).lower()  # Convert bool to string
             }
             response = self.client.post(
                 f"{API_PREFIX}/media/add",
@@ -462,7 +465,7 @@ class APIClient:
             **kwargs
         }
         response = self.client.post(
-            f"{API_PREFIX}/rag/simple/search",
+            f"{API_PREFIX}/rag/search/simple",  # Fixed path: /rag/search/simple instead of /rag/simple/search
             json=data
         )
         response.raise_for_status()
@@ -471,7 +474,7 @@ class APIClient:
     def rag_advanced_search(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Perform advanced RAG search with full configuration."""
         response = self.client.post(
-            f"{API_PREFIX}/rag/search",
+            f"{API_PREFIX}/rag/search/complex",  # Fixed path: /rag/search/complex for consistency
             json=config
         )
         response.raise_for_status()
@@ -489,14 +492,57 @@ class APIClient:
         self.client.close()
 
 
+def ensure_server_running(base_url: str = BASE_URL, timeout: int = SERVER_STARTUP_TIMEOUT) -> Dict[str, Any]:
+    """
+    Ensure the API server is running and accessible.
+    This simulates a user trying to connect to the application.
+    
+    Returns:
+        Server health information
+    
+    Raises:
+        pytest.skip if server is not available
+    """
+    health_url = f"{base_url}{API_PREFIX}/health"
+    start_time = time.time()
+    last_error = None
+    
+    print(f"🔍 Checking if API server is available at {base_url}...")
+    
+    while time.time() - start_time < timeout:
+        try:
+            with httpx.Client(timeout=5) as temp_client:
+                response = temp_client.get(health_url)
+                if response.status_code == 200:
+                    health_data = response.json()
+                    print(f"✅ API server is running in {health_data.get('auth_mode', 'unknown')} mode")
+                    return health_data
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            last_error = e
+            time.sleep(1)  # Wait before retrying
+            continue
+    
+    # Server not available after timeout
+    error_msg = (
+        f"❌ API server not available at {base_url} after {timeout} seconds.\n"
+        f"Please ensure the server is running:\n"
+        f"  python -m uvicorn tldw_Server_API.app.main:app --reload\n"
+        f"Last error: {last_error}"
+    )
+    pytest.skip(error_msg)
+
+
 @pytest.fixture(scope="session")
 def api_client():
-    """Create an API client for the test session."""
+    """Create an API client for the test session - simulating a user connecting to the app."""
+    # First ensure server is running - like a user would check if app is accessible
+    health_info = ensure_server_running()
+    
     client = APIClient()
+    
     # Check if single-user mode and set token
     try:
-        health = client.health_check()
-        if health.get("auth_mode") == "single_user":
+        if health_info.get("auth_mode") == "single_user":
             # Single-user mode uses the default API key or from environment
             # Try to get the actual API key from settings
             try:

@@ -192,6 +192,11 @@ class AddMediaForm(ChunkingOptions, AudioVideoOptions, PdfOptions):
     use_cookies: bool = Field(False, description="Whether to attach cookies to URL download requests")
     cookies: Optional[str] = Field(None, description="Cookie string if `use_cookies` is set to True")
 
+    # --- Embedding Options ---
+    generate_embeddings: bool = Field(False, description="Generate embeddings after media processing")
+    embedding_model: Optional[str] = Field(None, description="Specific embedding model to use (e.g., 'Qwen/Qwen3-Embedding-4B-GGUF')")
+    embedding_provider: Optional[str] = Field(None, description="Embedding provider (huggingface, openai, etc)")
+    
     # --- Deprecated/Less Common ---
     perform_rolling_summarization: bool = Field(False, description="Perform rolling summarization (legacy?)")
     summarize_recursively: bool = Field(False, description="Perform recursive summarization on chunks (if chunking enabled)")

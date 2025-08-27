@@ -8,9 +8,10 @@ Complex API: Full control with extensibility for future options
 
 import asyncio
 import time
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List, Union, Literal
 from uuid import uuid4
 from pathlib import Path
+from enum import Enum
 
 from fastapi import APIRouter, HTTPException, Depends, Body, status, Request
 from loguru import logger
@@ -31,6 +32,7 @@ from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import (
     expand_query,
     check_cache,
     retrieve_documents,
+    filter_by_keywords,
     optimize_chromadb_search,
     process_tables,
     rerank_documents,
@@ -44,6 +46,12 @@ from tldw_Server_API.app.core.RAG.rag_service.enhanced_chunking_integration impo
 from tldw_Server_API.app.core.RAG.rag_service.types import DataSource, Document
 
 # ============= Simple API Models =============
+
+class SearchMode(str, Enum):
+    """Available search modes."""
+    FTS = "fts"          # Full-text search only
+    VECTOR = "vector"    # Vector/semantic search only
+    HYBRID = "hybrid"    # Combined FTS + Vector search
 
 class SimpleSearchRequest(BaseModel):
     """Simple search request with essential parameters."""
@@ -91,6 +99,21 @@ class SimpleSearchRequest(BaseModel):
         default=False,
         description="Include citations with source information",
         example=True
+    )
+    
+    # Search mode configuration
+    search_mode: SearchMode = Field(
+        default=SearchMode.HYBRID,
+        description="Search mode: fts (full-text), vector (semantic), or hybrid",
+        example="hybrid"
+    )
+    
+    hybrid_alpha: float = Field(
+        default=0.7,
+        ge=0.0,
+        le=1.0,
+        description="Weight for vector search in hybrid mode (0=FTS only, 1=Vector only)",
+        example=0.7
     )
     
     # Keyword filtering
@@ -582,8 +605,11 @@ async def simple_search(
             "top_k": request.top_k * 3 if request.enable_reranking else request.top_k,  # Get more for reranking
             "enable_cache": True,
             "expansion_strategies": ["acronym", "semantic"],
-            "enable_hybrid_search": True,
-            "hybrid_alpha": 0.7,
+            "search_mode": request.search_mode.value,
+            "use_vector": request.search_mode in [SearchMode.VECTOR, SearchMode.HYBRID],
+            "use_fts": request.search_mode in [SearchMode.FTS, SearchMode.HYBRID],
+            "enable_hybrid_search": request.search_mode == SearchMode.HYBRID,
+            "hybrid_alpha": request.hybrid_alpha,
             "user_id": current_user.id,
             "media_db_path": Path(media_db.db_path),
             "chacha_db_path": Path(chacha_db.db_path),
@@ -610,6 +636,10 @@ async def simple_search(
             optimize_chromadb_search,
             retrieve_documents,
         ])
+        
+        # Add keyword filtering if keywords are provided
+        if request.keywords:
+            pipeline_functions.append(filter_by_keywords)
         
         # Add contextual expansion if enabled
         if request.enable_contextual_retrieval:

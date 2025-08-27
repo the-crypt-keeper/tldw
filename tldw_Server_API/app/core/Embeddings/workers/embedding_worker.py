@@ -30,7 +30,8 @@ from .base_worker import BaseWorker, WorkerConfig
 class EmbeddingWorkerConfig(WorkerConfig):
     """Extended configuration for embedding workers"""
     default_model_provider: str = "huggingface"
-    default_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    default_model_name: str = "dunzhang/stella_en_400M_v5"  # Better default model
+    fallback_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"  # Fallback model
     max_batch_size: int = 32
     gpu_id: Optional[int] = None
     
@@ -44,23 +45,27 @@ class EmbeddingWorkerConfig(WorkerConfig):
     long_text_threshold: int = 512  # Use different model for long texts
     multilingual_detection: bool = True
     
-    # Available models by category
+    # Available models by category with fallback support
     models_by_category: Dict[str, Dict[str, str]] = {
         "general": {
             "provider": "huggingface",
-            "model": "sentence-transformers/all-MiniLM-L6-v2"
+            "model": "dunzhang/stella_en_400M_v5",
+            "fallback": "sentence-transformers/all-MiniLM-L6-v2"
         },
         "multilingual": {
             "provider": "huggingface", 
-            "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+            "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            "fallback": "sentence-transformers/all-MiniLM-L6-v2"
         },
         "long_context": {
             "provider": "openai",
-            "model": "text-embedding-3-large"
+            "model": "text-embedding-3-large",
+            "fallback": "sentence-transformers/all-mpnet-base-v2"
         },
         "high_quality": {
             "provider": "openai",
-            "model": "text-embedding-3-large"
+            "model": "text-embedding-3-large",
+            "fallback": "sentence-transformers/all-mpnet-base-v2"
         }
     }
 
@@ -438,23 +443,57 @@ class EmbeddingWorker(BaseWorker):
         config: Union[HFModelCfg, ONNXModelCfg, OpenAIModelCfg, LocalAPICfg],
         provider: str
     ) -> List[np.ndarray]:
-        """Generate embeddings for a batch of texts"""
-        # Use the existing create_embeddings_batch function
-        # This runs in a thread pool to avoid blocking the event loop
+        """Generate embeddings for a batch of texts with fallback support"""
         import asyncio
         
         loop = asyncio.get_event_loop()
-        embeddings = await loop.run_in_executor(
-            None,
-            create_embeddings_batch,
-            texts,
-            config.model_name_or_path,
-            provider,
-            config.api_url if hasattr(config, 'api_url') else None,
-            config.api_key if hasattr(config, 'api_key') else None
-        )
         
-        return embeddings
+        try:
+            # Try primary model
+            embeddings = await loop.run_in_executor(
+                None,
+                create_embeddings_batch,
+                texts,
+                config.model_name_or_path,
+                provider,
+                config.api_url if hasattr(config, 'api_url') else None,
+                config.api_key if hasattr(config, 'api_key') else None
+            )
+            return embeddings
+            
+        except Exception as e:
+            logger.warning(f"Primary model failed ({provider}:{config.model_name_or_path}): {e}")
+            
+            # Try fallback model if available
+            fallback_model = self.embedding_config.fallback_model_name
+            if fallback_model and fallback_model != config.model_name_or_path:
+                logger.info(f"Attempting fallback model: {fallback_model}")
+                
+                try:
+                    # Use fallback with huggingface provider
+                    fallback_config = HFModelCfg(
+                        model_name_or_path=fallback_model,
+                        trust_remote_code=False
+                    )
+                    
+                    embeddings = await loop.run_in_executor(
+                        None,
+                        create_embeddings_batch,
+                        texts,
+                        fallback_model,
+                        "huggingface",
+                        None,
+                        None
+                    )
+                    logger.info(f"Successfully used fallback model: {fallback_model}")
+                    return embeddings
+                    
+                except Exception as fallback_error:
+                    logger.error(f"Fallback model also failed: {fallback_error}")
+                    raise fallback_error
+            else:
+                # No fallback available, re-raise original error
+                raise e
     
     async def _update_job_progress(self, job_id: str, percentage: float, chunks_processed: int):
         """Update job progress information"""

@@ -33,6 +33,9 @@ class TestDatabaseTransactions:
     
     def test_transaction_rollback_on_failure(self, api_client, data_tracker):
         """Test that failed operations don't leave partial data."""
+        # Add delay to avoid rate limiting from previous tests
+        time.sleep(1.0)
+        
         # Create initial media item
         content = "Test content for transaction rollback testing"
         file_path = self._create_temp_file(content)
@@ -48,6 +51,9 @@ class TestDatabaseTransactions:
             media_id = self._extract_media_id(response)
             assert media_id is not None, "Failed to create initial media"
             data_tracker.add_media(media_id)
+            
+            # Add delay before creating note
+            time.sleep(RATE_LIMIT_DELAY)
             
             # Create note referencing the media
             note_response = api_client.create_note(

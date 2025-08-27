@@ -298,6 +298,10 @@ def get_add_media_form(
     custom_chapter_pattern: Optional[str] = Form(None, description="Regex pattern for custom chapter splitting"),
     perform_rolling_summarization: bool = Form(False, description="Perform rolling summarization"),
     summarize_recursively: bool = Form(False, description="Perform recursive summarization"),
+    # Embedding options
+    generate_embeddings: bool = Form(False, description="Generate embeddings after media processing"),
+    embedding_model: Optional[str] = Form(None, description="Specific embedding model to use"),
+    embedding_provider: Optional[str] = Form(None, description="Embedding provider (huggingface, openai, etc)"),
     # Don't need token here, it's a Header dep
     # Don't need files here, it's a File dep
     # Don't need db here, it's a separate Depends
@@ -343,6 +347,9 @@ def get_add_media_form(
             custom_chapter_pattern=custom_chapter_pattern,
             perform_rolling_summarization=perform_rolling_summarization,
             summarize_recursively=summarize_recursively,
+            generate_embeddings=generate_embeddings,
+            embedding_model=embedding_model,
+            embedding_provider=embedding_provider,
         )
         return form_instance
     except ValidationError as e:
@@ -2467,7 +2474,7 @@ async def add_media(
     # # --- Use Dependency Injection for Form Data ---
     form_data: AddMediaForm = Depends(get_add_media_form),
     # --- Keep File and Header Dependencies Separate ---
-    token: str = Header(..., description="Authentication token"), # Placeholder for auth
+    # token: str = Header(..., description="Authentication token"), # Auth handled by get_media_db_for_user
     files: Optional[List[UploadFile]] = File(None, description="List of files to upload"),
     # --- DB Dependency ---
     db: MediaDatabase = Depends(get_media_db_for_user) # Use the correct dependency
@@ -2615,7 +2622,47 @@ async def add_media(
                 individual_results = await asyncio.gather(*tasks)
                 results.extend(individual_results)
 
-        # --- 7. Determine Final Status Code and Return Response (Success Path) ---
+        # --- 7. Generate Embeddings if Requested ---
+        logger.info(f"generate_embeddings flag: {form_data.generate_embeddings}")
+        if form_data.generate_embeddings:
+            logger.info("Generating embeddings for successfully processed media items...")
+            embedding_tasks = []
+            
+            for result in results:
+                # Only generate embeddings for successfully stored items
+                if result.get("status") == "Success" and result.get("db_id"):
+                    media_id = result["db_id"]
+                    logger.info(f"Scheduling embedding generation for media ID {media_id}")
+                    
+                    # Add background task for embedding generation
+                    async def generate_embeddings_task(media_id: int):
+                        try:
+                            from tldw_Server_API.app.api.v1.endpoints.media_embeddings import (
+                                generate_embeddings_for_media,
+                                get_media_content
+                            )
+                            
+                            media_content = await get_media_content(media_id, db)
+                            embedding_model = form_data.embedding_model or "Qwen/Qwen3-Embedding-4B-GGUF"
+                            embedding_provider = form_data.embedding_provider or "huggingface"
+                            
+                            result = await generate_embeddings_for_media(
+                                media_id=media_id,
+                                media_content=media_content,
+                                embedding_model=embedding_model,
+                                embedding_provider=embedding_provider,
+                                chunk_size=form_data.chunk_size or 1000,
+                                chunk_overlap=form_data.overlap or 200
+                            )
+                            logger.info(f"Embedding generation result for media {media_id}: {result}")
+                        except Exception as e:
+                            logger.error(f"Failed to generate embeddings for media {media_id}: {e}")
+                    
+                    # Run embedding generation in background
+                    background_tasks.add_task(generate_embeddings_task, media_id)
+                    result["embeddings_scheduled"] = True
+        
+        # --- 8. Determine Final Status Code and Return Response (Success Path) ---
         # TempDirManager handles cleanup automatically on exit from 'with' block
         final_status_code = _determine_final_status(results)
         log_level = "INFO" if final_status_code == status.HTTP_200_OK else "WARNING"

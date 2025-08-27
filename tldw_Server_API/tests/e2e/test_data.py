@@ -37,36 +37,58 @@ class TestDataGenerator:
     
     # Sample content generators
     @staticmethod
-    def sample_text_content() -> str:
-        """Generate sample text content for testing."""
-        return """
-        # Sample Document for E2E Testing
+    def sample_text_content(seed: Optional[str] = None) -> str:
+        """Generate dynamic sample text content for testing."""
+        import hashlib
+        from datetime import datetime
         
-        This is a test document created for end-to-end testing of the tldw_server API.
+        # Create unique content based on seed or timestamp
+        unique_id = seed or datetime.now().isoformat()
+        hash_suffix = hashlib.md5(unique_id.encode()).hexdigest()[:8]
+        
+        # Randomly select topics for variety
+        topics = random.choice([
+            ["Natural Language Processing", "Machine Learning", "Document Analysis", "Information Retrieval"],
+            ["Computer Vision", "Deep Learning", "Neural Networks", "Pattern Recognition"],
+            ["Data Science", "Statistical Analysis", "Big Data", "Predictive Modeling"],
+            ["Quantum Computing", "Cryptography", "Blockchain", "Distributed Systems"]
+        ])
+        
+        # Generate dynamic content that varies between test runs
+        return f"""
+        # Test Document {hash_suffix} - E2E Testing
+        
+        Generated: {datetime.now().isoformat()}
+        Test ID: {hash_suffix}
+        
+        This is a dynamically generated test document for end-to-end testing of the tldw_server API.
+        Each test run creates unique content to avoid caching issues and ensure proper functionality.
         
         ## Introduction
-        The purpose of this document is to provide realistic content for testing various
-        features including transcription, analysis, and search functionality.
+        The purpose of document {hash_suffix} is to provide realistic, unique content for testing
+        various features including transcription, analysis, and search functionality.
         
-        ## Key Topics
-        - Natural Language Processing
-        - Machine Learning Applications
-        - Document Analysis
-        - Information Retrieval
+        ## Key Topics for This Test
+        {chr(10).join(f"- {topic}" for topic in topics)}
         
         ## Technical Details
         This system uses advanced AI techniques to process and understand content.
-        The main components include:
-        1. Text extraction and parsing
-        2. Semantic analysis
-        3. Entity recognition
-        4. Summarization
+        Test iteration {random.randint(1000, 9999)} includes:
+        1. Text extraction and parsing (v{random.randint(1, 5)}.{random.randint(0, 9)})
+        2. Semantic analysis with confidence {random.uniform(0.85, 0.99):.2%}
+        3. Entity recognition for {random.randint(10, 50)} entity types
+        4. Summarization using {random.choice(['extractive', 'abstractive', 'hybrid'])} methods
+        
+        ## Random Test Data
+        - Test value A: {random.randint(100, 999)}
+        - Test value B: {TestDataGenerator.random_string(10)}
+        - Test timestamp: {datetime.now().timestamp()}
         
         ## Conclusion
-        This test content should be sufficient for validating the core functionality
-        of the system during end-to-end testing.
+        Document {hash_suffix} validates the core functionality of the system during
+        end-to-end testing with unique, non-cached content.
         
-        Keywords: testing, documentation, AI, NLP, machine learning
+        Keywords: testing-{hash_suffix}, documentation, AI, NLP, machine learning, unique-{unique_id[:8]}
         """
     
     @staticmethod

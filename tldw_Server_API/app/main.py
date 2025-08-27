@@ -40,6 +40,8 @@ from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced impo
 #
 # Media Endpoint
 from tldw_Server_API.app.api.v1.endpoints.media import router as media_router
+# Media Embeddings Endpoint (for generating embeddings for uploaded media)
+from tldw_Server_API.app.api.v1.endpoints.media_embeddings import router as media_embeddings_router
 #
 # Notes Endpoint
 from tldw_Server_API.app.api.v1.endpoints.notes import router as notes_router
@@ -490,6 +492,8 @@ app.include_router(chunking_templates_router, prefix=f"{API_V1_PREFIX}", tags=["
 # Router for Embedding Endpoint (OpenAI-compatible path)
 app.include_router(embeddings_router, prefix=f"{API_V1_PREFIX}", tags=["embeddings"])
 
+# Router for Media Embeddings Endpoint
+app.include_router(media_embeddings_router, prefix=f"{API_V1_PREFIX}", tags=["media-embeddings"])
 
 # Router for Note Management endpoints
 app.include_router(notes_router, prefix=f"{API_V1_PREFIX}/notes", tags=["notes"])

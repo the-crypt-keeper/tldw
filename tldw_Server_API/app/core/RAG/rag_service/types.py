@@ -11,11 +11,12 @@ import numpy as np
 
 class DataSource(Enum):
     """Supported data sources for RAG."""
-    MEDIA_DB = auto()
-    CHAT_HISTORY = auto()
-    NOTES = auto()
-    CHARACTER_CARDS = auto()
-    WEB_CONTENT = auto()
+    MEDIA_DB = "media_db"
+    CHAT_HISTORY = "chat_history"
+    NOTES = "notes"
+    CHARACTER_CARDS = "character_cards"
+    WEB_CONTENT = "web_content"
+    PROMPTS = "prompts"  # Add missing PROMPTS source
 
 
 class CitationType(Enum):

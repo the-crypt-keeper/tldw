@@ -95,58 +95,135 @@ class ConcurrentTestHelper:
         return results
     
     @staticmethod
-    def detect_race_condition(results: List[Dict]) -> bool:
-        """Detect if a race condition occurred based on results."""
-        # Extract IDs from various response formats
-        ids = []
+    def detect_race_condition(results: List[Dict]) -> Dict[str, Any]:
+        """Detect if a race condition occurred based on results.
+        
+        Returns detailed information about detected race conditions.
+        """
+        race_conditions = {
+            'detected': False,
+            'duplicate_ids': [],
+            'inconsistent_counters': [],
+            'ordering_violations': [],
+            'lost_updates': [],
+            'phantom_reads': []
+        }
+        
+        # Extract IDs and timestamps from various response formats
+        items = []
         for r in results:
             if not r:
                 continue
             
+            item = {'id': None, 'timestamp': None, 'version': None}
+            
             # Handle different response formats
             if 'results' in r and isinstance(r['results'], list) and r['results']:
                 # New format with results array
-                ids.append(r['results'][0].get('db_id'))
+                item['id'] = r['results'][0].get('db_id')
+                item['timestamp'] = r['results'][0].get('created_at')
+                item['version'] = r['results'][0].get('version', 1)
             elif 'id' in r:
-                ids.append(r['id'])
+                item['id'] = r['id']
+                item['timestamp'] = r.get('created_at') or r.get('timestamp')
+                item['version'] = r.get('version', 1)
             elif 'media_id' in r:
-                ids.append(r['media_id'])
+                item['id'] = r['media_id']
+                item['timestamp'] = r.get('created_at')
+                item['version'] = r.get('version', 1)
+            
+            if item['id'] is not None:
+                items.append(item)
         
-        # Filter out None values
-        valid_ids = [id for id in ids if id is not None]
-        unique_ids = set(valid_ids)
+        # Check for duplicate IDs (primary race condition indicator)
+        ids = [item['id'] for item in items]
+        unique_ids = set(ids)
+        if len(ids) != len(unique_ids):
+            race_conditions['detected'] = True
+            # Find duplicates
+            from collections import Counter
+            id_counts = Counter(ids)
+            race_conditions['duplicate_ids'] = [id for id, count in id_counts.items() if count > 1]
         
-        # Check for duplicate IDs
-        if len(valid_ids) != len(unique_ids):
-            return True  # Duplicate IDs indicate race condition
+        # Check for version conflicts (optimistic locking failures)
+        version_groups = {}
+        for item in items:
+            if item['id'] and item['version']:
+                if item['id'] not in version_groups:
+                    version_groups[item['id']] = []
+                version_groups[item['id']].append(item['version'])
         
-        return False
+        for id, versions in version_groups.items():
+            if len(set(versions)) > 1:
+                race_conditions['detected'] = True
+                race_conditions['inconsistent_counters'].append({
+                    'id': id,
+                    'versions': versions
+                })
+        
+        # Check for ordering violations (timestamps out of sequence)
+        if len(items) > 1:
+            sorted_by_id = sorted(items, key=lambda x: x['id'] or 0)
+            sorted_by_time = sorted(items, key=lambda x: x['timestamp'] or '')
+            
+            # IDs should generally increase with time
+            for i in range(len(sorted_by_id) - 1):
+                if sorted_by_id[i]['timestamp'] and sorted_by_id[i+1]['timestamp']:
+                    if sorted_by_id[i]['timestamp'] > sorted_by_id[i+1]['timestamp']:
+                        race_conditions['detected'] = True
+                        race_conditions['ordering_violations'].append({
+                            'earlier_id': sorted_by_id[i]['id'],
+                            'later_id': sorted_by_id[i+1]['id'],
+                            'timestamp_issue': 'out of order'
+                        })
+        
+        # Check for lost updates (same resource modified concurrently)
+        # This would need to track the actual modifications, simplified here
+        if race_conditions['duplicate_ids'] or race_conditions['inconsistent_counters']:
+            race_conditions['lost_updates'] = race_conditions['duplicate_ids']
+        
+        return race_conditions
     
     @staticmethod
     def _analyze_race_conditions(results: Dict[str, Any]) -> None:
-        """Analyze results for various race condition indicators."""
+        """Analyze results for various race condition indicators using improved detection."""
+        # Extract successful results
+        successful_results = []
+        for item in results.get('successful', []):
+            if 'result' in item:
+                successful_results.append(item['result'])
+        
+        # Use improved detection
+        race_analysis = ConcurrentTestHelper.detect_race_condition(successful_results)
+        
+        # Initialize race_indicators for additional checks
         race_indicators = []
         
-        # Check for duplicate IDs
-        if results['successful']:
-            all_ids = []
-            for item in results['successful']:
-                result = item.get('result', {})
-                if 'results' in result and result['results']:
-                    id_val = result['results'][0].get('db_id')
-                    if id_val:
-                        all_ids.append(id_val)
+        if race_analysis['detected']:
+            results['race_conditions'] = []
             
-            if len(all_ids) != len(set(all_ids)):
-                race_indicators.append('Duplicate IDs detected')
+            if race_analysis['duplicate_ids']:
+                results['race_conditions'].append(
+                    f"Duplicate IDs detected: {race_analysis['duplicate_ids']}"
+                )
+            
+            if race_analysis['inconsistent_counters']:
+                results['race_conditions'].append(
+                    f"Version conflicts detected: {len(race_analysis['inconsistent_counters'])} items"
+                )
+            
+            if race_analysis['ordering_violations']:
+                results['race_conditions'].append(
+                    f"Timestamp ordering violations: {len(race_analysis['ordering_violations'])} cases"
+                )
+            
+            if race_analysis['lost_updates']:
+                results['race_conditions'].append(
+                    f"Potential lost updates on IDs: {race_analysis['lost_updates']}"
+                )
         
-        # Check for lost updates (same operation sometimes fails)
-        if results['successful'] and results['failed']:
-            # If we have both successes and failures for identical operations
-            success_args = [str(s['args']) for s in results['successful']]
-            failed_args = [str(f['args']) for f in results['failed']]
-            
-            # Check error patterns
+        # Also check for failure patterns indicating race conditions
+        if results.get('failed'):
             error_types = {}
             for failure in results['failed']:
                 error_type = failure.get('error_type', 'Unknown')
@@ -165,7 +242,11 @@ class ConcurrentTestHelper:
             if max_time > avg_time * 3:
                 race_indicators.append(f'High timing variance: avg={avg_time:.2f}s, max={max_time:.2f}s')
         
-        results['race_conditions'] = race_indicators
+        # Merge race_indicators with existing race_conditions if any
+        if race_indicators:
+            if 'race_conditions' not in results:
+                results['race_conditions'] = []
+            results['race_conditions'].extend(race_indicators)
     
     @staticmethod
     def measure_throughput(

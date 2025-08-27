@@ -646,6 +646,9 @@ class TestRAGContextRetrieval:
     
     def test_multi_database_search(self, api_client, data_tracker):
         """Test searching across multiple databases."""
+        # Add delay to avoid rate limiting from previous tests
+        time.sleep(1.0)
+        
         # Create content in different types
         # 1. Media content
         media_file = self._create_temp_file("Media content about technology")
@@ -660,6 +663,9 @@ class TestRAGContextRetrieval:
                 data_tracker.add_media(media_id)
         finally:
             os.unlink(media_file)
+        
+        # Add delay before creating note
+        time.sleep(RATE_LIMIT_DELAY)
         
         # 2. Note content
         note_response = api_client.create_note(
