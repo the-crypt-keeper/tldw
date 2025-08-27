@@ -184,6 +184,12 @@ class WebUI {
 
         // Re-initialize form handlers for newly loaded content
         this.initFormHandlers();
+        
+        // After loading content, ensure all newly loaded tabs are hidden initially
+        // This is important when loading multiple tabs from a single HTML file
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
     }
 
     showContent(contentId) {
@@ -196,6 +202,9 @@ class WebUI {
         const content = document.getElementById(contentId);
         if (content) {
             content.classList.add('active');
+            console.log(`Showing tab: ${contentId}`);
+        } else {
+            console.warn(`Tab content not found: ${contentId}`);
         }
     }
 

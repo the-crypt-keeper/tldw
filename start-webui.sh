@@ -32,7 +32,8 @@ check_port() {
 
 # Check if API server is already running
 echo "Checking API server status..."
-if curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>/dev/null | grep -q "200"; then
+http_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>/dev/null || echo "000")
+if [ "$http_code" = "200" ]; then
     echo -e "${GREEN}✓${NC} API server is already running"
     SERVER_PID=""
 else
@@ -54,7 +55,7 @@ else
     echo "Starting API server..."
     
     # Start the server in background
-    SINGLE_USER_API_KEY="${SINGLE_USER_API_KEY}" AUTH_MODE="${AUTH_MODE:-single-user}" \
+    SINGLE_USER_API_KEY="${SINGLE_USER_API_KEY}" AUTH_MODE="${AUTH_MODE:-single_user}" \
         python -m uvicorn tldw_Server_API.app.main:app --host 0.0.0.0 --port 8000 --reload > /tmp/tldw_server.log 2>&1 &
     SERVER_PID=$!
     
@@ -63,7 +64,8 @@ else
     # Wait for server to be ready
     echo -n "Waiting for API to be ready"
     for i in {1..30}; do
-        if curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>/dev/null | grep -q "200"; then
+        http_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>/dev/null || echo "000")
+        if [ "$http_code" = "200" ]; then
             echo -e " ${GREEN}✓${NC}"
             break
         fi
@@ -72,10 +74,11 @@ else
     done
     
     # Check if server started successfully
-    if ! curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>/dev/null | grep -q "200"; then
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>/dev/null || echo "000")
+    if [ "$http_code" != "200" ]; then
         echo -e " ${RED}✗${NC}"
         echo ""
-        echo -e "${RED}Error:${NC} Failed to start API server."
+        echo -e "${RED}Error:${NC} Failed to start API server (HTTP code: $http_code)."
         echo "Check the logs at /tmp/tldw_server.log for details."
         exit 1
     fi
@@ -103,7 +106,7 @@ if [ ! -z "$SINGLE_USER_API_KEY" ]; then
     # Show first 10 chars of API key for confirmation
     KEY_PREVIEW="${SINGLE_USER_API_KEY:0:10}..."
     echo -e "  API Key Preview: ${YELLOW}${KEY_PREVIEW}${NC}"
-elif [ "$AUTH_MODE" = "multi-user" ]; then
+elif [ "$AUTH_MODE" = "multi_user" ]; then
     echo -e "${BLUE}Authentication:${NC}"
     echo -e "  Mode: ${YELLOW}Multi-User${NC}"
     echo -e "  Please log in through the WebUI to obtain a token."
