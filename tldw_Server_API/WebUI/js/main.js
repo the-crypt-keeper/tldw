@@ -170,6 +170,29 @@ class WebUI {
         if (contentId === 'tabChatCompletions' && typeof initializeChatCompletionsTab === 'function') {
             initializeChatCompletionsTab();
         }
+        
+        if (contentId === 'tabEvalsOpenAI' || contentId === 'tabEvalsGEval') {
+            if (typeof initializeEvaluationsTab === 'function') {
+                initializeEvaluationsTab();
+            }
+        }
+        
+        // Initialize model dropdowns for tabs that have LLM selection
+        // This includes chat, media processing, and evaluation tabs
+        const tabsWithModelSelection = [
+            'tabChatCompletions', 'tabCharacterChat', 'tabConversations',
+            'tabMediaIngestion', 'tabMediaProcessingNoDB', 
+            'tabEvalsOpenAI', 'tabEvalsGEval'
+        ];
+        
+        if (tabsWithModelSelection.includes(contentId)) {
+            // Small delay to ensure DOM is ready
+            setTimeout(() => {
+                if (typeof populateModelDropdowns === 'function') {
+                    populateModelDropdowns();
+                }
+            }, 100);
+        }
     }
 
     async loadContentGroup(groupName, targetContentId) {
@@ -190,6 +213,17 @@ class WebUI {
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.remove('active');
         });
+        
+        // Initialize model dropdowns for groups that contain LLM-using tabs
+        const groupsWithModelSelection = ['chat', 'media', 'evaluations'];
+        if (groupsWithModelSelection.includes(groupName)) {
+            // Populate dropdowns after DOM is updated
+            setTimeout(() => {
+                if (typeof populateModelDropdowns === 'function') {
+                    populateModelDropdowns();
+                }
+            }, 100);
+        }
     }
 
     showContent(contentId) {

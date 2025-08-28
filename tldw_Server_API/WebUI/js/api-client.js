@@ -28,6 +28,9 @@ class APIClient {
                 if (response.ok) {
                     const config = await response.json();
                     
+                    // Store the loaded config for later use (includes LLM providers)
+                    this.loadedConfig = config;
+                    
                     // Use apiUrl if provided, otherwise keep same origin
                     if (config.apiUrl) {
                         this.baseUrl = config.apiUrl;
@@ -430,6 +433,175 @@ class APIClient {
     }
 
     // ============================================================
+    // LLM Provider Management
+    // ============================================================
+
+    /**
+     * Get all configured LLM providers with their models
+     * @returns {Promise<Object>} Provider information including models
+     */
+    async getAvailableProviders() {
+        try {
+            // Check if providers are already cached in config
+            if (this.cachedProviders && this.cacheTimestamp && 
+                (Date.now() - this.cacheTimestamp) < 300000) { // Cache for 5 minutes
+                return this.cachedProviders;
+            }
+
+            // Try to get from config first (loaded at startup)
+            const config = await this.loadedConfig;
+            if (config && config.llm_providers) {
+                this.cachedProviders = config.llm_providers;
+                this.cacheTimestamp = Date.now();
+                return config.llm_providers;
+            }
+
+            // Fallback to API endpoint
+            const response = await this.get('/api/v1/llm/providers');
+            this.cachedProviders = response;
+            this.cacheTimestamp = Date.now();
+            return response;
+        } catch (error) {
+            console.error('Failed to get LLM providers:', error);
+            // Return empty providers list as fallback
+            return {
+                providers: [],
+                default_provider: 'openai',
+                total_configured: 0,
+                error: error.message
+            };
+        }
+    }
+
+    /**
+     * Get details for a specific provider
+     * @param {string} providerName - Name of the provider (e.g., 'openai', 'anthropic')
+     * @returns {Promise<Object>} Provider details
+     */
+    async getProviderDetails(providerName) {
+        try {
+            const response = await this.get(`/api/v1/llm/providers/${providerName}`);
+            return response;
+        } catch (error) {
+            console.error(`Failed to get provider details for ${providerName}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get all available models across all providers
+     * @returns {Promise<Array>} List of all available models
+     */
+    async getAllAvailableModels() {
+        try {
+            const response = await this.get('/api/v1/llm/models');
+            return response;
+        } catch (error) {
+            console.error('Failed to get all models:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Clear the cached providers to force a refresh
+     */
+    clearProvidersCache() {
+        this.cachedProviders = null;
+        this.cacheTimestamp = null;
+    }
+    
+    /**
+     * Populate all model select dropdowns with available LLM providers and models
+     */
+    async populateModelDropdowns() {
+        try {
+            // Get available providers from API
+            const providersInfo = await this.getAvailableProviders();
+            
+            if (!providersInfo || !providersInfo.providers || providersInfo.providers.length === 0) {
+                console.warn('No LLM providers configured');
+                // Update dropdowns to show no providers available
+                document.querySelectorAll('.llm-model-select').forEach(select => {
+                    select.innerHTML = '<option value="">No models available - check configuration</option>';
+                });
+                return;
+            }
+            
+            // Build options HTML grouped by provider
+            let optionsHtml = '';
+            const defaultProvider = providersInfo.default_provider;
+            let defaultModel = null;
+            
+            // Sort providers by type (commercial first, then local)
+            const sortedProviders = providersInfo.providers.sort((a, b) => {
+                if (a.type === 'commercial' && b.type === 'local') return -1;
+                if (a.type === 'local' && b.type === 'commercial') return 1;
+                return a.display_name.localeCompare(b.display_name);
+            });
+            
+            // Group models by provider
+            sortedProviders.forEach(provider => {
+                if (provider.models && provider.models.length > 0) {
+                    // Add indicator if provider is not configured
+                    const configStatus = provider.is_configured === false ? ' (Not Configured)' : '';
+                    const labelStyle = provider.is_configured === false ? ' style="color: #888;"' : '';
+                    
+                    optionsHtml += `<optgroup label="${provider.display_name}${configStatus}"${labelStyle}>`;
+                    
+                    provider.models.forEach(model => {
+                        const value = `${provider.name}/${model}`;
+                        const displayName = model;
+                        const isDefault = provider.name === defaultProvider && provider.default_model === model;
+                        
+                        if (isDefault) {
+                            defaultModel = value;
+                        }
+                        
+                        // Disable option if provider is not configured
+                        const disabled = provider.is_configured === false ? ' disabled' : '';
+                        const disabledText = provider.is_configured === false ? ' (requires API key)' : '';
+                        
+                        optionsHtml += `<option value="${value}"${isDefault ? ' data-default="true"' : ''}${disabled}>${displayName}${isDefault ? ' (default)' : ''}${disabledText}</option>`;
+                    });
+                    
+                    optionsHtml += '</optgroup>';
+                }
+            });
+            
+            // Update all model select dropdowns
+            document.querySelectorAll('.llm-model-select').forEach(select => {
+                const currentValue = select.value;
+                const hasUseDefault = select.querySelector('option[value=""]');
+                
+                // Build the complete HTML
+                let html = '';
+                if (hasUseDefault && hasUseDefault.textContent.includes('Use default')) {
+                    html = '<option value="">Use default</option>';
+                }
+                html += optionsHtml;
+                
+                select.innerHTML = html;
+                
+                // Restore previous selection or set default
+                if (currentValue) {
+                    select.value = currentValue;
+                } else if (defaultModel && !hasUseDefault) {
+                    select.value = defaultModel;
+                }
+            });
+            
+            console.log(`Populated model dropdowns with ${providersInfo.total_configured || providersInfo.providers.length} providers`);
+            
+        } catch (error) {
+            console.error('Failed to populate model dropdowns:', error);
+            // Show error in dropdowns
+            document.querySelectorAll('.llm-model-select').forEach(select => {
+                select.innerHTML = '<option value="">Error loading models</option>';
+            });
+        }
+    }
+
+    // ============================================================
     // WebSocket Support
     // ============================================================
 
@@ -781,6 +953,14 @@ class WebSocketManager {
 
 // Create global instance
 const apiClient = new APIClient();
+
+// Make apiClient globally accessible
+window.apiClient = apiClient;
+
+// Global function for populating model dropdowns
+window.populateModelDropdowns = async function() {
+    return apiClient.populateModelDropdowns();
+};
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {

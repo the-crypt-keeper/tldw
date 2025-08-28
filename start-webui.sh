@@ -161,6 +161,51 @@ if [ ! -z "$SERVER_PID" ]; then
         sleep 1
     done
 else
-    echo "Press Ctrl+C to exit."
+    echo "==========================================="
+    echo -e "${YELLOW}Server Status:${NC}"
+    echo "==========================================="
     echo ""
+    echo "The API server was already running."
+    echo ""
+    echo -e "Options:"
+    echo -e "  ${YELLOW}1${NC} - View server logs (if available)"
+    echo -e "  ${YELLOW}2${NC} - Check server health"
+    echo -e "  ${YELLOW}3${NC} - Open WebUI in browser"
+    echo -e "  ${YELLOW}Ctrl+C${NC} - Exit launcher"
+    echo ""
+    
+    # Keep script running even when server was already running
+    trap "echo ''; echo 'Launcher exiting.'; exit 0" INT
+    
+    # Interactive menu loop
+    while true; do
+        read -t 1 -n 1 key
+        if [[ $key = "1" ]]; then
+            echo ""
+            echo "Checking for server logs..."
+            if [ -f /tmp/tldw_server.log ]; then
+                echo "Showing last 20 lines of server log (press Ctrl+C to stop):"
+                echo "==========================================="
+                tail -f /tmp/tldw_server.log
+            else
+                echo "No log file found at /tmp/tldw_server.log"
+                echo "The server may have been started differently."
+            fi
+            echo ""
+        elif [[ $key = "2" ]]; then
+            echo ""
+            echo "Checking server health..."
+            curl -s http://localhost:8000/health | python -m json.tool 2>/dev/null || echo "Health check failed"
+            echo ""
+        elif [[ $key = "3" ]]; then
+            echo ""
+            echo "Opening WebUI in browser..."
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                open "http://localhost:8000/webui/" 2>/dev/null &
+            elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+                xdg-open "http://localhost:8000/webui/" 2>/dev/null &
+            fi
+            echo ""
+        fi
+    done
 fi

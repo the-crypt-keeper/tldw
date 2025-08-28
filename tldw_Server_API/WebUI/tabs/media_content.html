@@ -288,11 +288,13 @@
                                 <textarea id="addMedia_system_prompt" name="system_prompt"></textarea>
                             </div>
                             <div class="form-group">
-                                <label for="addMedia_api_name">API Name (for analysis):</label>
-                                <input type="text" id="addMedia_api_name" name="api_name">
+                                <label for="addMedia_model">Model for Analysis:</label>
+                                <select id="addMedia_model" class="llm-model-select" name="api_name">
+                                    <option value="">Loading models...</option>
+                                </select>
                             </div>
                             <div class="form-group">
-                                <label for="addMedia_api_key">API Key (for analysis):</label>
+                                <label for="addMedia_api_key">API Key (optional, if not in config):</label>
                                 <input type="password" id="addMedia_api_key" name="api_key">
                             </div>
                             <div class="form-group">
@@ -439,11 +441,13 @@
                                 <textarea id="processVideos_system_prompt" name="system_prompt"></textarea>
                             </div>
                             <div class="form-group">
-                                <label for="processVideos_api_name">API Name (for analysis):</label>
-                                <input type="text" id="processVideos_api_name" name="api_name">
+                                <label for="processVideos_model">Model for Analysis:</label>
+                                <select id="processVideos_model" class="llm-model-select" name="api_name">
+                                    <option value="">Loading models...</option>
+                                </select>
                             </div>
                             <div class="form-group">
-                                <label for="processVideos_api_key">API Key (for analysis):</label>
+                                <label for="processVideos_api_key">API Key (optional, if not in config):</label>
                                 <input type="password" id="processVideos_api_key" name="api_key">
                             </div>
                             <div class="form-group">
@@ -566,11 +570,13 @@
                                 <textarea id="processAudios_system_prompt" name="system_prompt"></textarea>
                             </div>
                             <div class="form-group">
-                                <label for="processAudios_api_name">API Name (for analysis):</label>
-                                <input type="text" id="processAudios_api_name" name="api_name">
+                                <label for="processAudios_model">Model for Analysis:</label>
+                                <select id="processAudios_model" class="llm-model-select" name="api_name">
+                                    <option value="">Loading models...</option>
+                                </select>
                             </div>
                             <div class="form-group">
-                                <label for="processAudios_api_key">API Key (for analysis):</label>
+                                <label for="processAudios_api_key">API Key (optional, if not in config):</label>
                                 <input type="password" id="processAudios_api_key" name="api_key">
                             </div>
                             <div class="form-group">
@@ -709,11 +715,13 @@
                                 <textarea id="processEbooks_system_prompt" name="system_prompt"></textarea>
                             </div>
                             <div class="form-group">
-                                <label for="processEbooks_api_name">API Name:</label>
-                                <input type="text" id="processEbooks_api_name" name="api_name">
+                                <label for="processEbooks_model">Model for Analysis:</label>
+                                <select id="processEbooks_model" class="llm-model-select" name="api_name">
+                                    <option value="">Loading models...</option>
+                                </select>
                             </div>
                             <div class="form-group">
-                                <label for="processEbooks_api_key">API Key:</label>
+                                <label for="processEbooks_api_key">API Key (optional, if not in config):</label>
                                 <input type="password" id="processEbooks_api_key" name="api_key">
                             </div>
                         </div>
@@ -798,11 +806,13 @@
                                 <textarea id="processDocuments_system_prompt" name="system_prompt"></textarea>
                             </div>
                             <div class="form-group">
-                                <label for="processDocuments_api_name">API Name:</label>
-                                <input type="text" id="processDocuments_api_name" name="api_name">
+                                <label for="processDocuments_model">Model for Analysis:</label>
+                                <select id="processDocuments_model" class="llm-model-select" name="api_name">
+                                    <option value="">Loading models...</option>
+                                </select>
                             </div>
                             <div class="form-group">
-                                <label for="processDocuments_api_key">API Key:</label>
+                                <label for="processDocuments_api_key">API Key (optional, if not in config):</label>
                                 <input type="password" id="processDocuments_api_key" name="api_key">
                             </div>
                         </div>
@@ -1065,4 +1075,226 @@
                     <pre id="processWebScraping_response">---</pre>
                 </div>
             </div>
+
+            <!-- Media Analysis Tab -->
+            <div id="tabMediaAnalysis" class="tab-content">
+                <h2>Media Analysis</h2>
+                <p>Analyze media content using custom or saved prompts with LLM models</p>
+                
+                <!-- Media Selection Section -->
+                <div class="endpoint-section">
+                    <h3>1. Select Media Item</h3>
+                    <div class="form-group">
+                        <label for="analysisMediaSearch">Search Media:</label>
+                        <input type="text" id="analysisMediaSearch" placeholder="Search by title, author, or keywords..." />
+                        <button class="api-button" onclick="searchMediaForAnalysis()">Search</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="analysisMediaSelect">Or Select from Recent:</label>
+                        <select id="analysisMediaSelect" onchange="loadMediaForAnalysis()">
+                            <option value="">-- Select a media item --</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Media Preview -->
+                    <div id="mediaPreview" style="display: none; margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px;">
+                        <h4>Selected Media</h4>
+                        <p><strong>Title:</strong> <span id="previewTitle">-</span></p>
+                        <p><strong>Author:</strong> <span id="previewAuthor">-</span></p>
+                        <p><strong>Type:</strong> <span id="previewType">-</span></p>
+                        <p><strong>Content Length:</strong> <span id="previewLength">-</span> characters</p>
+                        <details>
+                            <summary>Content Preview (first 500 characters)</summary>
+                            <pre id="previewContent" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">-</pre>
+                        </details>
+                    </div>
+                </div>
+                
+                <!-- Prompt Selection Section -->
+                <div class="endpoint-section">
+                    <h3>2. Configure Analysis Prompt</h3>
+                    
+                    <div class="form-group">
+                        <label for="analysisPromptSource">Prompt Source:</label>
+                        <select id="analysisPromptSource" onchange="togglePromptSource()">
+                            <option value="custom">Custom Prompt</option>
+                            <option value="saved">Select from Saved Prompts</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Custom Prompt -->
+                    <div id="customPromptSection">
+                        <div class="form-group">
+                            <label for="analysisCustomPrompt">Analysis Prompt:</label>
+                            <textarea id="analysisCustomPrompt" rows="4" placeholder="Enter your analysis instructions...">Analyze the following content and provide a comprehensive summary highlighting key points, themes, and insights.</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Saved Prompts -->
+                    <div id="savedPromptSection" style="display: none;">
+                        <div class="form-group">
+                            <label for="analysisSavedPrompt">Select Saved Prompt:</label>
+                            <select id="analysisSavedPrompt" onchange="loadSelectedPrompt()">
+                                <option value="">Loading prompts...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Selected Prompt Content:</label>
+                            <textarea id="selectedPromptContent" rows="4" readonly></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="analysisSystemPrompt">System Prompt (Optional):</label>
+                        <textarea id="analysisSystemPrompt" rows="2" placeholder="Optional system instructions for the model...">You are a helpful assistant that provides detailed and insightful analysis of content.</textarea>
+                    </div>
+                </div>
+                
+                <!-- Model Selection Section -->
+                <div class="endpoint-section">
+                    <h3>3. Select Model</h3>
+                    
+                    <div class="form-group">
+                        <label for="analysisModel">LLM Model:</label>
+                        <select id="analysisModel" class="llm-model-select">
+                            <option value="">Loading models...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="analysisTemperature">Temperature:</label>
+                        <input type="number" id="analysisTemperature" min="0" max="2" step="0.1" value="0.7" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="analysisMaxTokens">Max Tokens:</label>
+                        <input type="number" id="analysisMaxTokens" min="100" max="8000" value="2000" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <input type="checkbox" id="analysisStreaming" checked />
+                        <label for="analysisStreaming">Enable Streaming Response</label>
+                    </div>
+                </div>
+                
+                <!-- Run Analysis Section -->
+                <div class="endpoint-section">
+                    <h3>4. Run Analysis</h3>
+                    
+                    <button class="api-button primary" onclick="runMediaAnalysis()" id="runAnalysisBtn">
+                        Run Analysis
+                    </button>
+                    
+                    <!-- Analysis Response -->
+                    <div id="analysisResponse" style="margin-top: 20px;">
+                        <h4>Analysis Result</h4>
+                        <div id="analysisLoading" style="display: none;">
+                            <p>🔄 Analyzing content...</p>
+                            <div id="streamingResponse" style="padding: 10px; background: #f0f0f0; border-radius: 5px; min-height: 100px; white-space: pre-wrap;"></div>
+                        </div>
+                        <div id="analysisResult" style="display: none;">
+                            <div class="form-group">
+                                <label>Analysis:</label>
+                                <div id="analysisContent" style="padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px; white-space: pre-wrap;"></div>
+                            </div>
+                            <div style="margin-top: 10px;">
+                                <button class="api-button" onclick="saveAnalysisToMedia()">Save to Media Item</button>
+                                <button class="api-button" onclick="copyAnalysisToClipboard()">Copy to Clipboard</button>
+                                <button class="api-button" onclick="downloadAnalysisAsText()">Download as Text</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Existing Analyses Section -->
+                <div class="endpoint-section">
+                    <h3>5. Existing Analyses</h3>
+                    
+                    <button class="api-button" onclick="loadExistingAnalyses()">Load Analyses for Selected Media</button>
+                    
+                    <div id="existingAnalyses" style="margin-top: 20px;">
+                        <div id="analysesList"></div>
+                    </div>
+                </div>
+            </div>
+
+<script>
+// Initialize media tabs
+function initializeMediaTabs() {
+    console.log('Media tabs initialized');
+    // Populate model dropdowns when tab is initialized
+    populateModelDropdowns();
+}
+
+// Override the form submission to extract just the provider name from model selection
+document.addEventListener('DOMContentLoaded', () => {
+    // For each model dropdown in media processing, extract just provider name before form submission
+    const modelSelects = document.querySelectorAll('#addMedia_model, #processVideos_model, #processAudios_model, #processEbooks_model, #processDocuments_model');
+    
+    modelSelects.forEach(select => {
+        if (select) {
+            // Store the original name attribute
+            const originalName = select.getAttribute('name');
+            
+            // Update the value before form submission
+            select.addEventListener('change', function() {
+                if (this.value && this.value.includes('/')) {
+                    // Extract provider name from "provider/model" format
+                    const provider = this.value.split('/')[0];
+                    // Create a hidden input with the provider name
+                    let hiddenInput = this.parentElement.querySelector('input[type="hidden"][name="' + originalName + '"]');
+                    if (!hiddenInput) {
+                        hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = originalName;
+                        this.parentElement.appendChild(hiddenInput);
+                    }
+                    hiddenInput.value = provider;
+                    // Remove the name from select so it doesn't submit
+                    this.removeAttribute('name');
+                } else {
+                    // If no value or doesn't contain /, restore original name
+                    this.setAttribute('name', originalName);
+                    // Remove any hidden input
+                    const hiddenInput = this.parentElement.querySelector('input[type="hidden"][name="' + originalName + '"]');
+                    if (hiddenInput) {
+                        hiddenInput.remove();
+                    }
+                }
+            });
+        }
+    });
+});
+</script>
+
+<!-- Media Analysis JavaScript -->
+<script src="js/media-analysis.js"></script>
+<script>
+// Initialize Media Analysis tab when it becomes visible
+document.addEventListener('DOMContentLoaded', function() {
+    // Add observer for tab changes
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.target.id === 'tabMediaAnalysis' && 
+                mutation.attributeName === 'style' &&
+                mutation.target.style.display !== 'none') {
+                // Tab is now visible, initialize if needed
+                if (typeof initializeMediaAnalysis === 'function') {
+                    initializeMediaAnalysis();
+                }
+            }
+        });
+    });
+
+    // Observe the Analysis tab for visibility changes
+    const analysisTab = document.getElementById('tabMediaAnalysis');
+    if (analysisTab) {
+        observer.observe(analysisTab, {
+            attributes: true,
+            attributeFilter: ['style']
+        });
+    }
+});
+</script>
 

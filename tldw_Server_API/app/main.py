@@ -92,6 +92,9 @@ from tldw_Server_API.app.api.v1.endpoints.mcp_unified_endpoint import router as 
 # Chatbooks Endpoint
 from tldw_Server_API.app.api.v1.endpoints.chatbooks import router as chatbooks_router
 #
+# LLM Providers Endpoint
+from tldw_Server_API.app.api.v1.endpoints.llm_providers import router as llm_providers_router
+#
 # Metrics and Telemetry
 from tldw_Server_API.app.core.Metrics import (
     initialize_telemetry,
@@ -486,6 +489,7 @@ if WEBUI_DIR.exists():
     async def get_webui_config():
         """Dynamically generate WebUI configuration with API key in single user mode."""
         from tldw_Server_API.app.core.AuthNZ.settings import get_settings, is_single_user_mode
+        from tldw_Server_API.app.api.v1.endpoints.llm_providers import get_configured_providers
         from fastapi.responses import JSONResponse
         
         config = {
@@ -503,6 +507,14 @@ if WEBUI_DIR.exists():
         else:
             config["mode"] = "multi-user"
             config["_comment"] = "Multi-user mode - manual authentication required"
+        
+        # Add LLM providers information
+        try:
+            providers_info = get_configured_providers()
+            config["llm_providers"] = providers_info
+        except Exception as e:
+            logger.warning(f"Failed to get LLM providers for config: {e}")
+            config["llm_providers"] = {"providers": [], "default_provider": "openai", "total_configured": 0}
         
         return JSONResponse(content=config)
     
@@ -639,6 +651,8 @@ app.include_router(mcp_unified_router, prefix=f"{API_V1_PREFIX}", tags=["MCP Uni
 
 # Router for Chatbooks - import/export functionality
 app.include_router(chatbooks_router, prefix=f"{API_V1_PREFIX}", tags=["chatbooks"])
+# Router for LLM providers endpoint
+app.include_router(llm_providers_router, prefix=f"{API_V1_PREFIX}", tags=["llm"])
 
 # Router for trash endpoints - deletion of media items / trash file handling (FIXME: Secure delete vs lag on delete?)
 #app.include_router(trash_router, prefix=f"{API_V1_PREFIX}/trash", tags=["trash"])
