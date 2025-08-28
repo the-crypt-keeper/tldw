@@ -293,3 +293,4 @@ errors.log
 /postgres_data/
 /redis_data/
 /Databases/ChromaDB/
+uv.lock
