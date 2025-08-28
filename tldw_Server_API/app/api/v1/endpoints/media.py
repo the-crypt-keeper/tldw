@@ -32,6 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple, Callable, Literal, Union, S
 from fastapi import (
     APIRouter,
     BackgroundTasks,
+    Body,
     Depends,
     File,
     Form,

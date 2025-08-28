@@ -8,6 +8,7 @@ class MediaAnalysisManager {
         this.currentAnalyses = [];
         this.searchTimeout = null;
         this.isAnalyzing = false;
+        this.currentMediaContent = '';
     }
 
     async initialize() {
@@ -38,10 +39,10 @@ class MediaAnalysisManager {
         }
 
         // Prompt source toggle
-        const promptSourceRadios = document.querySelectorAll('input[name="promptSource"]');
-        promptSourceRadios.forEach(radio => {
-            radio.addEventListener('change', () => this.togglePromptSource());
-        });
+        const promptSource = document.getElementById('analysisPromptSource');
+        if (promptSource) {
+            promptSource.addEventListener('change', () => this.togglePromptSource());
+        }
 
         // Run analysis button
         const runButton = document.getElementById('runAnalysisBtn');
@@ -117,6 +118,8 @@ class MediaAnalysisManager {
     async loadMediaForAnalysis(mediaId) {
         this.selectedMediaId = mediaId;
         const selectedMediaDiv = document.getElementById('selectedMediaForAnalysis');
+        const contentSection = document.getElementById('mediaContentSection');
+        const contentTextarea = document.getElementById('analysisMediaContent');
         
         selectedMediaDiv.innerHTML = '<div class="loading">Loading media details...</div>';
 
@@ -126,6 +129,7 @@ class MediaAnalysisManager {
 
             const media = await response.json();
             
+            // Display media info
             selectedMediaDiv.innerHTML = `
                 <div class="selected-media-card">
                     <h3>${this.escapeHtml(media.title || 'Untitled')}</h3>
@@ -135,6 +139,24 @@ class MediaAnalysisManager {
                     <p><strong>Content Length:</strong> ${media.content ? media.content.length : 0} characters</p>
                 </div>
             `;
+
+            // Populate the content textarea with the media content
+            if (media.content) {
+                this.currentMediaContent = media.content;
+                contentTextarea.value = media.content;
+                contentSection.style.display = 'block';
+            } else {
+                // Try to get content from latest version
+                const versionsResponse = await fetch(`/api/v1/media/${mediaId}/versions?include_content=true&limit=1`);
+                if (versionsResponse.ok) {
+                    const versions = await versionsResponse.json();
+                    if (versions.length > 0 && versions[0].content) {
+                        this.currentMediaContent = versions[0].content;
+                        contentTextarea.value = versions[0].content;
+                        contentSection.style.display = 'block';
+                    }
+                }
+            }
 
             // Load existing analyses for this media
             await this.loadExistingAnalyses(mediaId);
@@ -176,34 +198,36 @@ class MediaAnalysisManager {
     }
 
     togglePromptSource() {
+        const promptSource = document.getElementById('analysisPromptSource').value;
         const customPromptDiv = document.getElementById('customPromptSection');
         const savedPromptDiv = document.getElementById('savedPromptSection');
-        const useCustom = document.getElementById('useCustomPrompt').checked;
+        const customSystemDiv = document.getElementById('customSystemPromptSection');
 
-        if (useCustom) {
+        if (promptSource === 'custom') {
             customPromptDiv.style.display = 'block';
             savedPromptDiv.style.display = 'none';
+            customSystemDiv.style.display = 'block';
         } else {
             customPromptDiv.style.display = 'none';
             savedPromptDiv.style.display = 'block';
+            customSystemDiv.style.display = 'none';
         }
     }
 
     async loadPromptDetails() {
         const promptId = document.getElementById('savedPromptSelect').value;
         if (!promptId) {
-            this.selectedPromptId = null;
+            document.getElementById('savedPromptUserPrompt').value = '';
+            document.getElementById('savedPromptSystemPrompt').value = '';
             return;
         }
 
-        try {
-            const prompt = this.availablePrompts.find(p => p.id == promptId);
-            if (prompt) {
-                this.selectedPromptId = promptId;
-                // Could display prompt details here if needed
-            }
-        } catch (error) {
-            console.error('Error loading prompt details:', error);
+        const prompt = this.availablePrompts.find(p => p.id == promptId);
+        if (prompt) {
+            // Load prompts into editable fields
+            document.getElementById('savedPromptUserPrompt').value = prompt.prompt || prompt.user_prompt || '';
+            document.getElementById('savedPromptSystemPrompt').value = prompt.system_prompt || '';
+            this.selectedPromptId = promptId;
         }
     }
 
@@ -218,26 +242,30 @@ class MediaAnalysisManager {
             return;
         }
 
-        const useCustom = document.getElementById('useCustomPrompt').checked;
+        // Get the (potentially modified) content from the textarea
+        const mediaContent = document.getElementById('analysisMediaContent').value;
+        if (!mediaContent) {
+            alert('No content to analyze');
+            return;
+        }
+
+        // Get prompts based on source
+        const promptSource = document.getElementById('analysisPromptSource').value;
         let systemPrompt = '';
         let userPrompt = '';
 
-        if (useCustom) {
+        if (promptSource === 'custom') {
             systemPrompt = document.getElementById('analysisSystemPrompt').value;
             userPrompt = document.getElementById('analysisUserPrompt').value;
         } else {
-            const promptId = document.getElementById('savedPromptSelect').value;
-            if (!promptId) {
-                alert('Please select a saved prompt');
-                return;
-            }
-            const prompt = this.availablePrompts.find(p => p.id == promptId);
-            if (!prompt) {
-                alert('Selected prompt not found');
-                return;
-            }
-            systemPrompt = prompt.system_prompt || '';
-            userPrompt = prompt.user_prompt || '';
+            // Get from saved prompt fields (which are editable)
+            systemPrompt = document.getElementById('savedPromptSystemPrompt').value;
+            userPrompt = document.getElementById('savedPromptUserPrompt').value;
+        }
+
+        if (!userPrompt) {
+            alert('Please enter an analysis prompt');
+            return;
         }
 
         const model = document.getElementById('analysisModelSelect').value;
@@ -259,21 +287,37 @@ class MediaAnalysisManager {
         resultsDiv.innerHTML = '<div class="loading">Running analysis...</div>';
 
         try {
-            const payload = {
-                system_prompt: systemPrompt,
-                user_prompt: userPrompt,
+            // Build the messages for the chat API
+            const messages = [];
+            if (systemPrompt) {
+                messages.push({
+                    role: 'system',
+                    content: systemPrompt
+                });
+            }
+            
+            // Combine the user prompt with the media content
+            const fullUserMessage = `${userPrompt}\n\nContent to analyze:\n\n${mediaContent}`;
+            messages.push({
+                role: 'user',
+                content: fullUserMessage
+            });
+
+            // Call the chat completions endpoint
+            const chatPayload = {
                 model: model,
+                messages: messages,
                 temperature: temperature,
                 max_tokens: maxTokens,
                 stream: stream
             };
 
-            const response = await fetch(`/api/v1/media/${this.selectedMediaId}/analyze`, {
+            const response = await fetch('/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(chatPayload)
             });
 
             if (!response.ok) {
@@ -281,12 +325,20 @@ class MediaAnalysisManager {
                 throw new Error(error.detail || 'Analysis failed');
             }
 
+            let analysisResult = '';
             if (stream) {
-                await this.handleStreamingResponse(response, resultsDiv);
+                analysisResult = await this.handleStreamingResponse(response, resultsDiv);
             } else {
                 const result = await response.json();
-                this.displayAnalysisResult(result);
+                analysisResult = result.choices[0].message.content;
+                this.displayAnalysisResult({
+                    analysis: analysisResult,
+                    created_at: new Date().toISOString()
+                });
             }
+
+            // Save the analysis as a document version
+            await this.saveAnalysisVersion(mediaContent, userPrompt, systemPrompt, analysisResult);
 
             // Reload existing analyses to show the new one
             await this.loadExistingAnalyses(this.selectedMediaId);
@@ -345,6 +397,36 @@ class MediaAnalysisManager {
             analysis: fullContent,
             created_at: new Date().toISOString()
         });
+
+        return fullContent;
+    }
+
+    async saveAnalysisVersion(content, userPrompt, systemPrompt, analysisResult) {
+        try {
+            const fullPrompt = systemPrompt ? 
+                `System: ${systemPrompt}\n\nUser: ${userPrompt}` : 
+                userPrompt;
+
+            const payload = {
+                content: content,
+                prompt: fullPrompt,
+                analysis_content: analysisResult
+            };
+
+            const response = await fetch(`/api/v1/media/${this.selectedMediaId}/versions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                console.error('Failed to save analysis version');
+            }
+        } catch (error) {
+            console.error('Error saving analysis version:', error);
+        }
     }
 
     displayAnalysisResult(result) {
@@ -358,7 +440,6 @@ class MediaAnalysisManager {
                 <div class="result-content">
                     ${this.formatAnalysisContent(result.analysis || result.content || '')}
                 </div>
-                ${result.version_id ? `<div class="result-meta">Version ID: ${result.version_id}</div>` : ''}
             </div>
         `;
     }
@@ -374,8 +455,6 @@ class MediaAnalysisManager {
 
     clearAnalysis() {
         document.getElementById('analysisResults').innerHTML = '';
-        document.getElementById('analysisSystemPrompt').value = '';
-        document.getElementById('analysisUserPrompt').value = '';
     }
 
     async loadExistingAnalyses(mediaId) {
@@ -383,10 +462,13 @@ class MediaAnalysisManager {
         container.innerHTML = '<div class="loading">Loading analyses...</div>';
 
         try {
-            const response = await fetch(`/api/v1/media/${mediaId}/analyses`);
+            const response = await fetch(`/api/v1/media/${mediaId}/versions?include_content=false`);
             if (!response.ok) throw new Error('Failed to load analyses');
 
-            const analyses = await response.json();
+            const versions = await response.json();
+            
+            // Filter to show only versions with analysis_content
+            const analyses = versions.filter(v => v.analysis_content);
             this.currentAnalyses = analyses;
             this.displayExistingAnalyses(analyses);
         } catch (error) {
@@ -404,18 +486,17 @@ class MediaAnalysisManager {
         }
 
         const html = analyses.map(analysis => `
-            <div class="analysis-card" data-version-id="${analysis.version_id}">
+            <div class="analysis-card" data-version-id="${analysis.version_number}">
                 <div class="analysis-header">
-                    <h4>${analysis.version_name || 'Analysis'}</h4>
+                    <h4>Version ${analysis.version_number}</h4>
                     <span class="analysis-date">${new Date(analysis.created_at).toLocaleDateString()}</span>
                 </div>
                 <div class="analysis-preview">
-                    ${this.escapeHtml(analysis.content).substring(0, 200)}...
+                    ${this.escapeHtml((analysis.analysis_content || '').substring(0, 200))}...
                 </div>
                 <div class="analysis-actions">
-                    <button onclick="mediaAnalysisManager.viewAnalysis('${analysis.version_id}')" class="btn-small">View</button>
-                    <button onclick="mediaAnalysisManager.editAnalysis('${analysis.version_id}')" class="btn-small">Edit</button>
-                    <button onclick="mediaAnalysisManager.deleteAnalysis('${analysis.version_id}')" class="btn-small btn-danger">Delete</button>
+                    <button onclick="mediaAnalysisManager.viewAnalysis(${analysis.version_number})" class="btn-small">View</button>
+                    <button onclick="mediaAnalysisManager.deleteAnalysis(${analysis.version_number})" class="btn-small btn-danger">Delete</button>
                 </div>
             </div>
         `).join('');
@@ -423,59 +504,42 @@ class MediaAnalysisManager {
         container.innerHTML = html;
     }
 
-    viewAnalysis(versionId) {
-        const analysis = this.currentAnalyses.find(a => a.version_id === versionId);
-        if (!analysis) return;
-
-        const resultsDiv = document.getElementById('analysisResults');
-        resultsDiv.innerHTML = `
-            <div class="analysis-result">
-                <div class="result-header">
-                    <h3>${analysis.version_name || 'Analysis'}</h3>
-                    <span class="timestamp">${new Date(analysis.created_at).toLocaleString()}</span>
-                </div>
-                <div class="result-content">
-                    ${this.formatAnalysisContent(analysis.content || '')}
-                </div>
-                <div class="result-meta">Version ID: ${analysis.version_id}</div>
-            </div>
-        `;
-    }
-
-    async editAnalysis(versionId) {
-        const analysis = this.currentAnalyses.find(a => a.version_id === versionId);
-        if (!analysis) return;
-
-        const newContent = prompt('Edit analysis content:', analysis.content);
-        if (newContent === null || newContent === analysis.content) return;
-
+    async viewAnalysis(versionNumber) {
         try {
-            const response = await fetch(`/api/v1/media/${this.selectedMediaId}/analyses/${versionId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    content: newContent,
-                    version_name: analysis.version_name
-                })
-            });
+            const response = await fetch(`/api/v1/media/${this.selectedMediaId}/versions/${versionNumber}?include_content=true`);
+            if (!response.ok) throw new Error('Failed to load analysis');
 
-            if (!response.ok) throw new Error('Failed to update analysis');
-
-            await this.loadExistingAnalyses(this.selectedMediaId);
-            alert('Analysis updated successfully');
+            const analysis = await response.json();
+            
+            const resultsDiv = document.getElementById('analysisResults');
+            resultsDiv.innerHTML = `
+                <div class="analysis-result">
+                    <div class="result-header">
+                        <h3>Analysis Version ${versionNumber}</h3>
+                        <span class="timestamp">${new Date(analysis.created_at).toLocaleString()}</span>
+                    </div>
+                    ${analysis.prompt ? `
+                        <div class="result-prompt">
+                            <h4>Prompt Used:</h4>
+                            <pre>${this.escapeHtml(analysis.prompt)}</pre>
+                        </div>
+                    ` : ''}
+                    <div class="result-content">
+                        ${this.formatAnalysisContent(analysis.analysis_content || '')}
+                    </div>
+                </div>
+            `;
         } catch (error) {
-            console.error('Error updating analysis:', error);
-            alert('Failed to update analysis');
+            console.error('Error viewing analysis:', error);
+            alert('Failed to load analysis details');
         }
     }
 
-    async deleteAnalysis(versionId) {
-        if (!confirm('Are you sure you want to delete this analysis?')) return;
+    async deleteAnalysis(versionNumber) {
+        if (!confirm(`Are you sure you want to delete analysis version ${versionNumber}?`)) return;
 
         try {
-            const response = await fetch(`/api/v1/media/${this.selectedMediaId}/analyses/${versionId}`, {
+            const response = await fetch(`/api/v1/media/${this.selectedMediaId}/versions/${versionNumber}`, {
                 method: 'DELETE'
             });
 

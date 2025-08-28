@@ -1097,17 +1097,18 @@
                         </select>
                     </div>
                     
-                    <!-- Media Preview -->
-                    <div id="mediaPreview" style="display: none; margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px;">
-                        <h4>Selected Media</h4>
-                        <p><strong>Title:</strong> <span id="previewTitle">-</span></p>
-                        <p><strong>Author:</strong> <span id="previewAuthor">-</span></p>
-                        <p><strong>Type:</strong> <span id="previewType">-</span></p>
-                        <p><strong>Content Length:</strong> <span id="previewLength">-</span> characters</p>
-                        <details>
-                            <summary>Content Preview (first 500 characters)</summary>
-                            <pre id="previewContent" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">-</pre>
-                        </details>
+                    <!-- Search Results -->
+                    <div id="analysisMediaResults" class="search-results"></div>
+                    
+                    <!-- Selected Media Display -->
+                    <div id="selectedMediaForAnalysis" class="selected-media"></div>
+                    
+                    <!-- Media Content Textarea -->
+                    <div id="mediaContentSection" style="display: none; margin-top: 20px;">
+                        <div class="form-group">
+                            <label for="analysisMediaContent">Media Content (editable):</label>
+                            <textarea id="analysisMediaContent" rows="10" placeholder="Media content will appear here. You can edit it before sending for analysis..." style="width: 100%; font-family: monospace;"></textarea>
+                        </div>
                     </div>
                 </div>
                 
@@ -1126,26 +1127,30 @@
                     <!-- Custom Prompt -->
                     <div id="customPromptSection">
                         <div class="form-group">
-                            <label for="analysisCustomPrompt">Analysis Prompt:</label>
-                            <textarea id="analysisCustomPrompt" rows="4" placeholder="Enter your analysis instructions...">Analyze the following content and provide a comprehensive summary highlighting key points, themes, and insights.</textarea>
+                            <label for="analysisUserPrompt">User Prompt:</label>
+                            <textarea id="analysisUserPrompt" rows="4" placeholder="Enter your analysis instructions...">Analyze the following content and provide a comprehensive summary highlighting key points, themes, and insights.</textarea>
                         </div>
                     </div>
                     
                     <!-- Saved Prompts -->
                     <div id="savedPromptSection" style="display: none;">
                         <div class="form-group">
-                            <label for="analysisSavedPrompt">Select Saved Prompt:</label>
-                            <select id="analysisSavedPrompt" onchange="loadSelectedPrompt()">
+                            <label for="savedPromptSelect">Select Saved Prompt:</label>
+                            <select id="savedPromptSelect" onchange="loadPromptDetails()">
                                 <option value="">Loading prompts...</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Selected Prompt Content:</label>
-                            <textarea id="selectedPromptContent" rows="4" readonly></textarea>
+                            <label for="savedPromptUserPrompt">User Prompt (editable):</label>
+                            <textarea id="savedPromptUserPrompt" rows="4" placeholder="Selected prompt will appear here for editing..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="savedPromptSystemPrompt">System Prompt (editable):</label>
+                            <textarea id="savedPromptSystemPrompt" rows="2" placeholder="System prompt will appear here for editing..."></textarea>
                         </div>
                     </div>
                     
-                    <div class="form-group">
+                    <div class="form-group" id="customSystemPromptSection">
                         <label for="analysisSystemPrompt">System Prompt (Optional):</label>
                         <textarea id="analysisSystemPrompt" rows="2" placeholder="Optional system instructions for the model...">You are a helpful assistant that provides detailed and insightful analysis of content.</textarea>
                     </div>
@@ -1156,8 +1161,8 @@
                     <h3>3. Select Model</h3>
                     
                     <div class="form-group">
-                        <label for="analysisModel">LLM Model:</label>
-                        <select id="analysisModel" class="llm-model-select">
+                        <label for="analysisModelSelect">LLM Model:</label>
+                        <select id="analysisModelSelect" class="llm-model-select">
                             <option value="">Loading models...</option>
                         </select>
                     </div>
