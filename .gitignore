@@ -293,3 +293,4 @@ errors.log
 # Database data (for local development)
 /postgres_data/
 /redis_data/
+uv.lock
