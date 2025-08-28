@@ -61,6 +61,7 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
 # Database Instance Dependency (Gets DB based on User)
 from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
+from tldw_Server_API.app.core.AuthNZ.jwt_service import verify_token
 from tldw_Server_API.app.core.DB_Management.DB_Manager import (
     get_paginated_files,
 )
@@ -72,7 +73,6 @@ from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import (
     get_document_version,
     check_media_exists,
     fetch_keywords_for_media,
-    get_all_content_from_database,
 )
 from tldw_Server_API.app.api.v1.API_Deps.validations_deps import file_validator_instance
 from tldw_Server_API.app.api.v1.schemas.media_response_models import PaginationInfo, MediaListResponse, MediaListItem, \
@@ -1273,8 +1273,8 @@ async def search_media_items(
 
 
         except ValidationError as ve:
-            logger.error(f"Pydantic validation error creating MediaListResponse for search: {ve.errors()}", exc_info=True)
             logger.debug(f"Data causing validation error in search: items_count={len(formatted_items)}, pagination={pagination_info.model_dump_json(indent=2) if pagination_info else 'None'}")
+            logger.error(f"Pydantic validation error creating MediaListResponse for search: {ve.errors()}", exc_info=True)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error: Response creation failed.")
 
     except ValueError as ve: # Catch custom ValueErrors from db.search_media_db or param validation
@@ -4374,6 +4374,7 @@ def get_process_pdfs_form(
             timestamp_option=timestamp_option,
             vad_use=vad_use,
             perform_confabulation_check_of_analysis=perform_confabulation_check_of_analysis,
+
         )
         return form_instance
     # --- Keep the exact same error handling as get_process_videos_form ---
@@ -5530,309 +5531,6 @@ async def _download_url_async(
                 logger.debug(f"Failed to remove temporary file {target_path}: {e}")
         raise RuntimeError(f"Failed to download or save {url}: {e}") from e  # Use RuntimeError for unexpected
 
-####################################################################################
-#
-# Media Analysis Endpoints - For analyzing media content with custom prompts
-#
-####################################################################################
-
-@router.post(
-    "/{media_id}/analyze",
-    summary="Analyze media content with custom prompt",
-    description="Analyze a media item's content using the chat completions API and save the result",
-    response_model=Dict[str, Any],
-    tags=["Media Analysis"]
-)
-async def analyze_media(
-    media_id: int,
-    prompt: str = Body(..., description="The analysis prompt/instructions"),
-    system_prompt: Optional[str] = Body(None, description="Optional system prompt"),
-    save_analysis: bool = Body(True, description="Whether to save the analysis as a new version"),
-    model: Optional[str] = Body(None, description="Optional model override (format: provider/model)"),
-    temperature: Optional[float] = Body(0.7, ge=0, le=2, description="Temperature for the model"),
-    max_tokens: Optional[int] = Body(2000, ge=100, le=8000, description="Maximum tokens for response"),
-    current_user: dict = Depends(verify_token)
-) -> Dict[str, Any]:
-    """
-    Analyze a media item's content using an LLM and optionally save the result.
-    
-    This endpoint:
-    1. Retrieves the media item's content
-    2. Sends it to the chat completions API with the provided prompt
-    3. Optionally saves the analysis as a new DocumentVersion
-    """
-    user_id = current_user.get("user_id", DEFAULT_USER_ID)
-    client_id = request.headers.get("X-Client-ID", "web")
-    
-    try:
-        # Get the media item's content
-        db = MediaDatabase(get_media_db_path(user_id), client_id=client_id)
-        media_details = db.fetch_media_details_single(media_id)
-        
-        if not media_details:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Media item {media_id} not found"
-            )
-        
-        # Extract content
-        content = media_details.get("content", {}).get("content", "")
-        if not content:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Media item has no content to analyze"
-            )
-        
-        # Prepare the chat completion request
-        messages = []
-        
-        if system_prompt:
-            messages.append({
-                "role": "system",
-                "content": system_prompt
-            })
-        
-        # Add the analysis prompt with the media content
-        user_message = f"{prompt}\n\n---\nContent to analyze:\n\n{content}"
-        messages.append({
-            "role": "user",
-            "content": user_message
-        })
-        
-        # Call the chat completions API (internal call)
-        # We'll use the existing chat endpoint logic
-        from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze as llm_analyze
-        
-        # Extract provider and model name if provided
-        api_name = "openai"  # Default
-        model_name = None
-        
-        if model:
-            if "/" in model:
-                api_name, model_name = model.split("/", 1)
-            else:
-                model_name = model
-        
-        # Perform the analysis
-        analysis_result = llm_analyze(
-            api_name=api_name,
-            input_data=content,
-            custom_prompt_arg=prompt,
-            system_message=system_prompt,
-            temp=temperature
-        )
-        
-        # Save the analysis if requested
-        version_info = None
-        if save_analysis:
-            version_info = db.create_document_version(
-                media_id=media_id,
-                content=content,  # Keep original content
-                prompt=prompt,
-                analysis_content=analysis_result
-            )
-            
-        return {
-            "status": "success",
-            "media_id": media_id,
-            "analysis": analysis_result,
-            "version_created": version_info is not None,
-            "version_info": version_info
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error analyzing media {media_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to analyze media: {str(e)}"
-        )
-
-
-@router.get(
-    "/{media_id}/analyses",
-    summary="Get all analyses for a media item",
-    description="Retrieve all analysis versions for a specific media item",
-    response_model=List[Dict[str, Any]],
-    tags=["Media Analysis"]
-)
-async def get_media_analyses(
-    media_id: int,
-    include_content: bool = Query(False, description="Include full analysis content"),
-    current_user: dict = Depends(verify_token)
-) -> List[Dict[str, Any]]:
-    """
-    Get all analyses (DocumentVersions with analysis_content) for a media item.
-    """
-    user_id = current_user.get("user_id", DEFAULT_USER_ID)
-    client_id = request.headers.get("X-Client-ID", "web")
-    
-    try:
-        db = MediaDatabase(get_media_db_path(user_id), client_id=client_id)
-        
-        # Get all versions for this media item
-        versions = db.get_document_versions(media_id, include_content=include_content)
-        
-        # Filter to only versions with analysis content
-        analyses = []
-        for version in versions:
-            if version.get("analysis_content"):
-                analyses.append({
-                    "version_id": version.get("id"),
-                    "version_number": version.get("version_number"),
-                    "created_at": version.get("created_at"),
-                    "prompt": version.get("prompt"),
-                    "analysis_content": version.get("analysis_content") if include_content else None,
-                    "has_analysis": True
-                })
-        
-        return analyses
-        
-    except Exception as e:
-        logger.error(f"Error fetching analyses for media {media_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch analyses: {str(e)}"
-        )
-
-
-@router.put(
-    "/{media_id}/analyses/{version_id}",
-    summary="Update an existing analysis",
-    description="Update the analysis content of a specific document version",
-    response_model=Dict[str, Any],
-    tags=["Media Analysis"]
-)
-async def update_media_analysis(
-    media_id: int,
-    version_id: int,
-    analysis_content: str = Body(..., description="Updated analysis content"),
-    prompt: Optional[str] = Body(None, description="Updated prompt"),
-    current_user: dict = Depends(verify_token)
-) -> Dict[str, Any]:
-    """
-    Update an existing analysis for a media item.
-    """
-    user_id = current_user.get("user_id", DEFAULT_USER_ID)
-    client_id = request.headers.get("X-Client-ID", "web")
-    
-    try:
-        db = MediaDatabase(get_media_db_path(user_id), client_id=client_id)
-        
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Check if version exists and belongs to this media
-            cursor.execute("""
-                SELECT id FROM DocumentVersions 
-                WHERE id = ? AND media_id = ? AND deleted = 0
-            """, (version_id, media_id))
-            
-            if not cursor.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Version {version_id} not found for media {media_id}"
-                )
-            
-            # Update the analysis
-            update_fields = ["analysis_content = ?"]
-            update_values = [analysis_content]
-            
-            if prompt is not None:
-                update_fields.append("prompt = ?")
-                update_values.append(prompt)
-            
-            update_fields.append("last_modified = ?")
-            update_values.append(datetime.utcnow().isoformat())
-            
-            update_values.extend([version_id, media_id])
-            
-            cursor.execute(f"""
-                UPDATE DocumentVersions 
-                SET {", ".join(update_fields)}
-                WHERE id = ? AND media_id = ?
-            """, update_values)
-            
-            conn.commit()
-            
-        return {
-            "status": "success",
-            "media_id": media_id,
-            "version_id": version_id,
-            "message": "Analysis updated successfully"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating analysis for media {media_id}, version {version_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update analysis: {str(e)}"
-        )
-
-
-@router.delete(
-    "/{media_id}/analyses/{version_id}",
-    summary="Delete an analysis",
-    description="Soft delete a specific analysis version",
-    response_model=Dict[str, Any],
-    tags=["Media Analysis"]
-)
-async def delete_media_analysis(
-    media_id: int,
-    version_id: int,
-    current_user: dict = Depends(verify_token)
-) -> Dict[str, Any]:
-    """
-    Soft delete an analysis version for a media item.
-    """
-    user_id = current_user.get("user_id", DEFAULT_USER_ID)
-    client_id = request.headers.get("X-Client-ID", "web")
-    
-    try:
-        db = MediaDatabase(get_media_db_path(user_id), client_id=client_id)
-        
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Check if version exists and belongs to this media
-            cursor.execute("""
-                SELECT id FROM DocumentVersions 
-                WHERE id = ? AND media_id = ? AND deleted = 0
-            """, (version_id, media_id))
-            
-            if not cursor.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Version {version_id} not found for media {media_id}"
-                )
-            
-            # Soft delete the version
-            cursor.execute("""
-                UPDATE DocumentVersions 
-                SET deleted = 1, last_modified = ?
-                WHERE id = ? AND media_id = ?
-            """, (datetime.utcnow().isoformat(), version_id, media_id))
-            
-            conn.commit()
-            
-        return {
-            "status": "success",
-            "media_id": media_id,
-            "version_id": version_id,
-            "message": "Analysis deleted successfully"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting analysis for media {media_id}, version {version_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete analysis: {str(e)}"
-        )
 
 #
 # End of media.py
