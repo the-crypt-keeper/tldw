@@ -28,7 +28,7 @@ from requests.adapters import HTTPAdapter
 from urllib3 import Retry
 #
 # Import Local
-from tldw_Server_API.app.core.Chunking.Chunk_Lib import (
+from tldw_Server_API.app.core.Chunking import (
     improved_chunking_process
 )
 from tldw_Server_API.app.core.LLM_Calls.Local_Summarization_Lib import (
@@ -552,7 +552,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
             logging.info("OpenAI Summarize: Attempting to use API key from config file")
             loaded_config_data = load_and_log_configs()
             api_key = loaded_config_data.get('openai_api', {}).get('api_key', "")
-            logging.debug(f"OpenAI Summarize: Using API key from config file: {api_key[:5]}...{api_key[-5:]}")
+            logging.debug("OpenAI Summarize: Using API key from config file")
 
         if not api_key or api_key.strip() == "":
             logging.error("OpenAI: #2 API key not found or is empty")
@@ -587,7 +587,7 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
         }
 
         logging.debug(
-            f"OpenAI API Key: {openai_api_key[:5]}...{openai_api_key[-5:] if openai_api_key else None}")
+            "OpenAI: Using configured API key")
         logging.debug("openai: Preparing data + prompt for submittal")
         openai_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         if temp is None: temp = 0.7
@@ -708,7 +708,7 @@ def summarize_with_anthropic(api_key, input_data, custom_prompt_arg, temp=None, 
             logging.error("Anthropic: No valid API key available")
             return "Anthropic: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"Anthropic: Using API Key: {anthropic_api_key[:5]}...{anthropic_api_key[-5:]}")
+        logging.debug("Anthropic: Using configured API key")
 
         logging.debug("AnthropicAI: Using provided string data for summarization")
         data = input_data
@@ -906,7 +906,7 @@ def summarize_with_cohere(api_key, input_data, custom_prompt_arg, temp=None, sys
         if system_message is None:
             system_message = ""
 
-        logging.debug(f"Cohere: Using API Key: {cohere_api_key[:5]}...{cohere_api_key[-5:] if cohere_api_key else None}")
+        logging.debug("Cohere: Using configured API key")
 
         logging.debug("Cohere: Using provided string data for summarization")
         data = input_data
@@ -1085,7 +1085,7 @@ def summarize_with_groq(api_key, input_data, custom_prompt_arg, temp=None, syste
             logging.error("Groq: No valid API key available")
             return "Groq: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"Groq: Using API Key: {groq_api_key[:5]}...{groq_api_key[-5:]}")
+        logging.debug("Groq: Using configured API key")
 
         # Input data handling
         logging.debug("Groq: Using provided string data for summarization")
@@ -1279,7 +1279,7 @@ def summarize_with_openrouter(api_key, input_data, custom_prompt_arg, temp=None,
         logging.error("OpenRouter: Error in processing: {str(e)}")
         return f"OpenRouter: Error occurred while processing config file with OpenRouter: {str(e)}"
 
-    logging.debug(f"OpenRouter: Using API Key: {openrouter_api_key[:5]}...{openrouter_api_key[-5:]}")
+    logging.debug("OpenRouter: Using configured API key")
 
     logging.debug(f"OpenRouter: Using Model: {openrouter_model}")
 
@@ -1468,7 +1468,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
             else:
                 # If no parameter is provided, use the key from the config
                 huggingface_api_key = loaded_config_data['huggingface_api'].get('api_key')
-                logging.debug(f"HuggingFace: API key from config: {huggingface_api_key[:5]}...{huggingface_api_key[-5:]}")
+                logging.debug("HuggingFace: API key from config")
                 if huggingface_api_key:
                     logging.info("HuggingFace: Using API key from config file")
                 else:
@@ -1481,7 +1481,7 @@ def summarize_with_huggingface(api_key, input_data, custom_prompt_arg, temp=None
             # FIXME
             # For example: raise ValueError("No valid Anthropic API key available")
 
-        logging.debug(f"HuggingFace: Using API Key: {huggingface_api_key[:5]}...{huggingface_api_key[-5:]}")
+        logging.debug("HuggingFace: Using configured API key")
 
         logging.debug("HuggingFace: Using provided string data for summarization")
         data = input_data
@@ -1644,7 +1644,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
             logging.error("DeepSeek: No valid API key available")
             return "DeepSeek: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"DeepSeek: Using API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:]}")
+        logging.debug("DeepSeek: Using configured API key")
 
         # Input data handling
         logging.debug("DeepSeek: Using provided string data for summarization")
@@ -1681,7 +1681,7 @@ def summarize_with_deepseek(api_key, input_data, custom_prompt_arg, temp=None, s
         }
 
         logging.debug(
-            f"DeepSeek API Key: {deepseek_api_key[:5]}...{deepseek_api_key[-5:] if deepseek_api_key else None}")
+            "DeepSeek: Using configured API key")
         logging.debug("DeepSeek: Preparing data + prompt for submission")
         deepseek_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         data = {
@@ -1816,7 +1816,7 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
             logging.error("Mistral: No valid API key available")
             return "Mistral: API Key Not Provided/Found in Config file or is empty"
 
-        logging.debug(f"Mistral: Using API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:]}")
+        logging.debug("Mistral: Using configured API key")
 
         # Input data handling
         logging.debug("Mistral: Using provided string data for summarization")
@@ -1852,7 +1852,7 @@ def summarize_with_mistral(api_key, input_data, custom_prompt_arg, temp=None, sy
             'Content-Type': 'application/json'
         }
 
-        logging.debug(f"Mistral API Key: {mistral_api_key[:5]}...{mistral_api_key[-5:] if mistral_api_key else None}")
+        logging.debug("Mistral: Using configured API key")
         logging.debug("Mistral: Preparing data + prompt for submission")
         mistral_prompt = f"{custom_prompt_arg}\n\n\n\n{text} "
         data = {
@@ -1991,7 +1991,7 @@ def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, sys
             return "Google: API Key Not Provided/Found in Config file or is empty"
 
         google_api_key = api_key
-        logging.debug(f"Google: Using API Key: {api_key[:5]}...{api_key[-5:]}")
+        logging.debug("Google: Using configured API key")
 
         # Input data handling
         logging.debug(f"Google: Raw input data type: {type(input_data)}")
@@ -2043,7 +2043,7 @@ def summarize_with_google(api_key, input_data, custom_prompt_arg, temp=None, sys
         }
 
         logging.debug(
-            f"Google API Key: {google_api_key[:5]}...{google_api_key[-5:] if google_api_key else None}")
+            "Google: Using configured API key")
         logging.debug("openai: Preparing data + prompt for submittal")
         google_prompt = f"{text} \n\n\n\n{custom_prompt_arg}"
         #if temp is None:

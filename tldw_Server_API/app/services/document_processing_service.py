@@ -14,7 +14,7 @@ from docx2txt import docx2txt
 from pypandoc import convert_file
 
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze
-from tldw_Server_API.app.core.Chunking.Chunk_Lib import improved_chunking_process
+from tldw_Server_API.app.core.Chunking import improved_chunking_process
 from tldw_Server_API.app.core.DB_Management.DB_Manager import add_media_with_keywords
 from tldw_Server_API.app.core.Utils.Utils import logging
 

@@ -162,7 +162,7 @@ sudo systemctl restart postgresql
 
 ```bash
 # Download schema file
-wget https://raw.githubusercontent.com/your-repo/tldw_server/main/schema/postgresql_users.sql
+wget https://raw.githubusercontent.com/your-repo/tldw_server/main/tldw_Server_API/Databases/Postgres/Schema/postgresql_users.sql
 
 # Apply schema
 psql -U tldw_user -h localhost -d tldw_multiuser -f postgresql_users.sql
@@ -889,7 +889,7 @@ services:
       POSTGRES_PASSWORD: SecurePassword123!
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./schema/postgresql_users.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./tldw_Server_API/Databases/Postgres/Schema/postgresql_users.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tldw_user"]
       interval: 10s

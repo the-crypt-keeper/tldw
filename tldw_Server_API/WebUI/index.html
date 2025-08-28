@@ -325,6 +325,9 @@
                 <button class="top-tab-button" data-toptab="chat" id="top-tab-chat" role="tab" aria-selected="false">
                     Chat
                 </button>
+                <button class="top-tab-button" data-toptab="chatbooks" role="tab" aria-selected="false">
+                    Chatbooks
+                </button>
                 <button class="top-tab-button" data-toptab="rag" role="tab" aria-selected="false">
                     RAG
                 </button>
@@ -351,6 +354,21 @@
                 </button>
                 <button class="top-tab-button" data-toptab="sync" role="tab" aria-selected="false">
                     Sync
+                </button>
+                <button class="top-tab-button" data-toptab="health" role="tab" aria-selected="false">
+                    Health
+                </button>
+                <button class="top-tab-button" data-toptab="mcp" role="tab" aria-selected="false">
+                    MCP
+                </button>
+                <button class="top-tab-button" data-toptab="llamacpp" role="tab" aria-selected="false">
+                    Llama.cpp
+                </button>
+                <button class="top-tab-button" data-toptab="webscraping" role="tab" aria-selected="false">
+                    Web Scraping
+                </button>
+                <button class="top-tab-button" data-toptab="maintenance" role="tab" aria-selected="false">
+                    Maintenance
                 </button>
             </div>
         </nav>
@@ -386,6 +404,9 @@
                 </button>
                 <button class="sub-tab-button" data-content-id="tabWebScraping" data-load-group="media" role="tab">
                     Web Scraping
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMediaAnalysis" data-load-group="media" role="tab">
+                    Analysis
                 </button>
             </div>
         </div>
@@ -509,6 +530,91 @@
             </div>
         </div>
 
+        <div id="health-subtabs" class="sub-tab-row" role="navigation" aria-label="Health sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabHealthDashboard" data-load-group="health" role="tab">
+                    Dashboard
+                </button>
+                <button class="sub-tab-button" data-content-id="tabHealthDetails" data-load-group="health" role="tab">
+                    Individual Checks
+                </button>
+            </div>
+        </div>
+
+        <div id="mcp-subtabs" class="sub-tab-row" role="navigation" aria-label="MCP sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabMCPAuth" data-load-group="mcp" role="tab">
+                    Authentication
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMCPStatus" data-load-group="mcp" role="tab">
+                    Status
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMCPTools" data-load-group="mcp" role="tab">
+                    Tools
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMCPContexts" data-load-group="mcp" role="tab">
+                    Contexts
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMCPHealth" data-load-group="mcp" role="tab">
+                    Health
+                </button>
+            </div>
+        </div>
+
+        <div id="llamacpp-subtabs" class="sub-tab-row" role="navigation" aria-label="Llama.cpp sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabLlamaCppStatus" data-load-group="llamacpp" role="tab">
+                    Status
+                </button>
+                <button class="sub-tab-button" data-content-id="tabLlamaCppModels" data-load-group="llamacpp" role="tab">
+                    Models
+                </button>
+                <button class="sub-tab-button" data-content-id="tabLlamaCppServer" data-load-group="llamacpp" role="tab">
+                    Server Management
+                </button>
+                <button class="sub-tab-button" data-content-id="tabLlamaCppInference" data-load-group="llamacpp" role="tab">
+                    Inference
+                </button>
+            </div>
+        </div>
+
+        <div id="webscraping-subtabs" class="sub-tab-row" role="navigation" aria-label="Web Scraping sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabWebScrapingStatus" data-load-group="webscraping" role="tab">
+                    Status
+                </button>
+                <button class="sub-tab-button" data-content-id="tabWebScrapingJobs" data-load-group="webscraping" role="tab">
+                    Jobs
+                </button>
+                <button class="sub-tab-button" data-content-id="tabWebScrapingService" data-load-group="webscraping" role="tab">
+                    Service
+                </button>
+                <button class="sub-tab-button" data-content-id="tabWebScrapingCookies" data-load-group="webscraping" role="tab">
+                    Cookies
+                </button>
+                <button class="sub-tab-button" data-content-id="tabWebScrapingDuplicates" data-load-group="webscraping" role="tab">
+                    Duplicates
+                </button>
+            </div>
+        </div>
+
+        <div id="maintenance-subtabs" class="sub-tab-row" role="navigation" aria-label="Maintenance sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabMaintenanceBatch" data-load-group="maintenance" role="tab">
+                    Batch Operations
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMaintenanceCleanup" data-load-group="maintenance" role="tab">
+                    Database Cleanup
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMaintenanceExportImport" data-load-group="maintenance" role="tab">
+                    Export/Import
+                </button>
+                <button class="sub-tab-button" data-content-id="tabMaintenanceBackup" data-load-group="maintenance" role="tab">
+                    Backup/Restore
+                </button>
+            </div>
+        </div>
+
         <!-- Main Content Area -->
         <main class="content-container" id="main-content-area" role="main">
             <!-- Global Settings Tab Content (always present) -->
@@ -540,11 +646,11 @@
                                 <input 
                                     type="password" 
                                     id="apiKeyInput" 
-                                    value="default-secret-key-for-single-user"
+                                    value=""
                                     placeholder="Enter your API token"
                                     aria-describedby="apiKey-help"
                                 >
-                                <small id="apiKey-help">Sent in the 'Token' header for authenticated requests</small>
+                                <small id="apiKey-help">Sent in the 'Token' header for authenticated requests. Contact your administrator for an API token.</small>
                             </div>
                         </div>
                     </div>
@@ -599,6 +705,7 @@
     <script src="js/utils.js"></script>
     <script src="js/components.js"></script>
     <script src="js/api-client.js"></script>
+    <script src="js/endpoint-helper.js"></script>
     <script src="js/chat-ui.js"></script>
     <script src="js/main.js"></script>
 
@@ -669,6 +776,19 @@
                     const payloadEl = document.getElementById(endpointId + '_payload');
                     if (payloadEl) {
                         body = JSON.parse(payloadEl.value);
+                    } else if (endpointId === 'embeddingsCreate') {
+                        // Special handling for embeddings endpoint - build from individual fields
+                        const inputEl = document.getElementById('embeddingsCreate_input');
+                        const modelEl = document.getElementById('embeddingsCreate_model');
+                        const formatEl = document.getElementById('embeddingsCreate_encoding_format');
+                        
+                        if (inputEl) {
+                            body = {
+                                input: inputEl.value || '',
+                                model: modelEl ? modelEl.value : 'text-embedding-ada-002',
+                                encoding_format: formatEl ? formatEl.value : 'float'
+                            };
+                        }
                     }
                 }
 

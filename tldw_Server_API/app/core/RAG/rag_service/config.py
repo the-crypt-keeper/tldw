@@ -27,6 +27,25 @@ class RetrieverConfig:
     chat_collection: str = "chat_embeddings"
     notes_collection: str = "notes_embeddings"
     character_collection: str = "character_embeddings"
+    
+    # Citation support
+    enable_citations: bool = True
+    max_citation_length: int = 200
+    citation_context_chars: int = 50
+    enable_fuzzy_citations: bool = True
+    fuzzy_threshold: float = 0.8
+    
+    # Parent document retrieval
+    enable_parent_retrieval: bool = True
+    parent_size_multiplier: int = 3
+    expand_to_siblings: bool = True
+    max_parent_docs: int = 5
+    
+    # Query expansion
+    enable_query_expansion: bool = True
+    query_expansion_strategy: str = "hybrid"  # "synonym", "multi_query", "hybrid"
+    max_query_variations: int = 3
+    expansion_merge_strategy: str = "union"  # "union" or "intersection"
 
 
 @dataclass
@@ -73,6 +92,48 @@ class ChromaConfig:
 
 
 @dataclass
+class ConnectionPoolConfig:
+    """Configuration for database connection pooling."""
+    enable_pooling: bool = True
+    min_connections: int = 2
+    max_connections: int = 10
+    connection_timeout: float = 5.0
+    max_connection_age: int = 3600  # seconds
+    idle_timeout: int = 300  # seconds
+    
+    # Pool sizes per database type
+    media_db_pool_size: int = 5
+    notes_db_pool_size: int = 3
+    chat_db_pool_size: int = 3
+
+
+@dataclass
+class ChunkingConfig:
+    """Configuration for enhanced chunking."""
+    enable_smart_chunking: bool = True
+    preserve_structure: bool = True  # Preserve headers, lists, etc.
+    clean_pdf_artifacts: bool = True
+    
+    # Chunking strategies
+    use_sentence_boundaries: bool = True
+    use_paragraph_boundaries: bool = True
+    respect_markdown_structure: bool = True
+    
+    # Size constraints
+    min_chunk_size: int = 100
+    max_chunk_size: int = 1000
+    target_chunk_size: int = 512
+    
+    # Table handling
+    preserve_tables: bool = True
+    table_as_single_chunk: bool = True
+    
+    # Code block handling  
+    preserve_code_blocks: bool = True
+    code_block_as_single_chunk: bool = True
+
+
+@dataclass
 class CacheConfig:
     """Configuration for caching."""
     enable_cache: bool = True
@@ -91,6 +152,8 @@ class RAGConfig:
     generator: GeneratorConfig = field(default_factory=GeneratorConfig)
     chroma: ChromaConfig = field(default_factory=ChromaConfig)
     cache: CacheConfig = field(default_factory=CacheConfig)
+    connection_pool: ConnectionPoolConfig = field(default_factory=ConnectionPoolConfig)
+    chunking: ChunkingConfig = field(default_factory=ChunkingConfig)
     
     # Performance settings
     batch_size: int = 32
@@ -100,6 +163,10 @@ class RAGConfig:
     # Logging
     log_level: str = "INFO"
     log_performance_metrics: bool = True
+    
+    def __post_init__(self):
+        """Apply environment variable overrides after initialization."""
+        self._apply_env_overrides()
     
     @classmethod
     def from_toml(cls, config_path: Optional[Path] = None) -> 'RAGConfig':

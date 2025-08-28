@@ -32,4 +32,4 @@ https://www.reddit.com/r/Rag/comments/1ljhksy/best_chunking_strategy_for_the_med
 https://arxiv.org/abs/2506.16035
 https://docs.llamaindex.ai/en/stable/examples/node_parsers/semantic_double_merging_chunking/
 
-
+https://github.com/speedyk-005/chunklet

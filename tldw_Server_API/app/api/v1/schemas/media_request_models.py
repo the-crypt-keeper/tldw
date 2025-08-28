@@ -60,18 +60,18 @@ class MediaSearchResponse(BaseModel):
     pagination: PaginationInfo
 
 class MediaUpdateRequest(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    author: Optional[str] = None
-    analysis: Optional[str] = None
-    prompt: Optional[str] = None
-    keywords: Optional[List[str]] = None
+    title: Optional[str] = Field(None, max_length=500, description="Title (max 500 chars)")
+    content: Optional[str] = Field(None, max_length=5000000, description="Content (max 5MB of text)")
+    author: Optional[str] = Field(None, max_length=255, description="Author (max 255 chars)")
+    analysis: Optional[str] = Field(None, max_length=100000, description="Analysis (max 100KB)")
+    prompt: Optional[str] = Field(None, max_length=10000, description="Prompt (max 10KB)")
+    keywords: Optional[List[str]] = Field(None, max_items=50, description="Keywords (max 50)")
 
 # Make prompt and analysis_content REQUIRED so missing them yields 422
 class VersionCreateRequest(BaseModel):
-    content: str
-    prompt: str
-    analysis_content: str
+    content: str = Field(..., max_length=5000000, description="Content (max 5MB)")
+    prompt: str = Field(..., max_length=10000, description="Prompt (max 10KB)")
+    analysis_content: str = Field(..., max_length=100000, description="Analysis content (max 100KB)")
 
 class VersionResponse(BaseModel):
     id: int
@@ -83,7 +83,7 @@ class VersionRollbackRequest(BaseModel):
     version_number: int
 
 class SearchRequest(BaseModel):
-    query: Optional[str] = None
+    query: Optional[str] = Field(None, max_length=1000, description="Search query (max 1000 chars)")
     fields: List[str] = ["title", "content"]
     exact_phrase: Optional[str] = None
     media_types: Optional[List[str]] = None
@@ -112,6 +112,10 @@ class ChunkingOptions(BaseModel):
     chunk_size: int = Field(500, gt=0, description="Target size of each chunk (positive integer)")
     chunk_overlap: int = Field(200, ge=0, description="Overlap size between chunks (non-negative integer)")
     custom_chapter_pattern: Optional[str] = Field(None, description="Optional regex pattern for custom chapter splitting (ebook/docs)")
+    # Contextual Chunking Options
+    enable_contextual_chunking: bool = Field(False, description="Add LLM-generated context to chunks for better retrieval")
+    contextual_llm_model: Optional[str] = Field(None, description="LLM model to use for generating contextual summaries (e.g., 'gpt-3.5-turbo')")
+    context_window_size: Optional[int] = Field(None, ge=100, le=2000, description="Size of context window around chunks in characters")
 
     @field_validator('chunk_method', mode='before')
     @classmethod
@@ -168,11 +172,11 @@ class AddMediaForm(ChunkingOptions, AudioVideoOptions, PdfOptions):
     urls: Optional[List[str]] = Field(None, description="List of URLs of the media items to add")
 
     # --- Common Optional Fields ---
-    title: Optional[str] = Field(None, description="Optional title (applied if only one item processed)")
-    author: Optional[str] = Field(None, description="Optional author (applied similarly to title)")
-    keywords_str: str = Field("", alias="keywords", description="Comma-separated keywords (applied to all processed items)")
-    custom_prompt: Optional[str] = Field(None, description="Optional custom prompt (applied to all)")
-    system_prompt: Optional[str] = Field(None, description="Optional system prompt (applied to all)")
+    title: Optional[str] = Field(None, max_length=500, description="Optional title (max 500 chars)")
+    author: Optional[str] = Field(None, max_length=255, description="Optional author (max 255 chars)")
+    keywords_str: str = Field("", alias="keywords", max_length=1000, description="Comma-separated keywords (max 1000 chars)")
+    custom_prompt: Optional[str] = Field(None, max_length=100000, description="Optional custom prompt (max 100KB)")
+    system_prompt: Optional[str] = Field(None, max_length=10000, description="Optional system prompt (max 10KB)")
     overwrite_existing: bool = Field(False, description="Overwrite any existing media with the same identifier (URL/filename)")
     keep_original_file: bool = Field(False, description="Whether to retain original uploaded files after processing")
     perform_analysis: bool = Field(True, description="Perform analysis (e.g., summarization) if applicable (default=True)")
@@ -188,6 +192,11 @@ class AddMediaForm(ChunkingOptions, AudioVideoOptions, PdfOptions):
     use_cookies: bool = Field(False, description="Whether to attach cookies to URL download requests")
     cookies: Optional[str] = Field(None, description="Cookie string if `use_cookies` is set to True")
 
+    # --- Embedding Options ---
+    generate_embeddings: bool = Field(False, description="Generate embeddings after media processing")
+    embedding_model: Optional[str] = Field(None, description="Specific embedding model to use (e.g., 'Qwen/Qwen3-Embedding-4B-GGUF')")
+    embedding_provider: Optional[str] = Field(None, description="Embedding provider (huggingface, openai, etc)")
+    
     # --- Deprecated/Less Common ---
     perform_rolling_summarization: bool = Field(False, description="Perform rolling summarization (legacy?)")
     summarize_recursively: bool = Field(False, description="Perform recursive summarization on chunks (if chunking enabled)")

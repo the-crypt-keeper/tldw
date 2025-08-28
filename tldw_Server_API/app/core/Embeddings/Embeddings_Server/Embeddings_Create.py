@@ -25,6 +25,7 @@ from transformers import AutoModel, AutoTokenizer
 from tldw_Server_API.app.core.LLM_Calls.LLM_API_Calls import get_openai_embeddings_batch
 from tldw_Server_API.app.core.Metrics.metrics_logger import log_counter, log_histogram  # Keep your existing metrics
 from tldw_Server_API.app.core.Utils.Utils import logging
+from tldw_Server_API.app.core.Embeddings.audit_logger import get_audit_logger, AuditEventType
 
 #
 ########################################################################################################################
@@ -44,8 +45,35 @@ COMMIT_HASHES: Dict[str, str] = {
     "dunzhang/setll_en_400M_v5": "2aa5579fcae1c579de199a3866b6e514bbbf5d10",
 }
 
+# Resource limits - loaded from config or use defaults
+def get_resource_limits():
+    """Get resource limits from config file."""
+    try:
+        from tldw_Server_API.app.core.config import load_comprehensive_config
+        config = load_comprehensive_config()
+        embeddings_config = config.get('Embeddings', {})
+        return {
+            'max_models': int(embeddings_config.get('max_models_in_memory', 3)),
+            'max_memory_gb': float(embeddings_config.get('max_model_memory_gb', 8)),
+            'lru_ttl_seconds': int(embeddings_config.get('model_lru_ttl_seconds', 3600))
+        }
+    except Exception as e:
+        logging.warning(f"Could not load resource limits from config: {e}. Using defaults.")
+        return {
+            'max_models': 3,
+            'max_memory_gb': 8.0,
+            'lru_ttl_seconds': 3600
+        }
+
+RESOURCE_LIMITS = get_resource_limits()
+MAX_MODELS_IN_MEMORY = RESOURCE_LIMITS['max_models']
+MAX_MODEL_MEMORY_GB = RESOURCE_LIMITS['max_memory_gb']
+MODEL_LRU_TTL_SECONDS = RESOURCE_LIMITS['lru_ttl_seconds']
+
 embedding_models: Dict[str, Any] = {}
-embedding_models_lock = threading.Lock()  # Global lock for the embedding_models dictionary
+embedding_models_lock = threading.RLock()  # Global reentrant lock for the embedding_models dictionary
+model_last_used: Dict[str, float] = {}  # Track last usage time for LRU eviction
+model_memory_usage: Dict[str, float] = {}  # Track estimated memory per model
 
 # Prometheus Metrics (Ensure these are correctly defined and registered in your application)
 ACTIVE_EMBEDDERS = Gauge("active_embedder_instances", "Number of active embedder instances",
@@ -235,6 +263,152 @@ def exponential_backoff(max_retries: int = 3, base_delay: int = 1):
         return wrapper
 
     return decorator
+
+
+def evict_lru_models(keep_model_id: Optional[str] = None) -> None:
+    """
+    Evict least recently used models to maintain resource limits.
+    
+    Args:
+        keep_model_id: Model ID to keep regardless of LRU status
+    """
+    global embedding_models, model_last_used, model_memory_usage
+    
+    with embedding_models_lock:
+        current_time = time.time()
+        
+        # Remove models that haven't been used within TTL
+        models_to_remove = []
+        for model_id, last_used in model_last_used.items():
+            if model_id != keep_model_id and (current_time - last_used) > MODEL_LRU_TTL_SECONDS:
+                models_to_remove.append(model_id)
+        
+        for model_id in models_to_remove:
+            _remove_model(model_id)
+        
+        # If still over limit, remove LRU models
+        while len(embedding_models) >= MAX_MODELS_IN_MEMORY:
+            if len(embedding_models) == 0:
+                break
+            
+            # Find LRU model (excluding keep_model_id)
+            lru_model_id = None
+            oldest_time = current_time
+            
+            for model_id, last_used in model_last_used.items():
+                if model_id != keep_model_id and last_used < oldest_time:
+                    oldest_time = last_used
+                    lru_model_id = model_id
+            
+            if lru_model_id:
+                logging.info(f"Evicting LRU model: {lru_model_id}")
+                # Audit log the eviction
+                audit_logger = get_audit_logger()
+                audit_logger.log_resource_event(
+                    AuditEventType.MODEL_EVICTED,
+                    model_id=lru_model_id,
+                    memory_usage_gb=model_memory_usage.get(lru_model_id, 0),
+                    reason="lru_eviction"
+                )
+                _remove_model(lru_model_id)
+            else:
+                break
+
+
+def _remove_model(model_id: str) -> None:
+    """Remove a model from memory and clean up resources."""
+    if model_id in embedding_models:
+        try:
+            model = embedding_models[model_id]
+            # Attempt to clean up model resources
+            if hasattr(model, 'unload'):
+                model.unload()
+            elif hasattr(model, 'model'):
+                del model.model
+            elif hasattr(model, 'session'):  # ONNX
+                model.session = None
+        except Exception as e:
+            logging.warning(f"Error cleaning up model {model_id}: {e}")
+        
+        del embedding_models[model_id]
+        model_last_used.pop(model_id, None)
+        model_memory_usage.pop(model_id, None)
+        ACTIVE_EMBEDDERS.labels(provider="", model_id=model_id).set(0)
+        logging.info(f"Removed model {model_id} from memory")
+
+
+def check_memory_limit(estimated_size_gb: float = 1.0) -> bool:
+    """
+    Check if loading a new model would exceed memory limits.
+    
+    Args:
+        estimated_size_gb: Estimated size of the new model in GB
+        
+    Returns:
+        True if within limits, False otherwise
+    """
+    current_usage = sum(model_memory_usage.values())
+    return (current_usage + estimated_size_gb) <= MAX_MODEL_MEMORY_GB
+
+
+def get_directory_size(path: str) -> float:
+    """
+    Calculate the size of a directory in GB.
+    
+    Args:
+        path: Path to the directory
+        
+    Returns:
+        Size in GB
+    """
+    total_size = 0
+    try:
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                try:
+                    total_size += os.path.getsize(filepath)
+                except (OSError, IOError):
+                    pass
+    except (OSError, IOError):
+        pass
+    
+    return total_size / (1024 ** 3)  # Convert bytes to GB
+
+
+def estimate_model_size(model_name: str, model_path: Optional[str] = None) -> float:
+    """
+    Estimate model size, preferring actual disk size when available.
+    
+    Args:
+        model_name: Name of the model
+        model_path: Optional path to the model directory
+        
+    Returns:
+        Estimated or actual size in GB
+    """
+    # If we have a path, try to get actual size
+    if model_path and os.path.exists(model_path):
+        actual_size = get_directory_size(model_path)
+        if actual_size > 0:
+            logging.debug(f"Model {model_name} actual size: {actual_size:.2f} GB")
+            return actual_size
+    
+    # Check if model is already loaded and we know its size
+    if model_name in model_memory_usage:
+        return model_memory_usage[model_name]
+    
+    # Fallback to name-based estimation
+    if 'large' in model_name.lower() or 'xl' in model_name.lower():
+        return 2.0
+    elif 'base' in model_name.lower() or 'medium' in model_name.lower():
+        return 1.0
+    elif 'small' in model_name.lower() or 'mini' in model_name.lower():
+        return 0.5
+    elif 'tiny' in model_name.lower():
+        return 0.25
+    else:
+        return 1.0  # Default estimate
 
 
 class HuggingFaceEmbedder:
@@ -716,11 +890,39 @@ def create_embeddings_batch(
             with embedding_models_lock:  # Protect access to the global embedding_models cache
                 if model_id_to_use not in embedding_models:
                     logging.info(f"HuggingFace model ID {model_id_to_use} not in cache. Initializing.")
+                    
+                    # Setup cache directory
                     hf_cache_dir = os.path.join(base_dir, model_spec.hf_cache_dir_subpath)
                     os.makedirs(hf_cache_dir, exist_ok=True)
+                    
+                    # Check resource limits before loading - use actual path if available
+                    model_path = os.path.join(hf_cache_dir, model_id_to_use.replace('/', '_'))
+                    estimated_size = estimate_model_size(model_id_to_use, model_path)
+                    
+                    if not check_memory_limit(estimated_size):
+                        logging.warning(f"Memory limit would be exceeded by loading {model_id_to_use} (size: {estimated_size:.2f} GB)")
+                        audit_logger = get_audit_logger()
+                        audit_logger.log_resource_event(
+                            AuditEventType.MEMORY_LIMIT_EXCEEDED,
+                            model_id=model_id_to_use,
+                            memory_usage_gb=estimated_size,
+                            current_usage_gb=sum(model_memory_usage.values()),
+                            limit_gb=MAX_MODEL_MEMORY_GB
+                        )
+                        evict_lru_models(keep_model_id=model_id_to_use)
+                    
+                    # Evict LRU models if at capacity
+                    if len(embedding_models) >= MAX_MODELS_IN_MEMORY:
+                        logging.info(f"At model capacity ({MAX_MODELS_IN_MEMORY}), evicting LRU models")
+                        evict_lru_models(keep_model_id=model_id_to_use)
+                    
                     embedding_models[model_id_to_use] = HuggingFaceEmbedder(model_id_to_use, model_spec, hf_cache_dir)
+                    model_memory_usage[model_id_to_use] = estimated_size
+                    model_last_used[model_id_to_use] = time.time()
+                    logging.info(f"Loaded model {model_id_to_use} (size: {estimated_size:.2f} GB)")
                 else:
                     MODEL_CACHE_HITS.labels(model_id=model_id_to_use).inc()
+                    model_last_used[model_id_to_use] = time.time()
                 embedder_instance = embedding_models[model_id_to_use]
 
             if embedder_instance:
@@ -734,12 +936,38 @@ def create_embeddings_batch(
             with embedding_models_lock:
                 if model_id_to_use not in embedding_models:
                     logging.info(f"ONNX model ID {model_id_to_use} not in cache. Initializing.")
+                    
+                    # Check resource limits before loading - use actual path if available
+                    onnx_model_path = os.path.join(base_dir, model_spec.onnx_storage_dir_subpath, model_id_to_use.replace('/', '_'))
+                    estimated_size = estimate_model_size(model_id_to_use, onnx_model_path)
+                    
+                    if not check_memory_limit(estimated_size):
+                        logging.warning(f"Memory limit would be exceeded by loading {model_id_to_use} (size: {estimated_size:.2f} GB)")
+                        audit_logger = get_audit_logger()
+                        audit_logger.log_resource_event(
+                            AuditEventType.MEMORY_LIMIT_EXCEEDED,
+                            model_id=model_id_to_use,
+                            memory_usage_gb=estimated_size,
+                            current_usage_gb=sum(model_memory_usage.values()),
+                            limit_gb=MAX_MODEL_MEMORY_GB
+                        )
+                        evict_lru_models(keep_model_id=model_id_to_use)
+                    
+                    # Evict LRU models if at capacity
+                    if len(embedding_models) >= MAX_MODELS_IN_MEMORY:
+                        logging.info(f"At model capacity ({MAX_MODELS_IN_MEMORY}), evicting LRU models")
+                        evict_lru_models(keep_model_id=model_id_to_use)
+                    
                     # The ONNXEmbedder itself will construct the full path to its model directory
                     # using base_dir and onnx_storage_dir_subpath.
                     # We just need to pass the base for all ONNX models.
                     embedding_models[model_id_to_use] = ONNXEmbedder(model_id_to_use, model_spec, base_dir)
+                    model_memory_usage[model_id_to_use] = estimated_size
+                    model_last_used[model_id_to_use] = time.time()
+                    logging.info(f"Loaded ONNX model {model_id_to_use} (size: {estimated_size:.2f} GB)")
                 else:
                     MODEL_CACHE_HITS.labels(model_id=model_id_to_use).inc()
+                    model_last_used[model_id_to_use] = time.time()
                 embedder_instance = embedding_models[model_id_to_use]
 
             if embedder_instance:
@@ -936,27 +1164,27 @@ def get_embedding_config() -> Dict[str, Any]:
     provider = embedding_settings.get('embedding_provider', 'openai')
     model = embedding_settings.get('embedding_model', 'text-embedding-3-small')
     
-    # Add default configurations for common models
+    # Add default configurations for common models - create proper instances
     if provider == 'openai':
-        config["embedding_config"]["models"][model] = {
-            "provider": "openai",
-            "model_name_or_path": model,
-            "api_key": embedding_settings.get('embedding_api_key', settings.get("OPENAI_API_KEY", ""))
-        }
+        config["embedding_config"]["models"][model] = OpenAIModelCfg(
+            provider="openai",
+            model_name_or_path=model,
+            api_key=embedding_settings.get('embedding_api_key', settings.get("OPENAI_API_KEY", ""))
+        )
     elif provider == 'huggingface':
-        config["embedding_config"]["models"][model] = {
-            "provider": "huggingface",
-            "model_name_or_path": model,
-            "trust_remote_code": False,
-            "hf_cache_dir_subpath": "huggingface_cache"
-        }
+        config["embedding_config"]["models"][model] = HFModelCfg(
+            provider="huggingface",
+            model_name_or_path=model,
+            trust_remote_code=False,
+            hf_cache_dir_subpath="huggingface_cache"
+        )
     elif provider == 'local_api':
-        config["embedding_config"]["models"][model] = {
-            "provider": "local_api",
-            "model_name_or_path": model,
-            "api_url": embedding_settings.get('embedding_api_url', 'http://localhost:8080/v1/embeddings'),
-            "api_key": embedding_settings.get('embedding_api_key', '')
-        }
+        config["embedding_config"]["models"][model] = LocalAPICfg(
+            provider="local_api",
+            model_name_or_path=model,
+            api_url=embedding_settings.get('embedding_api_url', 'http://localhost:8080/v1/embeddings'),
+            api_key=embedding_settings.get('embedding_api_key', '')
+        )
     
     # Add common HuggingFace models that might be requested
     common_hf_models = [
@@ -966,12 +1194,12 @@ def get_embedding_config() -> Dict[str, Any]:
     
     for hf_model in common_hf_models:
         if hf_model not in config["embedding_config"]["models"]:
-            config["embedding_config"]["models"][hf_model] = {
-                "provider": "huggingface",
-                "model_name_or_path": hf_model,
-                "trust_remote_code": False,
-                "hf_cache_dir_subpath": "huggingface_cache"
-            }
+            config["embedding_config"]["models"][hf_model] = HFModelCfg(
+                provider="huggingface",
+                model_name_or_path=hf_model,
+                trust_remote_code=False,
+                hf_cache_dir_subpath="huggingface_cache"
+            )
     
     return config
 

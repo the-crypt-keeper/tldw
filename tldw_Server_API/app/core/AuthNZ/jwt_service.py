@@ -137,9 +137,62 @@ class JWTService:
             logger.error(f"Failed to create refresh token: {e}")
             raise InvalidTokenError(f"Failed to create token: {e}")
     
+    async def verify_token_async(self, token: str, token_type: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Verify and decode a JWT token with blacklist checking (async version)
+        
+        Args:
+            token: JWT token to verify
+            token_type: Expected token type ('access' or 'refresh')
+            
+        Returns:
+            Decoded token payload
+            
+        Raises:
+            InvalidTokenError: If token is invalid, malformed, or blacklisted
+            TokenExpiredError: If token has expired
+        """
+        try:
+            # Decode the token
+            payload = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=[self.algorithm]
+            )
+            
+            # Check if token is blacklisted
+            jti = payload.get("jti")
+            if jti:
+                from tldw_Server_API.app.core.AuthNZ.token_blacklist import is_token_blacklisted
+                if await is_token_blacklisted(jti):
+                    raise InvalidTokenError("Token has been revoked")
+            
+            # Verify token type if specified
+            if token_type and payload.get("type") != token_type:
+                raise InvalidTokenError(f"Invalid token type. Expected {token_type}, got {payload.get('type')}")
+            
+            logger.debug(f"Token verified successfully for user ID: {payload.get('sub')}")
+            return payload
+            
+        except jwt.ExpiredSignatureError:
+            logger.debug("Token has expired")
+            raise TokenExpiredError()
+            
+        except jwt.JWTClaimsError as e:
+            logger.warning(f"JWT claims error: {e}")
+            raise InvalidTokenError(f"Invalid token claims: {e}")
+            
+        except JWTError as e:
+            logger.warning(f"JWT verification error: {e}")
+            raise InvalidTokenError(f"Invalid token: {e}")
+            
+        except Exception as e:
+            logger.error(f"Unexpected error verifying token: {e}")
+            raise InvalidTokenError(f"Token verification failed: {e}")
+    
     def verify_token(self, token: str, token_type: Optional[str] = None) -> Dict[str, Any]:
         """
-        Verify and decode a JWT token
+        Verify and decode a JWT token (sync version, no blacklist check)
         
         Args:
             token: JWT token to verify

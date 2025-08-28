@@ -1,0 +1,421 @@
+<!-- Benchmarks Tab -->
+<div id="tabBenchmarksList" class="tab-content">
+    <div class="endpoint-section" id="benchmarksList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/benchmarks - List Available Benchmarks</span>
+        </h2>
+        <p>Get a list of all available benchmark tests that can be run.</p>
+        
+        <div class="form-group">
+            <label for="benchmarksList_category">Category (Optional):</label>
+            <select id="benchmarksList_category">
+                <option value="">All Categories</option>
+                <option value="performance">Performance</option>
+                <option value="accuracy">Accuracy</option>
+                <option value="throughput">Throughput</option>
+                <option value="latency">Latency</option>
+                <option value="memory">Memory Usage</option>
+            </select>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('benchmarksList', 'GET', '/api/v1/benchmarks', 'query')">
+            List Benchmarks
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="benchmarksList_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="benchmarksList_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="benchmarksRun">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/benchmarks/run - Run Benchmark Test</span>
+        </h2>
+        <p>Execute a benchmark test to measure system performance.</p>
+        
+        <div class="form-group">
+            <label for="benchmarksRun_payload">Benchmark Configuration (JSON):</label>
+            <textarea id="benchmarksRun_payload" class="code-input" rows="25">{
+  "benchmark_type": "rag_retrieval",
+  "name": "RAG Performance Test",
+  "description": "Test RAG system retrieval speed and accuracy",
+  "parameters": {
+    "iterations": 100,
+    "concurrent_requests": 10,
+    "warmup_iterations": 5,
+    "timeout_seconds": 30
+  },
+  "test_data": {
+    "queries": [
+      "What is machine learning?",
+      "Explain neural networks",
+      "How does RAG work?"
+    ],
+    "expected_results": [],
+    "dataset_id": "benchmark_dataset_001"
+  },
+  "targets": {
+    "endpoints": ["/api/v1/rag/search/simple"],
+    "models": ["gpt-4", "gpt-3.5-turbo"],
+    "configurations": [
+      {
+        "name": "default",
+        "settings": {}
+      },
+      {
+        "name": "optimized",
+        "settings": {
+          "cache_enabled": true,
+          "batch_size": 50
+        }
+      }
+    ]
+  },
+  "metrics": [
+    "response_time_p50",
+    "response_time_p95",
+    "response_time_p99",
+    "throughput",
+    "error_rate",
+    "accuracy_score",
+    "memory_usage"
+  ],
+  "output": {
+    "format": "json",
+    "include_raw_data": false,
+    "generate_report": true
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('benchmarksRun', 'POST', '/api/v1/benchmarks/run', 'json')">
+            Run Benchmark
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="benchmarksRun_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="benchmarksRun_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="benchmarksResults">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/benchmarks/{id}/results - Get Benchmark Results</span>
+        </h2>
+        <p>Retrieve the results of a completed benchmark test.</p>
+        
+        <div class="form-group">
+            <label for="benchmarksResults_id">Benchmark ID:</label>
+            <input type="text" id="benchmarksResults_id" placeholder="benchmark_run_123">
+        </div>
+        
+        <div class="form-group">
+            <label for="benchmarksResults_format">Output Format:</label>
+            <select id="benchmarksResults_format">
+                <option value="json">JSON</option>
+                <option value="csv">CSV</option>
+                <option value="html">HTML Report</option>
+                <option value="summary">Summary Only</option>
+            </select>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('benchmarksResults', 'GET', '/api/v1/benchmarks/{id}/results', 'query')">
+            Get Results
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="benchmarksResults_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="benchmarksResults_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="benchmarksCompare">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/benchmarks/compare - Compare Benchmark Runs</span>
+        </h2>
+        <p>Compare results from multiple benchmark runs to identify performance changes.</p>
+        
+        <div class="form-group">
+            <label for="benchmarksCompare_payload">Comparison Request (JSON):</label>
+            <textarea id="benchmarksCompare_payload" class="code-input" rows="20">{
+  "benchmark_ids": [
+    "benchmark_run_123",
+    "benchmark_run_124",
+    "benchmark_run_125"
+  ],
+  "metrics": [
+    "response_time_p50",
+    "response_time_p95",
+    "throughput",
+    "error_rate"
+  ],
+  "comparison_type": "sequential",
+  "baseline_id": "benchmark_run_123",
+  "analysis": {
+    "calculate_improvements": true,
+    "detect_regressions": true,
+    "confidence_level": 0.95,
+    "minimum_change_threshold": 0.05
+  },
+  "visualization": {
+    "generate_charts": true,
+    "chart_types": ["line", "bar", "heatmap"],
+    "include_trends": true
+  },
+  "output": {
+    "format": "html",
+    "include_recommendations": true
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('benchmarksCompare', 'POST', '/api/v1/benchmarks/compare', 'json')">
+            Compare Results
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="benchmarksCompare_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="benchmarksCompare_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="benchmarksExport">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/benchmarks/{id}/export - Export Benchmark Data</span>
+        </h2>
+        <p>Export benchmark results in various formats for analysis or reporting.</p>
+        
+        <div class="form-group">
+            <label for="benchmarksExport_id">Benchmark ID:</label>
+            <input type="text" id="benchmarksExport_id" placeholder="benchmark_run_123">
+        </div>
+        
+        <div class="form-group">
+            <label for="benchmarksExport_format">Export Format:</label>
+            <select id="benchmarksExport_format">
+                <option value="json">JSON (Complete)</option>
+                <option value="csv">CSV (Tabular)</option>
+                <option value="excel">Excel Workbook</option>
+                <option value="pdf">PDF Report</option>
+                <option value="prometheus">Prometheus Metrics</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="benchmarksExport_include_raw">Include Raw Data:</label>
+            <input type="checkbox" id="benchmarksExport_include_raw">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('benchmarksExport', 'GET', '/api/v1/benchmarks/{id}/export', 'query')">
+            Export Data
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="benchmarksExport_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="benchmarksExport_response">---</pre>
+    </div>
+</div>
+
+<!-- Benchmark History Tab -->
+<div id="tabBenchmarksHistory" class="tab-content">
+    <div class="endpoint-section">
+        <h2>Benchmark Run History</h2>
+        <p>View and manage historical benchmark runs.</p>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label>Date Range:</label>
+                    <input type="date" id="benchmarksHistory_start_date">
+                    <input type="date" id="benchmarksHistory_end_date">
+                </div>
+            </div>
+            <div class="column">
+                <div class="form-group">
+                    <label>Status Filter:</label>
+                    <select id="benchmarksHistory_status">
+                        <option value="">All</option>
+                        <option value="completed">Completed</option>
+                        <option value="running">Running</option>
+                        <option value="failed">Failed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn btn-primary" onclick="loadBenchmarkHistory()">
+            Load History
+        </button>
+        
+        <div id="benchmarksHistory_table" class="data-table mt-3">
+            <!-- History table will be populated here -->
+        </div>
+    </div>
+    
+    <div class="endpoint-section mt-4">
+        <h2>Scheduled Benchmarks</h2>
+        <p>Configure automated benchmark runs.</p>
+        
+        <div class="form-group">
+            <label for="benchmarksSchedule_config">Schedule Configuration (JSON):</label>
+            <textarea id="benchmarksSchedule_config" class="code-input" rows="15">{
+  "name": "Daily Performance Check",
+  "benchmark_id": "rag_retrieval",
+  "schedule": {
+    "type": "cron",
+    "expression": "0 2 * * *",
+    "timezone": "UTC"
+  },
+  "notification": {
+    "enabled": true,
+    "on_failure": true,
+    "on_regression": true,
+    "email": "admin@example.com"
+  },
+  "auto_compare": true,
+  "retention_days": 30
+}</textarea>
+        </div>
+        
+        <button class="btn btn-primary" onclick="scheduleBenchmark()">
+            Create Schedule
+        </button>
+    </div>
+</div>
+
+<script>
+// Benchmark history functions
+function loadBenchmarkHistory() {
+    const startDate = document.getElementById('benchmarksHistory_start_date').value;
+    const endDate = document.getElementById('benchmarksHistory_end_date').value;
+    const status = document.getElementById('benchmarksHistory_status').value;
+    
+    // This would make an API call to fetch history
+    const table = document.getElementById('benchmarksHistory_table');
+    table.innerHTML = `
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Started</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>benchmark_run_125</td>
+                    <td>RAG Performance Test</td>
+                    <td>rag_retrieval</td>
+                    <td>2025-01-27 10:00:00</td>
+                    <td>2m 34s</td>
+                    <td><span class="badge badge-success">Completed</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="viewBenchmarkDetails('benchmark_run_125')">View</button>
+                        <button class="btn btn-sm btn-primary" onclick="rerunBenchmark('benchmark_run_125')">Rerun</button>
+                    </td>
+                </tr>
+                <!-- More rows would be populated from API -->
+            </tbody>
+        </table>
+    `;
+}
+
+function viewBenchmarkDetails(id) {
+    // Navigate to results view
+    document.getElementById('benchmarksResults_id').value = id;
+    makeRequest('benchmarksResults', 'GET', '/api/v1/benchmarks/{id}/results', 'query');
+}
+
+function rerunBenchmark(id) {
+    if (confirm(`Rerun benchmark ${id}?`)) {
+        // Would make API call to rerun
+        alert(`Rerunning benchmark ${id}...`);
+    }
+}
+
+function scheduleBenchmark() {
+    const config = document.getElementById('benchmarksSchedule_config').value;
+    // Would make API call to create schedule
+    alert('Benchmark schedule created (demo)');
+}
+</script>
+
+<style>
+.data-table {
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--color-surface);
+}
+
+.table th,
+.table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.table th {
+    background: var(--color-surface-alt);
+    font-weight: 600;
+}
+
+.table tbody tr:hover {
+    background: var(--color-surface-alt);
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.badge-success {
+    background: var(--color-success-light);
+    color: var(--color-success);
+}
+
+.badge-warning {
+    background: var(--color-warning-light);
+    color: var(--color-warning);
+}
+
+.badge-error {
+    background: var(--color-error-light);
+    color: var(--color-error);
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 0.85rem;
+}
+
+input[type="date"] {
+    padding: var(--spacing-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    margin-right: var(--spacing-sm);
+}
+</style>

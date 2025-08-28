@@ -35,98 +35,234 @@ class EvaluationMetrics:
             logger.warning("Prometheus client not installed. Metrics collection disabled.")
             logger.info("Install with: pip install prometheus-client")
             return
-            
-        # Request metrics
-        self.request_counter = Counter(
-            'evaluation_requests_total',
-            'Total number of evaluation requests',
-            ['endpoint', 'method', 'status']
-        )
         
-        self.request_duration = Histogram(
-            'evaluation_request_duration_seconds',
-            'Request duration in seconds',
-            ['endpoint', 'method'],
-            buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0)
-        )
+        # Try to get existing metrics or create new ones
+        # This prevents duplicate registration errors
+        from prometheus_client import REGISTRY
+        
+        # Request metrics
+        try:
+            self.request_counter = Counter(
+                'evaluation_requests_total',
+                'Total number of evaluation requests',
+                ['endpoint', 'method', 'status']
+            )
+        except ValueError:
+            # Metric already exists, get it from registry
+            self.request_counter = REGISTRY._names_to_collectors['evaluation_requests_total']
+        
+        try:
+            self.request_duration = Histogram(
+                'evaluation_request_duration_seconds',
+                'Request duration in seconds',
+                ['endpoint', 'method'],
+                buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0)
+            )
+        except ValueError:
+            self.request_duration = REGISTRY._names_to_collectors['evaluation_request_duration_seconds']
         
         # Evaluation-specific metrics
-        self.evaluation_counter = Counter(
-            'evaluations_total',
-            'Total number of evaluations',
-            ['type', 'provider', 'status']
-        )
+        try:
+            self.evaluation_counter = Counter(
+                'evaluations_total',
+                'Total number of evaluations',
+                ['type', 'provider', 'status']
+            )
+        except ValueError:
+            self.evaluation_counter = REGISTRY._names_to_collectors['evaluations_total']
         
-        self.evaluation_duration = Histogram(
-            'evaluation_duration_seconds',
-            'Evaluation processing time',
-            ['type', 'provider'],
-            buckets=(0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0)
-        )
+        try:
+            self.evaluation_duration = Histogram(
+                'evaluation_duration_seconds',
+                'Evaluation processing time',
+                ['type', 'provider'],
+                buckets=(0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0)
+            )
+        except ValueError:
+            self.evaluation_duration = REGISTRY._names_to_collectors['evaluation_duration_seconds']
         
-        self.evaluation_score = Histogram(
-            'evaluation_scores',
-            'Distribution of evaluation scores',
-            ['type', 'metric'],
-            buckets=(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
-        )
+        try:
+            self.evaluation_score = Histogram(
+                'evaluation_scores',
+                'Distribution of evaluation scores',
+                ['type', 'metric'],
+                buckets=(0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+            )
+        except ValueError:
+            self.evaluation_score = REGISTRY._names_to_collectors['evaluation_scores']
         
         # Circuit breaker metrics
-        self.circuit_breaker_state = Gauge(
-            'circuit_breaker_state',
-            'Circuit breaker state (0=closed, 1=open, 2=half-open)',
-            ['provider']
-        )
+        try:
+            self.circuit_breaker_state = Gauge(
+                'circuit_breaker_state',
+                'Circuit breaker state (0=closed, 1=open, 2=half-open)',
+                ['provider']
+            )
+        except ValueError:
+            self.circuit_breaker_state = REGISTRY._names_to_collectors['circuit_breaker_state']
         
-        self.circuit_breaker_failures = Counter(
-            'circuit_breaker_failures_total',
-            'Total circuit breaker failures',
-            ['provider', 'error_type']
-        )
+        try:
+            self.circuit_breaker_failures = Counter(
+                'circuit_breaker_failures_total',
+                'Total circuit breaker failures',
+                ['provider', 'error_type']
+            )
+        except ValueError:
+            self.circuit_breaker_failures = REGISTRY._names_to_collectors['circuit_breaker_failures_total']
         
         # Resource metrics
-        self.active_evaluations = Gauge(
-            'active_evaluations',
-            'Number of currently active evaluations',
-            ['type']
-        )
+        try:
+            self.active_evaluations = Gauge(
+                'active_evaluations',
+                'Number of currently active evaluations',
+                ['type']
+            )
+        except ValueError:
+            self.active_evaluations = REGISTRY._names_to_collectors['active_evaluations']
         
-        self.database_connections = Gauge(
-            'evaluation_database_connections',
-            'Number of active database connections'
-        )
-        
-        self.embedding_cache_hits = Counter(
-            'embedding_cache_hits_total',
-            'Total embedding cache hits',
-            ['provider']
-        )
-        
-        self.embedding_cache_misses = Counter(
-            'embedding_cache_misses_total',
-            'Total embedding cache misses',
-            ['provider']
-        )
+        try:
+            self.database_connections = Gauge(
+                'evaluation_database_connections',
+                'Number of active database connections'
+            )
+        except ValueError:
+            self.database_connections = REGISTRY._names_to_collectors['evaluation_database_connections']
         
         # Rate limiting metrics
-        self.rate_limit_hits = Counter(
-            'rate_limit_hits_total',
-            'Total rate limit hits',
-            ['endpoint', 'client_type']
-        )
+        try:
+            self.rate_limit_violations = Counter(
+                'rate_limit_violations_total',
+                'Total rate limit violations',
+                ['user_tier', 'limit_type', 'endpoint']
+            )
+        except ValueError:
+            self.rate_limit_violations = REGISTRY._names_to_collectors['rate_limit_violations_total']
+        
+        try:
+            self.rate_limit_usage = Histogram(
+                'rate_limit_usage_ratio',
+                'Rate limit usage as percentage of limit',
+                ['user_tier', 'limit_type'],
+            buckets=(0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1.0)
+            )
+        except ValueError:
+            self.rate_limit_usage = REGISTRY._names_to_collectors['rate_limit_usage_ratio']
+        
+        # Security metrics
+        try:
+            self.authentication_attempts = Counter(
+                'authentication_attempts_total',
+                'Total authentication attempts',
+                ['outcome', 'method']
+            )
+        except ValueError:
+            self.authentication_attempts = REGISTRY._names_to_collectors['authentication_attempts_total']
+        
+        try:
+            self.suspicious_activities = Counter(
+                'suspicious_activities_total',
+                'Total suspicious activities detected',
+                ['activity_type', 'severity']
+            )
+        except ValueError:
+            self.suspicious_activities = REGISTRY._names_to_collectors['suspicious_activities_total']
+        
+        # Webhook metrics
+        try:
+            self.webhook_deliveries = Counter(
+                'webhook_deliveries_total',
+                'Total webhook delivery attempts',
+                ['event_type', 'outcome']
+            )
+        except ValueError:
+            self.webhook_deliveries = REGISTRY._names_to_collectors['webhook_deliveries_total']
+        
+        try:
+            self.webhook_response_time = Histogram(
+                'webhook_response_time_seconds',
+                'Webhook delivery response time',
+                ['event_type'],
+                buckets=(0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
+            )
+        except ValueError:
+            self.webhook_response_time = REGISTRY._names_to_collectors['webhook_response_time_seconds']
+        
+        # Cache and database metrics
+        try:
+            self.embedding_cache_hits = Counter(
+                'embedding_cache_hits_total',
+                'Total embedding cache hits',
+                ['provider']
+            )
+        except ValueError:
+            self.embedding_cache_hits = REGISTRY._names_to_collectors['embedding_cache_hits_total']
+        
+        try:
+            self.embedding_cache_misses = Counter(
+                'embedding_cache_misses_total',
+                'Total embedding cache misses',
+                ['provider']
+            )
+        except ValueError:
+            self.embedding_cache_misses = REGISTRY._names_to_collectors['embedding_cache_misses_total']
+        
+        # Additional database metrics
+        try:
+            self.database_query_duration = Histogram(
+                'database_query_duration_seconds',
+                'Database query execution time',
+                ['operation', 'table'],
+                buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0)
+            )
+        except ValueError:
+            self.database_query_duration = REGISTRY._names_to_collectors['database_query_duration_seconds']
+        
+        try:
+            self.database_errors = Counter(
+                'database_errors_total',
+                'Total database errors',
+                ['operation', 'error_type']
+            )
+        except ValueError:
+            self.database_errors = REGISTRY._names_to_collectors['database_errors_total']
+        
+        # User tier metrics
+        try:
+            self.user_tier_distribution = Gauge(
+                'user_tier_distribution',
+                'Number of users by tier',
+                ['tier']
+            )
+        except ValueError:
+            self.user_tier_distribution = REGISTRY._names_to_collectors['user_tier_distribution']
+        
+        try:
+            self.evaluation_cost = Counter(
+                'evaluation_cost_total',
+            'Total evaluation costs',
+            ['user_tier', 'provider', 'evaluation_type']
+            )
+        except ValueError:
+            self.evaluation_cost = REGISTRY._names_to_collectors['evaluation_cost_total']
         
         # Error metrics
-        self.error_counter = Counter(
-            'evaluation_errors_total',
-            'Total evaluation errors',
-            ['type', 'error_category']
-        )
+        try:
+            self.error_counter = Counter(
+                'evaluation_errors_total',
+                'Total evaluation errors',
+                ['type', 'error_category']
+            )
+        except ValueError:
+            self.error_counter = REGISTRY._names_to_collectors['evaluation_errors_total']
         
         # Service info
-        self.service_info = Info(
-            'evaluation_service',
-            'Evaluation service information'
-        )
+        try:
+            self.service_info = Info(
+                'evaluation_service',
+                'Evaluation service information'
+            )
+        except ValueError:
+            self.service_info = REGISTRY._names_to_collectors['evaluation_service']
         
         self.service_info.info({
             'version': '1.0.0',
@@ -243,6 +379,110 @@ class EvaluationMetrics:
             return
             
         self.database_connections.set(count)
+    
+    def record_rate_limit_violation(self, user_tier: str, limit_type: str, endpoint: str):
+        """Record a rate limit violation"""
+        if not self.enabled:
+            return
+            
+        self.rate_limit_violations.labels(
+            user_tier=user_tier,
+            limit_type=limit_type,
+            endpoint=endpoint
+        ).inc()
+    
+    def record_rate_limit_usage(self, user_tier: str, limit_type: str, usage_ratio: float):
+        """Record rate limit usage ratio"""
+        if not self.enabled:
+            return
+            
+        self.rate_limit_usage.labels(
+            user_tier=user_tier,
+            limit_type=limit_type
+        ).observe(usage_ratio)
+    
+    def record_authentication(self, outcome: str, method: str):
+        """Record authentication attempt"""
+        if not self.enabled:
+            return
+            
+        self.authentication_attempts.labels(
+            outcome=outcome,
+            method=method
+        ).inc()
+    
+    def record_suspicious_activity(self, activity_type: str, severity: str):
+        """Record suspicious activity"""
+        if not self.enabled:
+            return
+            
+        self.suspicious_activities.labels(
+            activity_type=activity_type,
+            severity=severity
+        ).inc()
+    
+    def record_webhook_delivery(self, event_type: str, outcome: str, response_time: float):
+        """Record webhook delivery metrics"""
+        if not self.enabled:
+            return
+            
+        self.webhook_deliveries.labels(
+            event_type=event_type,
+            outcome=outcome
+        ).inc()
+        
+        if response_time > 0:
+            self.webhook_response_time.labels(
+                event_type=event_type
+            ).observe(response_time)
+    
+    def record_database_query(self, operation: str, table: str, duration: float, success: bool = True, error_type: str = None):
+        """Record database query metrics"""
+        if not self.enabled:
+            return
+            
+        self.database_query_duration.labels(
+            operation=operation,
+            table=table
+        ).observe(duration)
+        
+        if not success and error_type:
+            self.database_errors.labels(
+                operation=operation,
+                error_type=error_type
+            ).inc()
+    
+    def update_user_tier_distribution(self, tier_counts: Dict[str, int]):
+        """Update user tier distribution"""
+        if not self.enabled:
+            return
+            
+        for tier, count in tier_counts.items():
+            self.user_tier_distribution.labels(tier=tier).set(count)
+    
+    def record_evaluation_cost(self, user_tier: str, provider: str, evaluation_type: str, cost: float):
+        """Record evaluation cost"""
+        if not self.enabled:
+            return
+            
+        self.evaluation_cost.labels(
+            user_tier=user_tier,
+            provider=provider,
+            evaluation_type=evaluation_type
+        ).inc(cost)
+    
+    def get_health_metrics(self) -> Dict[str, Any]:
+        """Get system health metrics for monitoring"""
+        if not self.enabled:
+            return {"metrics_enabled": False}
+        
+        # This would typically query the metrics registry for current values
+        # For simplicity, we'll return basic health info
+        return {
+            "metrics_enabled": True,
+            "prometheus_registry_metrics": len(list(REGISTRY._collector_to_names.keys())),
+            "last_updated": datetime.utcnow().isoformat()
+        }
     
     def get_metrics(self) -> bytes:
         """Generate Prometheus metrics output"""

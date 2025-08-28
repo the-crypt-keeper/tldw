@@ -1,20 +1,21 @@
 """
 RAG (Retrieval-Augmented Generation) Service
 
-This package provides a modular, extensible implementation of RAG functionality
-for the tldw_chatbook application. It replaces the monolithic Unified_RAG_v2.py
-with a clean, testable architecture.
+This package provides a functional pipeline implementation of RAG functionality
+for the tldw_server application. It uses composable functions that can be
+combined into custom pipelines for different use cases.
 
 Main components:
-- app.py: Main RAGApplication class that orchestrates the service
-- config.py: Configuration management with TOML integration
-- retrieval.py: Document retrieval strategies for different data sources
-- processing.py: Document processing, ranking, and deduplication
-- generation.py: Response generation with LLM integration
-- utils.py: Utility functions and helpers
+- functional_pipeline.py: Core pipeline functions and presets
+- config.py: Configuration management
+- types.py: Type definitions
+- database_retrievers.py: Database retrieval strategies
+- query_expansion.py: Query expansion strategies
+- advanced_reranking.py: Document reranking
+- Various feature modules for caching, monitoring, etc.
 """
 
-from .app import RAGApplication
 from .config import RAGConfig
+from .types import DataSource, Document, SearchResult
 
-__all__ = ['RAGApplication', 'RAGConfig']
+__all__ = ['RAGConfig', 'DataSource', 'Document', 'SearchResult']

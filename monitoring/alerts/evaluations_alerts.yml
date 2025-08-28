@@ -1,0 +1,183 @@
+groups:
+  - name: evaluations_security
+    interval: 30s
+    rules:
+      - alert: HighRateLimitViolations
+        expr: sum(rate(rate_limit_violations_total[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          service: evaluations
+          category: security
+        annotations:
+          summary: "High rate limit violations detected"
+          description: "Rate limit violations are occurring at {{ $value }} violations/sec for the past 2 minutes"
+          runbook_url: "https://docs.example.com/runbooks/rate_limit_violations"
+
+      - alert: SuspiciousActivitySpike
+        expr: sum(rate(suspicious_activities_total[5m])) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          service: evaluations
+          category: security
+        annotations:
+          summary: "Suspicious activity spike detected"
+          description: "Suspicious activities are occurring at {{ $value }} activities/sec"
+          runbook_url: "https://docs.example.com/runbooks/suspicious_activity"
+
+      - alert: MultipleAuthenticationFailures
+        expr: sum(rate(authentication_attempts_total{outcome="failure"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluations
+          category: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failures are occurring at {{ $value }} failures/sec"
+
+  - name: evaluations_performance
+    interval: 30s
+    rules:
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state > 0.5
+        for: 1m
+        labels:
+          severity: critical
+          service: evaluations
+          category: performance
+        annotations:
+          summary: "Circuit breaker is open for {{ $labels.provider }}"
+          description: "Circuit breaker for {{ $labels.provider }} has been open for more than 1 minute"
+          runbook_url: "https://docs.example.com/runbooks/circuit_breaker"
+
+      - alert: HighEvaluationLatency
+        expr: histogram_quantile(0.95, sum(rate(evaluation_duration_seconds_bucket[5m])) by (le)) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluations
+          category: performance
+        annotations:
+          summary: "High evaluation latency detected"
+          description: "95th percentile evaluation latency is {{ $value }}s"
+
+      - alert: EvaluationErrorRateHigh
+        expr: sum(rate(evaluations_total{status="failure"}[5m])) / sum(rate(evaluations_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluations
+          category: performance
+        annotations:
+          summary: "High evaluation error rate"
+          description: "Evaluation error rate is {{ $value | humanizePercentage }}"
+
+      - alert: DatabaseQuerySlowness
+        expr: histogram_quantile(0.95, sum(rate(database_query_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 3m
+        labels:
+          severity: warning
+          service: evaluations
+          category: performance
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile database query time is {{ $value }}s"
+
+  - name: evaluations_infrastructure
+    interval: 60s
+    rules:
+      - alert: DatabaseConnectionsHigh
+        expr: evaluation_database_connections > 50
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluations
+          category: infrastructure
+        annotations:
+          summary: "High number of database connections"
+          description: "Database connections count is {{ $value }}"
+
+      - alert: DatabaseErrors
+        expr: sum(rate(database_errors_total[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: evaluations
+          category: infrastructure
+        annotations:
+          summary: "Database errors detected"
+          description: "Database errors are occurring at {{ $value }} errors/sec"
+
+      - alert: WebhookDeliveryFailures
+        expr: sum(rate(webhook_deliveries_total{outcome="failure"}[5m])) / sum(rate(webhook_deliveries_total[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: evaluations
+          category: infrastructure
+        annotations:
+          summary: "High webhook delivery failure rate"
+          description: "Webhook delivery failure rate is {{ $value | humanizePercentage }}"
+
+  - name: evaluations_cost_monitoring
+    interval: 300s  # 5 minutes
+    rules:
+      - alert: HighEvaluationCosts
+        expr: sum(rate(evaluation_cost_total[1h])) > 10  # $10/hour
+        for: 15m
+        labels:
+          severity: warning
+          service: evaluations
+          category: cost
+        annotations:
+          summary: "High evaluation costs detected"
+          description: "Evaluation costs are ${{ $value }}/hour"
+
+      - alert: UnusualCostSpike
+        expr: sum(rate(evaluation_cost_total[5m])) > 5 * avg_over_time(sum(rate(evaluation_cost_total[5m]))[1h:5m])
+        for: 5m
+        labels:
+          severity: critical
+          service: evaluations
+          category: cost
+        annotations:
+          summary: "Unusual evaluation cost spike detected"
+          description: "Current cost rate is 5x higher than average: ${{ $value }}/hour"
+
+  - name: evaluations_business_logic
+    interval: 60s
+    rules:
+      - alert: NoEvaluationsProcessed
+        expr: sum(rate(evaluations_total[10m])) == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: evaluations
+          category: business
+        annotations:
+          summary: "No evaluations processed"
+          description: "No evaluations have been processed in the last 10 minutes"
+
+      - alert: LowEvaluationScores
+        expr: histogram_quantile(0.5, sum(rate(evaluation_scores_bucket[1h])) by (le)) < 0.3
+        for: 30m
+        labels:
+          severity: info
+          service: evaluations
+          category: business
+        annotations:
+          summary: "Consistently low evaluation scores"
+          description: "Median evaluation score has been below 0.3 for 30 minutes"
+
+      - alert: UserTierImbalance
+        expr: (user_tier_distribution{tier="free"} / sum(user_tier_distribution)) > 0.95
+        for: 1h
+        labels:
+          severity: info
+          service: evaluations
+          category: business
+        annotations:
+          summary: "High percentage of free tier users"
+          description: "{{ $value | humanizePercentage }} of users are on free tier"

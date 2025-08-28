@@ -1,0 +1,153 @@
+# TTS Providers Configuration
+# This file configures all TTS providers and their settings
+
+# Provider priority order (first available will be used by default)
+provider_priority:
+  - openai      # Reliable, high quality
+  - kokoro      # Local, fast
+  - chatterbox  # Emotion control
+  - dia         # Dialogue specialist
+  - higgs       # Advanced multi-lingual
+
+# Provider-specific configurations
+providers:
+  # OpenAI TTS Configuration
+  openai:
+    enabled: true
+    api_key: ${OPENAI_API_KEY}  # From environment or config.txt
+    base_url: "https://api.openai.com/v1/audio/speech"
+    model: "tts-1"  # or "tts-1-hd" for higher quality
+    timeout: 60
+    max_retries: 3
+    
+  # Kokoro TTS Configuration
+  kokoro:
+    enabled: true
+    use_onnx: true  # Use ONNX model (faster) vs PyTorch
+    model_path: "models/kokoro-v0_19.onnx"
+    voices_json: "models/voices.json"
+    voice_dir: "models/voices"  # For PyTorch variant
+    device: "cpu"  # or "cuda" for GPU
+    normalize_text: true
+    sentence_splitting: true
+    sample_rate: 24000
+    # Chunking configuration
+    target_min_tokens: 175
+    target_max_tokens: 250
+    absolute_max_tokens: 450
+    
+  # Higgs Audio V2 Configuration
+  higgs:
+    enabled: false  # Disabled by default (requires large model)
+    model_path: "bosonai/higgs-audio-v2-generation-3B-base"
+    tokenizer_path: "bosonai/higgs-audio-v2-tokenizer"
+    device: "cuda"  # Recommended: GPU
+    use_fp16: true  # Use half precision for memory efficiency
+    batch_size: 1
+    sample_rate: 24000
+    frame_rate: 25  # Audio tokenizer frame rate
+    
+  # Dia TTS Configuration
+  dia:
+    enabled: false  # Disabled by default (requires model download)
+    model_path: "nari-labs/dia"
+    device: "cuda"  # Recommended: GPU
+    use_safetensors: true
+    use_bf16: true  # Use bfloat16 for better precision
+    sample_rate: 24000
+    auto_detect_speakers: true
+    max_speakers: 5
+    
+  # Chatterbox TTS Configuration
+  chatterbox:
+    enabled: false  # Disabled by default (requires installation)
+    model_path: "resemble-ai/chatterbox"
+    device: "cuda"  # Recommended: GPU
+    use_fp16: true
+    sample_rate: 24000
+    enable_watermark: true  # Perth watermarker for authenticity
+    target_latency_ms: 200  # Sub-200ms target
+    
+  # ElevenLabs Configuration (TODO: Implement adapter)
+  elevenlabs:
+    enabled: false
+    api_key: ${ELEVENLABS_API_KEY}
+    base_url: "https://api.elevenlabs.io/v1"
+    model: "eleven_monolingual_v1"
+    
+  # AllTalk Configuration (TODO: Implement adapter)
+  alltalk:
+    enabled: false
+    api_url: "http://localhost:7851/api/tts"
+    model: "xtts"
+
+# Voice mappings for cross-provider compatibility
+voice_mappings:
+  # Generic voice names mapped to provider-specific voices
+  generic:
+    male:
+      openai: "onyx"
+      kokoro: "am_adam"
+      higgs: "narrator"
+      dia: "speaker1"
+      chatterbox: "default"
+    female:
+      openai: "nova"
+      kokoro: "af_bella"
+      higgs: "narrator"
+      dia: "speaker2"
+      chatterbox: "default"
+    neutral:
+      openai: "alloy"
+      kokoro: "af_sky"
+      higgs: "conversational"
+      dia: "narrator"
+      chatterbox: "calm"
+      
+  # Emotion-based voice selection
+  emotions:
+    happy:
+      openai: "nova"
+      kokoro: "af_sky"
+      chatterbox: "energetic"
+    sad:
+      openai: "shimmer"
+      kokoro: "af_heart"
+      chatterbox: "calm"
+    angry:
+      openai: "onyx"
+      kokoro: "am_michael"
+      chatterbox: "default"
+    excited:
+      openai: "fable"
+      kokoro: "af_bella"
+      chatterbox: "energetic"
+
+# Audio format preferences by provider
+format_preferences:
+  openai: ["mp3", "opus", "aac", "flac", "wav", "pcm"]
+  kokoro: ["wav", "mp3", "opus", "flac", "pcm"]
+  higgs: ["wav", "mp3", "opus", "flac", "pcm"]
+  dia: ["wav", "mp3", "opus", "flac", "pcm"]
+  chatterbox: ["wav", "mp3", "opus", "flac", "pcm"]
+
+# Performance settings
+performance:
+  max_concurrent_generations: 4
+  cache_enabled: false  # Future: Enable response caching
+  cache_ttl_seconds: 3600
+  stream_chunk_size: 1024
+  
+# Fallback settings
+fallback:
+  enabled: true
+  max_attempts: 3
+  retry_delay_ms: 1000
+  exclude_providers: []  # Providers to never use as fallback
+
+# Logging settings
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  log_requests: true
+  log_responses: false
+  log_performance_metrics: true

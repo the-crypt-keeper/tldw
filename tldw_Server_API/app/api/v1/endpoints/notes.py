@@ -3,6 +3,8 @@
 #
 # Imports
 import logging
+import time
+from collections import defaultdict
 from typing import List, Optional, Dict, Any
 #
 # 3rd-party Libraries
@@ -11,6 +13,7 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    Request,
     status,
     Body,
     Header  # Keep Header for expected_version
@@ -39,6 +42,38 @@ from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_
 
 router = APIRouter()
 
+# Simple rate limiter for resource creation
+class SimpleRateLimiter:
+    def __init__(self, max_requests_per_minute: int = 30):
+        self.max_requests = max_requests_per_minute
+        self.requests = defaultdict(list)
+    
+    def check_rate_limit(self, client_id: str, request=None) -> bool:
+        """Check if client has exceeded rate limit."""
+        # Skip rate limiting in test mode - ONLY from server environment
+        import os
+        if os.getenv("TEST_MODE") == "true":
+            return True
+            
+        current_time = time.time()
+        minute_ago = current_time - 60
+        
+        # Clean up old requests
+        self.requests[client_id] = [
+            req_time for req_time in self.requests[client_id]
+            if req_time > minute_ago
+        ]
+        
+        # Check if limit exceeded
+        if len(self.requests[client_id]) >= self.max_requests:
+            return False
+        
+        # Add current request
+        self.requests[client_id].append(current_time)
+        return True
+
+# Initialize rate limiter for notes creation
+notes_rate_limiter = SimpleRateLimiter(max_requests_per_minute=30)
 
 # --- Helper for Exception Handling (largely the same) ---
 def handle_db_errors(e: Exception, entity_type: str = "resource"):
@@ -89,10 +124,19 @@ def handle_db_errors(e: Exception, entity_type: str = "resource"):
     tags=["Notes"]
 )
 async def create_note(
+        request: Request,
         note_in: NoteCreate,
         db: CharactersRAGDB = Depends(get_chacha_db_for_user)  # Use the user-specific DB instance
 ):
     try:
+        # Check rate limit for note creation
+        client_id = db.client_id or "anonymous"
+        if not notes_rate_limiter.check_rate_limit(client_id, request):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Rate limit exceeded. Maximum 30 notes per minute allowed."
+            )
+        
         # The user context (user_id) is implicitly handled by `get_chacha_db_for_user`
         # The `db` instance is already specific to the authenticated user.
         logger.info(f"User (via DB instance client_id: {db.client_id}) creating note: Title='{note_in.title[:30]}...'")

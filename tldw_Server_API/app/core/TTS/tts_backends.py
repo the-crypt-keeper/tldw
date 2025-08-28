@@ -18,11 +18,8 @@ from tldw_Server_API.app.api.v1.schemas.audio_schemas import OpenAISpeechRequest
 #
 # Functions
 
-# FIXME - placheolder for TTS backend
-
-# --- Load your existing config for API keys etc. ---
-# from PoC_Version.App_Function_Libraries.Utils.Utils import load_and_log_configs
-# loaded_config_data = load_and_log_configs() # Load once globally or per backend instance
+# Import StreamingAudioWriter for audio format conversion
+from tldw_Server_API.app.core.TTS.streaming_audio_writer import StreamingAudioWriter, AudioNormalizer
 
 # --- Abstract Base Class for TTS Backends ---
 class TTSBackendBase(ABC):
@@ -54,16 +51,16 @@ class TTSBackendBase(ABC):
 class OpenAIAPIBackend(TTSBackendBase):
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         super().__init__(config)
-        self.api_key = self.config.get("OPENAI_API_KEY") # Or load from your config system
+        # Try to get API key from config dict or environment variable
+        self.api_key = self.config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
         self.base_url = "https://api.openai.com/v1/audio/speech"
         if not self.api_key:
             logger.error("OpenAIAPIBackend: API key not configured!")
-            # raise ValueError("OpenAI API key is required.") # Or handle gracefully
 
     async def initialize(self):
         logger.info("OpenAIAPIBackend initialized.")
         if not self.api_key:
-             logger.warning("OpenAIAPIBackend: API key is missing. Requests will likely fail.")
+             logger.warning("OpenAIAPIBackend: API key is missing. Requests will fail.")
 
 
     async def generate_speech_stream(
@@ -71,33 +68,57 @@ class OpenAIAPIBackend(TTSBackendBase):
     ) -> AsyncGenerator[bytes, None]:
         if not self.api_key:
             logger.error("OpenAIAPIBackend: Cannot generate speech, API key missing.")
-            yield b"ERROR: OpenAI API Key not configured" # Or raise an exception
-            return
+            raise ValueError("OpenAI API key not configured")
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        
+        # Map the internal model name to OpenAI's expected format
+        # The request.model might be our internal name, need to map to OpenAI's name
+        openai_model = request.model
+        if request.model in ["openai_official_tts-1", "openai_official_tts-1-hd"]:
+            # Strip our internal prefix
+            openai_model = request.model.replace("openai_official_", "")
+        elif request.model not in ["tts-1", "tts-1-hd"]:
+            # Default to tts-1 if unknown model
+            logger.warning(f"Unknown model {request.model}, defaulting to tts-1")
+            openai_model = "tts-1"
+        
         payload = {
-            "model": request.model, # Pass the original model name (e.g., "tts-1")
+            "model": openai_model,
             "input": request.input,
             "voice": request.voice,
             "response_format": request.response_format,
             "speed": request.speed,
         }
-        logger.info(f"OpenAIAPIBackend: Sending request to OpenAI: {payload}")
+        logger.info(f"OpenAIAPIBackend: Requesting TTS with model={openai_model}, voice={request.voice}")
+        logger.debug(f"Full payload: {payload}")
 
         try:
             async with self.client.stream("POST", self.base_url, headers=headers, json=payload) as response:
-                response.raise_for_status() # Raise HTTPStatusError for 4xx/5xx
-                async for chunk in response.aiter_bytes():
+                response.raise_for_status()
+                total_bytes = 0
+                async for chunk in response.aiter_bytes(chunk_size=1024):
+                    total_bytes += len(chunk)
                     yield chunk
+                logger.info(f"OpenAIAPIBackend: Successfully streamed {total_bytes} bytes")
         except httpx.HTTPStatusError as e:
             error_content = await e.response.aread()
-            logger.error(f"OpenAI API error: {e.response.status_code} - {error_content.decode()}")
-            # You might want to stream back a JSON error or raise HTTPException
-            # For now, we'll let it propagate to the main endpoint handler
-            raise # This will likely become a 500 or be caught by the router
+            error_msg = error_content.decode()
+            logger.error(f"OpenAI API error: {e.response.status_code} - {error_msg}")
+            if e.response.status_code == 401:
+                raise ValueError("Invalid OpenAI API key")
+            elif e.response.status_code == 429:
+                raise ValueError("OpenAI API rate limit exceeded")
+            elif e.response.status_code == 400:
+                raise ValueError(f"Invalid request to OpenAI: {error_msg}")
+            else:
+                raise ValueError(f"OpenAI API error: {error_msg}")
+        except httpx.RequestError as e:
+            logger.error(f"OpenAIAPIBackend: Network error: {e}", exc_info=True)
+            raise ValueError(f"Network error connecting to OpenAI: {str(e)}")
         except Exception as e:
             logger.error(f"OpenAIAPIBackend: Unexpected error: {e}", exc_info=True)
             raise
@@ -116,22 +137,14 @@ class LocalKokoroBackend(TTSBackendBase):
         self.kokoro_instance = None # For ONNX Kokoro library
         self.kokoro_model_pt = None # For PyTorch model
         self.tokenizer = None
-
-        # Borrow text processing from the target app (if you want its advanced features)
-        # from target_app.services.text_processing import smart_split as target_smart_split
-        # from target_app.services.audio import AudioService as TargetAudioService
-        # from target_app.services.streaming_audio_writer import StreamingAudioWriter as TargetSAW
-        # self.smart_split = target_smart_split
-        # self.audio_service = TargetAudioService
-        # self.streaming_audio_writer_class = TargetSAW
+        self.audio_normalizer = AudioNormalizer()
 
 
     async def initialize(self):
         logger.info(f"LocalKokoroBackend: Initializing (ONNX: {self.use_onnx}, Device: {self.device})")
         if self.use_onnx:
             try:
-                # FIXME
-                from kokoro_onnx import Kokoro, EspeakConfig # Assuming you have this installed/vendored
+                from kokoro_onnx import Kokoro, EspeakConfig
                 # Ensure model files exist, download if not (like in your TTS_Providers_Local.py)
                 if not os.path.exists(self.kokoro_model_path):
                     logger.error(f"Kokoro ONNX model not found at {self.kokoro_model_path}")
@@ -176,107 +189,68 @@ class LocalKokoroBackend(TTSBackendBase):
     async def _generate_with_kokoro_onnx(self, request: OpenAISpeechRequest) -> AsyncGenerator[bytes, None]:
         if not self.kokoro_instance:
             logger.error("LocalKokoroBackend (ONNX): Not initialized.")
-            yield b"ERROR: Kokoro ONNX backend not initialized"
-            return
+            raise ValueError("Kokoro ONNX backend not initialized")
 
-        # Your TTS_Providers_Local.py uses `kokoro.create_stream` which is an async generator.
-        # It yields (samples, sr). We need to convert these samples to the target `response_format`.
-        # This is where the target app's StreamingAudioWriter and AudioService would be very handy.
+        # Determine language from voice name (simple heuristic)
+        lang = 'en-us'  # Default
+        if request.voice and len(request.voice) > 0:
+            if request.voice[0].lower() == 'a':
+                lang = 'en-us'
+            elif request.voice[0].lower() == 'b':
+                lang = 'en-gb'
+        
+        # Use lang_code from request if provided
+        if hasattr(request, 'lang_code') and request.lang_code:
+            lang = request.lang_code
 
-        # For simplicity now, let's assume WAV output and directly yield, then you can adapt.
-        # A more robust solution would use something like target app's StreamingAudioWriter.
-        # Example:
-        # saw = self.streaming_audio_writer_class(request.response_format, sample_rate=24000)
-
-        lang = 'en-us' # Determine from voice, e.g., request.voice == "af_bella" -> 'en-us'
-        if request.voice.startswith('a'): # Simple heuristic
-            lang = 'en-us'
-        elif request.voice.startswith('b'):
-            lang = 'en-gb'
-        else: # Fallback or derive from a lang_code field if you add it
-            lang = 'en-us'
-
-        # This part needs the most adaptation to fit how you want to handle audio format conversion
-        # The `kokoro_onnx.create_stream` yields (samples_np_array, sample_rate)
-        # You need to convert `samples_np_array` to the `request.response_format`
-        logger.info(f"Kokoro ONNX: Streaming for voice '{request.voice}', lang '{lang}'")
+        logger.info(f"Kokoro ONNX: Generating speech for voice '{request.voice}', lang '{lang}', format '{request.response_format}'")
+        
+        # Initialize StreamingAudioWriter for the target format
+        # Kokoro typically outputs at 24kHz
+        sample_rate = 24000
+        saw = StreamingAudioWriter(format=request.response_format, sample_rate=sample_rate, channels=1)
+        
         try:
-            # Using the target app's StreamingAudioWriter pattern:
-            # saw = TargetSAW(format=request.response_format, sample_rate=24000) # Assuming Kokoro outputs 24kHz
-
-            # This is a simplified placeholder.
-            # For real audio conversion, integrate the target app's StreamingAudioWriter
-            # or a similar library that can encode raw PCM (from Kokoro) to MP3/Opus etc. in chunks.
-            if request.response_format == "wav": # Simplest case, can write WAV header and then PCM
-                 # Yield WAV header first (simplified)
-                # This is a very basic header and might not be fully correct for all players.
-                # A proper WAV library should be used.
-                # For streaming, you'd ideally use a library that handles the format correctly.
-                # For now, we'll simulate by collecting all and then encoding.
-                # This negates true streaming benefits for formats other than PCM.
-                all_samples = []
-                sample_rate = 24000 # Assume this from Kokoro
-
-                async for samples_chunk, sr_chunk in self.kokoro_instance.create_stream(
-                    request.input, voice=request.voice, speed=request.speed, lang=lang
-                ):
-                    sample_rate = sr_chunk # Update sample rate from first chunk
-                    all_samples.append(samples_chunk)
-
-                if all_samples:
-                    combined_samples = np.concatenate(all_samples)
-                    # Now convert combined_samples to WAV bytes
-                    # This is NOT true streaming for WAV but demonstrates the flow.
-                    # You would use `scipy.io.wavfile.write` to a BytesIO buffer.
-                    import io
-                    import scipy.io.wavfile
-                    byte_io = io.BytesIO()
-                    # Kokoro ONNX typically outputs float32, scale to int16 for WAV
-                    scaled_samples = np.int16(combined_samples * 32767)
-                    # FIXME
-                    scipy.io.wavfile.write(byte_io, sample_rate, scaled_samples)
-                    yield byte_io.getvalue()
-                else:
-                    yield b"" # No audio generated
-            elif request.response_format == "pcm":
-                 async for samples_chunk, sr_chunk in self.kokoro_instance.create_stream(
-                    request.input, voice=request.voice, speed=request.speed, lang=lang
-                ):
-                    # Kokoro samples are float32. PCM for OpenAI often means S16LE.
-                    # Convert to int16 bytes
-                    int16_samples = np.int16(samples_chunk * 32767)
-                    yield int16_samples.tobytes()
-            else:
-                # For MP3, Opus, etc., you NEED a streaming encoder.
-                # The target app's StreamingAudioWriter using pyav is ideal here.
-                # Placeholder:
-                logger.warning(f"Streaming {request.response_format} from LocalKokoroBackend is non-trivial without a streaming encoder. Yielding placeholder.")
-                yield f"Placeholder for {request.response_format} stream. Implement proper encoding.".encode()
-
+            # Stream audio chunks from Kokoro
+            chunk_count = 0
+            async for samples_chunk, sr_chunk in self.kokoro_instance.create_stream(
+                request.input, voice=request.voice, speed=request.speed, lang=lang
+            ):
+                if samples_chunk is not None and len(samples_chunk) > 0:
+                    chunk_count += 1
+                    # Normalize float32 samples to int16
+                    normalized_chunk = self.audio_normalizer.normalize(samples_chunk, target_dtype=np.int16)
+                    
+                    # Write chunk and get encoded bytes
+                    encoded_bytes = saw.write_chunk(normalized_chunk)
+                    if encoded_bytes:
+                        yield encoded_bytes
+                        logger.debug(f"Kokoro ONNX: Yielded chunk {chunk_count}, {len(encoded_bytes)} bytes")
+            
+            # Finalize the stream and get any remaining bytes
+            final_bytes = saw.write_chunk(finalize=True)
+            if final_bytes:
+                yield final_bytes
+                logger.debug(f"Kokoro ONNX: Yielded final chunk, {len(final_bytes)} bytes")
+            
+            logger.info(f"Kokoro ONNX: Successfully generated {chunk_count} chunks")
+            
+        except ImportError as e:
+            logger.error(f"Kokoro ONNX import error: {e}")
+            raise ValueError("Kokoro ONNX library not properly installed")
         except Exception as e:
             logger.error(f"LocalKokoroBackend (ONNX) error during generation: {e}", exc_info=True)
-            yield b"ERROR: Kokoro ONNX generation failed"
+            raise ValueError(f"Kokoro ONNX generation failed: {str(e)}")
+        finally:
+            # Ensure cleanup
+            saw.close()
 
 
     async def _generate_with_kokoro_pytorch(self, request: OpenAISpeechRequest) -> AsyncGenerator[bytes, None]:
-        # This would adapt your existing PyTorch Kokoro logic.
-        # It involves:
-        # 1. Text chunking (e.g., your `split_text_into_sentence_chunks` or target app's `smart_split`)
-        # 2. For each chunk:
-        #    - Call your `generate(MODEL, chunk_text, VOICEPACK, ...)`
-        #    - Convert the output tensor to numpy array
-        #    - Convert this raw audio to `request.response_format` bytes (again, StreamingAudioWriter is good)
-        #    - Yield the bytes
-        logger.warning("LocalKokoroBackend (PyTorch): generate_speech_stream not fully implemented.")
-        # Example of yielding chunks (you'd replace this with actual generation and encoding)
-        # text_chunks = self.smart_split(request.input, lang_code=...) # if using target app's
-        # for chunk_text in text_chunks:
-        #     # raw_audio_np = your_pytorch_kokoro_generate(chunk_text, ...)
-        #     # encoded_bytes = your_streaming_encoder_instance.write_chunk(raw_audio_np)
-        #     # yield encoded_bytes
-        # # encoded_bytes = your_streaming_encoder_instance.write_chunk(finalize=True)
-        # # yield encoded_bytes
-        yield b"PyTorch Kokoro stream placeholder"
+        # PyTorch implementation would go here
+        # For now, we'll focus on ONNX implementation
+        logger.warning("LocalKokoroBackend (PyTorch): Not implemented. Use ONNX mode instead.")
+        raise NotImplementedError("PyTorch Kokoro backend not yet implemented. Please use ONNX mode.")
 
 
     async def generate_speech_stream(
@@ -290,44 +264,61 @@ class LocalKokoroBackend(TTSBackendBase):
             async for chunk in self._generate_with_kokoro_pytorch(request):
                 yield chunk
 
-# --- Add more backends: ElevenLabsBackend, AllTalkBackend etc. ---
-# FIXME
-# class ElevenLabsBackend(TTSBackendBase):
-#// ... implementation using your generate_audio_elevenlabs logic ...
-# Remember to adapt it to be async and yield bytes. Httpx can stream responses.
+# Additional backends can be added here (ElevenLabs, AllTalk, etc.)
 
 
-# --- Backend Manager (Simplified from target app's ModelManager) ---
+# --- Backend Manager ---
 class TTSBackendManager:
-    def __init__(self, app_config: Dict[str, Any]):
-        self.app_config = app_config # Your global app config
+    def __init__(self, app_config: Any):  # app_config is ConfigParser
+        self.app_config = app_config
         self._backends: Dict[str, TTSBackendBase] = {}
         self._initialized_backends: set[str] = set()
+        self._config_dict = self._parse_config(app_config)
+    
+    def _parse_config(self, config_parser) -> Dict[str, Any]:
+        """Extract relevant config values from ConfigParser"""
+        config_dict = {}
+        
+        # Extract API keys from API section
+        if hasattr(config_parser, 'has_section') and config_parser.has_section('API'):
+            if config_parser.has_option('API', 'openai_api_key'):
+                config_dict['openai_api_key'] = config_parser.get('API', 'openai_api_key')
+            if config_parser.has_option('API', 'elevenlabs_api_key'):
+                config_dict['elevenlabs_api_key'] = config_parser.get('API', 'elevenlabs_api_key')
+        
+        # Extract TTS-specific settings if they exist
+        if hasattr(config_parser, 'has_section') and config_parser.has_section('TTS'):
+            for key, value in config_parser.items('TTS'):
+                config_dict[key] = value
+        
+        # Also check environment variables as fallback
+        config_dict['openai_api_key'] = config_dict.get('openai_api_key') or os.getenv('OPENAI_API_KEY')
+        config_dict['elevenlabs_api_key'] = config_dict.get('elevenlabs_api_key') or os.getenv('ELEVENLABS_API_KEY')
+        
+        return config_dict
 
     async def get_backend(self, backend_id: str) -> Optional[TTSBackendBase]:
         if backend_id not in self._backends:
             logger.info(f"TTSBackendManager: Creating backend for ID: {backend_id}")
-            # --- Logic to create the correct backend based on backend_id ---
-            # This is where you map your internal backend_id (from openai_mappings.json)
-            # to the actual backend class.
-            specific_config = self.app_config.get(backend_id, {}) # Get backend-specific config
-            specific_config.update(self.app_config.get("global_tts_settings", {})) # Merge global settings
+            
+            # Use the parsed config dictionary
+            base_config = self._config_dict.copy()
 
-            if backend_id == "openai_official_tts-1" or backend_id == "openai_official_tts-1-hd":
-                self._backends[backend_id] = OpenAIAPIBackend(config=specific_config)
+            if backend_id in ["openai_official_tts-1", "openai_official_tts-1-hd"]:
+                self._backends[backend_id] = OpenAIAPIBackend(config=base_config)
             elif backend_id == "local_kokoro_default_onnx":
-                # Example specific config for this Kokoro instance
-                kokoro_cfg = {
+                # Kokoro-specific config
+                kokoro_cfg = base_config.copy()
+                kokoro_cfg.update({
                     "KOKORO_USE_ONNX": True,
-                    "KOKORO_MODEL_PATH": self.app_config.get("KOKORO_ONNX_MODEL_PATH_DEFAULT", "path/to/kokoro.onnx"),
-                    "KOKORO_VOICES_JSON_PATH": self.app_config.get("KOKORO_ONNX_VOICES_JSON_DEFAULT", "path/to/voices.json"),
-                    "KOKORO_DEVICE": self.app_config.get("KOKORO_DEVICE_DEFAULT", "cpu"),
-                }
-                kokoro_cfg.update(specific_config) # Allow overrides
+                    "KOKORO_MODEL_PATH": base_config.get("kokoro_model_path", "kokoro-v0_19.onnx"),
+                    "KOKORO_VOICES_JSON_PATH": base_config.get("kokoro_voices_json", "voices.json"),
+                    "KOKORO_DEVICE": base_config.get("kokoro_device", "cpu"),
+                })
                 self._backends[backend_id] = LocalKokoroBackend(config=kokoro_cfg)
-            # Add elif for ElevenLabs, AllTalk, your PyTorch Kokoro, etc.
+            # Add more backends as needed
             # elif backend_id == "elevenlabs_english_v1":
-            #     self._backends[backend_id] = ElevenLabsBackend(config=specific_config)
+            #     self._backends[backend_id] = ElevenLabsBackend(config=base_config)
             else:
                 logger.error(f"TTSBackendManager: Unknown backend ID: {backend_id}")
                 return None

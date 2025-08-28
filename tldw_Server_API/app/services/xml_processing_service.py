@@ -14,7 +14,7 @@ from typing import Optional, List
 from fastapi import HTTPException
 from tldw_Server_API.app.core.Utils.Utils import logger
 
-from tldw_Server_API.app.core.Chunking.Chunk_Lib import chunk_xml
+from tldw_Server_API.app.core.Chunking import improved_chunking_process
 
 async def process_xml_task(
     file_bytes: bytes,
@@ -55,9 +55,10 @@ async def process_xml_task(
             'overlap': 200,
             'language': 'english'
         }
-        # Convert root to string
+        # Convert root to string and chunk using xml method
         xml_string = ET.tostring(root, encoding='unicode')
-        chunks = chunk_xml(xml_string, chunk_options)
+        chunk_options['method'] = 'xml'
+        chunks = improved_chunking_process(xml_string, chunk_options)
 
         # 4) Summarization
         summary_text = "No summary provided"

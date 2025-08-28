@@ -306,7 +306,7 @@ class PromptsDatabase:
                     self.db_path_str,
                     detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
                     check_same_thread=False,  # Required for threading.local
-                    timeout=10  # seconds
+                    timeout=30  # seconds
                 )
                 conn.row_factory = sqlite3.Row
                 if not self.is_memory_db:

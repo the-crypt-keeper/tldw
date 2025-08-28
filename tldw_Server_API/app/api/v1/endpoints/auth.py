@@ -36,9 +36,14 @@ from tldw_Server_API.app.core.AuthNZ.password_service import PasswordService
 from tldw_Server_API.app.core.AuthNZ.jwt_service import JWTService, get_jwt_service
 from tldw_Server_API.app.core.AuthNZ.session_manager import SessionManager
 from tldw_Server_API.app.core.AuthNZ.rate_limiter import RateLimiter
+from tldw_Server_API.app.core.AuthNZ.input_validation import get_input_validator
 from tldw_Server_API.app.services.registration_service import RegistrationService
 from tldw_Server_API.app.core.AuthNZ.settings import Settings, get_settings
-from tldw_Server_API.app.services.audit_service import get_audit_service, AuditAction
+from tldw_Server_API.app.core.Audit.unified_audit_service import (
+    get_unified_audit_service,
+    AuditEventType,
+    AuditContext
+)
 from tldw_Server_API.app.core.AuthNZ.exceptions import (
     AuthenticationError,
     InvalidCredentialsError,
@@ -99,29 +104,72 @@ async def login(
         user_agent = request.headers.get("User-Agent", "Unknown")
         logger.info(f"Login attempt for user: {form_data.username} from IP: {client_ip}")
         
+        # Check if IP is locked out
+        is_locked, lockout_expires = await rate_limiter.check_lockout(client_ip)
+        if is_locked:
+            logger.warning(f"Login attempt from locked IP: {client_ip}")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Too many failed login attempts. Please try again later.",
+                headers={"Retry-After": str(int((lockout_expires - datetime.utcnow()).total_seconds()))}
+            )
+        
+        # Validate and sanitize input
+        input_validator = get_input_validator()
+        
+        # Check if username looks like an email
+        login_identifier = form_data.username.strip()
+        if '@' in login_identifier:
+            # Validate as email
+            is_valid, error_msg = input_validator.validate_email(login_identifier)
+            if not is_valid:
+                logger.warning(f"Invalid email format in login: {error_msg}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid credentials",  # Generic message for security
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
+        else:
+            # Validate as username
+            is_valid, error_msg = input_validator.validate_username(login_identifier)
+            if not is_valid:
+                logger.warning(f"Invalid username format in login: {error_msg}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid credentials",  # Generic message for security
+                    headers={"WWW-Authenticate": "Bearer"}
+                )
+        
         # Get audit service
         audit_service = await get_audit_service()
         
-        # Fetch user from database
+        # Fetch user from database using sanitized identifier
         user = None
         if hasattr(db, 'fetchrow'):
             # PostgreSQL
             user = await db.fetchrow(
                 "SELECT * FROM users WHERE lower(username) = $1 OR lower(email) = $1",
-                form_data.username.lower()
+                login_identifier.lower()
             )
         else:
             # SQLite
             cursor = await db.execute(
                 "SELECT * FROM users WHERE lower(username) = ? OR lower(email) = ?",
-                (form_data.username.lower(), form_data.username.lower())
+                (login_identifier.lower(), login_identifier.lower())
             )
             user = await cursor.fetchone()
         
         # Check if user exists
         if not user:
             # Log failed attempt
-            logger.warning(f"Failed login: User not found - {form_data.username}")
+            logger.warning(f"Failed login: User not found - {login_identifier}")
+            
+            # Track failed attempt by IP
+            await rate_limiter.record_failed_attempt(
+                identifier=client_ip,
+                attempt_type="login"
+            )
+            
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect username or password",
@@ -154,8 +202,28 @@ async def login(
                 success=False
             )
             
-            # TODO: Implement failed attempt tracking in rate limiter
-            # await rate_limiter.record_failed_attempt(client_ip, "login")
+            # Track failed attempt by IP and username
+            ip_result = await rate_limiter.record_failed_attempt(
+                identifier=client_ip,
+                attempt_type="login"
+            )
+            
+            user_result = await rate_limiter.record_failed_attempt(
+                identifier=user['username'],
+                attempt_type="login"
+            )
+            
+            # Provide informative error if locked out
+            if ip_result['is_locked'] or user_result['is_locked']:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many failed login attempts. Account temporarily locked.",
+                    headers={"Retry-After": "900"}  # 15 minutes
+                )
+            
+            # Otherwise generic error
+            remaining = min(ip_result.get('remaining_attempts', 5), user_result.get('remaining_attempts', 5))
+            logger.info(f"Remaining login attempts: {remaining}")
             
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -263,6 +331,10 @@ async def login(
         
         # Log successful login
         logger.info(f"Successful login for user: {user['username']} (ID: {user['id']})")
+        
+        # Reset failed login attempts on successful login
+        await rate_limiter.reset_failed_attempts(client_ip, "login")
+        await rate_limiter.reset_failed_attempts(user['username'], "login")
         
         # Audit log successful login
         await audit_service.log_login(

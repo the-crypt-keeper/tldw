@@ -11,6 +11,7 @@
 # FIXME
 #
 # Imports
+import os
 import re
 import sqlite3
 from math import ceil
@@ -46,8 +47,8 @@ from pydantic import BaseModel, ValidationError
 import redis
 from pydantic.v1 import Field
 # API Rate Limiter/Caching via Redis
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+# Use centralized rate limiter that respects TEST_MODE
+from tldw_Server_API.app.api.v1.API_Deps.rate_limiting import limiter
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
 #
@@ -137,8 +138,7 @@ from tldw_Server_API.app.core.Ingestion_Media_Processing.MediaWiki.Media_Wiki im
 # Create a new router instance
 router = APIRouter()
 
-# Rate Limiter + Cache Setup
-limiter = Limiter(key_func=get_remote_address)
+# Rate Limiter is imported from centralized configuration above
 
 # Configure Redis cache (optional based on config)
 cache = None
@@ -298,6 +298,10 @@ def get_add_media_form(
     custom_chapter_pattern: Optional[str] = Form(None, description="Regex pattern for custom chapter splitting"),
     perform_rolling_summarization: bool = Form(False, description="Perform rolling summarization"),
     summarize_recursively: bool = Form(False, description="Perform recursive summarization"),
+    # Embedding options
+    generate_embeddings: bool = Form(False, description="Generate embeddings after media processing"),
+    embedding_model: Optional[str] = Form(None, description="Specific embedding model to use"),
+    embedding_provider: Optional[str] = Form(None, description="Embedding provider (huggingface, openai, etc)"),
     # Don't need token here, it's a Header dep
     # Don't need files here, it's a File dep
     # Don't need db here, it's a separate Depends
@@ -343,6 +347,9 @@ def get_add_media_form(
             custom_chapter_pattern=custom_chapter_pattern,
             perform_rolling_summarization=perform_rolling_summarization,
             summarize_recursively=summarize_recursively,
+            generate_embeddings=generate_embeddings,
+            embedding_model=embedding_model,
+            embedding_provider=embedding_provider,
         )
         return form_instance
     except ValidationError as e:
@@ -532,124 +539,7 @@ async def get_media_item(
     except Exception as e:
         logger.error(f"Unexpected error fetching details for media {media_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred retrieving media details")
-# async def get_media_item( # Changed to `async def` for consistency
-#     media_id: int,
-#     # --- Use the new DB dependency ---
-#     db: Database = Depends(get_media_db_for_user) # Inject the Database instance
-# ):
-#     """
-#     **Retrieve Media Item by ID**
-#
-#     Fetches the details for a specific *active* (non-deleted, non-trash) media item,
-#     including its associated keywords and the prompt/analysis from its latest version.
-#     """
-#     logger.debug(f"Attempting to fetch details for media_id: {media_id}")
-#     try:
-#         # --- 1. Fetch the main Media record (active only) ---
-#         # Use the instance method get_media_by_id, asking for non-deleted/non-trash
-#         media_record = db.get_media_by_id(media_id, include_deleted=False, include_trash=False)
-#
-#         if not media_record:
-#             logger.warning(f"Media not found or not active for ID: {media_id}")
-#             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found or is inactive/trashed")
-#
-#         logger.debug(f"Found active media record for ID: {media_id}")
-#         # Convert row object to dict if not already (depends on DB class setup)
-#         # Assuming db.get_media_by_id returns a dict-like object or row factory handles it
-#         if not isinstance(media_record, dict):
-#              # Explicitly convert if needed, though db.get_media_by_id SHOULD return a dict
-#              try:
-#                   media_record = dict(media_record)
-#              except TypeError:
-#                    logger.error(f"Could not convert media_record to dict for ID {media_id}")
-#                    raise HTTPException(status_code=500, detail="Internal server error processing media data format.")
-#
-#
-#         # --- 2. Fetch Associated Keywords (active only) ---
-#         # Use the standalone function from the new DB library
-#         keywords_list = fetch_keywords_for_media(media_id=media_id, db_instance=db)
-#         logger.debug(f"Fetched keywords for media ID {media_id}: {keywords_list}")
-#
-#         # --- 3. Fetch Latest Prompt & Analysis from DocumentVersions ---
-#         latest_version_info = None
-#         prompt = None
-#         analysis = None
-#         try:
-#              # Use the standalone function, get latest by passing version_number=None
-#              # Don't include full content to save bandwidth/processing
-#              latest_version_info = get_document_version(
-#                  db_instance=db,
-#                  media_id=media_id,
-#                  version_number=None, # Explicitly get latest
-#                  include_content=False # We only need prompt/analysis from here
-#              )
-#              if latest_version_info:
-#                   prompt = latest_version_info.get('prompt')
-#                   analysis = latest_version_info.get('analysis_content')
-#                   logger.debug(f"Fetched latest version info (prompt/analysis) for media ID {media_id}")
-#              else:
-#                    logger.warning(f"No active document version found for media ID {media_id}")
-#
-#         except DatabaseError as dv_e:
-#             # Log error fetching version, but don't fail the whole request
-#             logger.error(f"Database error fetching latest document version for media {media_id}: {dv_e}")
-#         except Exception as dv_e:
-#             logger.error(f"Unexpected error fetching latest document version for media {media_id}: {dv_e}", exc_info=True)
-#
-#         # --- 4. Prepare Response ---
-#         # Extract data primarily from the main media_record
-#         # NOTE: Metadata like 'duration', 'webpage_url', and detailed 'timestamps'
-#         # are NOT standard fields in the new `Media` table schema provided.
-#         # They would need to be added to the schema or stored differently (e.g., in content or a dedicated metadata field/table)
-#         # if they are required. The response below reflects data *available* in the new schema.
-#
-#         content_text = media_record.get('content', '') # Main content/transcript
-#         word_count = len(content_text.split()) if content_text else 0
-#
-#         # Reconstruct the response structure using available data
-#         response_data = {
-#             "media_id": media_id,
-#             "uuid": media_record.get('uuid'), # Add UUID
-#             "source": {
-#                 "url": media_record.get('url'), # Original URL if available
-#                 "title": media_record.get('title'),
-#                 "duration": None, # <<< Not directly available in schema
-#                 "type": media_record.get('type')
-#             },
-#             "processing": {
-#                 "prompt": prompt, # From latest version
-#                 "analysis": analysis, # From latest version
-#                 "model": media_record.get('transcription_model'), # From Media table
-#                 "timestamp_option": None # <<< Not directly available, unclear how determined
-#             },
-#             "content": {
-#                 # 'metadata' dictionary is unclear how it would be populated now
-#                 # If you stored JSON in a 'metadata' TEXT column, parse it here.
-#                 "metadata": {}, # <<< Placeholder, needs clarification
-#                 "text": content_text, # Main content from Media table
-#                 "word_count": word_count
-#             },
-#             "keywords": keywords_list if keywords_list else [], # Use fetched list
-#             "timestamps": [], # <<< Not directly available in schema/content format
-#             "author": media_record.get('author'),
-#             "ingestion_date": media_record.get('ingestion_date'),
-#             "last_modified": media_record.get('last_modified'),
-#             "version": media_record.get('version'), # Sync version
-#         }
-#
-#         return response_data
-#
-#     except HTTPException: # Re-raise HTTP exceptions directly
-#         raise
-#     except DatabaseError as e: # Catch specific DB errors
-#         logger.error(f"Database error fetching details for media {media_id}: {e}", exc_info=True)
-#         raise HTTPException(status_code=500, detail="Database error retrieving media details")
-#     except Exception as e: # Catch other potential errors
-#         logger.error(f"Unexpected error fetching details for media {media_id}: {e}", exc_info=True)
-#         # Print traceback if needed during debugging:
-#         # import traceback
-#         # traceback.print_exc()
-#         raise HTTPException(status_code=500, detail="An unexpected error occurred retrieving media details")
+
 
 ##############################################################################
 ############################## MEDIA Versioning ##############################
@@ -1512,6 +1402,27 @@ async def _save_uploaded_files(
 
             # --- Extension Validation ---
             file_extension = Path(original_filename).suffix.lower()
+            
+            # Block dangerous/executable file types for security
+            BLOCKED_EXTENSIONS = {
+                '.exe', '.bat', '.cmd', '.com', '.scr', '.vbs', '.vbe', '.js', '.jse', 
+                '.ws', '.wsf', '.wsc', '.wsh', '.ps1', '.ps1xml', '.ps2', '.ps2xml', 
+                '.psc1', '.psc2', '.msh', '.msh1', '.msh2', '.mshxml', '.msh1xml', 
+                '.msh2xml', '.scf', '.lnk', '.inf', '.reg', '.dll', '.app', '.sh',
+                '.csh', '.ksh', '.bash', '.zsh', '.fish', '.bat', '.cmd', '.jar',
+                '.msi', '.dmg', '.pkg', '.deb', '.rpm', '.appimage', '.snap'
+            }
+            
+            if file_extension in BLOCKED_EXTENSIONS:
+                logger.warning(f"Rejecting potentially dangerous file type '{file_extension}' for file '{original_filename}'")
+                file_handling_errors.append({
+                    "original_filename": original_filename,
+                    "input_ref": input_ref,
+                    "status": "Error",
+                    "error": f"File type '{file_extension}' is not allowed for security reasons"
+                })
+                continue # Skip to the next file
+            
             if normalized_allowed_extensions and file_extension not in normalized_allowed_extensions:
                 logger.warning(f"Skipping file '{original_filename}' due to disallowed extension '{file_extension}'. Allowed: {allowed_extensions}")
                 file_handling_errors.append({
@@ -1557,6 +1468,32 @@ async def _save_uploaded_files(
                  # Clean up zero-byte file if created by mistake (though 'wb' should handle it)
                  if local_file_path.exists(): local_file_path.unlink(missing_ok=True)
                  continue # Skip to the next file
+            
+            # Check file size based on media type - different limits for different types
+            # Media files (audio/video) can be much larger
+            file_ext_lower = file_extension.lower()
+            if file_ext_lower in ['.mp4', '.mkv', '.avi', '.mov', '.flv', '.webm', '.wmv', '.mpg', '.mpeg']:
+                # Video files: 10GB default
+                MAX_FILE_SIZE = int(os.getenv('MAX_VIDEO_UPLOAD_SIZE', 10 * 1024 * 1024 * 1024))
+            elif file_ext_lower in ['.mp3', '.aac', '.flac', '.wav', '.ogg', '.m4a', '.wma']:
+                # Audio files: 2GB default
+                MAX_FILE_SIZE = int(os.getenv('MAX_AUDIO_UPLOAD_SIZE', 2 * 1024 * 1024 * 1024))
+            elif file_ext_lower in ['.pdf', '.epub']:
+                # PDF/ebooks: 500MB default
+                MAX_FILE_SIZE = int(os.getenv('MAX_DOCUMENT_UPLOAD_SIZE', 500 * 1024 * 1024))
+            else:
+                # Other files (text, etc): 100MB default
+                MAX_FILE_SIZE = int(os.getenv('MAX_UPLOAD_SIZE', 100 * 1024 * 1024))
+            
+            if len(content) > MAX_FILE_SIZE:
+                logger.warning(f"Uploaded file '{original_filename}' exceeds size limit ({len(content)} > {MAX_FILE_SIZE} bytes). Skipping save.")
+                file_handling_errors.append({
+                    "original_filename": original_filename,
+                    "input_ref": input_ref,
+                    "status": "Error",
+                    "error": f"File size ({len(content)} bytes) exceeds maximum allowed size ({MAX_FILE_SIZE} bytes) for {file_ext_lower} files"
+                })
+                continue # Skip to the next file
 
             # Write content to the secure path
             with open(local_file_path, "wb") as buffer:
@@ -1625,6 +1562,10 @@ def _prepare_chunking_options_dict(form_data: AddMediaForm) -> Optional[Dict[str
         # Use specific chunk language, fallback to transcription lang, else None
         'language': form_data.chunk_language or (form_data.transcription_language if form_data.media_type in ['audio', 'video'] else None),
         'custom_chapter_pattern': form_data.custom_chapter_pattern,
+        # Add contextual chunking options
+        'enable_contextual_chunking': form_data.enable_contextual_chunking,
+        'contextual_llm_model': form_data.contextual_llm_model,
+        'context_window_size': form_data.context_window_size
     }
     logging.info(f"Chunking enabled with options: {chunk_options}")
     return chunk_options
@@ -2416,7 +2357,7 @@ async def add_media(
     # # --- Use Dependency Injection for Form Data ---
     form_data: AddMediaForm = Depends(get_add_media_form),
     # --- Keep File and Header Dependencies Separate ---
-    token: str = Header(..., description="Authentication token"), # Placeholder for auth
+    # token: str = Header(..., description="Authentication token"), # Auth handled by get_media_db_for_user
     files: Optional[List[UploadFile]] = File(None, description="List of files to upload"),
     # --- DB Dependency ---
     db: MediaDatabase = Depends(get_media_db_for_user) # Use the correct dependency
@@ -2464,6 +2405,26 @@ async def add_media(
 
             # --- 4. Save Uploaded Files ---
             saved_files_info, file_save_errors = await _save_uploaded_files(files or [], temp_dir_path, validator=file_validator_instance,)
+            
+            # Check for file errors and return appropriate HTTP errors immediately
+            for err_info in file_save_errors:
+                error_msg = err_info.get("error", "")
+                if "exceeds maximum allowed size" in error_msg:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=error_msg
+                    )
+                elif "not allowed for security reasons" in error_msg:
+                    raise HTTPException(
+                        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                        detail=error_msg
+                    )
+                elif "empty" in error_msg.lower():
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=error_msg
+                    )
+            
             # Adapt file saving errors to the standard result format
             for err_info in file_save_errors:
                  results.append({
@@ -2544,7 +2505,47 @@ async def add_media(
                 individual_results = await asyncio.gather(*tasks)
                 results.extend(individual_results)
 
-        # --- 7. Determine Final Status Code and Return Response (Success Path) ---
+        # --- 7. Generate Embeddings if Requested ---
+        logger.info(f"generate_embeddings flag: {form_data.generate_embeddings}")
+        if form_data.generate_embeddings:
+            logger.info("Generating embeddings for successfully processed media items...")
+            embedding_tasks = []
+            
+            for result in results:
+                # Only generate embeddings for successfully stored items
+                if result.get("status") == "Success" and result.get("db_id"):
+                    media_id = result["db_id"]
+                    logger.info(f"Scheduling embedding generation for media ID {media_id}")
+                    
+                    # Add background task for embedding generation
+                    async def generate_embeddings_task(media_id: int):
+                        try:
+                            from tldw_Server_API.app.api.v1.endpoints.media_embeddings import (
+                                generate_embeddings_for_media,
+                                get_media_content
+                            )
+                            
+                            media_content = await get_media_content(media_id, db)
+                            embedding_model = form_data.embedding_model or "Qwen/Qwen3-Embedding-4B-GGUF"
+                            embedding_provider = form_data.embedding_provider or "huggingface"
+                            
+                            result = await generate_embeddings_for_media(
+                                media_id=media_id,
+                                media_content=media_content,
+                                embedding_model=embedding_model,
+                                embedding_provider=embedding_provider,
+                                chunk_size=form_data.chunk_size or 1000,
+                                chunk_overlap=form_data.overlap or 200
+                            )
+                            logger.info(f"Embedding generation result for media {media_id}: {result}")
+                        except Exception as e:
+                            logger.error(f"Failed to generate embeddings for media {media_id}: {e}")
+                    
+                    # Run embedding generation in background
+                    background_tasks.add_task(generate_embeddings_task, media_id)
+                    result["embeddings_scheduled"] = True
+        
+        # --- 8. Determine Final Status Code and Return Response (Success Path) ---
         # TempDirManager handles cleanup automatically on exit from 'with' block
         final_status_code = _determine_final_status(results)
         log_level = "INFO" if final_status_code == status.HTTP_200_OK else "WARNING"
@@ -5426,7 +5427,8 @@ async def debug_schema(
 
         return schema_info
     except Exception as e:
-        return {"error": str(e)}
+        logging.error({"error": str(e)})
+        return {"error": "An internal error has occurred."}
 
 #
 # End of Debugging and Diagnostics
@@ -5527,6 +5529,310 @@ async def _download_url_async(
             except OSError as e:
                 logger.debug(f"Failed to remove temporary file {target_path}: {e}")
         raise RuntimeError(f"Failed to download or save {url}: {e}") from e  # Use RuntimeError for unexpected
+
+####################################################################################
+#
+# Media Analysis Endpoints - For analyzing media content with custom prompts
+#
+####################################################################################
+
+@router.post(
+    "/{media_id}/analyze",
+    summary="Analyze media content with custom prompt",
+    description="Analyze a media item's content using the chat completions API and save the result",
+    response_model=Dict[str, Any],
+    tags=["Media Analysis"]
+)
+async def analyze_media(
+    media_id: int,
+    prompt: str = Body(..., description="The analysis prompt/instructions"),
+    system_prompt: Optional[str] = Body(None, description="Optional system prompt"),
+    save_analysis: bool = Body(True, description="Whether to save the analysis as a new version"),
+    model: Optional[str] = Body(None, description="Optional model override (format: provider/model)"),
+    temperature: Optional[float] = Body(0.7, ge=0, le=2, description="Temperature for the model"),
+    max_tokens: Optional[int] = Body(2000, ge=100, le=8000, description="Maximum tokens for response"),
+    current_user: dict = Depends(verify_token)
+) -> Dict[str, Any]:
+    """
+    Analyze a media item's content using an LLM and optionally save the result.
+    
+    This endpoint:
+    1. Retrieves the media item's content
+    2. Sends it to the chat completions API with the provided prompt
+    3. Optionally saves the analysis as a new DocumentVersion
+    """
+    user_id = current_user.get("user_id", DEFAULT_USER_ID)
+    client_id = request.headers.get("X-Client-ID", "web")
+    
+    try:
+        # Get the media item's content
+        db = MediaDatabase(get_media_db_path(user_id), client_id=client_id)
+        media_details = db.fetch_media_details_single(media_id)
+        
+        if not media_details:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Media item {media_id} not found"
+            )
+        
+        # Extract content
+        content = media_details.get("content", {}).get("content", "")
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Media item has no content to analyze"
+            )
+        
+        # Prepare the chat completion request
+        messages = []
+        
+        if system_prompt:
+            messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
+        
+        # Add the analysis prompt with the media content
+        user_message = f"{prompt}\n\n---\nContent to analyze:\n\n{content}"
+        messages.append({
+            "role": "user",
+            "content": user_message
+        })
+        
+        # Call the chat completions API (internal call)
+        # We'll use the existing chat endpoint logic
+        from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze as llm_analyze
+        
+        # Extract provider and model name if provided
+        api_name = "openai"  # Default
+        model_name = None
+        
+        if model:
+            if "/" in model:
+                api_name, model_name = model.split("/", 1)
+            else:
+                model_name = model
+        
+        # Perform the analysis
+        analysis_result = llm_analyze(
+            api_name=api_name,
+            input_data=content,
+            custom_prompt_arg=prompt,
+            system_message=system_prompt,
+            temp=temperature
+        )
+        
+        # Save the analysis if requested
+        version_info = None
+        if save_analysis:
+            version_info = db.create_document_version(
+                media_id=media_id,
+                content=content,  # Keep original content
+                prompt=prompt,
+                analysis_content=analysis_result
+            )
+            
+        return {
+            "status": "success",
+            "media_id": media_id,
+            "analysis": analysis_result,
+            "version_created": version_info is not None,
+            "version_info": version_info
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing media {media_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to analyze media: {str(e)}"
+        )
+
+
+@router.get(
+    "/{media_id}/analyses",
+    summary="Get all analyses for a media item",
+    description="Retrieve all analysis versions for a specific media item",
+    response_model=List[Dict[str, Any]],
+    tags=["Media Analysis"]
+)
+async def get_media_analyses(
+    media_id: int,
+    include_content: bool = Query(False, description="Include full analysis content"),
+    current_user: dict = Depends(verify_token)
+) -> List[Dict[str, Any]]:
+    """
+    Get all analyses (DocumentVersions with analysis_content) for a media item.
+    """
+    user_id = current_user.get("user_id", DEFAULT_USER_ID)
+    client_id = request.headers.get("X-Client-ID", "web")
+    
+    try:
+        db = MediaDatabase(get_media_db_path(user_id), client_id=client_id)
+        
+        # Get all versions for this media item
+        versions = db.get_document_versions(media_id, include_content=include_content)
+        
+        # Filter to only versions with analysis content
+        analyses = []
+        for version in versions:
+            if version.get("analysis_content"):
+                analyses.append({
+                    "version_id": version.get("id"),
+                    "version_number": version.get("version_number"),
+                    "created_at": version.get("created_at"),
+                    "prompt": version.get("prompt"),
+                    "analysis_content": version.get("analysis_content") if include_content else None,
+                    "has_analysis": True
+                })
+        
+        return analyses
+        
+    except Exception as e:
+        logger.error(f"Error fetching analyses for media {media_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch analyses: {str(e)}"
+        )
+
+
+@router.put(
+    "/{media_id}/analyses/{version_id}",
+    summary="Update an existing analysis",
+    description="Update the analysis content of a specific document version",
+    response_model=Dict[str, Any],
+    tags=["Media Analysis"]
+)
+async def update_media_analysis(
+    media_id: int,
+    version_id: int,
+    analysis_content: str = Body(..., description="Updated analysis content"),
+    prompt: Optional[str] = Body(None, description="Updated prompt"),
+    current_user: dict = Depends(verify_token)
+) -> Dict[str, Any]:
+    """
+    Update an existing analysis for a media item.
+    """
+    user_id = current_user.get("user_id", DEFAULT_USER_ID)
+    client_id = request.headers.get("X-Client-ID", "web")
+    
+    try:
+        db = MediaDatabase(get_media_db_path(user_id), client_id=client_id)
+        
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if version exists and belongs to this media
+            cursor.execute("""
+                SELECT id FROM DocumentVersions 
+                WHERE id = ? AND media_id = ? AND deleted = 0
+            """, (version_id, media_id))
+            
+            if not cursor.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Version {version_id} not found for media {media_id}"
+                )
+            
+            # Update the analysis
+            update_fields = ["analysis_content = ?"]
+            update_values = [analysis_content]
+            
+            if prompt is not None:
+                update_fields.append("prompt = ?")
+                update_values.append(prompt)
+            
+            update_fields.append("last_modified = ?")
+            update_values.append(datetime.utcnow().isoformat())
+            
+            update_values.extend([version_id, media_id])
+            
+            cursor.execute(f"""
+                UPDATE DocumentVersions 
+                SET {", ".join(update_fields)}
+                WHERE id = ? AND media_id = ?
+            """, update_values)
+            
+            conn.commit()
+            
+        return {
+            "status": "success",
+            "media_id": media_id,
+            "version_id": version_id,
+            "message": "Analysis updated successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating analysis for media {media_id}, version {version_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update analysis: {str(e)}"
+        )
+
+
+@router.delete(
+    "/{media_id}/analyses/{version_id}",
+    summary="Delete an analysis",
+    description="Soft delete a specific analysis version",
+    response_model=Dict[str, Any],
+    tags=["Media Analysis"]
+)
+async def delete_media_analysis(
+    media_id: int,
+    version_id: int,
+    current_user: dict = Depends(verify_token)
+) -> Dict[str, Any]:
+    """
+    Soft delete an analysis version for a media item.
+    """
+    user_id = current_user.get("user_id", DEFAULT_USER_ID)
+    client_id = request.headers.get("X-Client-ID", "web")
+    
+    try:
+        db = MediaDatabase(get_media_db_path(user_id), client_id=client_id)
+        
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check if version exists and belongs to this media
+            cursor.execute("""
+                SELECT id FROM DocumentVersions 
+                WHERE id = ? AND media_id = ? AND deleted = 0
+            """, (version_id, media_id))
+            
+            if not cursor.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Version {version_id} not found for media {media_id}"
+                )
+            
+            # Soft delete the version
+            cursor.execute("""
+                UPDATE DocumentVersions 
+                SET deleted = 1, last_modified = ?
+                WHERE id = ? AND media_id = ?
+            """, (datetime.utcnow().isoformat(), version_id, media_id))
+            
+            conn.commit()
+            
+        return {
+            "status": "success",
+            "media_id": media_id,
+            "version_id": version_id,
+            "message": "Analysis deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting analysis for media {media_id}, version {version_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete analysis: {str(e)}"
+        )
 
 #
 # End of media.py

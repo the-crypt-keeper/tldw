@@ -3,7 +3,7 @@ Type definitions and base interfaces for the RAG service.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import List, Dict, Any, Optional, Protocol, TypeVar, Generic
 import numpy as np
@@ -11,11 +11,70 @@ import numpy as np
 
 class DataSource(Enum):
     """Supported data sources for RAG."""
-    MEDIA_DB = auto()
-    CHAT_HISTORY = auto()
-    NOTES = auto()
-    CHARACTER_CARDS = auto()
-    WEB_CONTENT = auto()
+    MEDIA_DB = "media_db"
+    CHAT_HISTORY = "chat_history"
+    NOTES = "notes"
+    CHARACTER_CARDS = "character_cards"
+    WEB_CONTENT = "web_content"
+    PROMPTS = "prompts"  # Add missing PROMPTS source
+
+
+class CitationType(Enum):
+    """Type of citation match."""
+    EXACT = "exact"          # Exact phrase match
+    SEMANTIC = "semantic"    # Semantic similarity
+    FUZZY = "fuzzy"         # Fuzzy/partial match
+    KEYWORD = "keyword"      # Keyword/FTS5 match
+
+
+@dataclass
+class Citation:
+    """
+    Represents a citation to a source document.
+    
+    Attributes:
+        document_id: Unique identifier of the source document
+        document_title: Human-readable title of the document
+        chunk_id: ID of the specific chunk within the document
+        text: The actual text snippet being cited
+        start_char: Character offset in the original document
+        end_char: End character offset in the original document
+        confidence: Confidence score (0-1) for this citation
+        match_type: Type of match that produced this citation
+        metadata: Additional metadata (author, date, URL, etc.)
+    """
+    document_id: str
+    document_title: str
+    chunk_id: str
+    text: str
+    start_char: int
+    end_char: int
+    confidence: float
+    match_type: CitationType
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def __post_init__(self):
+        """Validate citation data."""
+        if self.confidence < 0 or self.confidence > 1:
+            raise ValueError(f"Confidence must be between 0 and 1, got {self.confidence}")
+        if self.start_char < 0:
+            raise ValueError(f"start_char must be non-negative, got {self.start_char}")
+        if self.end_char < self.start_char:
+            raise ValueError(f"end_char must be >= start_char, got start={self.start_char}, end={self.end_char}")
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return {
+            "document_id": self.document_id,
+            "document_title": self.document_title,
+            "chunk_id": self.chunk_id,
+            "text": self.text,
+            "start_char": self.start_char,
+            "end_char": self.end_char,
+            "confidence": self.confidence,
+            "match_type": self.match_type.value,
+            "metadata": self.metadata
+        }
 
 
 @dataclass
@@ -33,6 +92,18 @@ class Document:
     score: float = 0.0  # Relevance score (set during retrieval)
     embedding: Optional[np.ndarray] = None  # Vector embedding if available
     
+    # Citation support
+    citations: List[Citation] = field(default_factory=list)
+    
+    # Parent document support
+    parent_id: Optional[str] = None  # ID of parent document if this is a chunk
+    children_ids: List[str] = field(default_factory=list)  # IDs of child chunks
+    chunk_index: Optional[int] = None  # Position in parent document
+    
+    # Character positions for citation tracking
+    start_char: Optional[int] = None  # Start position in original document
+    end_char: Optional[int] = None  # End position in original document
+    
     def __hash__(self):
         return hash(self.id)
     
@@ -40,6 +111,14 @@ class Document:
         if not isinstance(other, Document):
             return False
         return self.id == other.id
+    
+    def add_citation(self, citation: Citation) -> None:
+        """Add a citation to this document."""
+        self.citations.append(citation)
+    
+    def get_citations_by_type(self, citation_type: CitationType) -> List[Citation]:
+        """Get citations of a specific type."""
+        return [c for c in self.citations if c.match_type == citation_type]
 
 
 @dataclass
@@ -49,6 +128,19 @@ class SearchResult:
     query: str
     search_type: str  # "vector", "fts", "hybrid"
     metadata: Dict[str, Any] = None  # Additional search metadata
+    
+    # Enhanced features
+    citations: List[Citation] = field(default_factory=list)
+    expanded_context: Optional[str] = None  # Context expanded with parent documents
+    query_variations: List[str] = field(default_factory=list)  # Query expansion results
+
+
+@dataclass
+class EnhancedSearchResult(SearchResult):
+    """Enhanced search result with additional features."""
+    parent_documents: List[Document] = field(default_factory=list)
+    reranked: bool = False
+    diversity_score: float = 0.0
 
 
 @dataclass
@@ -58,6 +150,11 @@ class RAGContext:
     combined_text: str
     total_tokens: int
     metadata: Dict[str, Any]
+    
+    # Enhanced features
+    citations: List[Citation] = field(default_factory=list)
+    parent_context: Optional[str] = None  # Expanded context from parent documents
+    structured_sections: Dict[str, str] = field(default_factory=dict)  # Structured content
 
 
 @dataclass
@@ -67,6 +164,10 @@ class RAGResponse:
     context: RAGContext
     sources: List[Document]
     metadata: Dict[str, Any]  # Timing, model used, etc.
+    
+    # Enhanced features
+    citations: List[Citation] = field(default_factory=list)
+    confidence_score: float = 0.0  # Overall confidence in the response
 
 
 # Protocol definitions for better type checking

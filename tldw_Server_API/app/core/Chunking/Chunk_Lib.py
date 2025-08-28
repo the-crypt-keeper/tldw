@@ -1,14 +1,25 @@
 # Chunk_Lib.py
 #########################################
+# ⚠️ DEPRECATED - V1 IMPLEMENTATION ⚠️
+# This is the legacy V1 chunking implementation.
+# All production code has been migrated to use V2 through the module's public API.
+# 
+# To use chunking in your code:
+#   from tldw_Server_API.app.core.Chunking import improved_chunking_process
+# 
+# This file is maintained for test compatibility only and will be removed in v2.0.0
+#########################################
 # Chunking Library
 # This library is used to perform chunking of input files.
-# Currently, uses naive approaches. Nothing fancy.
+# Includes both basic and enhanced chunking approaches.
 #
 ####
 # Import necessary libraries
 import hashlib
 import json
 import re
+from enum import Enum
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple, Union, Callable, Generator
 import xml.etree.ElementTree as ET
 #
@@ -20,11 +31,20 @@ import nltk
 from nltk.tokenize import sent_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from loguru import logger
 #
 # Import Local
 from tldw_Server_API.app.core.Utils.Utils import logging
 from tldw_Server_API.app.core.config import load_and_log_configs
 from tldw_Server_API.app.core.config import global_default_chunk_language
+
+# Try to import table serialization (optional dependency)
+try:
+    from tldw_Server_API.app.core.RAG.rag_service.table_serialization import TableProcessor, TableFormat
+    TABLE_SERIALIZATION_AVAILABLE = True
+except ImportError:
+    TABLE_SERIALIZATION_AVAILABLE = False
+    logger.warning("Table serialization module not available. Table extraction features will be limited.")
 #
 #######################################################################################################################
 # Custom Exceptions
@@ -43,6 +63,56 @@ class InvalidInputError(ChunkingError):
 class LanguageDetectionError(ChunkingError):
     """Raised when language detection fails critically."""
     pass
+
+#######################################################################################################################
+# Enhanced Chunking Classes
+
+class ChunkType(Enum):
+    """Types of content chunks."""
+    TEXT = "text"
+    CODE = "code"
+    TABLE = "table"
+    HEADER = "header"
+    LIST = "list"
+    PARAGRAPH = "paragraph"
+
+
+@dataclass
+class EnhancedChunk:
+    """Enhanced chunk with type and position tracking."""
+    id: str
+    content: str
+    chunk_type: ChunkType
+    start_char: int  # Position in original document
+    end_char: int    # Position in original document
+    chunk_index: int
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    parent_id: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "id": self.id,
+            "content": self.content,
+            "chunk_type": self.chunk_type.value,
+            "start_char": self.start_char,
+            "end_char": self.end_char,
+            "chunk_index": self.chunk_index,
+            "metadata": self.metadata,
+            "parent_id": self.parent_id
+        }
+
+
+@dataclass
+class TransformationRecord:
+    """Track position transformations during processing."""
+    operation: str
+    original_start: int
+    original_end: int
+    new_start: int
+    new_end: int
+    content_removed: Optional[str] = None
+    content_added: Optional[str] = None
 
 #######################################################################################################################
 # Config Settings & NLTK
@@ -115,6 +185,10 @@ class Chunker:
             tokenizer_name_or_path (str): Name or path of the Hugging Face tokenizer to use.
                                            Defaults to "gpt2".
         """
+        # Initialize caches for performance
+        self._language_cache: Dict[int, str] = {}  # Cache language detection by text hash
+        self._cache_size_limit = 100  # Limit cache size to prevent memory issues
+        
         # Initialize options: start with defaults, then update with provided options
         self.options = DEFAULT_CHUNK_OPTIONS.copy()
         if options:
@@ -139,16 +213,55 @@ class Chunker:
 
             self.options.update(options)
 
+        # Enhanced options for advanced features
+        self.enhanced_options = {
+            "clean_pdf_artifacts": False,  # Default to False for backward compatibility
+            "preserve_code_blocks": False,
+            "preserve_tables": False,
+            "structure_aware": False,
+            "track_positions": False,
+            "preserve_headers": False,
+            "min_code_block_size": 50,
+            "header_levels": 3,
+            "table_serialize_method": "hybrid"
+        }
+        
+        # Update enhanced options from provided options
+        if options:
+            for key in self.enhanced_options:
+                if key in options:
+                    self.enhanced_options[key] = options[key]
+
         logging.debug(f"Chunker initialized with options: {self.options}")
+        logging.debug(f"Enhanced options: {self.enhanced_options}")
 
         try:
             self.tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(tokenizer_name_or_path)
             logging.info(f"Tokenizer '{tokenizer_name_or_path}' loaded successfully.")
         except Exception as e:
-            logging.error(f"Failed to load tokenizer '{tokenizer_name_or_path}': {e}. Some token-based methods may fail.")
-            # Fallback or raise error? For now, set to None and let methods handle it.
+            logging.warning(f"Failed to load tokenizer '{tokenizer_name_or_path}': {e}. Token-based methods will not be available.")
+            # Set to None but warn user - token-based methods will check and raise appropriate errors
             self.tokenizer = None
-            # raise ChunkingError(f"Failed to load tokenizer '{tokenizer_name_or_path}': {e}") from e
+        
+        # Initialize table processor if available and tables should be preserved
+        self.table_processor = None
+        if TABLE_SERIALIZATION_AVAILABLE and self.enhanced_options.get("preserve_tables"):
+            try:
+                from tldw_Server_API.app.core.RAG.rag_service.table_serialization import TableProcessor
+                self.table_processor = TableProcessor(
+                    self.enhanced_options.get("table_serialize_method", "hybrid")
+                )
+                logger.info("Table processor initialized for table extraction")
+            except Exception as e:
+                logger.warning(f"Failed to initialize table processor: {e}")
+                self.table_processor = None
+        
+        # Position tracking for enhanced chunking
+        self.transformations: List[TransformationRecord] = []
+        
+        # Compile regex patterns for enhanced features if needed
+        if any(self.enhanced_options.values()):
+            self._compile_enhanced_patterns()
 
     def _get_option(self, key: str, default_override: Optional[Any] = None) -> Any:
         """Helper to get an option, allowing for a dynamic default."""
@@ -161,7 +274,7 @@ class Chunker:
 
     def detect_language(self, text: str) -> str:
         """
-        Detects the language of the given text.
+        Detects the language of the given text with caching.
 
         Args:
             text (str): The text to detect language from.
@@ -173,19 +286,41 @@ class Chunker:
         if not text or not text.strip():
             logging.warning("Attempted to detect language from empty or whitespace-only text. Defaulting to 'en'.")
             return self._get_option('language', 'en') # Use option if available, else 'en'
+        
+        # Use first 1000 chars for language detection to improve cache efficiency
+        sample_text = text[:1000] if len(text) > 1000 else text
+        text_hash = hash(sample_text)
+        
+        # Check cache first
+        if text_hash in self._language_cache:
+            cached_lang = self._language_cache[text_hash]
+            logging.debug(f"Using cached language detection: {cached_lang}")
+            return cached_lang
+        
         try:
             # langdetect can be sensitive to very short texts.
             # Add a minimum length check if it becomes an issue.
             # For example: if len(text) < 20: return 'en' (or self.options.get('language', 'en'))
-            lang = detect(text)
+            lang = detect(sample_text)
             logging.debug(f"Detected language: {lang}")
+            
+            # Cache the result (with size limit)
+            if len(self._language_cache) >= self._cache_size_limit:
+                # Remove oldest entries (simple FIFO)
+                self._language_cache.pop(next(iter(self._language_cache)))
+            self._language_cache[text_hash] = lang
+            
             return lang
         except LangDetectException as e:
             logging.warning(f"Language detection failed: {e}. Defaulting to 'en'.")
-            return self._get_option('language', 'en')
+            default_lang = self._get_option('language', 'en')
+            self._language_cache[text_hash] = default_lang  # Cache the default too
+            return default_lang
         except Exception as e_gen:
             logging.error(f"Unexpected error during language detection: {e_gen}. Defaulting to 'en'.")
-            return self._get_option('language', 'en')
+            default_lang = self._get_option('language', 'en')
+            self._language_cache[text_hash] = default_lang  # Cache the default too
+            return default_lang
 
 
     def _ensure_language(self, text: str, language_option: Optional[str] = None) -> str:
@@ -206,6 +341,73 @@ class Chunker:
         Strips whitespace from each chunk and removes empty chunks.
         """
         return [chunk.strip() for chunk in chunks if chunk and chunk.strip()]
+    
+    def chunk_text_generator(self,
+                            text: str,
+                            method: Optional[str] = None,
+                            chunk_size: Optional[int] = None) -> Generator[str, None, None]:
+        """
+        Memory-efficient generator for chunking large texts.
+        
+        Args:
+            text (str): The text to chunk.
+            method (Optional[str]): Override the chunking method.
+            chunk_size (Optional[int]): Override the chunk size.
+            
+        Yields:
+            str: Individual chunks
+        """
+        # Use regular chunk_text for structured methods (JSON, XML, etc)
+        structured_methods = ['json', 'xml', 'ebook_chapters', 'rolling_summarize']
+        if method in structured_methods or self._get_option('method', 'words') in structured_methods:
+            # These methods need the full text, so yield all at once
+            for chunk in self.chunk_text(text, method):
+                yield chunk
+            return
+        
+        # For text-based methods, process in streaming fashion
+        chunk_method = method if method else self._get_option('method', 'words')
+        max_size = chunk_size if chunk_size else self._get_option('max_size', 400)
+        overlap = self._get_option('overlap', 200)
+        
+        # Process text in blocks to avoid loading everything into memory at once
+        BLOCK_SIZE = 1_000_000  # 1MB blocks
+        
+        if chunk_method == 'words':
+            buffer = []
+            word_count = 0
+            
+            for i in range(0, len(text), BLOCK_SIZE):
+                block = text[i:i + BLOCK_SIZE]
+                # Find last complete word boundary
+                if i + BLOCK_SIZE < len(text):
+                    last_space = block.rfind(' ')
+                    if last_space != -1:
+                        next_block_start = i + last_space + 1
+                        block = block[:last_space]
+                    else:
+                        next_block_start = i + BLOCK_SIZE
+                else:
+                    next_block_start = len(text)
+                
+                words = block.split()
+                for word in words:
+                    buffer.append(word)
+                    word_count += 1
+                    
+                    if word_count >= max_size:
+                        yield ' '.join(buffer[:max_size])
+                        # Keep overlap words
+                        buffer = buffer[max_size - overlap:] if overlap > 0 else []
+                        word_count = len(buffer)
+                
+                # Update position for next iteration
+                if i + BLOCK_SIZE < len(text):
+                    i = next_block_start - BLOCK_SIZE  # Adjust for the loop increment
+            
+            # Yield remaining words
+            if buffer:
+                yield ' '.join(buffer)
 
     def chunk_text(self,
                    text: str,
@@ -228,9 +430,32 @@ class Chunker:
             InvalidChunkingMethodError: If the method is not supported.
             ChunkingError: For errors during the chunking process.
         """
+        # Input validation
+        MAX_TEXT_SIZE = 100_000_000  # 100MB limit
+        if text is None:
+            logging.warning("Received None as text input. Returning empty list.")
+            return []
+        if not isinstance(text, str):
+            raise InvalidInputError(f"Expected string input, got {type(text).__name__}")
+        if len(text) > MAX_TEXT_SIZE:
+            raise InvalidInputError(f"Text size ({len(text)} bytes) exceeds maximum allowed size ({MAX_TEXT_SIZE} bytes)")
+        if not text.strip():
+            logging.debug("Empty text provided to chunk_text. Returning empty list.")
+            return []
+        
         chunk_method = method if method else self._get_option('method', 'words')
         max_size = self._get_option('max_size') # Already int from __init__
         overlap = self._get_option('overlap')   # Already int from __init__
+        
+        # Validate chunk parameters
+        if max_size <= 0:
+            raise ValueError(f"max_size must be positive, got {max_size}")
+        if overlap < 0:
+            raise ValueError(f"overlap cannot be negative, got {overlap}")
+        if overlap >= max_size:
+            logging.warning(f"Overlap ({overlap}) >= max_size ({max_size}). Setting overlap to max_size - 1")
+            overlap = max_size - 1
+            
         language = self._ensure_language(text, self._get_option('language')) # Ensure language is determined
 
         logging.debug(f"Chunking text with method='{chunk_method}', max_size={max_size}, overlap={overlap}, language='{language}'")
@@ -348,9 +573,8 @@ class Chunker:
 
 
         chunks = []
-        # Ensure step is at least 1 to prevent infinite loops if max_words equals overlap (though handled above)
-        step = max_words - overlap
-        if step <= 0: step = max_words # Should not happen if overlap < max_words
+        # Ensure step is at least 1 to prevent infinite loops
+        step = max(1, max_words - overlap)
 
         for i in range(0, len(words), step):
             chunk_words = words[i : i + max_words]
@@ -425,8 +649,7 @@ class Chunker:
             overlap = 0
 
         chunks = []
-        step = max_sentences - overlap
-        if step <= 0: step = max_sentences
+        step = max(1, max_sentences - overlap)
 
         for i in range(0, len(sentences), step):
             chunk_sentences = sentences[i : i + max_sentences]
@@ -450,8 +673,7 @@ class Chunker:
             overlap = 0
 
         chunks = []
-        step = max_paragraphs - overlap
-        if step <= 0: step = max_paragraphs
+        step = max(1, max_paragraphs - overlap)
 
         for i in range(0, len(paragraphs), step):
             chunk_paragraphs = paragraphs[i : i + max_paragraphs]
@@ -478,9 +700,7 @@ class Chunker:
             logging.warning(f"Token overlap {overlap} >= max_tokens {max_tokens}. Setting overlap to 0.")
             overlap = 0
 
-        step = max_tokens - overlap
-        if step <= 0: step = max_tokens
-
+        step = max(1, max_tokens - overlap)
 
         chunks = []
         for i in range(0, len(tokens), step):
@@ -661,6 +881,11 @@ class Chunker:
 
     def _chunk_text_by_json(self, text: str, max_size: int, overlap: int) -> List[Dict[str, Any]]:
         logging.debug("chunk_text_by_json (method) started...")
+        # Limit JSON size to prevent DoS
+        MAX_JSON_SIZE = 50_000_000  # 50MB limit for JSON text
+        if len(text) > MAX_JSON_SIZE:
+            raise InvalidInputError(f"JSON text size ({len(text)} bytes) exceeds maximum allowed size ({MAX_JSON_SIZE} bytes)")
+        
         try:
             json_data = json.loads(text)
         except json.JSONDecodeError as e:
@@ -688,8 +913,7 @@ class Chunker:
 
         chunks_output = []
         total_items = len(json_list)
-        step = max_size - overlap
-        if step <= 0: step = max_size
+        step = max(1, max_size - overlap)
 
         for i in range(0, total_items, step):
             chunk_data = json_list[i : i + max_size]
@@ -729,8 +953,7 @@ class Chunker:
         total_keys = len(all_keys)
 
         chunks_output = []
-        step = max_size - overlap
-        if step <= 0: step = max_size
+        step = max(1, max_size - overlap)
 
         # Preserve other parts of the original dictionary
         preserved_data_shell = {k: v for k, v in json_dict.items() if k != chunkable_key}
@@ -1241,11 +1464,586 @@ class Chunker:
 
         return combined_texts_for_llm, original_indices, dropped_count
 
+    # ================== ENHANCED CHUNKING METHODS ==================
+    
+    def _compile_enhanced_patterns(self):
+        """Pre-compile regex patterns for enhanced features."""
+        # PDF artifact patterns
+        self.page_number_pattern = re.compile(r'\n\s*\d+\s*\n')
+        self.page_marker_pattern = re.compile(r'Page \d+ of \d+')
+        self.hyphenation_pattern = re.compile(r'(\w+)-\n(\w+)')
+        
+        # Structure patterns
+        self.header_pattern = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
+        self.code_block_pattern = re.compile(r'```[\w]*\n(.*?)\n```', re.DOTALL)
+        self.table_pattern = re.compile(r'((?:^\|[^\n]+\|$\n)+)', re.MULTILINE)
+        
+        # List patterns
+        self.bullet_list_pattern = re.compile(r'^[\*\-\+]\s+', re.MULTILINE)
+        self.numbered_list_pattern = re.compile(r'^\d+\.\s+', re.MULTILINE)
+    
+    def chunk_text_enhanced(
+        self,
+        text: str,
+        chunk_size: Optional[int] = None,
+        overlap: Optional[int] = None,
+        doc_id: Optional[str] = None
+    ) -> List[EnhancedChunk]:
+        """
+        Enhanced text chunking with structure preservation.
+        
+        Args:
+            text: Text to chunk
+            chunk_size: Target chunk size (uses max_size from options if not provided)
+            overlap: Overlap between chunks (uses overlap from options if not provided)
+            doc_id: Document ID for parent tracking
+            
+        Returns:
+            List of enhanced chunks with metadata
+        """
+        # Use provided values or fall back to options
+        chunk_size = chunk_size if chunk_size is not None else self._get_option('max_size', 512)
+        overlap = overlap if overlap is not None else self._get_option('overlap', 128)
+        
+        # Reset transformations for new document
+        self.transformations = []
+        
+        # Step 1: Clean PDF artifacts if enabled
+        if self.enhanced_options.get("clean_pdf_artifacts"):
+            text, pdf_transforms = self._clean_pdf_artifacts_tracked(text)
+            self.transformations.extend(pdf_transforms)
+        
+        # Step 2: Extract special blocks
+        extracted_blocks = {}
+        
+        if self.enhanced_options.get("preserve_code_blocks"):
+            text, code_blocks = self._extract_code_blocks_tracked(text)
+            extracted_blocks["code"] = code_blocks
+        
+        if self.enhanced_options.get("preserve_tables"):
+            text, table_blocks = self._extract_tables_tracked(text)
+            extracted_blocks["tables"] = table_blocks
+        
+        # Step 3: Perform structure-aware chunking
+        if self.enhanced_options.get("structure_aware"):
+            chunks = self._structure_aware_chunking(
+                text, chunk_size, overlap, doc_id
+            )
+        else:
+            # Fall back to simple chunking
+            chunks = self._simple_enhanced_chunking(
+                text, chunk_size, overlap, doc_id
+            )
+        
+        # Step 4: Add extracted blocks as separate chunks
+        chunk_index = len(chunks)
+        
+        # Add code blocks
+        if "code" in extracted_blocks:
+            for code_block in extracted_blocks["code"]:
+                chunks.append(self._create_code_chunk(
+                    code_block, chunk_index, doc_id
+                ))
+                chunk_index += 1
+        
+        # Add table chunks
+        if "tables" in extracted_blocks:
+            for table_block in extracted_blocks["tables"]:
+                chunks.append(self._create_table_chunk(
+                    table_block, chunk_index, doc_id
+                ))
+                chunk_index += 1
+        
+        # Step 5: Apply position tracking if enabled
+        if self.enhanced_options.get("track_positions"):
+            self._apply_position_transformations(chunks)
+        
+        logger.debug(f"Created {len(chunks)} enhanced chunks from {len(text)} characters")
+        
+        return chunks
+    
+    def _clean_pdf_artifacts_tracked(self, text: str) -> Tuple[str, List[TransformationRecord]]:
+        """
+        Clean PDF artifacts with position tracking.
+        
+        Returns:
+            Tuple of (cleaned_text, transformations)
+        """
+        transformations = []
+        original_text = text
+        current_offset = 0
+        
+        # Remove page numbers
+        for match in self.page_number_pattern.finditer(original_text):
+            start = match.start() - current_offset
+            end = match.end() - current_offset
+            
+            transformations.append(TransformationRecord(
+                operation="remove_page_number",
+                original_start=match.start(),
+                original_end=match.end(),
+                new_start=start,
+                new_end=start,  # Removed, so end = start
+                content_removed=match.group()
+            ))
+            
+            text = text[:start] + text[end:]
+            current_offset += (end - start)
+        
+        # Fix hyphenation
+        hyphen_fixes = []
+        for match in self.hyphenation_pattern.finditer(text):
+            word = match.group(1) + match.group(2)
+            hyphen_fixes.append((match.start(), match.end(), word))
+        
+        # Apply hyphenation fixes in reverse to maintain positions
+        for start, end, word in reversed(hyphen_fixes):
+            transformations.append(TransformationRecord(
+                operation="fix_hyphenation",
+                original_start=start,
+                original_end=end,
+                new_start=start,
+                new_end=start + len(word),
+                content_removed=text[start:end],
+                content_added=word
+            ))
+            text = text[:start] + word + text[end:]
+        
+        # Clean excessive whitespace
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r' {2,}', ' ', text)
+        
+        # Fix common OCR errors
+        ocr_replacements = [
+            ('ﬁ', 'fi'),
+            ('ﬂ', 'fl'),
+            ('ﬀ', 'ff'),
+            ('ﬃ', 'ffi'),
+            ('ﬄ', 'ffl')
+        ]
+        
+        for old, new in ocr_replacements:
+            text = text.replace(old, new)
+        
+        return text, transformations
+    
+    def _extract_code_blocks_tracked(self, text: str) -> Tuple[str, List[Dict[str, Any]]]:
+        """
+        Extract code blocks with position tracking.
+        
+        Returns:
+            Tuple of (text_with_placeholders, code_blocks)
+        """
+        code_blocks = []
+        
+        matches = list(self.code_block_pattern.finditer(text))
+        
+        # Process in reverse to maintain positions
+        for i, match in enumerate(reversed(matches)):
+            block_id = f"__CODE_BLOCK_{len(matches) - i - 1}__"
+            
+            # Extract language hint if present
+            first_line = text[match.start():match.start() + 20]
+            language = "unknown"
+            if "```" in first_line:
+                lang_match = re.match(r'```(\w+)', first_line)
+                if lang_match:
+                    language = lang_match.group(1)
+            
+            code_blocks.append({
+                "id": block_id,
+                "content": match.group(0),
+                "code_content": match.group(1),
+                "language": language,
+                "start_pos": match.start(),
+                "end_pos": match.end()
+            })
+            
+            text = text[:match.start()] + block_id + text[match.end():]
+        
+        return text, code_blocks
+    
+    def _extract_tables_tracked(self, text: str) -> Tuple[str, List[Dict[str, Any]]]:
+        """
+        Extract and serialize tables with position tracking.
+        
+        Returns:
+            Tuple of (text_with_placeholders, table_blocks)
+        """
+        table_blocks = []
+        
+        matches = list(self.table_pattern.finditer(text))
+        
+        for i, match in enumerate(reversed(matches)):
+            table_text = match.group(0)
+            table_id = f"__TABLE_{len(matches) - i - 1}__"
+            
+            if self.table_processor:
+                try:
+                    # Use table processor to serialize
+                    from tldw_Server_API.app.core.RAG.rag_service.table_serialization import TableFormat
+                    serialized = self.table_processor.process_table(
+                        table_text,
+                        TableFormat.MARKDOWN
+                    )
+                    
+                    table_blocks.append({
+                        "id": table_id,
+                        "content": table_text,
+                        "serialized": serialized,
+                        "start_pos": match.start(),
+                        "end_pos": match.end()
+                    })
+                    
+                    # Create informative placeholder
+                    search_text = serialized.get("search_text", "")[:100]
+                    placeholder = f"{table_id}\n[Table: {search_text}...]"
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to serialize table: {e}")
+                    placeholder = table_id
+                    table_blocks.append({
+                        "id": table_id,
+                        "content": table_text,
+                        "serialized": None,
+                        "start_pos": match.start(),
+                        "end_pos": match.end()
+                    })
+            else:
+                # No table processor available
+                placeholder = table_id
+                table_blocks.append({
+                    "id": table_id,
+                    "content": table_text,
+                    "serialized": None,
+                    "start_pos": match.start(),
+                    "end_pos": match.end()
+                })
+            
+            text = text[:match.start()] + placeholder + text[match.end():]
+        
+        return text, table_blocks
+    
+    def _structure_aware_chunking(
+        self,
+        text: str,
+        chunk_size: int,
+        overlap: int,
+        doc_id: Optional[str]
+    ) -> List[EnhancedChunk]:
+        """
+        Perform structure-aware chunking respecting headers and sections.
+        """
+        chunks = []
+        
+        # Split by headers
+        sections = self._split_by_headers(text)
+        
+        chunk_index = 0
+        current_position = 0
+        
+        for section in sections:
+            section_text = section["text"]
+            section_type = section["type"]
+            header_level = section.get("level", 0)
+            
+            # Small sections become single chunks
+            if len(section_text) <= chunk_size:
+                chunk_type = ChunkType.HEADER if "header" in section_type else ChunkType.TEXT
+                
+                chunks.append(EnhancedChunk(
+                    id=self._generate_chunk_id(doc_id, chunk_index),
+                    content=section_text,
+                    chunk_type=chunk_type,
+                    start_char=current_position,
+                    end_char=current_position + len(section_text),
+                    chunk_index=chunk_index,
+                    metadata={
+                        "section_type": section_type,
+                        "header_level": header_level
+                    },
+                    parent_id=doc_id
+                ))
+                chunk_index += 1
+            else:
+                # Large sections need sub-chunking
+                sub_chunks = self._chunk_by_sentences_enhanced(
+                    section_text,
+                    chunk_size,
+                    overlap,
+                    chunk_index,
+                    current_position,
+                    doc_id
+                )
+                
+                # Add section metadata to sub-chunks
+                for sub_chunk in sub_chunks:
+                    sub_chunk.metadata["section_type"] = section_type
+                    sub_chunk.metadata["header_level"] = header_level
+                
+                chunks.extend(sub_chunks)
+                chunk_index += len(sub_chunks)
+            
+            current_position += len(section_text)
+        
+        return chunks
+    
+    def _split_by_headers(self, text: str) -> List[Dict[str, Any]]:
+        """Split text by markdown headers."""
+        sections = []
+        
+        lines = text.split('\n')
+        current_section = []
+        current_type = "text"
+        current_level = 0
+        
+        for line in lines:
+            header_match = self.header_pattern.match(line)
+            
+            if header_match:
+                # Save previous section
+                if current_section:
+                    sections.append({
+                        "text": '\n'.join(current_section),
+                        "type": current_type,
+                        "level": current_level
+                    })
+                
+                # Start new header section
+                current_section = [line]
+                current_level = len(header_match.group(1))
+                current_type = f"header_{current_level}"
+            else:
+                current_section.append(line)
+        
+        # Add last section
+        if current_section:
+            sections.append({
+                "text": '\n'.join(current_section),
+                "type": current_type,
+                "level": current_level
+            })
+        
+        return sections if sections else [{"text": text, "type": "text", "level": 0}]
+    
+    def _chunk_by_sentences_enhanced(
+        self,
+        text: str,
+        chunk_size: int,
+        overlap: int,
+        start_index: int,
+        start_position: int,
+        doc_id: Optional[str]
+    ) -> List[EnhancedChunk]:
+        """Chunk text by sentence boundaries for enhanced chunking."""
+        chunks = []
+        
+        # Simple sentence splitting
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        
+        current_chunk = []
+        current_size = 0
+        chunk_index = start_index
+        
+        for sentence in sentences:
+            sentence_size = len(sentence)
+            
+            if current_size + sentence_size > chunk_size and current_chunk:
+                # Create chunk
+                chunk_text = ' '.join(current_chunk)
+                
+                chunks.append(EnhancedChunk(
+                    id=self._generate_chunk_id(doc_id, chunk_index),
+                    content=chunk_text,
+                    chunk_type=ChunkType.TEXT,
+                    start_char=start_position,
+                    end_char=start_position + len(chunk_text),
+                    chunk_index=chunk_index,
+                    metadata={"chunking_method": "sentence"},
+                    parent_id=doc_id
+                ))
+                
+                # Handle overlap
+                if overlap > 0:
+                    overlap_sentences = []
+                    overlap_size = 0
+                    for sent in reversed(current_chunk):
+                        overlap_size += len(sent)
+                        overlap_sentences.insert(0, sent)
+                        if overlap_size >= overlap:
+                            break
+                    current_chunk = overlap_sentences
+                    current_size = overlap_size
+                else:
+                    current_chunk = []
+                    current_size = 0
+                    start_position += len(chunk_text)
+                
+                chunk_index += 1
+            
+            current_chunk.append(sentence)
+            current_size += sentence_size
+        
+        # Add remaining sentences
+        if current_chunk:
+            chunk_text = ' '.join(current_chunk)
+            chunks.append(EnhancedChunk(
+                id=self._generate_chunk_id(doc_id, chunk_index),
+                content=chunk_text,
+                chunk_type=ChunkType.TEXT,
+                start_char=start_position,
+                end_char=start_position + len(chunk_text),
+                chunk_index=chunk_index,
+                metadata={"chunking_method": "sentence"},
+                parent_id=doc_id
+            ))
+        
+        return chunks
+    
+    def _simple_enhanced_chunking(
+        self,
+        text: str,
+        chunk_size: int,
+        overlap: int,
+        doc_id: Optional[str]
+    ) -> List[EnhancedChunk]:
+        """Simple character-based chunking with enhanced metadata."""
+        chunks = []
+        chunk_index = 0
+        i = 0
+        
+        while i < len(text):
+            end = min(i + chunk_size, len(text))
+            chunk_text = text[i:end]
+            
+            chunks.append(EnhancedChunk(
+                id=self._generate_chunk_id(doc_id, chunk_index),
+                content=chunk_text,
+                chunk_type=ChunkType.TEXT,
+                start_char=i,
+                end_char=end,
+                chunk_index=chunk_index,
+                metadata={"chunking_method": "simple"},
+                parent_id=doc_id
+            ))
+            
+            chunk_index += 1
+            i += chunk_size - overlap
+        
+        return chunks
+    
+    def _create_code_chunk(
+        self,
+        code_block: Dict[str, Any],
+        chunk_index: int,
+        doc_id: Optional[str]
+    ) -> EnhancedChunk:
+        """Create a chunk for a code block."""
+        return EnhancedChunk(
+            id=self._generate_chunk_id(doc_id, chunk_index),
+            content=code_block["content"],
+            chunk_type=ChunkType.CODE,
+            start_char=code_block["start_pos"],
+            end_char=code_block["end_pos"],
+            chunk_index=chunk_index,
+            metadata={
+                "language": code_block["language"],
+                "placeholder_id": code_block["id"],
+                "code_content": code_block["code_content"]
+            },
+            parent_id=doc_id
+        )
+    
+    def _create_table_chunk(
+        self,
+        table_block: Dict[str, Any],
+        chunk_index: int,
+        doc_id: Optional[str]
+    ) -> EnhancedChunk:
+        """Create a chunk for a table with serialization."""
+        metadata = {
+            "placeholder_id": table_block["id"],
+            "has_serialization": table_block.get("serialized") is not None
+        }
+        
+        # Build content with serialization
+        content_parts = [table_block["content"]]
+        
+        if table_block.get("serialized"):
+            serialized = table_block["serialized"]
+            
+            # Add metadata from serialization
+            if "metadata" in serialized:
+                metadata.update({
+                    "num_rows": serialized["metadata"].get("num_rows", 0),
+                    "num_columns": serialized["metadata"].get("num_columns", 0),
+                    "headers": serialized["metadata"].get("headers", [])
+                })
+            
+            # Add searchable content
+            if "search_text" in serialized:
+                content_parts.append(f"\n[Table Search Text: {serialized['search_text']}]")
+        
+        return EnhancedChunk(
+            id=self._generate_chunk_id(doc_id, chunk_index),
+            content="\n".join(content_parts),
+            chunk_type=ChunkType.TABLE,
+            start_char=table_block["start_pos"],
+            end_char=table_block["end_pos"],
+            chunk_index=chunk_index,
+            metadata=metadata,
+            parent_id=doc_id
+        )
+    
+    def _apply_position_transformations(self, chunks: List[EnhancedChunk]):
+        """Apply position transformations to maintain original document positions."""
+        for chunk in chunks:
+            # Apply transformations in order
+            for transform in self.transformations:
+                if chunk.start_char >= transform.new_start:
+                    # Adjust positions based on transformation
+                    offset = transform.original_start - transform.new_start
+                    chunk.start_char += offset
+                    chunk.end_char += offset
+    
+    def _generate_chunk_id(self, doc_id: Optional[str], chunk_index: int) -> str:
+        """Generate unique chunk ID."""
+        if doc_id:
+            return f"{doc_id}_chunk_{chunk_index}"
+        else:
+            # Generate hash-based ID
+            content = f"chunk_{chunk_index}_{hashlib.md5(str(chunk_index).encode()).hexdigest()[:8]}"
+            return content
+    
+    def to_simple_chunks(self, enhanced_chunks: List[EnhancedChunk]) -> List[str]:
+        """Convert enhanced chunks to simple string chunks for backward compatibility."""
+        return [chunk.content for chunk in enhanced_chunks]
+
 
 # ... (end of Chunker class) ...
 
 # The global `improved_chunking_process` function (defined in Part 1)
 # already instantiates and uses `Chunker`.
+
+# Export enhanced classes for backward compatibility with Enhanced_Chunk_Lib imports
+__all__ = [
+    'Chunker',
+    'ChunkType',
+    'EnhancedChunk',
+    'TransformationRecord',
+    'ChunkingError',
+    'InvalidChunkingMethodError',
+    'InvalidInputError',
+    'LanguageDetectionError',
+    'improved_chunking_process',
+    'chunk_for_embedding',
+    'process_document_with_metadata',
+    'load_document',
+    'DEFAULT_CHUNK_OPTIONS'
+]
+
+# Alias for backward compatibility
+EnhancedChunker = Chunker  # Enhanced features are now integrated into base Chunker
 
 # Remove old global functions that are now methods in Chunker:
 # detect_language (done)
@@ -1388,13 +2186,18 @@ def improved_chunking_process(text: str,
             if json_end_match:
                 json_end_index = json_end_match.end()
                 potential_json_str = processed_text[:json_end_index].strip()
-                try:
-                    json_content_metadata = json.loads(potential_json_str)
-                    processed_text = processed_text[json_end_index:].strip()
-                    logging.debug(f"Extracted JSON metadata: {json_content_metadata}")
-                except json.JSONDecodeError:
-                    logging.debug("Potential JSON at start, but failed to parse. Treating as normal text.")
+                # Limit JSON metadata size
+                if len(potential_json_str) > 1_000_000:  # 1MB limit for metadata
+                    logging.warning(f"JSON metadata too large ({len(potential_json_str)} bytes), skipping")
                     json_content_metadata = {}
+                else:
+                    try:
+                        json_content_metadata = json.loads(potential_json_str)
+                        processed_text = processed_text[json_end_index:].strip()
+                        logging.debug(f"Extracted JSON metadata: {json_content_metadata}")
+                    except json.JSONDecodeError:
+                        logging.debug("Potential JSON at start, but failed to parse. Treating as normal text.")
+                        json_content_metadata = {}
             else:
                 logging.debug("Text starts with '{' but no clear '}\\n' end for JSON metadata.")
         else:

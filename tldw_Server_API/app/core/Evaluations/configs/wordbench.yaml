@@ -1,0 +1,54 @@
+# WordBench - Next Token Prediction Analysis Benchmark
+name: wordbench
+description: Analyze next token predictions and probability distributions across different prompts
+evaluation_type: next_token_capture  # Special type for logprob capture
+dataset_source: inline  # Prompts provided directly or from file
+dataset_format: custom
+
+# Configuration for logprob capture
+evaluation_params:
+  top_k: 10  # Number of top tokens to capture
+  max_tokens: 1  # Usually 1 for next token prediction
+  temperature: 1.0  # Default temperature
+  capture_logprobs: true
+  
+# Example prompts to analyze
+example_prompts:
+  - "The sky is"
+  - "I am on my way to"
+  - "Once upon a time"
+  - "The quick brown fox"
+  - "In the beginning"
+  - "To be or not to"
+  - "The capital of France is"
+  - "Water freezes at"
+  - "The sun rises in the"
+  - "Artificial intelligence is"
+
+# Field mappings not needed for this type
+field_mappings: {}
+
+metadata:
+  purpose: >
+    WordBench is designed to analyze next token prediction behavior and 
+    probability distributions. It captures the top K most likely next tokens
+    for given prompts, along with their log probabilities. This is useful for:
+    - Understanding model behavior and biases
+    - Analyzing prediction confidence
+    - Comparing different models' token distributions
+    - Studying language model uncertainty
+  
+  usage: >
+    Provide prompts either inline or from a file. The system will capture
+    the next token predictions and their probabilities without scoring.
+    Results show the probability distribution over possible continuations.
+  
+  output_format:
+    generated_token: "The actual token generated"
+    top_tokens: "List of top K tokens with probabilities"
+    entropy: "Measure of uncertainty in the distribution"
+    concentration: "How concentrated the probability mass is"
+    
+  requirements:
+    - "API must support logprob return (OpenAI, some local models)"
+    - "Prompts should be complete up to the point of prediction"

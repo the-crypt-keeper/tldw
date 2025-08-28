@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Provider Test - Served by Server</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        select { width: 100%; padding: 8px; font-size: 14px; }
+        .status { margin: 20px 0; padding: 10px; background: #f0f0f0; border-radius: 5px; }
+        .configured { color: green; font-weight: bold; }
+        .unconfigured { color: #999; }
+        optgroup { font-weight: bold; }
+        option:disabled { color: #999; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>LLM Provider Dropdown Test</h1>
+        
+        <h2>Test Dropdown (same class as used in WebUI):</h2>
+        <select class="llm-model-select" id="test-select">
+            <option value="">Loading models...</option>
+        </select>
+        
+        <div class="status" id="status">
+            <strong>Status:</strong> <span id="status-text">Initializing...</span>
+        </div>
+        
+        <h2>Provider Summary:</h2>
+        <div id="summary"></div>
+        
+        <h2>Raw Provider Data:</h2>
+        <pre id="raw-data" style="background: #f5f5f5; padding: 10px; overflow-x: auto;"></pre>
+    </div>
+
+    <!-- Load the actual API client and utilities used by WebUI -->
+    <script src="/webui/js/utils.js"></script>
+    <script src="/webui/js/api-client.js"></script>
+    
+    <script>
+        async function testProviders() {
+            const statusEl = document.getElementById('status-text');
+            const summaryEl = document.getElementById('summary');
+            const rawEl = document.getElementById('raw-data');
+            
+            try {
+                statusEl.textContent = 'Fetching providers...';
+                
+                // Use the actual apiClient from the WebUI
+                if (typeof apiClient !== 'undefined' && apiClient.getAvailableProviders) {
+                    const providers = await apiClient.getAvailableProviders();
+                    
+                    statusEl.textContent = `Successfully loaded ${providers.providers.length} providers`;
+                    statusEl.className = 'configured';
+                    
+                    // Show raw data
+                    rawEl.textContent = JSON.stringify(providers, null, 2);
+                    
+                    // Create summary
+                    let summaryHtml = '<table style="width: 100%; border-collapse: collapse;">';
+                    summaryHtml += '<tr style="background: #e0e0e0;"><th style="padding: 5px; text-align: left;">Provider</th><th>Type</th><th>Configured</th><th>Models</th></tr>';
+                    
+                    providers.providers.forEach(p => {
+                        const configClass = p.is_configured ? 'configured' : 'unconfigured';
+                        const configText = p.is_configured ? '✓ Yes' : '✗ No';
+                        summaryHtml += `<tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 5px;">${p.display_name}</td>
+                            <td>${p.type}</td>
+                            <td class="${configClass}">${configText}</td>
+                            <td>${p.models.length} models</td>
+                        </tr>`;
+                    });
+                    summaryHtml += '</table>';
+                    
+                    summaryEl.innerHTML = summaryHtml;
+                    
+                    // Now populate the dropdown using the WebUI function
+                    if (typeof populateModelDropdowns === 'function') {
+                        await populateModelDropdowns();
+                        statusEl.textContent += ' - Dropdown populated!';
+                    } else {
+                        statusEl.textContent += ' - populateModelDropdowns function not found';
+                    }
+                } else {
+                    statusEl.textContent = 'API client not available';
+                    statusEl.className = 'unconfigured';
+                }
+            } catch (error) {
+                statusEl.textContent = 'Error: ' + error.message;
+                statusEl.className = 'unconfigured';
+                console.error('Error testing providers:', error);
+            }
+        }
+        
+        // Wait for everything to load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(testProviders, 500);
+        });
+    </script>
+</body>
+</html>

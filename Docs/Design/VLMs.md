@@ -27,8 +27,8 @@ https://github.com/ekshaks/ragpipe
 https://99franklin.github.io/ocrbench_v2/
 https://github.com/opendatalab/OmniDocBench
 https://idp-leaderboard.org/
-
-
+https://github.com/rednote-hilab/dots.ocr/blob/master/assets/blog.md
+https://huggingface.co/rednote-hilab/dots.ocr
 
 
 

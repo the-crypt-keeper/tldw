@@ -1,6 +1,10 @@
 """
 Integration tests for RAG-Embeddings system.
 
+NOTE: This test file is for deprecated v2 functionality that has been archived.
+The tests are kept for reference but should be skipped in normal test runs.
+The new v3 functional pipeline handles embeddings differently.
+
 These tests verify that the RAG system properly integrates with the real embeddings
 service without any mocking. All embeddings are generated using the actual production
 embeddings service.
@@ -9,6 +13,8 @@ NO MOCKING - These are true integration tests.
 """
 
 import pytest
+# Skip all tests in this file - deprecated v2 functionality
+pytestmark = pytest.mark.skip(reason="Tests deprecated v2 embeddings integration - v3 uses functional pipeline")
 import asyncio
 import tempfile
 from pathlib import Path
@@ -19,7 +25,7 @@ import time
 from loguru import logger
 
 # Import the actual services - no mocks
-from tldw_Server_API.app.core.RAG.rag_embeddings_integration import (
+from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import (
     ProductionEmbeddingFunction,
     EnhancedVectorRetriever,
     RAGEmbeddingsIntegration,

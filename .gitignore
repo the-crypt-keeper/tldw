@@ -233,7 +233,7 @@ PoC_Version/
 *.db-wal
 *.db-shm
 *.db-journal
-/user_databases/
+/Databases/user_databases/
 /PoC_Version/Databases/
 tldw_Server_API/app/Databases/
 
@@ -273,7 +273,6 @@ desktop.ini
 # User Registration System
 .jwt_secret
 *.jwt_secret
-/user_databases/
 /migration_backups/
 /logs/*.log
 /logs/*.gz
@@ -293,4 +292,4 @@ errors.log
 # Database data (for local development)
 /postgres_data/
 /redis_data/
-uv.lock
+/Databases/ChromaDB/

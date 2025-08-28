@@ -11,6 +11,7 @@ Provides endpoints for:
 """
 
 import asyncio
+import json
 import time
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends, status, Query, Request, Response
@@ -36,6 +37,20 @@ from tldw_Server_API.app.core.Evaluations.evaluation_manager import EvaluationMa
 from tldw_Server_API.app.core.Evaluations.metrics import (
     get_metrics, track_request_metrics, track_evaluation_metrics
 )
+from tldw_Server_API.app.core.Evaluations.config_validator import validate_configuration
+
+# Import new production features
+from tldw_Server_API.app.core.Evaluations.user_rate_limiter import user_rate_limiter, UserTier
+from tldw_Server_API.app.core.Evaluations.webhook_manager import webhook_manager, WebhookEvent
+from tldw_Server_API.app.core.Evaluations.metrics_advanced import advanced_metrics
+
+# Import webhook schemas
+from tldw_Server_API.app.api.v1.schemas.webhook_schemas import (
+    WebhookRegistrationRequest, WebhookRegistrationResponse,
+    WebhookUpdateRequest, WebhookStatusResponse,
+    WebhookTestRequest, WebhookTestResponse,
+    RateLimitStatusResponse
+)
 
 # Import rate limiting and auth dependencies
 from tldw_Server_API.app.core.AuthNZ.rate_limiter import RateLimiter, get_rate_limiter
@@ -46,8 +61,23 @@ router = APIRouter(prefix="/evaluations", tags=["Evaluations"])
 
 # Initialize evaluation components
 evaluation_manager = EvaluationManager()
-rag_evaluator = RAGEvaluator()
-quality_evaluator = ResponseQualityEvaluator()
+# Lazy initialization - create evaluators only when needed to avoid startup embedding checks
+_rag_evaluator = None
+_quality_evaluator = None
+
+def get_rag_evaluator() -> RAGEvaluator:
+    """Get or create RAG evaluator instance (lazy initialization)."""
+    global _rag_evaluator
+    if _rag_evaluator is None:
+        _rag_evaluator = RAGEvaluator()
+    return _rag_evaluator
+
+def get_quality_evaluator() -> ResponseQualityEvaluator:
+    """Get or create quality evaluator instance (lazy initialization)."""
+    global _quality_evaluator
+    if _quality_evaluator is None:
+        _quality_evaluator = ResponseQualityEvaluator()
+    return _quality_evaluator
 
 
 # Rate limiting dependency for evaluation endpoints
@@ -104,7 +134,10 @@ async def check_evaluation_rate_limit(
 @router.post("/geval", response_model=GEvalResponse, dependencies=[Depends(check_evaluation_rate_limit)])
 @track_request_metrics("/evaluations/geval")
 @track_evaluation_metrics("geval")
-async def evaluate_summary_geval(request: GEvalRequest):
+async def evaluate_summary_geval(
+    request: GEvalRequest,
+    user_id: str = Depends(get_rate_limiter_dep)  # Get user ID from auth
+):
     """
     Evaluate a summary using G-Eval metrics.
     
@@ -116,16 +149,53 @@ async def evaluate_summary_geval(request: GEvalRequest):
     """
     try:
         start_time = time.time()
+        evaluation_id = f"geval_{int(time.time())}_{user_id[:8]}"
         
-        # Run G-Eval
-        result = await asyncio.to_thread(
-            run_geval,
-            transcript=request.source_text,
-            summary=request.summary,
-            api_key=request.api_key,
-            api_name=request.api_name,
-            save=request.save_results
+        # Check per-user rate limits
+        allowed, rate_metadata = await user_rate_limiter.check_rate_limit(
+            user_id=user_id,
+            endpoint="/api/v1/evaluations/geval",
+            tokens_requested=len(request.source_text) + len(request.summary),
+            estimated_cost=0.01  # Estimate based on model
         )
+        
+        if not allowed:
+            if advanced_metrics.enabled:
+                advanced_metrics.track_rate_limit_hit("free", "minute")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=rate_metadata,
+                headers=rate_metadata.get("headers", {})
+            )
+        
+        # Send webhook for evaluation started
+        asyncio.create_task(webhook_manager.send_webhook(
+            user_id=user_id,
+            event=WebhookEvent.EVALUATION_STARTED,
+            evaluation_id=evaluation_id,
+            data={"evaluation_type": "geval", "api_name": request.api_name}
+        ))
+        
+        # Run G-Eval with SLI tracking
+        if advanced_metrics.enabled:
+            with advanced_metrics.track_sli_request("/api/v1/evaluations/geval"):
+                result = await asyncio.to_thread(
+                    run_geval,
+                    transcript=request.source_text,
+                    summary=request.summary,
+                    api_key=request.api_key,
+                    api_name=request.api_name,
+                    save=request.save_results
+                )
+        else:
+            result = await asyncio.to_thread(
+                run_geval,
+                transcript=request.source_text,
+                summary=request.summary,
+                api_key=request.api_key,
+                api_name=request.api_name,
+                save=request.save_results
+            )
         
         # Parse the formatted result back into structured data
         # The run_geval function returns a formatted string, so we need to extract the scores
@@ -182,9 +252,42 @@ async def evaluate_summary_geval(request: GEvalRequest):
             },
             metadata={
                 "api_name": request.api_name,
-                "evaluation_time": evaluation_time
+                "evaluation_time": evaluation_time,
+                "user_id": user_id
             }
         )
+        
+        # Track advanced metrics
+        if advanced_metrics.enabled:
+            # Track evaluation quality
+            advanced_metrics.track_evaluation_quality(
+                evaluation_type="geval",
+                model=request.api_name,
+                accuracy=average_score,
+                confidence=0.85  # Could be calculated from consistency
+            )
+            
+            # Track cost
+            advanced_metrics.track_evaluation_cost(
+                user_tier="free",  # Would get from user profile
+                provider=request.api_name.split("/")[0] if "/" in request.api_name else request.api_name,
+                model=request.api_name,
+                evaluation_type="geval",
+                cost=0.01  # Actual cost calculation
+            )
+        
+        # Send webhook for evaluation completed
+        asyncio.create_task(webhook_manager.send_webhook(
+            user_id=user_id,
+            event=WebhookEvent.EVALUATION_COMPLETED,
+            evaluation_id=evaluation_id,
+            data={
+                "evaluation_type": "geval",
+                "scores": {k: v.dict() for k, v in scores.items()},
+                "average_score": average_score,
+                "processing_time": evaluation_time
+            }
+        ))
         
         return GEvalResponse(
             metrics=scores,
@@ -196,6 +299,19 @@ async def evaluate_summary_geval(request: GEvalRequest):
         
     except Exception as e:
         logger.error(f"G-Eval evaluation failed: {e}")
+        
+        # Send webhook for evaluation failed
+        if 'evaluation_id' in locals():
+            asyncio.create_task(webhook_manager.send_webhook(
+                user_id=user_id,
+                event=WebhookEvent.EVALUATION_FAILED,
+                evaluation_id=evaluation_id,
+                data={
+                    "evaluation_type": "geval",
+                    "error": str(e)
+                }
+            ))
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Evaluation failed: {str(e)}"
@@ -205,7 +321,10 @@ async def evaluate_summary_geval(request: GEvalRequest):
 @router.post("/rag", response_model=RAGEvaluationResponse, dependencies=[Depends(check_evaluation_rate_limit)])
 @track_request_metrics("/evaluations/rag")
 @track_evaluation_metrics("rag")
-async def evaluate_rag_system(request: RAGEvaluationRequest):
+async def evaluate_rag_system(
+    request: RAGEvaluationRequest,
+    user_id: str = Depends(get_rate_limiter_dep)  # Get user ID from auth
+):
     """
     Evaluate RAG system performance.
     
@@ -218,16 +337,54 @@ async def evaluate_rag_system(request: RAGEvaluationRequest):
     """
     try:
         start_time = time.time()
+        evaluation_id = f"rag_{int(time.time())}_{user_id[:8]}"
         
-        # Run RAG evaluation
-        results = await rag_evaluator.evaluate(
-            query=request.query,
-            contexts=request.retrieved_contexts,
-            response=request.generated_response,
-            ground_truth=request.ground_truth,
-            metrics=request.metrics,
-            api_name=request.api_name
+        # Check per-user rate limits
+        context_size = sum(len(c) for c in request.retrieved_contexts)
+        allowed, rate_metadata = await user_rate_limiter.check_rate_limit(
+            user_id=user_id,
+            endpoint="/api/v1/evaluations/rag",
+            tokens_requested=len(request.query) + context_size + len(request.generated_response),
+            estimated_cost=0.02  # Estimate based on model
         )
+        
+        if not allowed:
+            if advanced_metrics.enabled:
+                advanced_metrics.track_rate_limit_hit("free", "minute")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=rate_metadata,
+                headers=rate_metadata.get("headers", {})
+            )
+        
+        # Send webhook for evaluation started
+        asyncio.create_task(webhook_manager.send_webhook(
+            user_id=user_id,
+            event=WebhookEvent.EVALUATION_STARTED,
+            evaluation_id=evaluation_id,
+            data={"evaluation_type": "rag", "api_name": request.api_name}
+        ))
+        
+        # Run RAG evaluation with SLI tracking
+        if advanced_metrics.enabled:
+            with advanced_metrics.track_sli_request("/api/v1/evaluations/rag"):
+                results = await get_rag_evaluator().evaluate(
+                    query=request.query,
+                    contexts=request.retrieved_contexts,
+                    response=request.generated_response,
+                    ground_truth=request.ground_truth,
+                    metrics=request.metrics,
+                    api_name=request.api_name
+                )
+        else:
+            results = await get_rag_evaluator().evaluate(
+                query=request.query,
+                contexts=request.retrieved_contexts,
+                response=request.generated_response,
+                ground_truth=request.ground_truth,
+                metrics=request.metrics,
+                api_name=request.api_name
+            )
         
         # Calculate scores
         retrieval_metrics = ["context_precision", "context_recall"]
@@ -251,16 +408,50 @@ async def evaluate_rag_system(request: RAGEvaluationRequest):
         
         evaluation_time = time.time() - start_time
         
-        # Store evaluation
+        # Store evaluation with user ID
         eval_id = await evaluation_manager.store_evaluation(
             evaluation_type="rag",
             input_data=request.dict(),
             results=results,
             metadata={
                 "evaluation_time": evaluation_time,
-                "overall_score": overall_score
+                "overall_score": overall_score,
+                "user_id": user_id
             }
         )
+        
+        # Track advanced metrics
+        if advanced_metrics.enabled:
+            # Track evaluation quality
+            advanced_metrics.track_evaluation_quality(
+                evaluation_type="rag",
+                model=request.api_name,
+                accuracy=overall_score,
+                confidence=0.85  # Could be calculated from metrics
+            )
+            
+            # Track cost
+            advanced_metrics.track_evaluation_cost(
+                user_tier="free",  # Would get from user profile
+                provider=request.api_name.split("/")[0] if "/" in request.api_name else request.api_name,
+                model=request.api_name,
+                evaluation_type="rag",
+                cost=0.02  # Actual cost calculation
+            )
+        
+        # Send webhook for evaluation completed
+        asyncio.create_task(webhook_manager.send_webhook(
+            user_id=user_id,
+            event=WebhookEvent.EVALUATION_COMPLETED,
+            evaluation_id=evaluation_id,
+            data={
+                "evaluation_type": "rag",
+                "overall_score": overall_score,
+                "retrieval_quality": retrieval_quality,
+                "generation_quality": generation_quality,
+                "processing_time": evaluation_time
+            }
+        ))
         
         return RAGEvaluationResponse(
             metrics=results["metrics"],
@@ -273,6 +464,19 @@ async def evaluate_rag_system(request: RAGEvaluationRequest):
         
     except Exception as e:
         logger.error(f"RAG evaluation failed: {e}")
+        
+        # Send webhook for evaluation failed
+        if 'evaluation_id' in locals():
+            asyncio.create_task(webhook_manager.send_webhook(
+                user_id=user_id,
+                event=WebhookEvent.EVALUATION_FAILED,
+                evaluation_id=evaluation_id,
+                data={
+                    "evaluation_type": "rag",
+                    "error": str(e)
+                }
+            ))
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"RAG evaluation failed: {str(e)}"
@@ -280,7 +484,10 @@ async def evaluate_rag_system(request: RAGEvaluationRequest):
 
 
 @router.post("/response-quality", response_model=ResponseQualityResponse, dependencies=[Depends(check_evaluation_rate_limit)])
-async def evaluate_response_quality(request: ResponseQualityRequest):
+async def evaluate_response_quality(
+    request: ResponseQualityRequest,
+    user_id: str = Depends(get_rate_limiter_dep)  # Get user ID from auth
+):
     """
     Evaluate the quality of a generated response.
     
@@ -293,25 +500,96 @@ async def evaluate_response_quality(request: ResponseQualityRequest):
     """
     try:
         start_time = time.time()
+        evaluation_id = f"quality_{int(time.time())}_{user_id[:8]}"
         
-        # Run quality evaluation
-        results = await quality_evaluator.evaluate(
-            prompt=request.prompt,
-            response=request.response,
-            expected_format=request.expected_format,
-            custom_criteria=request.evaluation_criteria,
-            api_name=request.api_name
+        # Check per-user rate limits
+        allowed, rate_metadata = await user_rate_limiter.check_rate_limit(
+            user_id=user_id,
+            endpoint="/api/v1/evaluations/response-quality",
+            tokens_requested=len(request.prompt) + len(request.response),
+            estimated_cost=0.015  # Estimate based on model
         )
+        
+        if not allowed:
+            if advanced_metrics.enabled:
+                advanced_metrics.track_rate_limit_hit("free", "minute")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=rate_metadata,
+                headers=rate_metadata.get("headers", {})
+            )
+        
+        # Send webhook for evaluation started
+        asyncio.create_task(webhook_manager.send_webhook(
+            user_id=user_id,
+            event=WebhookEvent.EVALUATION_STARTED,
+            evaluation_id=evaluation_id,
+            data={"evaluation_type": "response_quality", "api_name": request.api_name}
+        ))
+        
+        # Run quality evaluation with SLI tracking
+        if advanced_metrics.enabled:
+            with advanced_metrics.track_sli_request("/api/v1/evaluations/response-quality"):
+                results = await get_quality_evaluator().evaluate(
+                    prompt=request.prompt,
+                    response=request.response,
+                    expected_format=request.expected_format,
+                    custom_criteria=request.evaluation_criteria,
+                    api_name=request.api_name
+                )
+        else:
+            results = await get_quality_evaluator().evaluate(
+                prompt=request.prompt,
+                response=request.response,
+                expected_format=request.expected_format,
+                custom_criteria=request.evaluation_criteria,
+                api_name=request.api_name
+            )
         
         evaluation_time = time.time() - start_time
         
-        # Store evaluation
+        # Store evaluation with user ID
         eval_id = await evaluation_manager.store_evaluation(
             evaluation_type="response_quality",
             input_data=request.dict(),
             results=results,
-            metadata={"evaluation_time": evaluation_time}
+            metadata={
+                "evaluation_time": evaluation_time,
+                "user_id": user_id
+            }
         )
+        
+        # Track advanced metrics
+        if advanced_metrics.enabled:
+            # Track evaluation quality
+            advanced_metrics.track_evaluation_quality(
+                evaluation_type="response_quality",
+                model=request.api_name,
+                accuracy=results.get("overall_quality", 0.0),
+                confidence=0.85
+            )
+            
+            # Track cost
+            advanced_metrics.track_evaluation_cost(
+                user_tier="free",  # Would get from user profile
+                provider=request.api_name.split("/")[0] if "/" in request.api_name else request.api_name,
+                model=request.api_name,
+                evaluation_type="response_quality",
+                cost=0.015  # Actual cost calculation
+            )
+        
+        # Send webhook for evaluation completed
+        asyncio.create_task(webhook_manager.send_webhook(
+            user_id=user_id,
+            event=WebhookEvent.EVALUATION_COMPLETED,
+            evaluation_id=evaluation_id,
+            data={
+                "evaluation_type": "response_quality",
+                "overall_quality": results.get("overall_quality", 0.0),
+                "format_compliance": results.get("format_compliance", {}),
+                "processing_time": evaluation_time
+            }
+        ))
         
         return ResponseQualityResponse(
             metrics=results["metrics"],
@@ -323,6 +601,19 @@ async def evaluate_response_quality(request: ResponseQualityRequest):
         
     except Exception as e:
         logger.error(f"Response quality evaluation failed: {e}")
+        
+        # Send webhook for evaluation failed
+        if 'evaluation_id' in locals():
+            asyncio.create_task(webhook_manager.send_webhook(
+                user_id=user_id,
+                event=WebhookEvent.EVALUATION_FAILED,
+                evaluation_id=evaluation_id,
+                data={
+                    "evaluation_type": "response_quality",
+                    "error": str(e)
+                }
+            ))
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Quality evaluation failed: {str(e)}"
@@ -332,7 +623,10 @@ async def evaluate_response_quality(request: ResponseQualityRequest):
 @router.post("/batch", response_model=BatchEvaluationResponse, dependencies=[Depends(check_evaluation_rate_limit)])
 @track_request_metrics("/evaluations/batch")
 @track_evaluation_metrics("batch")
-async def evaluate_batch(request: BatchEvaluationRequest):
+async def evaluate_batch(
+    request: BatchEvaluationRequest,
+    user_id: str = Depends(get_rate_limiter_dep)  # Get user ID from auth
+):
     """
     Perform batch evaluation of multiple items.
     
@@ -340,16 +634,47 @@ async def evaluate_batch(request: BatchEvaluationRequest):
     """
     try:
         start_time = time.time()
+        batch_id = f"batch_{int(time.time())}_{user_id[:8]}"
         
-        # Create evaluation tasks
+        # Check per-user rate limits for batch operations
+        # Batch operations have stricter limits
+        allowed, rate_metadata = await user_rate_limiter.check_rate_limit(
+            user_id=user_id,
+            endpoint="/api/v1/evaluations/batch",
+            tokens_requested=len(request.items) * 1000,  # Estimate tokens per item
+            estimated_cost=len(request.items) * 0.02  # Estimate cost per item
+        )
+        
+        if not allowed:
+            if advanced_metrics.enabled:
+                advanced_metrics.track_rate_limit_hit("free", "batch")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=rate_metadata,
+                headers=rate_metadata.get("headers", {})
+            )
+        
+        # Send webhook for batch started
+        asyncio.create_task(webhook_manager.send_webhook(
+            user_id=user_id,
+            event=WebhookEvent.BATCH_STARTED,
+            evaluation_id=batch_id,
+            data={
+                "evaluation_type": request.evaluation_type,
+                "item_count": len(request.items),
+                "parallel_workers": request.parallel_workers
+            }
+        ))
+        
+        # Create evaluation tasks with user_id
         tasks = []
         for item in request.items:
             if request.evaluation_type == "geval":
-                task = evaluate_summary_geval(GEvalRequest(**item))
+                task = evaluate_summary_geval(GEvalRequest(**item), user_id)
             elif request.evaluation_type == "rag":
-                task = evaluate_rag_system(RAGEvaluationRequest(**item))
+                task = evaluate_rag_system(RAGEvaluationRequest(**item), user_id)
             elif request.evaluation_type == "response_quality":
-                task = evaluate_response_quality(ResponseQualityRequest(**item))
+                task = evaluate_response_quality(ResponseQualityRequest(**item), user_id)
             else:
                 raise ValueError(f"Unknown evaluation type: {request.evaluation_type}")
             
@@ -380,6 +705,36 @@ async def evaluate_batch(request: BatchEvaluationRequest):
         
         processing_time = time.time() - start_time
         
+        # Track advanced metrics for batch
+        if advanced_metrics.enabled:
+            # Track batch cost
+            total_cost = len(request.items) * 0.02  # Actual cost calculation
+            advanced_metrics.track_evaluation_cost(
+                user_tier="free",  # Would get from user profile
+                provider="batch",
+                model=request.evaluation_type,
+                evaluation_type="batch",
+                cost=total_cost
+            )
+            
+            # Track queue depth if applicable
+            advanced_metrics.track_queue_depth("batch", 0)
+        
+        # Send webhook for batch completed
+        asyncio.create_task(webhook_manager.send_webhook(
+            user_id=user_id,
+            event=WebhookEvent.BATCH_COMPLETED,
+            evaluation_id=batch_id,
+            data={
+                "evaluation_type": request.evaluation_type,
+                "total_items": len(request.items),
+                "successful": len(request.items) - failed,
+                "failed": failed,
+                "aggregate_metrics": aggregate_metrics,
+                "processing_time": processing_time
+            }
+        ))
+        
         return BatchEvaluationResponse(
             total_items=len(request.items),
             successful=len(request.items) - failed,
@@ -391,6 +746,19 @@ async def evaluate_batch(request: BatchEvaluationRequest):
         
     except Exception as e:
         logger.error(f"Batch evaluation failed: {e}")
+        
+        # Send webhook for batch failed
+        if 'batch_id' in locals():
+            asyncio.create_task(webhook_manager.send_webhook(
+                user_id=user_id,
+                event=WebhookEvent.BATCH_FAILED,
+                evaluation_id=batch_id,
+                data={
+                    "evaluation_type": request.evaluation_type if 'request' in locals() else "unknown",
+                    "error": str(e)
+                }
+            ))
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Batch evaluation failed: {str(e)}"
@@ -484,3 +852,216 @@ async def get_evaluation_metrics(request: Request):
         content=metrics_output,
         media_type="text/plain; version=0.0.4; charset=utf-8"
     )
+
+
+@router.get("/health/config")
+async def check_configuration_health():
+    """
+    Check configuration health and production readiness.
+    
+    Returns detailed configuration validation results.
+    """
+    try:
+        validation_results = validate_configuration()
+        
+        # Determine HTTP status based on validation
+        if validation_results["status"] == "error":
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        elif validation_results["status"] == "warning":
+            status_code = status.HTTP_200_OK
+        else:
+            status_code = status.HTTP_200_OK
+        
+        return Response(
+            content=json.dumps(validation_results, indent=2),
+            status_code=status_code,
+            media_type="application/json"
+        )
+        
+    except Exception as e:
+        logger.error(f"Configuration health check failed: {e}")
+        return Response(
+            content=json.dumps({
+                "status": "error",
+                "message": f"Health check failed: {str(e)}"
+            }),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            media_type="application/json"
+        )
+
+
+# ============= Webhook Management Endpoints =============
+
+@router.post("/webhooks", response_model=WebhookRegistrationResponse)
+async def register_webhook(
+    request: WebhookRegistrationRequest,
+    user_id: str = Depends(get_rate_limiter_dep)  # Gets user_id from auth
+):
+    """
+    Register a webhook for evaluation notifications.
+    
+    Webhooks will receive POST requests with evaluation events.
+    The payload is signed with HMAC-SHA256 using the provided secret.
+    """
+    try:
+        # Convert string events to enum
+        events = [WebhookEvent(e.value) for e in request.events]
+        
+        result = await webhook_manager.register_webhook(
+            user_id=user_id,
+            url=str(request.url),
+            events=events,
+            secret=request.secret
+        )
+        
+        # Track in metrics
+        if advanced_metrics.enabled:
+            advanced_metrics.feature_adoption.labels(
+                feature_name="webhooks",
+                user_tier="unknown"  # Would get from user profile
+            ).set(1.0)
+        
+        return WebhookRegistrationResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Failed to register webhook: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to register webhook: {str(e)}"
+        )
+
+
+@router.get("/webhooks", response_model=List[WebhookStatusResponse])
+async def list_webhooks(
+    user_id: str = Depends(get_rate_limiter_dep)
+):
+    """
+    List all registered webhooks for the authenticated user.
+    """
+    try:
+        webhooks = await webhook_manager.get_webhook_status(user_id)
+        return [WebhookStatusResponse(**w) for w in webhooks]
+        
+    except Exception as e:
+        logger.error(f"Failed to list webhooks: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list webhooks: {str(e)}"
+        )
+
+
+@router.delete("/webhooks")
+async def unregister_webhook(
+    url: str = Query(..., description="Webhook URL to unregister"),
+    user_id: str = Depends(get_rate_limiter_dep)
+):
+    """
+    Unregister a webhook.
+    """
+    try:
+        success = await webhook_manager.unregister_webhook(user_id, url)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Webhook not found"
+            )
+        
+        return {"message": "Webhook unregistered successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to unregister webhook: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to unregister webhook: {str(e)}"
+        )
+
+
+@router.post("/webhooks/test", response_model=WebhookTestResponse)
+async def test_webhook(
+    request: WebhookTestRequest,
+    user_id: str = Depends(get_rate_limiter_dep)
+):
+    """
+    Send a test webhook to verify endpoint configuration.
+    
+    This will send a test payload to the webhook URL with a sample event.
+    """
+    try:
+        result = await webhook_manager.test_webhook(user_id, str(request.url))
+        return WebhookTestResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Failed to test webhook: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to test webhook: {str(e)}"
+        )
+
+
+# ============= Rate Limit Management Endpoints =============
+
+@router.get("/rate-limits", response_model=RateLimitStatusResponse)
+async def get_rate_limit_status(
+    user_id: str = Depends(get_rate_limiter_dep)
+):
+    """
+    Get current rate limit status for the authenticated user.
+    
+    Shows current tier, limits, usage, and remaining allowance.
+    """
+    try:
+        summary = await user_rate_limiter.get_usage_summary(user_id)
+        return RateLimitStatusResponse(**summary)
+        
+    except Exception as e:
+        logger.error(f"Failed to get rate limit status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get rate limit status: {str(e)}"
+        )
+
+
+@router.post("/rate-limits/upgrade")
+async def upgrade_user_tier(
+    tier: str = Query(..., description="Target tier: basic, premium, or enterprise"),
+    user_id: str = Depends(get_rate_limiter_dep)
+):
+    """
+    Upgrade user to a higher tier (admin only in production).
+    
+    This endpoint is for testing/demo purposes. In production,
+    tier upgrades would be handled through billing/subscription system.
+    """
+    try:
+        # In production, verify admin permissions here
+        # For now, allow for testing
+        
+        tier_enum = UserTier(tier.lower())
+        success = await user_rate_limiter.upgrade_user_tier(user_id, tier_enum)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to upgrade tier"
+            )
+        
+        return {
+            "message": f"Successfully upgraded to {tier} tier",
+            "tier": tier,
+            "user_id": user_id
+        }
+        
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid tier. Choose from: basic, premium, enterprise"
+        )
+    except Exception as e:
+        logger.error(f"Failed to upgrade tier: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upgrade tier: {str(e)}"
+        )

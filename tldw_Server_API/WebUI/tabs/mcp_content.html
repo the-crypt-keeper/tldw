@@ -1,0 +1,237 @@
+<!-- MCP Unified Tab -->
+<div id="tabMCPAuth" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/mcp/auth/token</span>
+        </h2>
+        <p>Authenticate and get MCP access token with JWT</p>
+        
+        <div class="form-group">
+            <label for="mcpAuth_username">Username:</label>
+            <input type="text" id="mcpAuth_username" placeholder="Enter username">
+        </div>
+        
+        <div class="form-group">
+            <label for="mcpAuth_password">Password:</label>
+            <input type="password" id="mcpAuth_password" placeholder="Enter password">
+        </div>
+        
+        <div class="form-group">
+            <label for="mcpAuth_role">Role:</label>
+            <select id="mcpAuth_role">
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+                <option value="developer">Developer</option>
+            </select>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('mcpAuth', 'POST', '/api/v1/mcp/auth/token', 'json')">
+            Authenticate
+        </button>
+        
+        <pre id="mcpAuth_response"></pre>
+    </div>
+</div>
+
+<div id="tabMCPStatus" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/mcp/status</span>
+        </h2>
+        <p>Get MCP server status</p>
+        
+        <button class="api-button" onclick="makeRequest('mcpStatus', 'GET', '/api/v1/mcp/status', 'none')">
+            Check Status
+        </button>
+        
+        <pre id="mcpStatus_response"></pre>
+    </div>
+</div>
+
+<div id="tabMCPTools" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/mcp/request</span>
+        </h2>
+        <p>Send an MCP request to the server</p>
+        
+        <div class="form-group">
+            <label for="mcpRequest_payload">MCP Request (JSON):</label>
+            <textarea id="mcpRequest_payload" class="code-input" rows="10">{
+  "method": "tools/list",
+  "params": {},
+  "id": "req_123"
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('mcpRequest', 'POST', '/api/v1/mcp/request', 'json')">
+            Send Request
+        </button>
+        
+        <pre id="mcpRequest_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/mcp/tools</span>
+        </h2>
+        <p>List available MCP tools</p>
+        
+        <button class="api-button" onclick="makeRequest('mcpToolsList', 'GET', '/api/v1/mcp/tools', 'none')">
+            List Tools
+        </button>
+        
+        <pre id="mcpToolsList_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/mcp/tools/execute</span>
+        </h2>
+        <p>Execute an MCP tool</p>
+        
+        <div class="form-group">
+            <label for="mcpToolExecute_payload">Tool Execution Request (JSON):</label>
+            <textarea id="mcpToolExecute_payload" class="code-input" rows="12">{
+  "tool_name": "example_tool",
+  "arguments": {
+    "param1": "value1",
+    "param2": "value2"
+  },
+  "context": {}
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('mcpToolExecute', 'POST', '/api/v1/mcp/tools/execute', 'json')">
+            Execute Tool
+        </button>
+        
+        <pre id="mcpToolExecute_response"></pre>
+    </div>
+</div>
+
+<div id="tabMCPModules" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/mcp/modules</span>
+        </h2>
+        <p>List available MCP modules</p>
+        
+        <button class="api-button" onclick="makeRequest('mcpModules', 'GET', '/api/v1/mcp/modules', 'none')">
+            List Modules
+        </button>
+        
+        <pre id="mcpModules_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/mcp/modules/health</span>
+        </h2>
+        <p>Check health of all MCP modules</p>
+        
+        <button class="api-button" onclick="makeRequest('mcpModulesHealth', 'GET', '/api/v1/mcp/modules/health', 'none')">
+            Check Module Health
+        </button>
+        
+        <pre id="mcpModulesHealth_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/mcp/resources</span>
+        </h2>
+        <p>List available MCP resources</p>
+        
+        <button class="api-button" onclick="makeRequest('mcpResources', 'GET', '/api/v1/mcp/resources', 'none')">
+            List Resources
+        </button>
+        
+        <pre id="mcpResources_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/mcp/prompts</span>
+        </h2>
+        <p>List available MCP prompts</p>
+        
+        <button class="api-button" onclick="makeRequest('mcpPrompts', 'GET', '/api/v1/mcp/prompts', 'none')">
+            List Prompts
+        </button>
+        
+        <pre id="mcpPrompts_response"></pre>
+    </div>
+
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/mcp/metrics</span>
+        </h2>
+        <p>Get MCP server metrics</p>
+        
+        <button class="api-button" onclick="makeRequest('mcpMetrics', 'GET', '/api/v1/mcp/metrics', 'none')">
+            Get Metrics
+        </button>
+        
+        <pre id="mcpMetrics_response"></pre>
+    </div>
+</div>
+
+<div id="tabMCPHealth" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/mcp/health</span>
+        </h2>
+        <p>Check MCP service health</p>
+        
+        <button class="api-button" onclick="makeRequest('mcpHealth', 'GET', '/api/v1/mcp/health', 'none')">
+            Check Health
+        </button>
+        
+        <pre id="mcpHealth_response"></pre>
+    </div>
+</div>
+
+<div id="tabMCPWebSocket" class="tab-content" role="tabpanel">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method ws">WebSocket</span>
+            <span class="endpoint-path">/api/v1/mcp/ws</span>
+        </h2>
+        <p>Connect to MCP server via WebSocket for real-time communication</p>
+        
+        <div class="form-group">
+            <label for="mcpWS_token">JWT Token:</label>
+            <input type="text" id="mcpWS_token" placeholder="Enter JWT token from auth endpoint">
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn btn-success" onclick="connectMCPWebSocket()">Connect</button>
+            <button class="btn btn-danger" onclick="disconnectMCPWebSocket()">Disconnect</button>
+        </div>
+        
+        <div class="form-group mt-3">
+            <label for="mcpWS_message">Send Message (JSON):</label>
+            <textarea id="mcpWS_message" class="code-input" rows="8">{
+  "method": "tools/list",
+  "params": {},
+  "id": "msg_123"
+}</textarea>
+            <button class="btn btn-primary mt-2" onclick="sendMCPWebSocketMessage()">Send Message</button>
+        </div>
+        
+        <h3>WebSocket Log:</h3>
+        <pre id="mcpWS_log" style="max-height: 400px; overflow-y: auto;">Not connected</pre>
+    </div>
+</div>

@@ -12,7 +12,7 @@ Provides endpoints for:
 import os
 from datetime import datetime
 from typing import List, Optional, Dict, Any, AsyncGenerator
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status, Query, Security, Request
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status, Query, Security, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
@@ -87,23 +87,27 @@ eval_runner = EvaluationRunner(db_path)
 
 # ============= Authentication =============
 
-async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)) -> str:
+async def verify_api_key(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+    x_api_key: Optional[str] = Header(None, alias="X-API-KEY")
+) -> str:
     """
     Verify API key or JWT token based on authentication mode.
     
     Supports:
-    - Single-user mode: API key from environment or config
-    - Multi-user mode: JWT tokens
+    - Single-user mode: API key from environment or config (X-API-KEY header or Bearer token)
+    - Multi-user mode: JWT tokens (Bearer token)
     - OpenAI compatibility: sk- prefixed keys
     """
     settings = get_settings()
     
-    # In single-user mode with no credentials, use default auth
-    if not credentials and settings.AUTH_MODE == "single_user":
-        # Use the configured API key as the authenticated user
-        return os.getenv("API_BEARER") or os.getenv("SINGLE_USER_API_KEY") or "default-user"
-    
-    if not credentials:
+    # Check for X-API-KEY header first (for single-user mode)
+    if settings.AUTH_MODE == "single_user" and x_api_key:
+        token = x_api_key
+    elif credentials:
+        token = credentials.credentials
+    else:
+        # No credentials provided
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {
@@ -112,8 +116,6 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
                 "code": "missing_credentials"
             }}
         )
-    
-    token = credentials.credentials
     
     # Remove Bearer prefix if present
     if token.startswith("Bearer "):
@@ -135,16 +137,12 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
                 }}
             )
         
-        # Check token matches expected
+        # Check token matches expected (including sk- prefixed keys)
         if token == expected_token:
             return token
         
-        # For OpenAI compatibility, accept sk- prefixed keys that match
+        # For OpenAI compatibility, accept sk- prefixed keys that match expected token
         if token.startswith("sk-") and token == expected_token:
-            return token
-        
-        # Also accept sk- keys in general for OpenAI compatibility in single-user mode
-        if token.startswith("sk-"):
             return token
             
     elif settings.AUTH_MODE == "multi_user":
@@ -209,7 +207,7 @@ def create_error_response(
 
 # ============= Evaluation Endpoints =============
 
-@router.post("/v1/evals", response_model=EvaluationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/evals", response_model=EvaluationResponse, status_code=status.HTTP_201_CREATED)
 @create_limit
 async def create_evaluation(
     eval_request: CreateEvaluationRequest,
@@ -272,7 +270,7 @@ async def create_evaluation(
         )
 
 
-@router.get("/v1/evals", response_model=EvaluationListResponse)
+@router.get("/evals", response_model=EvaluationListResponse)
 @read_limit
 async def list_evaluations(
     request: Request,
@@ -309,7 +307,7 @@ async def list_evaluations(
         )
 
 
-@router.get("/v1/evals/{eval_id}", response_model=EvaluationResponse)
+@router.get("/evals/{eval_id}", response_model=EvaluationResponse)
 async def get_evaluation(
     eval_id: str,
     api_key: str = Depends(verify_api_key)
@@ -338,7 +336,7 @@ async def get_evaluation(
         )
 
 
-@router.patch("/v1/evals/{eval_id}", response_model=EvaluationResponse)
+@router.patch("/evals/{eval_id}", response_model=EvaluationResponse)
 async def update_evaluation(
     eval_id: str,
     update_request: UpdateEvaluationRequest,
@@ -381,7 +379,7 @@ async def update_evaluation(
         )
 
 
-@router.delete("/v1/evals/{eval_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/evals/{eval_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_evaluation(
     eval_id: str,
     api_key: str = Depends(verify_api_key)
@@ -413,7 +411,7 @@ async def delete_evaluation(
 
 # ============= Run Endpoints =============
 
-@router.post("/v1/evals/{eval_id}/runs", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/evals/{eval_id}/runs", response_model=RunResponse, status_code=status.HTTP_202_ACCEPTED)
 @run_limit
 @burst_limit_decorator
 async def create_run(
@@ -441,7 +439,7 @@ async def create_run(
     
     **Returns:** Run object with status "pending" and run ID for tracking
     
-    **Note:** Use `/v1/runs/{run_id}` to check status or `/v1/runs/{run_id}/stream` for real-time updates
+    **Note:** Use `/api/v1/runs/{run_id}` to check status or `/api/v1/runs/{run_id}/stream` for real-time updates
     """
     try:
         # Verify evaluation exists
@@ -496,7 +494,7 @@ async def create_run(
         )
 
 
-@router.get("/v1/evals/{eval_id}/runs", response_model=RunListResponse)
+@router.get("/evals/{eval_id}/runs", response_model=RunListResponse)
 async def list_runs(
     eval_id: str,
     limit: int = Query(20, ge=1, le=100),
@@ -545,7 +543,7 @@ async def list_runs(
         )
 
 
-@router.get("/v1/runs/{run_id}", response_model=RunResponse)
+@router.get("/runs/{run_id}", response_model=RunResponse)
 async def get_run(
     run_id: str,
     api_key: str = Depends(verify_api_key)
@@ -585,7 +583,7 @@ async def get_run(
         )
 
 
-@router.get("/v1/runs/{run_id}/results", response_model=RunResultsResponse)
+@router.get("/runs/{run_id}/results", response_model=RunResultsResponse)
 async def get_run_results(
     run_id: str,
     api_key: str = Depends(verify_api_key)
@@ -642,7 +640,7 @@ async def get_run_results(
         )
 
 
-@router.post("/v1/runs/{run_id}/cancel")
+@router.post("/runs/{run_id}/cancel")
 async def cancel_run(
     run_id: str,
     api_key: str = Depends(verify_api_key)
@@ -685,7 +683,7 @@ async def cancel_run(
 
 # ============= SSE Progress Tracking =============
 
-@router.get("/v1/runs/{run_id}/stream")
+@router.get("/runs/{run_id}/stream")
 async def stream_run_progress(
     run_id: str,
     api_key: str = Depends(verify_api_key)
@@ -705,7 +703,7 @@ async def stream_run_progress(
     
     **Example Usage:**
     ```javascript
-    const eventSource = new EventSource('/v1/runs/run_abc123/stream');
+    const eventSource = new EventSource('/api/v1/runs/run_abc123/stream');
     eventSource.addEventListener('progress', (e) => {
         const progress = JSON.parse(e.data);
         console.log(`Progress: ${progress.completed_samples}/${progress.total_samples}`);
@@ -769,7 +767,7 @@ async def stream_run_progress(
 
 # ============= Dataset Endpoints =============
 
-@router.post("/v1/datasets", response_model=DatasetResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/datasets", response_model=DatasetResponse, status_code=status.HTTP_201_CREATED)
 async def create_dataset(
     dataset_request: CreateDatasetRequest,
     api_key: str = Depends(verify_api_key)
@@ -799,7 +797,7 @@ async def create_dataset(
         )
 
 
-@router.get("/v1/datasets", response_model=DatasetListResponse)
+@router.get("/datasets", response_model=DatasetListResponse)
 async def list_datasets(
     limit: int = Query(20, ge=1, le=100),
     after: Optional[str] = Query(None),
@@ -832,7 +830,7 @@ async def list_datasets(
         )
 
 
-@router.get("/v1/datasets/{dataset_id}", response_model=DatasetResponse)
+@router.get("/datasets/{dataset_id}", response_model=DatasetResponse)
 async def get_dataset(
     dataset_id: str,
     api_key: str = Depends(verify_api_key)
@@ -861,7 +859,7 @@ async def get_dataset(
         )
 
 
-@router.delete("/v1/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_dataset(
     dataset_id: str,
     api_key: str = Depends(verify_api_key)

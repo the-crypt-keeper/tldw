@@ -34,12 +34,17 @@ class EvaluationManager:
         self._init_database()
     
     def _get_db_path(self) -> Path:
-        """Get evaluation database path"""
+        """Get evaluation database path with security validation"""
         # Use the same path as the OpenAI-compatible evaluations DB
         if self.config and self.config.has_section("Database"):
             db_path = self.config.get("Database", "evaluations_db_path", fallback="Databases/evaluations.db")
         else:
             db_path = "Databases/evaluations.db"
+        
+        # Sanitize path to prevent directory traversal
+        # Remove any directory traversal attempts
+        db_path = db_path.replace("..", "")
+        db_path = os.path.normpath(db_path)
         
         # Make absolute if relative
         if not os.path.isabs(db_path):
@@ -48,6 +53,18 @@ class EvaluationManager:
             db_path = project_root / db_path
         else:
             db_path = Path(db_path)
+        
+        # Resolve to absolute path and check it's within project boundaries
+        db_path = db_path.resolve()
+        project_root = Path(__file__).parent.parent.parent.parent.resolve()
+        
+        # Ensure the path is within the project directory
+        try:
+            db_path.relative_to(project_root)
+        except ValueError:
+            # Path is outside project directory - use default safe path
+            logger.warning(f"Attempted to use database path outside project: {db_path}")
+            db_path = project_root / "Databases" / "evaluations.db"
         
         # Ensure directory exists
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -66,7 +83,6 @@ class EvaluationManager:
             logger.critical(error_msg)
             
             # Check if we're in a production environment
-            import os
             env = os.getenv('ENVIRONMENT', 'development').lower()
             
             if env in ['production', 'staging']:
@@ -124,7 +140,7 @@ class EvaluationManager:
                     metric_name TEXT NOT NULL,
                     score REAL NOT NULL,
                     created_at TIMESTAMP NOT NULL,
-                    FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id)
+                    FOREIGN KEY (evaluation_id) REFERENCES internal_evaluations(evaluation_id)
                 )
             """)
             
@@ -370,13 +386,57 @@ class EvaluationManager:
                 system_message="You are an expert evaluator. Provide scores and detailed explanations."
             )
             
-            # Parse response
+            # Parse response with strict validation
             import re
-            score_match = re.search(r'\b(\d+)\b', response)
-            score = float(score_match.group(1)) / 10.0 if score_match else 0.5
+            import json as json_module
             
-            # Extract explanation
-            explanation = response.split('\n', 1)[1] if '\n' in response else response
+            # Try to parse as JSON first (most reliable)
+            score = None
+            explanation = response
+            
+            try:
+                # Attempt to parse JSON response
+                parsed = json_module.loads(response)
+                if isinstance(parsed, dict):
+                    if 'score' in parsed:
+                        raw_score = parsed['score']
+                        # Validate score is a number between 0 and 10
+                        if isinstance(raw_score, (int, float)) and 0 <= raw_score <= 10:
+                            score = float(raw_score) / 10.0
+                    if 'explanation' in parsed:
+                        explanation = str(parsed['explanation'])
+            except (json_module.JSONDecodeError, ValueError):
+                # Fallback to regex parsing with strict validation
+                # Only accept scores that are clearly delimited (e.g., "Score: 8")
+                score_patterns = [
+                    r'[Ss]core[:\s]+(\d+(?:\.\d+)?)\s*(?:/\s*10)?',  # Score: 8 or Score: 8/10
+                    r'(\d+(?:\.\d+)?)\s*(?:/\s*10)\s+points?',  # 8/10 points
+                    r'^(\d+(?:\.\d+)?)\s*$'  # Just a number on its own line
+                ]
+                
+                for pattern in score_patterns:
+                    match = re.search(pattern, response, re.MULTILINE)
+                    if match:
+                        try:
+                            raw_score = float(match.group(1))
+                            # Validate range
+                            if 0 <= raw_score <= 10:
+                                score = raw_score / 10.0 if raw_score > 1 else raw_score
+                                break
+                        except (ValueError, IndexError):
+                            continue
+                
+                # Extract explanation (everything after first score mention or first newline)
+                if '\n' in response:
+                    lines = response.split('\n')
+                    # Skip lines that contain just the score
+                    explanation_lines = [l for l in lines if not re.match(r'^\s*\d+(?:\.\d+)?\s*(?:/\s*10)?\s*$', l)]
+                    explanation = '\n'.join(explanation_lines).strip()
+            
+            # Default to 0.5 if no valid score found
+            if score is None:
+                logger.warning(f"Could not parse valid score from response: {response[:100]}...")
+                score = 0.5
             
             return {
                 "metric_name": metric_name,

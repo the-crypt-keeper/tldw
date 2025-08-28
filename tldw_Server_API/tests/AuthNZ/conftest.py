@@ -24,7 +24,7 @@ from tldw_Server_API.app.core.AuthNZ.settings import Settings
 from tldw_Server_API.app.core.AuthNZ.session_manager import SessionManager
 from tldw_Server_API.app.core.AuthNZ.rate_limiter import RateLimiter
 from tldw_Server_API.app.services.registration_service import RegistrationService
-from tldw_Server_API.app.services.audit_service import AuditService
+from tldw_Server_API.app.core.Audit.unified_audit_service import UnifiedAuditService
 from tldw_Server_API.app.services.storage_quota_service import StorageQuotaService
 from tldw_Server_API.app.core.config import settings
 
@@ -56,7 +56,7 @@ async def reset_singletons():
     from tldw_Server_API.app.core.AuthNZ.session_manager import reset_session_manager
     from tldw_Server_API.app.core.AuthNZ.settings import reset_settings
     from tldw_Server_API.app.services.registration_service import reset_registration_service
-    from tldw_Server_API.app.services.audit_service import reset_audit_service
+    from tldw_Server_API.app.core.Audit.unified_audit_service import shutdown_audit_service
     
     # Disable CSRF protection for tests
     original_csrf_setting = settings.get('CSRF_ENABLED')
@@ -66,7 +66,7 @@ async def reset_singletons():
     await reset_session_manager()
     reset_settings()
     await reset_registration_service()
-    await reset_audit_service()
+    await shutdown_audit_service()
     
     # Clear any FastAPI dependency overrides
     app.dependency_overrides.clear()
@@ -78,7 +78,7 @@ async def reset_singletons():
     await reset_session_manager()
     reset_settings()
     await reset_registration_service()
-    await reset_audit_service()
+    await shutdown_audit_service()
     app.dependency_overrides.clear()
     
     # Restore original CSRF setting
@@ -245,13 +245,13 @@ async def isolated_test_environment(monkeypatch):
     from tldw_Server_API.app.core.AuthNZ.session_manager import reset_session_manager
     from tldw_Server_API.app.core.AuthNZ.settings import reset_settings
     from tldw_Server_API.app.services.registration_service import reset_registration_service
-    from tldw_Server_API.app.services.audit_service import reset_audit_service
+    from tldw_Server_API.app.core.Audit.unified_audit_service import shutdown_audit_service
     
     await reset_db_pool()
     await reset_session_manager()
     reset_settings()
     await reset_registration_service()
-    await reset_audit_service()
+    await shutdown_audit_service()
     
     # 6. Clear app dependency overrides
     app.dependency_overrides.clear()
@@ -265,7 +265,7 @@ async def isolated_test_environment(monkeypatch):
     await reset_session_manager()
     reset_settings()
     await reset_registration_service()
-    await reset_audit_service()
+    await shutdown_audit_service()
     
     # 9. Drop the unique database
     cleanup_conn = await asyncpg.connect(
@@ -612,7 +612,9 @@ async def registration_service(test_db_pool, password_service):
 @pytest.fixture
 async def audit_service(test_db_pool):
     """Create an audit service instance for testing."""
-    return AuditService(test_db_pool)
+    service = UnifiedAuditService()
+    await service.initialize()
+    return service
 
 
 @pytest.fixture

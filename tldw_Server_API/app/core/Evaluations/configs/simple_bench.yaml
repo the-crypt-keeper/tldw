@@ -1,0 +1,17 @@
+name: simple_bench
+description: Simple reasoning problems with detailed scenarios
+evaluation_type: multiple_choice
+dataset_source: https://raw.githubusercontent.com/simple-bench/SimpleBench/main/simple_bench_public.json
+dataset_format: json
+field_mappings:
+  question: prompt
+  correct_answer: answer
+  question_id: question_id
+evaluation_params:
+  num_choices: 6
+  require_reasoning: false
+metadata:
+  repository: https://github.com/simple-bench/SimpleBench
+  description: >
+    SimpleBench contains reasoning problems with detailed narrative scenarios
+    that test logical thinking and problem-solving abilities.

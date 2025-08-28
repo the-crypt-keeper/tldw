@@ -11,6 +11,13 @@ https://github.com/qixucen/atom
 https://gist.githubusercontent.com/transitive-bullshit/487c9cb52c75a9701d312334ed53b20c/raw/d50ae033bbb0bea41026e338e70d7435f651ae5d/claude-code-prompts.js
 https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools
 https://github.com/jamesponddotco/llm-prompts/tree/trunk
+https://github.com/jamesponddotco/llm-prompts/blob/trunk/data/socratic-coder.md
+https://github.com/jamesponddotco/llm-prompts/blob/trunk/data/brainstorm-specification.md
+https://github.com/jamesponddotco/llm-prompts/blob/trunk/data/brainstorm-critique.md
+https://github.com/jamesponddotco/llm-prompts/blob/trunk/data/socratic-coder.md
+https://news.ycombinator.com/item?id=44838018
+
+
 
 https://ai-sdk.dev/elements/components/prompt-input
 https://dspy.ai/api/optimizers/MIPROv2/

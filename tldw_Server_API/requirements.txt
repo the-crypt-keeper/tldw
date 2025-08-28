@@ -1,5 +1,6 @@
 # Requirements.txt for tldw Server API. Sorted into categories.
 # Audio
+av  # For audio encoding/streaming
 faster_whisper
 kokoro_onnx
 nemo_toolkit

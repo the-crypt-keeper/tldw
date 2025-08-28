@@ -30,17 +30,35 @@ class ToastManager {
             info: 'ℹ'
         };
 
-        toast.innerHTML = `
-            <span class="toast-icon">${icons[type] || icons.info}</span>
-            <div class="toast-content">
-                ${title ? `<div class="toast-title">${title}</div>` : ''}
-                <div class="toast-message">${message}</div>
-            </div>
-            <button class="toast-close" aria-label="Close">×</button>
-        `;
-
-        const closeBtn = toast.querySelector('.toast-close');
+        // Create toast elements safely
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'toast-icon';
+        iconSpan.textContent = icons[type] || icons.info;
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'toast-content';
+        
+        if (title) {
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'toast-title';
+            titleDiv.textContent = title;
+            contentDiv.appendChild(titleDiv);
+        }
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'toast-message';
+        messageDiv.textContent = message;  // Safe text content
+        contentDiv.appendChild(messageDiv);
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'toast-close';
+        closeBtn.setAttribute('aria-label', 'Close');
+        closeBtn.textContent = '×';
         closeBtn.onclick = () => this.remove(toast);
+        
+        toast.appendChild(iconSpan);
+        toast.appendChild(contentDiv);
+        toast.appendChild(closeBtn);
 
         this.container.appendChild(toast);
 
@@ -90,12 +108,20 @@ class LoadingIndicator {
         const overlay = document.createElement('div');
         overlay.className = 'loading-overlay';
         overlay.id = loaderId;
-        overlay.innerHTML = `
-            <div class="loading-content">
-                <div class="loading-spinner"></div>
-                <div class="loading-message">${message}</div>
-            </div>
-        `;
+        // Create loading elements safely
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'loading-content';
+        
+        const spinnerDiv = document.createElement('div');
+        spinnerDiv.className = 'loading-spinner';
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'loading-message';
+        messageDiv.textContent = message;  // Safe text content
+        
+        contentDiv.appendChild(spinnerDiv);
+        contentDiv.appendChild(messageDiv);
+        overlay.appendChild(contentDiv);
 
         element.style.position = 'relative';
         element.appendChild(overlay);

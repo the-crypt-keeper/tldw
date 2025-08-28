@@ -114,6 +114,15 @@ See the [Migration Guide](#migration-guide) if upgrading from a previous version
 - **Character Chat**: SillyTavern-compatible character cards
 - **Soft Delete**: Trash system with recovery options
 
+### Chatbooks - Portable Content Archives
+- **Export/Import**: Back up and migrate your content between servers
+- **Selective Export**: Choose specific conversations, notes, and characters to include
+- **Media Preservation**: Optionally include images, audio, and video files
+- **Conflict Resolution**: Smart handling of duplicate content during import
+- **Background Processing**: Async job queue for large exports/imports
+- **Version Control**: Create snapshots of your knowledge base at specific points
+- **Sharing**: Share curated collections with colleagues or team members
+
 ### Advanced Features
 - **MCP Server**: Model Context Protocol for tool integration and extensibility
 - **Database Migrations**: Automatic schema updates with versioning
@@ -199,11 +208,11 @@ python -m uvicorn tldw_Server_API.app.main:app --reload
 
 ```bash
 # CPU only
-docker build -f Helper_Scripts/Dockerfiles/tldw_cpu_Dockerfile -t tldw-cpu .
+docker build -f tldw_Server_API/Dockerfiles/Dockerfile -t tldw-cpu .
 docker run -p 8000:8000 tldw-cpu
 
 # With GPU support
-docker build -f Helper_Scripts/Dockerfiles/tldw_nvidia_Dockerfile -t tldw-gpu .
+docker build -f tldw_Server_API/Dockerfiles/Dockerfile -t tldw-gpu .
 docker run --gpus all -p 8000:8000 tldw-gpu
 ```
 
@@ -388,6 +397,14 @@ Full API documentation is available at `http://localhost:8000/docs` when the ser
 - `POST /api/v1/prompts` - Create prompt
 - `GET /api/v1/prompts` - List prompts
 
+#### Chatbooks
+- `POST /api/v1/chatbooks/export` - Export content to chatbook
+- `POST /api/v1/chatbooks/import` - Import chatbook file
+- `POST /api/v1/chatbooks/preview` - Preview chatbook contents
+- `GET /api/v1/chatbooks/export/jobs` - List export jobs
+- `GET /api/v1/chatbooks/import/jobs` - List import jobs
+- `GET /api/v1/chatbooks/download/{job_id}` - Download exported chatbook
+
 #### Advanced Features
 - `POST /api/v1/chunking/chunk` - Chunk text content
 - `POST /api/v1/research/arxiv` - Search arXiv papers
@@ -443,6 +460,27 @@ curl -X POST "http://localhost:8000/api/v1/rag/agent" \
     "message": "Explain neural networks based on my notes",
     "search_databases": ["media_db", "notes"]
   }'
+```
+
+#### Chatbook Export/Import
+```bash
+# Export all content to a chatbook
+curl -X POST "http://localhost:8000/api/v1/chatbooks/export" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
+  -d '{
+    "name": "Weekly Backup",
+    "description": "Full backup of all content",
+    "content_selections": {},
+    "include_media": true,
+    "async_mode": true
+  }'
+
+# Import a chatbook
+curl -X POST "http://localhost:8000/api/v1/chatbooks/import" \
+  -H "Authorization: Bearer your-api-key" \
+  -F "file=@my_chatbook.chatbook" \
+  -F 'options={"conflict_resolution": "skip"}'
 ```
 
 </details>

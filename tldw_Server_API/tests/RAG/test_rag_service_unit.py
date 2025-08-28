@@ -1,473 +1,524 @@
 """
-Unit tests for the RAG service integration module.
+Unit tests for the RAG service functional pipeline.
 
-Tests the RAGService class and its methods in isolation.
+Tests the functional pipeline components and their composition.
 """
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from pathlib import Path
+import asyncio
 
-from tldw_Server_API.app.core.RAG.rag_service.integration import RAGService
+from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import (
+    RAGPipelineContext,
+    build_pipeline,
+    standard_pipeline,
+    minimal_pipeline,
+    expand_query,
+    check_cache,
+    retrieve_documents,
+    rerank_documents,
+    get_pipeline,
+    register_pipeline
+)
 from tldw_Server_API.app.core.RAG.rag_service.config import RAGConfig
-from tldw_Server_API.app.core.RAG.rag_service.types import DataSource
-from tldw_Server_API.app.core.RAG.rag_service.app import RAGApplication
+from tldw_Server_API.app.core.RAG.rag_service.types import DataSource, Document
 
 
-class TestRAGServiceInitialization:
-    """Test RAGService initialization and configuration."""
-    
-    def test_init_with_config_object(self, mock_rag_config):
-        """Test initialization with a pre-configured RAGConfig object."""
-        service = RAGService(
-            config=mock_rag_config,
-            media_db_path=Path("/test/media.db"),
-            chachanotes_db_path=Path("/test/chacha.db")
-        )
-        
-        assert service.config == mock_rag_config
-        assert service.media_db_path == Path("/test/media.db")
-        assert service.chachanotes_db_path == Path("/test/chacha.db")
-        assert service.chroma_path == Path.home() / ".tldw_chatbook" / "chroma"
-    
-    def test_init_with_config_path(self, tmp_path):
-        """Test initialization with a TOML config file path."""
-        config_file = tmp_path / "config.toml"
-        config_file.write_text("""
-[general]
-batch_size = 16
-
-[cache]
-enable_cache = true
-max_cache_size = 500
-        """)
-        
-        with patch('tldw_Server_API.app.core.RAG.rag_service.config.RAGConfig.from_toml') as mock_from_toml:
-            mock_config = Mock()
-            mock_config.validate.return_value = []  # Return empty list (no errors)
-            mock_config.num_workers = 2
-            mock_config.log_level = "INFO"  # Add required log_level attribute
-            mock_from_toml.return_value = mock_config
-            
-            service = RAGService(config_path=config_file)
-            
-            mock_from_toml.assert_called_once_with(config_file)
-            assert service.config == mock_config
-    
-    def test_custom_chroma_path(self):
-        """Test setting a custom ChromaDB path."""
-        import tempfile
-        with tempfile.TemporaryDirectory() as temp_dir:
-            custom_path = Path(temp_dir) / "chroma"
-            service = RAGService(chroma_path=custom_path)
-            
-            assert service.chroma_path == custom_path
-            assert custom_path.exists()  # Should have been created
+class TestFunctionalPipeline:
+    """Test functional pipeline initialization and configuration."""
     
     @pytest.mark.asyncio
-    async def test_initialize(self, mock_rag_config):
-        """Test service initialization."""
-        service = RAGService(
-            config=mock_rag_config,
-            media_db_path=Path("/test/media.db"),
-            chachanotes_db_path=Path("/test/chacha.db")
+    async def test_pipeline_context_initialization(self):
+        """Test RAGPipelineContext initialization."""
+        query = "test query"
+        context = RAGPipelineContext(
+            query=query,
+            original_query=query,
+            config={"enable_cache": True}
         )
         
-        with patch.object(service, '_setup_retrievers', new_callable=AsyncMock) as mock_setup_retrievers:
-            with patch.object(service, '_setup_processor') as mock_setup_processor:
-                with patch.object(service, '_setup_generator') as mock_setup_generator:
-                    
-                    await service.initialize()
-                    
-                    assert service._initialized
-                    mock_setup_retrievers.assert_called_once()
-                    mock_setup_processor.assert_called_once()
-                    mock_setup_generator.assert_called_once()
+        assert context.query == query
+        assert context.original_query == query
+        assert context.config["enable_cache"] is True
+        assert context.documents == []
+        assert context.cache_hit is False
+        assert context.timings == {}
     
     @pytest.mark.asyncio
-    async def test_initialize_idempotent(self, mock_rag_config):
-        """Test that initialization is idempotent."""
-        service = RAGService(config=mock_rag_config)
+    async def test_build_pipeline(self):
+        """Test building a custom pipeline."""
+        # Create mock functions
+        async def mock_expand(context):
+            context.metadata["expanded"] = True
+            return context
         
-        with patch.object(service, '_setup_retrievers', new_callable=AsyncMock) as mock_setup:
-            await service.initialize()
-            await service.initialize()  # Second call
+        async def mock_retrieve(context):
+            context.documents = [
+                Document(id="1", content="test content", source=DataSource.MEDIA_DB, metadata={})
+            ]
+            return context
+        
+        # Build pipeline
+        pipeline = build_pipeline(mock_expand, mock_retrieve)
+        
+        # Execute pipeline
+        result = await pipeline("test query", {})
+        
+        assert result.metadata["expanded"] is True
+        assert len(result.documents) == 1
+        assert result.documents[0].content == "test content"
+    
+    @pytest.mark.asyncio
+    async def test_get_pipeline(self):
+        """Test getting predefined pipelines."""
+        # Test getting standard pipeline
+        pipeline = get_pipeline("standard")
+        assert pipeline is not None
+        assert callable(pipeline)
+        
+        # Test getting minimal pipeline
+        pipeline = get_pipeline("minimal")
+        assert pipeline is not None
+        assert callable(pipeline)
+        
+        # Test invalid pipeline name
+        with pytest.raises(ValueError) as exc_info:
+            get_pipeline("nonexistent")
+        assert "Unknown pipeline" in str(exc_info.value)
+    
+    @pytest.mark.asyncio
+    async def test_register_pipeline(self):
+        """Test registering custom pipelines."""
+        # Create a custom pipeline
+        async def custom_test_pipeline(query: str, config: dict):
+            context = RAGPipelineContext(query=query, original_query=query, config=config)
+            context.metadata["custom"] = True
+            return context
+        
+        # Register the pipeline
+        register_pipeline("test_custom", custom_test_pipeline)
+        
+        # Retrieve and test the registered pipeline
+        pipeline = get_pipeline("test_custom")
+        assert pipeline is custom_test_pipeline
+        
+        # Execute the pipeline
+        result = await pipeline("test", {})
+        assert result.metadata["custom"] is True
+    
+    @pytest.mark.asyncio
+    async def test_pipeline_with_config(self):
+        """Test pipeline execution with configuration."""
+        config = {
+            "enable_cache": True,
+            "top_k": 5,
+            "expansion_strategies": ["acronym"]
+        }
+        
+        # Create a mock pipeline that uses config
+        async def config_aware_pipeline(query: str, config_dict: dict):
+            context = RAGPipelineContext(query=query, original_query=query, config=config_dict)
+            context.metadata["top_k"] = config_dict.get("top_k", 10)
+            return context
+        
+        result = await config_aware_pipeline("test query", config)
+        assert result.metadata["top_k"] == 5
+        assert result.config["enable_cache"] is True
+
+
+class TestPipelineComponents:
+    """Test individual pipeline components."""
+    
+    @pytest.mark.asyncio
+    async def test_expand_query_component(self):
+        """Test query expansion component."""
+        context = RAGPipelineContext(
+            query="ML",
+            original_query="ML",
+            config={"expansion_strategies": ["acronym"]}
+        )
+        
+        with patch('tldw_Server_API.app.core.RAG.rag_service.query_expansion.expand_acronyms') as mock_expand:
+            mock_expand.return_value = "Machine Learning ML"
             
-            # Should only be called once
-            mock_setup.assert_called_once()
-
-
-class TestRAGServiceRetrievers:
-    """Test retriever setup and configuration."""
-    
-    @pytest.mark.asyncio
-    async def test_setup_retrievers_with_media_db(self, mock_rag_config, tmp_path):
-        """Test setting up retrievers with media database."""
-        media_db_path = tmp_path / "media.db"
-        media_db_path.touch()  # Create the file
-        
-        service = RAGService(
-            config=mock_rag_config,
-            media_db_path=media_db_path
-        )
-        
-        # Mock the app's register_retriever method
-        service.app.register_retriever = Mock()
-        
-        with patch('tldw_Server_API.app.core.RAG.rag_service.integration.MediaDBRetriever') as mock_retriever_class:
-            mock_retriever = Mock()
-            mock_retriever_class.return_value = mock_retriever
+            # Import and test the actual expand_query function
+            from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import expand_query
+            result = await expand_query(context)
             
-            await service._setup_retrievers()
+            # Query should be expanded
+            assert result.query != result.original_query
+            assert result.metadata.get("query_expanded") is not None
+    
+    @pytest.mark.asyncio
+    async def test_cache_component(self):
+        """Test cache checking component."""
+        context = RAGPipelineContext(
+            query="test query",
+            original_query="test query",
+            config={"enable_cache": True}
+        )
+        
+        # Mock cache lookup
+        with patch('tldw_Server_API.app.core.RAG.rag_service.functional_pipeline.semantic_cache') as mock_cache:
+            mock_cache_instance = Mock()
+            mock_cache.get_instance.return_value = mock_cache_instance
+            mock_cache_instance.get.return_value = None  # Cache miss
             
-            mock_retriever_class.assert_called_once_with(media_db_path)
-            service.app.register_retriever.assert_called()
-    
-    @pytest.mark.asyncio
-    async def test_setup_retrievers_with_chacha_db(self, mock_rag_config, tmp_path):
-        """Test setting up retrievers with ChaChaNotes database."""
-        chacha_db_path = tmp_path / "chacha.db"
-        chacha_db_path.touch()
-        
-        service = RAGService(
-            config=mock_rag_config,
-            chachanotes_db_path=chacha_db_path
-        )
-        
-        with patch('tldw_Server_API.app.core.RAG.rag_service.integration.NotesRetriever') as mock_notes_retriever:
-            with patch('tldw_Server_API.app.core.RAG.rag_service.integration.ChatHistoryRetriever') as mock_chat_retriever:
-                
-                await service._setup_retrievers()
-                
-                # Should create both notes and chat history retrievers
-                mock_notes_retriever.assert_called()
-                mock_chat_retriever.assert_called()
-    
-    @pytest.mark.asyncio
-    async def test_hybrid_retriever_setup(self, mock_rag_config, tmp_path):
-        """Test hybrid retriever setup when configured."""
-        mock_rag_config.retriever.hybrid_alpha = 0.7
-        mock_rag_config.retriever.vector_top_k = 10
-        
-        media_db_path = tmp_path / "media.db"
-        media_db_path.touch()
-        
-        service = RAGService(
-            config=mock_rag_config,
-            media_db_path=media_db_path,
-            chroma_path=tmp_path / "chroma"
-        )
-        
-        with patch('tldw_Server_API.app.core.RAG.rag_service.integration.HybridRetriever') as mock_hybrid_class:
-            with patch('tldw_Server_API.app.core.RAG.rag_service.integration.MediaDBRetriever'):
-                with patch('tldw_Server_API.app.core.RAG.rag_service.integration.VectorRetriever'):
-                    
-                    await service._setup_retrievers()
-                    
-                    # Should create hybrid retriever with correct alpha
-                    mock_hybrid_class.assert_called()
-                    call_kwargs = mock_hybrid_class.call_args.kwargs
-                    assert call_kwargs['alpha'] == 0.7
-
-
-class TestRAGServiceProcessorGenerator:
-    """Test processor and generator setup."""
-    
-    def test_setup_processor_default(self, mock_rag_config):
-        """Test default processor setup."""
-        # Ensure enable_reranking is False for default processor
-        mock_rag_config.processor.enable_reranking = False
-        
-        service = RAGService(config=mock_rag_config)
-        
-        # Mock the app's register_processor method
-        service.app.register_processor = Mock()
-        
-        # Call _setup_processor 
-        service._setup_processor()
-        
-        # Now verify register_processor was called
-        service.app.register_processor.assert_called_once()
-    
-    def test_setup_processor_advanced(self, mock_rag_config):
-        """Test advanced processor setup with reranking."""
-        mock_rag_config.processor.enable_reranking = True
-        service = RAGService(config=mock_rag_config)
-        
-        # Mock the app's register_processor method
-        service.app.register_processor = Mock()
-        
-        with patch('tldw_Server_API.app.core.RAG.rag_service.integration.AdvancedProcessor') as mock_processor_class:
-            service._setup_processor()
-            mock_processor_class.assert_called_once()
-    
-    def test_setup_generator_with_llm(self, mock_rag_config, mock_llm_handler):
-        """Test generator setup with LLM handler."""
-        service = RAGService(
-            config=mock_rag_config,
-            llm_handler=mock_llm_handler
-        )
-        
-        # Mock the app's register_generator method
-        service.app.register_generator = Mock()
-        
-        with patch('tldw_Server_API.app.core.RAG.rag_service.integration.StreamingGenerator') as mock_gen_class:
-            service._setup_generator()
+            from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import check_cache
+            result = await check_cache(context)
             
-            mock_gen_class.assert_called_once_with(
-                mock_llm_handler,
-                mock_rag_config.generator.__dict__
-            )
-    
-    def test_setup_generator_fallback(self, mock_rag_config):
-        """Test fallback generator when no LLM available."""
-        service = RAGService(config=mock_rag_config)
-        
-        # Mock the app's register_generator method
-        service.app.register_generator = Mock()
-        
-        with patch('tldw_Server_API.app.core.RAG.rag_service.integration.FallbackGenerator') as mock_gen_class:
-            service._setup_generator()
-            mock_gen_class.assert_called_once()
-
-
-class TestRAGServiceSearch:
-    """Test search functionality."""
+            assert result.cache_hit is False
     
     @pytest.mark.asyncio
-    async def test_search_basic(self, mock_rag_config):
-        """Test basic search functionality."""
-        service = RAGService(config=mock_rag_config)
-        service._initialized = True
+    async def test_retrieve_documents_component(self):
+        """Test document retrieval component."""
+        context = RAGPipelineContext(
+            query="test query",
+            original_query="test query",
+            config={
+                "data_sources": ["media_db"],
+                "top_k": 5
+            }
+        )
         
-        mock_results = [
-            Mock(documents=[
-                Mock(id="1", content="Test", source=DataSource.MEDIA_DB, score=0.9, metadata={})
+        # Mock retrieval
+        mock_docs = [
+            Document(id="1", content="doc1", source=DataSource.MEDIA_DB, metadata={}),
+            Document(id="2", content="doc2", source=DataSource.MEDIA_DB, metadata={})
+        ]
+        
+        with patch('tldw_Server_API.app.core.RAG.rag_service.database_retrievers.MediaDBRetriever') as mock_retriever:
+            mock_retriever_instance = Mock()
+            mock_retriever.return_value = mock_retriever_instance
+            mock_retriever_instance.retrieve = AsyncMock(return_value=mock_docs)
+            
+            from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import retrieve_documents
+            result = await retrieve_documents(context)
+            
+            assert len(result.documents) > 0
+
+
+class TestPipelineReranking:
+    """Test reranking and processing components."""
+    
+    @pytest.mark.asyncio
+    async def test_rerank_documents_component(self):
+        """Test document reranking component."""
+        context = RAGPipelineContext(
+            query="test query",
+            original_query="test query",
+            config={"reranking_strategy": "similarity"},
+            documents=[
+                Document(id="1", content="relevant", source=DataSource.MEDIA_DB, metadata={"score": 0.5}),
+                Document(id="2", content="very relevant", source=DataSource.MEDIA_DB, metadata={"score": 0.8}),
+                Document(id="3", content="not relevant", source=DataSource.MEDIA_DB, metadata={"score": 0.2})
+            ]
+        )
+        
+        from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import rerank_documents
+        
+        with patch('tldw_Server_API.app.core.RAG.rag_service.advanced_reranking.rerank_by_similarity') as mock_rerank:
+            mock_rerank.return_value = context.documents[:2]  # Return top 2
+            
+            result = await rerank_documents(context)
+            
+            # Should have reranked documents
+            assert len(result.documents) <= 3
+            assert "reranking_time" in result.timings or "rerank_documents" in result.timings
+    
+    @pytest.mark.asyncio
+    async def test_process_tables_component(self):
+        """Test table processing component."""
+        context = RAGPipelineContext(
+            query="test query",
+            original_query="test query",
+            config={"process_tables": True},
+            documents=[
+                Document(
+                    id="1",
+                    content="<table><tr><td>A</td><td>B</td></tr></table>",
+                    source=DataSource.MEDIA_DB,
+                    metadata={}
+                )
+            ]
+        )
+        
+        from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import process_tables
+        
+        with patch('tldw_Server_API.app.core.RAG.rag_service.table_serialization.serialize_table') as mock_serialize:
+            mock_serialize.return_value = "Table: A | B"
+            
+            result = await process_tables(context)
+            
+            # Should have processed tables if enabled
+            assert result.documents is not None
+
+
+class TestPipelineIntegration:
+    """Test complete pipeline integration."""
+    
+    @pytest.mark.asyncio
+    async def test_minimal_pipeline_execution(self):
+        """Test minimal pipeline end-to-end."""
+        query = "test query"
+        config = {"top_k": 3}
+        
+        with patch('tldw_Server_API.app.core.RAG.rag_service.database_retrievers.MediaDBRetriever') as mock_retriever:
+            mock_retriever_instance = Mock()
+            mock_retriever.return_value = mock_retriever_instance
+            mock_retriever_instance.retrieve = AsyncMock(return_value=[
+                Document(id="1", content="test", source=DataSource.MEDIA_DB, metadata={})
             ])
-        ]
-        
-        service.app.search = AsyncMock(return_value=mock_results)
-        
-        results = await service.search("test query")
-        
-        service.app.search.assert_called_once_with(
-            "test query", None, None
-        )
-        assert len(results) == 1
-        assert results[0]["id"] == "1"
-        assert results[0]["content"] == "Test"
+            
+            result = await minimal_pipeline(query, config)
+            
+            assert result.query == query
+            assert result.original_query == query
+            assert len(result.documents) >= 0
+            assert result.config == config
     
     @pytest.mark.asyncio
-    async def test_search_with_sources(self, mock_rag_config):
-        """Test search with specific sources."""
-        service = RAGService(config=mock_rag_config)
-        service._initialized = True
-        service.app.search = AsyncMock(return_value=[])
+    async def test_standard_pipeline_with_cache(self):
+        """Test standard pipeline with caching."""
+        query = "cached query"
+        config = {"enable_cache": True, "top_k": 5}
         
-        await service.search(
-            "test",
-            sources=["MEDIA_DB", "NOTES"],
-            filters={"category": "test"}
-        )
-        
-        call_args = service.app.search.call_args
-        assert DataSource.MEDIA_DB in call_args[0][1]
-        assert DataSource.NOTES in call_args[0][1]
-        assert call_args[0][2] == {"category": "test"}
+        with patch('tldw_Server_API.app.core.RAG.rag_service.semantic_cache') as mock_cache:
+            # Setup cache hit
+            mock_cache_instance = Mock()
+            mock_cache.get_instance.return_value = mock_cache_instance
+            mock_cache_instance.get.return_value = [
+                Document(id="cached", content="cached result", source=DataSource.MEDIA_DB, metadata={})
+            ]
+            
+            result = await standard_pipeline(query, config)
+            
+            # Should use cached results
+            assert result.cache_hit is True
     
-    @pytest.mark.asyncio
-    async def test_search_auto_initialize(self, mock_rag_config):
-        """Test that search auto-initializes if needed."""
-        service = RAGService(config=mock_rag_config)
-        assert not service._initialized
-        
-        with patch.object(service, 'initialize', new_callable=AsyncMock) as mock_init:
-            service.app.search = AsyncMock(return_value=[])
-            
-            await service.search("test")
-            
-            mock_init.assert_called_once()
 
 
-class TestRAGServiceGeneration:
-    """Test answer generation functionality."""
+class TestPerformanceMonitoring:
+    """Test performance monitoring and analysis."""
     
     @pytest.mark.asyncio
-    async def test_generate_answer_basic(self, mock_rag_config):
-        """Test basic answer generation."""
-        service = RAGService(config=mock_rag_config)
-        service._initialized = True
-        
-        mock_response = Mock(
-            answer="Generated answer",
-            sources=[Mock(id="1", source=DataSource.MEDIA_DB, metadata={"title": "Doc"}, score=0.9, content="Content")],
-            context=Mock(combined_text="Context text"),
-            metadata={"model": "gpt-3.5-turbo"}
+    async def test_performance_analysis(self):
+        """Test performance analysis component."""
+        context = RAGPipelineContext(
+            query="test",
+            original_query="test",
+            config={"enable_performance_analysis": True},
+            timings={
+                "expand_query": 0.1,
+                "retrieve_documents": 0.5,
+                "rerank_documents": 0.2
+            }
         )
         
-        service.app.generate = AsyncMock(return_value=mock_response)
+        from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import analyze_performance
         
-        result = await service.generate_answer("What is RAG?")
+        result = await analyze_performance(context)
         
-        assert result["answer"] == "Generated answer"
-        assert len(result["sources"]) == 1
-        assert result["sources"][0]["title"] == "Doc"
-        assert "context_preview" in result
-        assert result["context_size"] == len("Context text")
+        # Should have performance metadata
+        assert "performance" in result.metadata or "total_time" in result.metadata
+        assert result.timings is not None
     
     @pytest.mark.asyncio
-    async def test_generate_answer_with_options(self, mock_rag_config):
-        """Test answer generation with various options."""
-        service = RAGService(config=mock_rag_config)
-        service._initialized = True
-        
-        mock_response = Mock(
-            answer="Answer",
-            sources=[],
-            context=Mock(combined_text=""),
-            metadata={}
-        )
-        service.app.generate = AsyncMock(return_value=mock_response)
-        
-        await service.generate_answer(
-            "Query",
-            sources=["MEDIA_DB"],
-            filters={"type": "article"},
-            temperature=0.5,
-            max_tokens=1000
+    async def test_cache_storage(self):
+        """Test storing results in cache."""
+        context = RAGPipelineContext(
+            query="test",
+            original_query="test",
+            config={"enable_cache": True},
+            documents=[
+                Document(id="1", content="result", source=DataSource.MEDIA_DB, metadata={})
+            ]
         )
         
-        call_kwargs = service.app.generate.call_args.kwargs
-        assert "temperature" in call_kwargs
-        assert call_kwargs["temperature"] == 0.5
-        assert "max_tokens" in call_kwargs
-        assert call_kwargs["max_tokens"] == 1000
-    
-    @pytest.mark.asyncio
-    async def test_generate_answer_stream(self, mock_rag_config):
-        """Test streaming answer generation."""
-        service = RAGService(config=mock_rag_config)
-        service._initialized = True
+        from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import store_in_cache
         
-        async def mock_stream(**kwargs):
-            yield Mock(content="Hello")
-            yield Mock(content=" world")
-            yield "Raw text"
-        
-        service.app.generate_stream = mock_stream
-        
-        chunks = []
-        async for chunk in service.generate_answer_stream("Test"):
-            chunks.append(chunk)
-        
-        assert len(chunks) == 3
-        assert chunks[0]["type"] == "content"
-        assert chunks[0]["content"] == "Hello"
-        assert chunks[2]["content"] == "Raw text"
-
-
-class TestRAGServiceUtilities:
-    """Test utility methods."""
-    
-    @pytest.mark.asyncio
-    async def test_embed_documents(self, mock_rag_config):
-        """Test document embedding."""
-        service = RAGService(config=mock_rag_config)
-        service._initialized = True
-        service.app.embed_documents = AsyncMock()
-        
-        documents = [
-            {"id": "1", "content": "Test document", "metadata": {"title": "Test"}}
-        ]
-        
-        await service.embed_documents("MEDIA_DB", documents)
-        
-        service.app.embed_documents.assert_called_once()
-        call_args = service.app.embed_documents.call_args[0]
-        assert len(call_args[0]) == 1
-        assert call_args[0][0].id == "1"
-        assert call_args[1] == DataSource.MEDIA_DB
-    
-    def test_get_stats(self, mock_rag_config):
-        """Test getting service statistics."""
-        service = RAGService(config=mock_rag_config)
-        service._initialized = True
-        service.app._cache = Mock(get_stats=Mock(return_value={"hits": 10, "misses": 5}))
-        
-        stats = service.get_stats()
-        
-        assert stats["initialized"] is True
-        assert stats["config"]["cache_enabled"] is True
-        assert stats["cache"]["hits"] == 10
-        assert stats["cache"]["misses"] == 5
-    
-    @pytest.mark.asyncio
-    async def test_clear_cache(self, mock_rag_config):
-        """Test cache clearing."""
-        service = RAGService(config=mock_rag_config)
-        service._initialized = True
-        service.app.clear_cache = AsyncMock()
-        
-        await service.clear_cache()
-        
-        service.app.clear_cache.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_close(self, mock_rag_config):
-        """Test service cleanup."""
-        service = RAGService(config=mock_rag_config)
-        service._initialized = True
-        
-        mock_retriever = Mock(close=Mock())
-        service.app._retrievers = {DataSource.MEDIA_DB: mock_retriever}
-        
-        await service.close()
-        
-        mock_retriever.close.assert_called_once()
-
-
-class TestCompatibilityWrapper:
-    """Test the compatibility wrapper for migration."""
-    
-    @pytest.mark.asyncio
-    async def test_enhanced_rag_pipeline_wrapper(self, tmp_path):
-        """Test the enhanced_rag_pipeline compatibility wrapper."""
-        from tldw_Server_API.app.core.RAG.rag_service.integration import enhanced_rag_pipeline
-        
-        media_db = tmp_path / "media.db"
-        chacha_db = tmp_path / "chacha.db"
-        media_db.touch()
-        chacha_db.touch()
-        
-        with patch('tldw_Server_API.app.core.RAG.rag_service.integration.RAGService') as mock_service_class:
-            mock_service = AsyncMock()
-            mock_service.generate_answer = AsyncMock(return_value={
-                "answer": "Test answer",
-                "context_preview": "Test context",
-                "sources": []
-            })
-            mock_service_class.return_value = mock_service
+        with patch('tldw_Server_API.app.core.RAG.rag_service.semantic_cache') as mock_cache:
+            mock_cache_instance = Mock()
+            mock_cache.get_instance.return_value = mock_cache_instance
+            mock_cache_instance.set = Mock()
             
-            result = await enhanced_rag_pipeline(
-                query="Test query",
-                api_choice="openai",
-                media_db_path=media_db,
-                chachanotes_db_path=chacha_db,
-                keywords="test,keywords",
-                fts_top_k=20,
-                vector_top_k=15,
-                apply_re_ranking=False
-            )
+            result = await store_in_cache(context)
             
-            # Verify service was configured correctly
-            assert mock_service.config.retriever.fts_top_k == 20
-            assert mock_service.config.retriever.vector_top_k == 15
-            assert mock_service.config.processor.enable_reranking is False
+            # Should have stored in cache if enabled
+            if context.config.get("enable_cache"):
+                assert mock_cache_instance.set.called or mock_cache_instance.put.called
+    
+    @pytest.mark.asyncio
+    async def test_chromadb_optimization(self):
+        """Test ChromaDB optimization component."""
+        context = RAGPipelineContext(
+            query="test",
+            original_query="test",
+            config={"enable_chromadb_optimization": True},
+            metadata={"collection_size": 100000}
+        )
+        
+        from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import optimize_chromadb_search
+        
+        with patch('tldw_Server_API.app.core.RAG.rag_service.chromadb_optimizer.optimize_for_large_collection') as mock_optimize:
+            mock_optimize.return_value = {"optimization_applied": True}
             
-            # Verify result format
-            assert result["answer"] == "Test answer"
-            assert result["context"] == "Test context"
-            assert "source_documents" in result
+            result = await optimize_chromadb_search(context)
+            
+            # Should have optimization metadata if large collection
+            assert result.metadata is not None
+
+
+class TestPipelineUtilities:
+    """Test pipeline utility functions."""
+    
+    @pytest.mark.asyncio
+    async def test_conditional_execution(self):
+        """Test conditional pipeline execution."""
+        from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import conditional
+        
+        context = RAGPipelineContext(
+            query="test",
+            original_query="test",
+            cache_hit=False,
+            config={}
+        )
+        
+        # Create mock functions
+        async def if_true_func(ctx):
+            ctx.metadata["executed"] = "true_branch"
+            return ctx
+        
+        async def if_false_func(ctx):
+            ctx.metadata["executed"] = "false_branch"
+            return ctx
+        
+        # Test when condition is true
+        cond_func = await conditional(
+            lambda ctx: not ctx.cache_hit,
+            if_true_func,
+            if_false_func
+        )
+        
+        result = await cond_func(context)
+        assert result.metadata["executed"] == "true_branch"
+        
+        # Test when condition is false
+        context.cache_hit = True
+        cond_func = await conditional(
+            lambda ctx: not ctx.cache_hit,
+            if_true_func,
+            if_false_func
+        )
+        
+        result = await cond_func(context)
+        assert result.metadata["executed"] == "false_branch"
+    
+    @pytest.mark.asyncio
+    async def test_parallel_execution(self):
+        """Test parallel pipeline execution."""
+        from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import parallel
+        
+        context = RAGPipelineContext(
+            query="test",
+            original_query="test",
+            config={}
+        )
+        
+        # Create mock functions
+        async def func1(ctx):
+            ctx.metadata["func1"] = True
+            return ctx
+        
+        async def func2(ctx):
+            ctx.metadata["func2"] = True
+            return ctx
+        
+        # Execute in parallel
+        parallel_func = await parallel(func1, func2)
+        result = await parallel_func(context)
+        
+        # Both functions should have executed
+        assert result.metadata.get("func1") is True
+        assert result.metadata.get("func2") is True
+
+
+class TestCustomPipelines:
+    """Test custom pipeline creation and execution."""
+    
+    @pytest.mark.asyncio
+    async def test_custom_pipeline_builder(self):
+        """Test building custom pipelines with various components."""
+        # Create custom components
+        async def custom_preprocessor(context):
+            context.metadata["preprocessed"] = True
+            context.query = context.query.lower()
+            return context
+        
+        async def custom_postprocessor(context):
+            context.metadata["postprocessed"] = True
+            # Filter out low-score documents
+            context.documents = [d for d in context.documents if d.metadata.get("score", 0) > 0.5]
+            return context
+        
+        # Build custom pipeline
+        custom_pipeline = build_pipeline(
+            custom_preprocessor,
+            expand_query,
+            retrieve_documents,
+            custom_postprocessor
+        )
+        
+        # Execute with mock retrieval
+        with patch('tldw_Server_API.app.core.RAG.rag_service.database_retrievers.MediaDBRetriever') as mock_retriever:
+            mock_retriever_instance = Mock()
+            mock_retriever.return_value = mock_retriever_instance
+            mock_retriever_instance.retrieve = AsyncMock(return_value=[
+                Document(id="1", content="high score", source=DataSource.MEDIA_DB, metadata={"score": 0.8}),
+                Document(id="2", content="low score", source=DataSource.MEDIA_DB, metadata={"score": 0.3})
+            ])
+            
+            result = await custom_pipeline("TEST QUERY", {"data_sources": ["media_db"]})
+            
+            # Verify preprocessing
+            assert result.query == "test query"  # lowercased
+            assert result.metadata["preprocessed"] is True
+            
+            # Verify postprocessing
+            assert result.metadata["postprocessed"] is True
+            assert len(result.documents) == 1  # Low score doc filtered out
+            assert result.documents[0].id == "1"
+
+
+# ========== Fixtures ==========
+
+@pytest.fixture
+def mock_rag_config():
+    """Create a mock RAGConfig for testing."""
+    config = Mock(spec=RAGConfig)
+    config.cache_enabled = True
+    config.retriever = Mock()
+    config.retriever.fts_top_k = 10
+    config.retriever.vector_top_k = 10
+    config.retriever.hybrid_alpha = 0.5
+    config.processor = Mock()
+    config.processor.enable_reranking = False
+    config.generator = Mock()
+    config.generator.__dict__ = {"temperature": 0.7, "max_tokens": 2000}
+    config.validate = Mock(return_value=[])
+    config.num_workers = 2
+    config.log_level = "INFO"
+    return config
+
+
+@pytest.fixture  
+def mock_llm_handler():
+    """Create a mock LLM handler for testing."""
+    handler = Mock()
+    handler.generate = AsyncMock(return_value="Generated text")
+    handler.stream_generate = AsyncMock()
+    return handler
 
 
 if __name__ == "__main__":

@@ -25,9 +25,9 @@ https://sgnt.ai/p/embeddings-explainer/
 
 
 
+https://huggingface.co/ibm-granite/granite-embedding-english-r2
 
-
-
+https://huggingface.co/ibm-granite/granite-embedding-small-english-r2
 
 
 
