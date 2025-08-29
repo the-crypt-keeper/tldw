@@ -146,20 +146,41 @@ class ChatbookValidator:
                 if not valid:
                     return False, error
                 
+                # Check for zip bomb - excessive compression ratio
+                if file_size > 0:
+                    compression_ratio = total_uncompressed / file_size
+                    if compression_ratio > 100:  # More than 100:1 compression is suspicious
+                        return False, f"Suspicious compression ratio ({compression_ratio:.1f}:1) - possible zip bomb"
+                
                 # Validate each file in archive
                 for info in zf.filelist:
+                    # Check for null bytes in filename (can cause issues)
+                    if '\x00' in info.filename:
+                        return False, "Archive contains files with invalid characters in filename"
+                    
+                    # Check for symlinks (external file attribute indicates symlink in Unix)
+                    # Symlinks have external_attr with 0xA1ED0000 (symlink mode in Unix)
+                    if info.external_attr >> 16 == 0xA1ED:
+                        return False, "Archive contains symbolic links which are not allowed"
+                    
                     # Check for path traversal
                     if cls._is_path_traversal(info.filename):
-                        return False, f"Unsafe path in archive: {info.filename}"
+                        # Don't expose the actual path in error message
+                        return False, "Archive contains files with unsafe paths"
                     
                     # Check individual file size
                     if info.file_size > cls.MAX_FILE_IN_ARCHIVE:
                         size_mb = info.file_size / (1024 * 1024)
-                        return False, f"File too large in archive: {info.filename} ({size_mb:.1f}MB)"
+                        max_mb = cls.MAX_FILE_IN_ARCHIVE / (1024 * 1024)
+                        return False, f"Archive contains files larger than {max_mb:.0f}MB limit"
+                    
+                    # Check for suspicious compression ratio per file
+                    if info.compress_size > 0 and info.file_size / info.compress_size > 100:
+                        return False, "Archive contains files with suspicious compression ratios"
                     
                     # Check for suspicious file types
                     if cls._is_dangerous_file(info.filename):
-                        return False, f"Potentially dangerous file type: {info.filename}"
+                        return False, "Archive contains potentially dangerous file types"
                 
                 # Check for required files
                 if 'manifest.json' not in zf.namelist():

@@ -415,6 +415,46 @@ class MediaWikiDumpOptionsForm(BaseModel):
     chunk_max_size: int = Field(default_factory=lambda: media_wiki_global_config.get('chunking', {}).get('default_size', 1000), description="Maximum chunk size for MediaWiki content processing.")
     api_name_vector_db: Optional[str] = Field(None, description="API name for vector DB/embedding/summary service (e.g., 'openai') used during ingestion.")
     api_key_vector_db: Optional[str] = Field(None, description="API key for the vector DB/embedding/summary service.")
+    
+    @field_validator('wiki_name')
+    @classmethod
+    def validate_wiki_name(cls, v: str) -> str:
+        """Validate wiki name to prevent path traversal and injection attacks."""
+        if not v:
+            raise ValueError("Wiki name cannot be empty")
+        
+        # Only allow alphanumeric, underscore, hyphen, and spaces
+        if not re.match(r'^[a-zA-Z0-9_\- ]+$', v):
+            raise ValueError("Invalid wiki name: Only alphanumeric characters, underscores, hyphens, and spaces are allowed")
+        
+        # Additional security checks for path traversal patterns
+        if any(pattern in v for pattern in ['..', '/', '\\', '\x00']):
+            raise ValueError("Invalid wiki name: Contains forbidden characters")
+        
+        # Length validation
+        if len(v) > 100:
+            raise ValueError("Wiki name too long (max 100 characters)")
+        
+        return v
+    
+    @field_validator('namespaces_str')
+    @classmethod
+    def validate_namespaces(cls, v: Optional[str]) -> Optional[str]:
+        """Validate namespace string format."""
+        if v is None:
+            return v
+        
+        # Check format: should be comma-separated integers
+        try:
+            namespaces = [int(ns.strip()) for ns in v.split(',')]
+            # Validate namespace IDs are reasonable
+            for ns in namespaces:
+                if ns < -2 or ns > 9999:  # MediaWiki namespace IDs typically range from -2 to a few hundred
+                    raise ValueError(f"Invalid namespace ID: {ns}")
+        except ValueError as e:
+            raise ValueError(f"Invalid namespace format. Must be comma-separated integers: {e}")
+        
+        return v
 
 class ProcessedMediaWikiPage(BaseModel):
     title: str

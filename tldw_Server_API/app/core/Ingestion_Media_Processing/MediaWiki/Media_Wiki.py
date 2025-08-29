@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import traceback
+from pathlib import Path
 from typing import List, Dict, Any, Iterator, Optional, Union
 from datetime import datetime, timezone  # Added for default ingestion_date
 #
@@ -50,9 +51,118 @@ setup_media_wiki_logger('mediawiki_import', log_file='./Logs/mediawiki_import.lo
 #
 # Functions:
 
+def validate_file_path(file_path: str, allowed_dir: Optional[Path] = None) -> Path:
+    """Validate and resolve file path to prevent path traversal attacks.
+    
+    Args:
+        file_path: Path to validate
+        allowed_dir: Optional directory to restrict file access to (default: current working directory)
+    
+    Returns:
+        Resolved safe Path object
+    
+    Raises:
+        ValueError: If path is invalid or attempts traversal
+    """
+    try:
+        # Additional checks for suspicious patterns first
+        if '../' in file_path or '..' + os.sep in file_path:
+            raise ValueError("Path traversal attempt detected")
+        
+        # Convert to Path and resolve to absolute path
+        path = Path(file_path).resolve()
+        
+        # Check if path exists
+        if not path.exists():
+            raise ValueError(f"File does not exist: {file_path}")
+        
+        # Check if it's a file (not a directory)
+        if not path.is_file():
+            raise ValueError(f"Path is not a file: {file_path}")
+        
+        # Default to current working directory if no allowed_dir specified
+        if allowed_dir is None:
+            # For MediaWiki dumps, we expect them to be in a reasonable location
+            # Default to allowing files in current directory and subdirectories
+            allowed_dir = Path.cwd()
+        
+        allowed = Path(allowed_dir).resolve()
+        if not str(path).startswith(str(allowed) + os.sep) and path != allowed:
+            raise ValueError(f"Access denied: Path is outside allowed directory")
+        
+        return path
+    except (ValueError, OSError) as e:
+        logger.error(f"Path validation failed for {file_path}: {e}")
+        raise ValueError(f"Invalid file path: {e}")
+
+
+def sanitize_wiki_name(wiki_name: str) -> str:
+    """Sanitize wiki name to prevent path traversal and injection attacks.
+    
+    Args:
+        wiki_name: Wiki name to sanitize
+    
+    Returns:
+        Sanitized wiki name
+    
+    Raises:
+        ValueError: If wiki name contains invalid characters
+    """
+    # Only allow alphanumeric, underscore, hyphen, and spaces
+    if not re.match(r'^[a-zA-Z0-9_\- ]+$', wiki_name):
+        raise ValueError(f"Invalid wiki name: Only alphanumeric characters, underscores, hyphens, and spaces are allowed")
+    
+    # Additional security checks
+    if any(pattern in wiki_name for pattern in ['..', '/', '\\', '\x00']):
+        raise ValueError(f"Invalid wiki name: Contains forbidden characters")
+    
+    # Replace spaces with underscores for filesystem safety
+    safe_name = wiki_name.replace(' ', '_')
+    
+    # Limit length to prevent issues
+    if len(safe_name) > 100:
+        raise ValueError(f"Wiki name too long (max 100 characters)")
+    
+    return safe_name
+
+
+def get_safe_checkpoint_path(wiki_name: str, checkpoint_dir: Optional[Path] = None) -> Path:
+    """Generate safe checkpoint file path.
+    
+    Args:
+        wiki_name: Wiki name for checkpoint
+        checkpoint_dir: Directory for checkpoint files (default: current directory)
+    
+    Returns:
+        Safe Path object for checkpoint file
+    """
+    # Sanitize wiki name first
+    safe_wiki_name = sanitize_wiki_name(wiki_name)
+    
+    # Use provided directory or default to a safe location
+    if checkpoint_dir:
+        base_dir = Path(checkpoint_dir).resolve()
+    else:
+        # Default to a checkpoints subdirectory
+        base_dir = Path('./checkpoints').resolve()
+        base_dir.mkdir(exist_ok=True)
+    
+    # Construct checkpoint filename
+    checkpoint_filename = f"{safe_wiki_name}_import_checkpoint.json"
+    checkpoint_path = base_dir / checkpoint_filename
+    
+    # Verify the path is within the expected directory
+    if not str(checkpoint_path).startswith(str(base_dir) + os.sep):
+        raise ValueError("Invalid checkpoint path")
+    
+    return checkpoint_path
+
+
 def parse_mediawiki_dump(file_path: str, namespaces: List[int] = None, skip_redirects: bool = False) -> Iterator[
     Dict[str, Any]]:
-    dump = mwxml.Dump.from_file(open(file_path, encoding='utf-8'))
+    # Validate file path
+    safe_path = validate_file_path(file_path)
+    dump = mwxml.Dump.from_file(open(safe_path, encoding='utf-8'))
     for page in dump.pages:
         if skip_redirects and page.redirect:
             continue
@@ -286,19 +396,34 @@ def process_single_item(
 
 
 def load_checkpoint(file_path: str) -> int:
-    if os.path.exists(file_path):
+    # Validate checkpoint file path
+    try:
+        safe_path = validate_file_path(file_path)
+    except ValueError:
+        # File doesn't exist yet, which is fine for checkpoints
+        return 0
+    
+    if safe_path.exists():
         try:
-            with open(file_path, 'r') as f:
+            with open(safe_path, 'r') as f:
                 data = json.load(f)
                 return data.get('last_processed_id', 0)
         except json.JSONDecodeError:
-            logging.warning(f"Checkpoint file {file_path} is corrupted. Starting from beginning.")
+            logging.warning(f"Checkpoint file {safe_path} is corrupted. Starting from beginning.")
             return 0
     return 0
 
 
 def save_checkpoint(file_path: str, last_processed_id: int):
-    with open(file_path, 'w') as f:
+    # Convert to Path and ensure parent directory exists
+    safe_path = Path(file_path).resolve()
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Validate the path is safe
+    if '../' in str(file_path) or '..' + os.sep in str(file_path):
+        raise ValueError("Path traversal attempt in checkpoint file")
+    
+    with open(safe_path, 'w') as f:
         json.dump({'last_processed_id': last_processed_id}, f)
 
 
@@ -315,15 +440,20 @@ def import_mediawiki_dump(
         api_key_vector_db: Optional[str] = None
 ) -> Iterator[Dict[str, Any]]:
     try:
+        # Sanitize wiki_name and validate file_path
+        safe_wiki_name = sanitize_wiki_name(wiki_name)
+        safe_file_path = validate_file_path(file_path)
+        
         logging.info(
-            f"Importing MediaWiki dump: {file_path} for wiki: {wiki_name}. StoreDB: {store_to_db}, StoreVector: {store_to_vector_db}")
+            f"Importing MediaWiki dump: {safe_file_path} for wiki: {safe_wiki_name}. StoreDB: {store_to_db}, StoreVector: {store_to_vector_db}")
         final_chunk_options = chunk_options_override if chunk_options_override else media_wiki_import_config.get(
             'chunking', {})
 
-        checkpoint_file = f"{wiki_name}_import_checkpoint.json"
+        # Get safe checkpoint path
+        checkpoint_file = get_safe_checkpoint_path(safe_wiki_name)
         last_processed_id = 0
         if store_to_db:  # Checkpoints only make sense if we are saving progress to DB
-            last_processed_id = load_checkpoint(checkpoint_file)
+            last_processed_id = load_checkpoint(str(checkpoint_file))
 
         total_pages = count_pages(file_path, namespaces, skip_redirects)
         processed_pages_count = 0
@@ -359,7 +489,7 @@ def import_mediawiki_dump(
 
             if store_to_db and processed_item_details.get("status") == "Success" and processed_item_details.get(
                     "media_id") is not None:
-                save_checkpoint(checkpoint_file, current_page_id)
+                save_checkpoint(str(checkpoint_file), current_page_id)
 
             processed_pages_count += 1
             current_progress_percent = processed_pages_count / total_pages if total_pages > 0 else 0
@@ -369,9 +499,9 @@ def import_mediawiki_dump(
             # Yield detailed result for each page, including its processing status
             yield {"type": "item_result", "data": processed_item_details, "progress_percent": current_progress_percent}
 
-        if store_to_db and os.path.exists(checkpoint_file):
+        if store_to_db and checkpoint_file.exists():
             try:
-                os.remove(checkpoint_file)
+                checkpoint_file.unlink()
                 logging.info(f"Successfully removed checkpoint file: {checkpoint_file}")
             except OSError as e:
                 logging.warning(f"Could not remove checkpoint file {checkpoint_file}: {e}")
@@ -393,7 +523,9 @@ def import_mediawiki_dump(
 def count_pages(file_path: str, namespaces: List[int] = None, skip_redirects: bool = False) -> int:
     count = 0
     try:
-        dump = mwxml.Dump.from_file(open(file_path, encoding='utf-8'))
+        # Validate file path
+        safe_path = validate_file_path(file_path)
+        dump = mwxml.Dump.from_file(open(safe_path, encoding='utf-8'))
         for page in dump.pages:
             if skip_redirects and page.redirect:
                 continue

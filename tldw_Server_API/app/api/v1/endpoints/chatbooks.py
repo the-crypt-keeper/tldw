@@ -18,6 +18,14 @@ from loguru import logger
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+# Import audit logging if available
+try:
+    from ....core.Evaluations.audit_logger import AuditLogger, AuditEventType
+    audit_logger = AuditLogger()
+except ImportError:
+    logger.warning("Audit logger not available, using fallback logging")
+    audit_logger = None
+
 from ....core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from ....core.Chatbooks.chatbook_service import ChatbookService
 from ....core.Chatbooks.chatbook_models import ContentType, ConflictResolution, ExportStatus
@@ -217,9 +225,24 @@ async def import_chatbook(
         import tempfile
         base_temp = Path(tempfile.gettempdir())
         temp_dir = base_temp / f"tldw_uploads/{user.id}"
+        
+        # Ensure temp directory path is canonical and secure
+        temp_dir = temp_dir.resolve()
+        base_temp_resolved = base_temp.resolve()
+        
+        # Verify the temp dir is within the expected base
+        if not str(temp_dir).startswith(str(base_temp_resolved)):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory path")
+        
         temp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         
         temp_file = temp_dir / f"import_{safe_filename}"
+        temp_file = temp_file.resolve()
+        
+        # Ensure the file path stays within temp_dir
+        if not str(temp_file).startswith(str(temp_dir)):
+            raise HTTPException(status_code=400, detail="Invalid file path")
+        
         with open(temp_file, 'wb') as f:
             shutil.copyfileobj(file.file, f)
         
@@ -328,9 +351,24 @@ async def preview_chatbook(
         import tempfile
         base_temp = Path(tempfile.gettempdir())
         temp_dir = base_temp / f"tldw_uploads/{user.id}"
+        
+        # Ensure temp directory path is canonical and secure
+        temp_dir = temp_dir.resolve()
+        base_temp_resolved = base_temp.resolve()
+        
+        # Verify the temp dir is within the expected base
+        if not str(temp_dir).startswith(str(base_temp_resolved)):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory path")
+        
         temp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         
         temp_file = temp_dir / f"preview_{safe_filename}"
+        temp_file = temp_file.resolve()
+        
+        # Ensure the file path stays within temp_dir
+        if not str(temp_file).startswith(str(temp_dir)):
+            raise HTTPException(status_code=400, detail="Invalid file path")
+        
         with open(temp_file, 'wb') as f:
             shutil.copyfileobj(file.file, f)
         
@@ -628,14 +666,45 @@ async def download_chatbook(
         if not job.output_path:
             raise HTTPException(status_code=404, detail="Export file not found")
         
-        file_path = Path(job.output_path)
+        file_path = Path(job.output_path).resolve()
         
         # Verify file exists and is within secure storage
         if not file_path.exists() or not file_path.is_file():
             raise HTTPException(status_code=404, detail="Export file no longer exists")
         
+        # Additional path containment check - ensure file is in expected user directory
+        # The file should be within the user's export directory
+        expected_base = Path(service.export_dir).resolve()
+        if not str(file_path).startswith(str(expected_base)):
+            logger.warning(f"Path traversal attempt detected for user {user.id}")
+            # Log security event if audit logger is available
+            if audit_logger:
+                audit_logger.log_security_event(
+                    event_type="PATH_TRAVERSAL_ATTEMPT",
+                    user_id=str(user.id),
+                    details={
+                        "endpoint": "/chatbooks/download",
+                        "job_id": job_id,
+                        "attempted_path": str(file_path)[:100]  # Truncate for safety
+                    },
+                    severity="HIGH"
+                )
+            raise HTTPException(status_code=403, detail="Access denied")
+        
         # Get filename from path
         filename = file_path.name
+        
+        # Log successful download if audit logger is available
+        if audit_logger:
+            audit_logger.log_event(
+                event_type="CHATBOOK_DOWNLOAD",
+                user_id=str(user.id),
+                details={
+                    "job_id": job_id,
+                    "filename": filename,
+                    "file_size": file_path.stat().st_size
+                }
+            )
         
         # Return file with security headers
         return FileResponse(
@@ -644,7 +713,9 @@ async def download_chatbook(
             media_type="application/zip",
             headers={
                 "X-Content-Type-Options": "nosniff",
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Download-Options": "noopen",  # Prevent IE from opening files directly
+                "Cache-Control": "no-cache, no-store, must-revalidate"  # Prevent caching of sensitive data
             }
         )
         

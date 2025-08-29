@@ -297,7 +297,7 @@ def get_configured_providers() -> Dict[str, Any]:
             'providers': [],
             'default_provider': 'openai',
             'total_configured': 0,
-            'error': str(e)
+            'error': 'An internal error occurred getting available providers. Please check your config.txt file for errors and try again. If the problem persists, please contact support for assistance.'
         }
 
 
