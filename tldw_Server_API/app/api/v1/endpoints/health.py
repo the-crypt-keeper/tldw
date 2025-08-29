@@ -14,10 +14,10 @@ from loguru import logger
 # Local imports
 from tldw_Server_API.app.core.AuthNZ.database import DatabasePool, get_db_pool
 from tldw_Server_API.app.core.AuthNZ.settings import Settings, get_settings
+from tldw_Server_API.app.core.Chatbooks.chatbook_service import audit_logger
 from tldw_Server_API.app.core.Evaluations.circuit_breaker import CircuitBreaker, CircuitState
 from tldw_Server_API.app.core.Evaluations.evaluation_manager import EvaluationManager
 from tldw_Server_API.app.core.Evaluations.metrics import get_metrics
-from tldw_Server_API.app.core.Evaluations.audit_logger import audit_logger
 from tldw_Server_API.app.core.Security.secret_manager import secret_manager
 from tldw_Server_API.app.core.Evaluations.connection_pool import get_connection_health, get_connection_stats
 

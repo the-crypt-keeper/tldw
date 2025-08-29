@@ -3,6 +3,7 @@
 # Imports
 import json
 import os
+import re
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
@@ -39,16 +40,45 @@ class PromptTemplate(BaseModel):
 _loaded_templates: Dict[str, PromptTemplate] = {}
 
 def load_template(template_name: str) -> Optional[PromptTemplate]:
-    """Loads a single prompt template from a JSON file."""
+    """Loads a single prompt template from a JSON file.
+    
+    Security: Validates template name to prevent path traversal attacks.
+    """
+    # Check cache first
     if template_name in _loaded_templates:
         return _loaded_templates[template_name]
-
+    
+    # Security validation: Only allow alphanumeric, underscore, and hyphen
+    if not re.match(r'^[a-zA-Z0-9_-]+$', template_name):
+        logger.warning(f"Invalid template name format attempted: {template_name}")
+        return None
+    
+    # Additional security: Check for path traversal attempts
+    if '/' in template_name or '\\' in template_name or '..' in template_name:
+        logger.warning(f"Potential path traversal attempt detected in template name: {template_name}")
+        return None
+    
+    # Construct the path
     template_file = PROMPT_TEMPLATES_DIR / f"{template_name}.json"
-    if not template_file.exists():
-        logger.warning(f"Prompt template '{template_name}' not found at {template_file}")
+    
+    # Security: Resolve and validate the path is within expected directory
+    try:
+        resolved_path = template_file.resolve()
+        expected_dir = PROMPT_TEMPLATES_DIR.resolve()
+        
+        # Check if the resolved path is within the templates directory
+        if not str(resolved_path).startswith(str(expected_dir) + os.sep) and resolved_path != expected_dir:
+            logger.warning(f"Path traversal attempt blocked - resolved path outside template directory: {template_name}")
+            return None
+    except (ValueError, OSError) as e:
+        logger.warning(f"Invalid path resolution for template name: {template_name}, error: {e}")
+        return None
+    
+    if not resolved_path.exists():
+        logger.warning(f"Prompt template '{template_name}' not found at {resolved_path}")
         return None
     try:
-        with open(template_file, 'r', encoding='utf-8') as f:
+        with open(resolved_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             template = PromptTemplate(**data)
             _loaded_templates[template_name] = template

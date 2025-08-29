@@ -14,7 +14,8 @@ from fastapi import (
     status,
     UploadFile,
     File,
-    Form  # If you add auth/DB dependencies later
+    Form,
+    Depends  # Added for dependency injection
 )
 
 # Local Imports
@@ -43,6 +44,10 @@ from tldw_Server_API.app.api.v1.schemas.chunking_schema import ChunkingResponse,
     ChunkingOptionsRequest, ChunkedContentResponse
 from tldw_Server_API.app.core.LLM_Calls.Summarization_General_Lib import analyze as general_llm_analyzer
 from tldw_Server_API.app.core.config import load_and_log_configs as load_server_configs
+# Dependencies for user-specific database access
+from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
+from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
+from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 #
 #######################################################################################################################
 #
@@ -64,8 +69,9 @@ chunking_router = APIRouter()
     }
 )
 async def process_text_for_chunking_json(
-    request_data: ChunkingTextRequest = Body(...)
-    # Add Depends(get_current_user) or similar if you need authentication
+    request_data: ChunkingTextRequest = Body(...),
+    current_user: User = Depends(get_request_user),
+    media_db: MediaDatabase = Depends(get_media_db_for_user)
 ):
     """
     Accepts text content and chunking options in a JSON body.
@@ -90,20 +96,12 @@ async def process_text_for_chunking_json(
     if request_data.options and request_data.options.template_name:
         # Import necessary modules for template support
         import json
-        from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
         from tldw_Server_API.app.core.Chunking.templates import TemplateProcessor, ChunkingTemplate, TemplateStage
-        import os
         
         try:
-            # Get database instance
-            db_path = os.environ.get('TLDW_DB_PATH', 'Databases/Media_DB_v2.db')
-            db = MediaDatabase(
-                db_path=db_path,
-                client_id='api_client'
-            )
-            
+            # Use the injected user-specific database instance
             # Get template from database
-            template_data = db.get_chunking_template(name=request_data.options.template_name)
+            template_data = media_db.get_chunking_template(name=request_data.options.template_name)
             if template_data:
                 logger.info(f"Using chunking template: {request_data.options.template_name}")
                 template_used = True

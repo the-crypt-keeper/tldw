@@ -55,25 +55,40 @@ def load_builtin_templates() -> List[Dict[str, Any]]:
     return templates
 
 
-def initialize_chunking_templates(db_path: str = None, client_id: str = 'system') -> int:
+def initialize_chunking_templates(db_path: str = None, client_id: str = 'system', db: MediaDatabase = None) -> int:
     """
     Initialize built-in chunking templates in the database.
     
     Args:
-        db_path: Path to the database file (uses default if None)
-        client_id: Client ID for database operations
+        db_path: Path to the database file (uses default if None and db is None)
+        client_id: Client ID for database operations (only used if creating new db)
+        db: MediaDatabase instance (if provided, db_path is ignored)
         
     Returns:
         Number of templates successfully seeded
     """
     try:
-        # Get database path from config if not provided
-        if db_path is None:
-            import os
-            db_path = os.environ.get('TLDW_DB_PATH', 'Databases/Media_DB_v2.db')
-        
-        # Create database instance
-        db = MediaDatabase(db_path=db_path, client_id=client_id)
+        # Use provided database instance or create one
+        if db is None:
+            # For backward compatibility and startup initialization
+            # This will be called for the default/single-user database
+            if db_path is None:
+                from pathlib import Path
+                from tldw_Server_API.app.core.config import settings
+                # Use proper user database path for single-user mode
+                user_db_base = settings.get("USER_DB_BASE_DIR")
+                single_user_id = settings.get("SINGLE_USER_FIXED_ID", "1")
+                if user_db_base:
+                    db_path = Path(user_db_base) / str(single_user_id) / "Media_DB_v2.db"
+                    # Ensure directory exists
+                    db_path.parent.mkdir(parents=True, exist_ok=True)
+                    db_path = str(db_path)
+                else:
+                    # Fallback to old path if config not available
+                    db_path = 'Databases/user_databases/1/Media_DB_v2.db'
+            
+            # Create database instance
+            db = MediaDatabase(db_path=db_path, client_id=client_id)
         
         # Load built-in templates
         templates = load_builtin_templates()
@@ -93,7 +108,7 @@ def initialize_chunking_templates(db_path: str = None, client_id: str = 'system'
         return 0
 
 
-def update_builtin_templates(db_path: str = None, client_id: str = 'system', force: bool = False) -> int:
+def update_builtin_templates(db_path: str = None, client_id: str = 'system', force: bool = False, db: MediaDatabase = None) -> int:
     """
     Update existing built-in templates with latest definitions.
     
@@ -106,11 +121,24 @@ def update_builtin_templates(db_path: str = None, client_id: str = 'system', for
         Number of templates updated
     """
     try:
-        if db_path is None:
-            import os
-            db_path = os.environ.get('TLDW_DB_PATH', 'Databases/Media_DB_v2.db')
-        
-        db = MediaDatabase(db_path=db_path, client_id=client_id)
+        # Use provided database instance or create one
+        if db is None:
+            if db_path is None:
+                from pathlib import Path
+                from tldw_Server_API.app.core.config import settings
+                # Use proper user database path for single-user mode
+                user_db_base = settings.get("USER_DB_BASE_DIR")
+                single_user_id = settings.get("SINGLE_USER_FIXED_ID", "1")
+                if user_db_base:
+                    db_path = Path(user_db_base) / str(single_user_id) / "Media_DB_v2.db"
+                    # Ensure directory exists
+                    db_path.parent.mkdir(parents=True, exist_ok=True)
+                    db_path = str(db_path)
+                else:
+                    # Fallback to old path if config not available
+                    db_path = 'Databases/user_databases/1/Media_DB_v2.db'
+            
+            db = MediaDatabase(db_path=db_path, client_id=client_id)
         templates = load_builtin_templates()
         
         updated_count = 0
@@ -144,7 +172,7 @@ def update_builtin_templates(db_path: str = None, client_id: str = 'system', for
 
 
 # Convenience function to be called during application startup
-def ensure_templates_initialized(db_path: str = None) -> bool:
+def ensure_templates_initialized(db_path: str = None, db: MediaDatabase = None) -> bool:
     """
     Ensure built-in templates are initialized in the database.
     Called during application startup.
@@ -156,17 +184,29 @@ def ensure_templates_initialized(db_path: str = None) -> bool:
         True if templates are properly initialized
     """
     try:
-        count = initialize_chunking_templates(db_path=db_path)
+        count = initialize_chunking_templates(db_path=db_path, db=db)
         
         if count > 0:
             logger.info(f"Initialized {count} chunking templates on startup")
         else:
             # Check if templates already exist
-            import os
-            if db_path is None:
-                db_path = os.environ.get('TLDW_DB_PATH', 'Databases/Media_DB_v2.db')
-            
-            db = MediaDatabase(db_path=db_path, client_id='system')
+            if db is None:
+                if db_path is None:
+                    from pathlib import Path
+                    from tldw_Server_API.app.core.config import settings
+                    # Use proper user database path for single-user mode
+                    user_db_base = settings.get("USER_DB_BASE_DIR")
+                    single_user_id = settings.get("SINGLE_USER_FIXED_ID", "1")
+                    if user_db_base:
+                        db_path = Path(user_db_base) / str(single_user_id) / "Media_DB_v2.db"
+                        # Ensure directory exists
+                        db_path.parent.mkdir(parents=True, exist_ok=True)
+                        db_path = str(db_path)
+                    else:
+                        # Fallback to old path if config not available
+                        db_path = 'Databases/user_databases/1/Media_DB_v2.db'
+                
+                db = MediaDatabase(db_path=db_path, client_id='system')
             existing = db.list_chunking_templates(include_builtin=True, include_custom=False)
             
             if existing:

@@ -61,7 +61,7 @@ def _get_db_path_for_user(user_id: int) -> Path:
     user_dir_name = str(user_id)
     # Use the variable assigned from settings dict
     user_dir = USER_DB_BASE_DIR / user_dir_name
-    db_file = user_dir / "user_media_library.sqlite" # Consistent naming
+    db_file = user_dir / "Media_DB_v2.db" # Using standard Media_DB_v2.db naming
 
     try:
         user_dir.mkdir(parents=True, exist_ok=True)

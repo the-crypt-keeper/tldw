@@ -440,8 +440,16 @@ class AuditLogger:
         return await asyncio.to_thread(_cleanup)
 
 
-# Global audit logger instance
-audit_logger = AuditLogger()
+# Global audit logger instance - DEPRECATED
+# NOTE: The global singleton pattern is deprecated. Use dependency injection instead:
+# from tldw_Server_API.app.api.v1.API_Deps.Evaluations_DB_Deps import get_evaluations_logger_for_user
+#
+# Migration guide:
+# Old: from tldw_Server_API.app.core.Evaluations.audit_logger import audit_logger
+# New: from tldw_Server_API.app.api.v1.API_Deps.Evaluations_DB_Deps import get_evaluations_logger_for_user
+#      logger: AuditLogger = Depends(get_evaluations_logger_for_user)
+#
+# audit_logger = AuditLogger()  # REMOVED - Use dependency injection
 
 
 # Convenience functions for common audit operations

@@ -19,6 +19,7 @@ from pathlib import Path
 from loguru import logger
 import secrets
 
+from tldw_Server_API.app.core.Chatbooks.chatbook_service import audit_logger
 # Import security enhancements
 from tldw_Server_API.app.core.Evaluations.webhook_security import (
     webhook_validator,
@@ -27,7 +28,6 @@ from tldw_Server_API.app.core.Evaluations.webhook_security import (
 )
 from tldw_Server_API.app.core.Evaluations.config_manager import get_config
 from tldw_Server_API.app.core.Evaluations.audit_logger import (
-    audit_logger,
     AuditEventType,
     AuditSeverity
 )

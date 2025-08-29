@@ -17,8 +17,9 @@ import aiohttp
 import ssl
 from loguru import logger
 
+from tldw_Server_API.app.core.Chatbooks.chatbook_service import audit_logger
 from tldw_Server_API.app.core.Evaluations.config_manager import get_config
-from tldw_Server_API.app.core.Evaluations.audit_logger import audit_logger, AuditEventType, AuditSeverity
+from tldw_Server_API.app.core.Evaluations.audit_logger import AuditEventType, AuditSeverity
 
 
 class WebhookSecurityLevel(Enum):
