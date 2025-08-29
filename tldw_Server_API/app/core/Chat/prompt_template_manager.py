@@ -44,6 +44,11 @@ def load_template(template_name: str) -> Optional[PromptTemplate]:
         return _loaded_templates[template_name]
 
     template_file = PROMPT_TEMPLATES_DIR / f"{template_name}.json"
+    # Normalize the path and ensure it is within the safe directory
+    normalized_path = template_file.resolve()
+    if not str(normalized_path).startswith(str(PROMPT_TEMPLATES_DIR.resolve())):
+        logger.warning(f"Invalid template name '{template_name}'. Path traversal attempt detected: {normalized_path}")
+        return None
     if not template_file.exists():
         logger.warning(f"Prompt template '{template_name}' not found at {template_file}")
         return None
