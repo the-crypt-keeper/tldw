@@ -58,7 +58,7 @@ from tldw_Server_API.app.api.v1.endpoints.prompt_studio_websocket import router 
 from tldw_Server_API.app.api.v1.endpoints.prompt_studio_evaluations import router as prompt_studio_evaluations_router
 #
 # RAG Endpoints
-from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_api_router  # Production RAG API using functional pipeline
+from tldw_Server_API.app.api.v1.endpoints.rag_unified import router as rag_unified_router  # Unified RAG API with all features as parameters
 # Legacy RAG Endpoint (Deprecated)
 # from tldw_Server_API.app.api.v1.endpoints.rag import router as retrieval_agent_router
 #
@@ -622,7 +622,7 @@ app.include_router(prompt_studio_websocket_router, tags=["Prompt Studio"])
 
 # Router for RAG endpoints
 # RAG API - Production API using functional pipeline
-app.include_router(rag_api_router, tags=["RAG"])
+app.include_router(rag_unified_router, tags=["RAG - Unified"])
 
 
 # Router for Research endpoint

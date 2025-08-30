@@ -214,9 +214,9 @@ class UnifiedRAGRequest(BaseModel):
         example=True
     )
     
-    citation_style: Literal["apa", "mla", "chicago", "harvard"] = Field(
+    citation_style: Literal["apa", "mla", "chicago", "harvard", "ieee"] = Field(
         default="apa",
-        description="Citation format style",
+        description="Academic citation format style",
         example="apa"
     )
     
@@ -224,6 +224,12 @@ class UnifiedRAGRequest(BaseModel):
         default=False,
         description="Include page numbers in citations",
         example=False
+    )
+    
+    enable_chunk_citations: bool = Field(
+        default=True,
+        description="Generate chunk-level citations for answer verification",
+        example=True
     )
     
     # ========== ANSWER GENERATION ==========
@@ -272,10 +278,29 @@ class UnifiedRAGRequest(BaseModel):
         example=False
     )
     
-    # ========== MONITORING ==========
+    # ========== MONITORING & ANALYTICS ==========
     enable_monitoring: bool = Field(
         default=False,
         description="Enable performance monitoring",
+        example=True
+    )
+    
+    enable_analytics: bool = Field(
+        default=True,
+        description="Enable analytics collection (server QA)",
+        example=True
+    )
+    
+    # ========== PERFORMANCE ==========
+    use_connection_pool: bool = Field(
+        default=True,
+        description="Use database connection pooling",
+        example=True
+    )
+    
+    use_embedding_cache: bool = Field(
+        default=True,
+        description="Use LRU cache for embeddings",
         example=True
     )
     
@@ -456,7 +481,17 @@ class UnifiedRAGResponse(BaseModel):
     
     citations: List[Dict[str, Any]] = Field(
         default_factory=list,
-        description="Generated citations"
+        description="Generated citations (academic and chunk-level)"
+    )
+    
+    academic_citations: List[str] = Field(
+        default_factory=list,
+        description="Formatted academic citations (MLA/APA/etc)"
+    )
+    
+    chunk_citations: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Chunk-level citations for answer verification"
     )
     
     feedback_id: Optional[str] = Field(
@@ -548,9 +583,94 @@ class UnifiedBatchRequest(BaseModel):
         example=5
     )
     
-    # Include all parameters from UnifiedRAGRequest except query
-    # These will be applied to all queries in the batch
-    **{k: v for k, v in UnifiedRAGRequest.__fields__.items() if k != 'query'}
+    # Include all optional parameters from UnifiedRAGRequest that will be applied to all queries
+    # Data Sources
+    sources: Optional[List[str]] = Field(default=["media_db"], description="Databases to search")
+    
+    # Search Configuration  
+    search_mode: Literal["fts", "vector", "hybrid"] = Field(default="hybrid")
+    hybrid_alpha: float = Field(default=0.7, ge=0.0, le=1.0)
+    top_k: int = Field(default=10, ge=1, le=100)
+    min_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    
+    # Query Expansion
+    expand_query: bool = Field(default=False)
+    expansion_strategies: Optional[List[str]] = Field(default=None)
+    spell_check: bool = Field(default=False)
+    
+    # Caching
+    enable_cache: bool = Field(default=True)
+    cache_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
+    adaptive_cache: bool = Field(default=True)
+    
+    # Filtering
+    keyword_filter: Optional[List[str]] = Field(default=None)
+    
+    # Security & Privacy
+    enable_security_filter: bool = Field(default=False)
+    detect_pii: bool = Field(default=False)
+    redact_pii: bool = Field(default=False)
+    sensitivity_level: Literal["public", "internal", "confidential", "restricted"] = Field(default="public")
+    content_filter: bool = Field(default=False)
+    
+    # Document Processing
+    enable_table_processing: bool = Field(default=False)
+    table_method: Literal["markdown", "html", "hybrid"] = Field(default="markdown")
+    
+    # Chunking & Context
+    enable_enhanced_chunking: bool = Field(default=False)
+    chunk_type_filter: Optional[List[str]] = Field(default=None)
+    enable_parent_expansion: bool = Field(default=False)
+    parent_context_size: int = Field(default=500, ge=100, le=2000)
+    include_sibling_chunks: bool = Field(default=False)
+    
+    # Reranking
+    enable_reranking: bool = Field(default=True)
+    reranking_strategy: Literal["flashrank", "cross_encoder", "hybrid", "none"] = Field(default="flashrank")
+    rerank_top_k: Optional[int] = Field(default=None, ge=1, le=100)
+    
+    # Citations
+    enable_citations: bool = Field(default=False)
+    citation_style: Literal["apa", "mla", "chicago", "harvard"] = Field(default="apa")
+    include_page_numbers: bool = Field(default=False)
+    
+    # Answer Generation
+    enable_generation: bool = Field(default=False)
+    generation_model: Optional[str] = Field(default=None)
+    generation_prompt: Optional[str] = Field(default=None)
+    max_generation_tokens: int = Field(default=500, ge=50, le=2000)
+    
+    # Feedback
+    collect_feedback: bool = Field(default=False)
+    feedback_user_id: Optional[str] = Field(default=None)
+    apply_feedback_boost: bool = Field(default=False)
+    
+    # Monitoring
+    enable_monitoring: bool = Field(default=False)
+    enable_observability: bool = Field(default=False)
+    trace_id: Optional[str] = Field(default=None)
+    
+    # Performance
+    enable_performance_analysis: bool = Field(default=False)
+    timeout_seconds: Optional[float] = Field(default=None, ge=1.0, le=60.0)
+    
+    # Quick Wins
+    highlight_results: bool = Field(default=False)
+    highlight_query_terms: bool = Field(default=False)
+    track_cost: bool = Field(default=False)
+    debug_mode: bool = Field(default=False)
+    
+    # Batch Processing (excluding batch fields as this IS a batch request)
+    # enable_batch, batch_queries, batch_concurrent are not included
+    
+    # Resilience
+    enable_resilience: bool = Field(default=False)
+    retry_attempts: int = Field(default=3, ge=1, le=5)
+    circuit_breaker: bool = Field(default=False)
+    
+    # User Context
+    user_id: Optional[str] = Field(default=None)
+    session_id: Optional[str] = Field(default=None)
     
     class Config:
         schema_extra = {

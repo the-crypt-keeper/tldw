@@ -15,6 +15,7 @@ Design Philosophy:
 
 import asyncio
 import time
+import uuid
 from typing import Dict, List, Any, Optional, Union, Literal
 from dataclasses import dataclass, field
 from loguru import logger
@@ -22,6 +23,97 @@ from loguru import logger
 # Core types
 from .types import Document, SearchResult, DataSource
 from .metrics_collector import MetricsCollector, QueryMetrics
+
+# Import all modules at module level to avoid 500ms overhead
+try:
+    from .quick_wins import spell_check_query, highlight_results as highlight_func, track_llm_cost
+except ImportError:
+    spell_check_query = None
+    highlight_func = None
+    track_llm_cost = None
+
+try:
+    from .query_expansion import (
+        expand_acronyms,
+        expand_synonyms,
+        entity_recognition_expansion,
+        domain_specific_expansion,
+        multi_strategy_expansion
+    )
+except ImportError:
+    expand_acronyms = None
+    expand_synonyms = None
+    entity_recognition_expansion = None
+    domain_specific_expansion = None
+    multi_strategy_expansion = None
+
+try:
+    from .semantic_cache import SemanticCache, AdaptiveCache
+except ImportError:
+    SemanticCache = None
+    AdaptiveCache = None
+
+try:
+    from .database_retrievers import MultiDatabaseRetriever, RetrievalConfig
+except ImportError:
+    MultiDatabaseRetriever = None
+    RetrievalConfig = None
+
+try:
+    from .security_filters import SecurityFilter, SensitivityLevel
+except ImportError:
+    SecurityFilter = None
+    SensitivityLevel = None
+
+try:
+    from .table_serialization import TableProcessor
+except ImportError:
+    TableProcessor = None
+
+try:
+    from .enhanced_chunking_integration import (
+        ChunkTypeFilter,
+        ParentChunkExpander,
+        SiblingChunkRetriever,
+        HierarchicalChunkProcessor
+    )
+except ImportError:
+    ChunkTypeFilter = None
+    ParentChunkExpander = None
+    SiblingChunkRetriever = None
+    HierarchicalChunkProcessor = None
+
+try:
+    from .advanced_reranking import create_reranker, RerankingStrategy, RerankingConfig
+except ImportError:
+    create_reranker = None
+    RerankingStrategy = None
+    RerankingConfig = None
+
+try:
+    from .citations import DualCitationGenerator
+except ImportError:
+    DualCitationGenerator = None
+
+try:
+    from .generation import AnswerGenerator
+except ImportError:
+    AnswerGenerator = None
+
+try:
+    from .analytics_system import UnifiedFeedbackSystem
+except ImportError:
+    UnifiedFeedbackSystem = None
+
+try:
+    from .observability import Tracer
+except ImportError:
+    Tracer = None
+
+try:
+    from .performance_monitor import PerformanceMonitor
+except ImportError:
+    PerformanceMonitor = None
 
 
 @dataclass
@@ -183,8 +275,7 @@ async def unified_rag_pipeline(
     try:
         # ========== SPELL CHECK ==========
         if spell_check:
-            try:
-                from .quick_wins import spell_check_query
+            if spell_check_query:
                 spell_start = time.time()
                 corrected = await spell_check_query(query)
                 if corrected != query:
@@ -192,7 +283,7 @@ async def unified_rag_pipeline(
                     result.metadata["corrected_query"] = corrected
                     query = corrected
                 result.timings["spell_check"] = time.time() - spell_start
-            except ImportError:
+            else:
                 result.errors.append("Spell check module not available")
                 logger.warning("Spell check requested but module not available")
         
@@ -200,50 +291,50 @@ async def unified_rag_pipeline(
         expanded_queries = [query]
         if expand_query:
             expansion_start = time.time()
-            try:
-                from .query_expansion import (
-                    HybridQueryExpansion, AcronymExpansion, 
-                    SynonymExpansion, DomainExpansion, EntityExpansion
-                )
-                
+            if multi_strategy_expansion:
                 strategies = expansion_strategies or ["acronym", "synonym"]
-                strategy_objects = []
                 
-                if "acronym" in strategies:
-                    strategy_objects.append(AcronymExpansion())
-                if "synonym" in strategies or "semantic" in strategies:
-                    strategy_objects.append(SynonymExpansion())
-                if "domain" in strategies:
-                    strategy_objects.append(DomainExpansion())
+                # Use the imported expansion functions
+                for strategy in strategies:
+                    if strategy == "acronym" and expand_acronyms:
+                        expanded = await expand_acronyms(query)
+                        expanded_queries.extend(expanded)
+                    elif strategy == "synonym" and expand_synonyms:
+                        expanded = await expand_synonyms(query)
+                        expanded_queries.extend(expanded)
+                    elif strategy == "domain" and domain_specific_expansion:
+                        expanded = await domain_specific_expansion(query)
+                        expanded_queries.extend(expanded)
                 if "entity" in strategies:
                     strategy_objects.append(EntityExpansion())
                 
-                expander = HybridQueryExpansion(strategies=strategy_objects)
-                expanded = await expander.expand(query)
+                    elif strategy == "entity" and entity_recognition_expansion:
+                        expanded = await entity_recognition_expansion(query)
+                        expanded_queries.extend(expanded)
                 
-                if hasattr(expanded, 'variations'):
-                    expanded_queries.extend(expanded.variations)
-                    result.expanded_queries = expanded.variations
+                # Remove duplicates
+                expanded_queries = list(set(expanded_queries))
+                result.expanded_queries = expanded_queries[1:]  # Exclude original query
                     
                 result.timings["query_expansion"] = time.time() - expansion_start
                 if metrics:
                     metrics.expansion_time = result.timings["query_expansion"]
-                    
-            except Exception as e:
-                result.errors.append(f"Query expansion failed: {str(e)}")
-                logger.error(f"Query expansion error: {e}")
+            else:
+                result.errors.append("Query expansion modules not available")
+                logger.warning("Query expansion requested but modules not available")
         
         # ========== CACHE CHECK ==========
         cached_documents = None
         if enable_cache:
             cache_start = time.time()
-            try:
-                if adaptive_cache:
-                    from .semantic_cache import AdaptiveCache
-                    cache = AdaptiveCache(similarity_threshold=cache_threshold)
-                else:
-                    from .semantic_cache import SemanticCache
-                    cache = SemanticCache(similarity_threshold=cache_threshold)
+            if AdaptiveCache and adaptive_cache:
+                cache = AdaptiveCache(similarity_threshold=cache_threshold)
+            elif SemanticCache:
+                cache = SemanticCache(similarity_threshold=cache_threshold)
+            else:
+                cache = None
+            
+            if cache:
                 
                 # Check cache for all query variations
                 for q in expanded_queries:
@@ -258,19 +349,14 @@ async def unified_rag_pipeline(
                             result.metadata["cached_query"] = cached_query
                             break
                             
-                result.timings["cache_check"] = time.time() - cache_start
-                if metrics:
-                    metrics.cache_lookup_time = result.timings["cache_check"]
-                    
-            except Exception as e:
-                result.errors.append(f"Cache check failed: {str(e)}")
-                logger.error(f"Cache error: {e}")
+            result.timings["cache_check"] = time.time() - cache_start
+            if metrics:
+                metrics.cache_lookup_time = result.timings["cache_check"]
         
         # ========== DOCUMENT RETRIEVAL ==========
         if not result.cache_hit:
             retrieval_start = time.time()
-            try:
-                from .database_retrievers import MultiDatabaseRetriever, RetrievalConfig
+            if MultiDatabaseRetriever and RetrievalConfig:
                 
                 # Set up database paths
                 db_paths = {}
@@ -349,9 +435,7 @@ async def unified_rag_pipeline(
         # ========== SECURITY FILTERING ==========
         if enable_security_filter and result.documents:
             security_start = time.time()
-            try:
-                from .security_filters import SecurityFilter, SensitivityLevel
-                
+            if SecurityFilter and SensitivityLevel:
                 security_filter = SecurityFilter()
                 
                 # Detect PII if requested
@@ -392,9 +476,7 @@ async def unified_rag_pipeline(
         # ========== TABLE PROCESSING ==========
         if enable_table_processing and result.documents:
             table_start = time.time()
-            try:
-                from .table_serialization import TableProcessor
-                
+            if TableProcessor:
                 processor = TableProcessor()
                 processed_docs = []
                 
@@ -416,10 +498,8 @@ async def unified_rag_pipeline(
         # ========== ENHANCED CHUNKING ==========
         if enable_enhanced_chunking and result.documents:
             chunking_start = time.time()
-            try:
-                from .enhanced_chunking_integration import (
-                    enhanced_chunk_documents,
-                    filter_chunks_by_type,
+            if ChunkTypeFilter and ParentChunkExpander:
+                # Use the imported chunking modules
                     expand_with_parent_context
                 )
                 
@@ -450,9 +530,7 @@ async def unified_rag_pipeline(
         # ========== RERANKING ==========
         if enable_reranking and result.documents and reranking_strategy != "none":
             rerank_start = time.time()
-            try:
-                from .advanced_reranking import create_reranker, RerankingStrategy, RerankingConfig
-                
+            if create_reranker and RerankingStrategy and RerankingConfig:
                 strategy_map = {
                     "flashrank": RerankingStrategy.FLASHRANK,
                     "cross_encoder": RerankingStrategy.CROSS_ENCODER,
@@ -483,10 +561,8 @@ async def unified_rag_pipeline(
         # ========== CITATION GENERATION ==========
         if enable_citations and result.documents:
             citation_start = time.time()
-            try:
-                from .citations import CitationGenerator
-                
-                generator = CitationGenerator()
+            if DualCitationGenerator:
+                generator = DualCitationGenerator()
                 citations = await generator.generate_citations(
                     documents=result.documents,
                     query=query,
@@ -516,9 +592,7 @@ async def unified_rag_pipeline(
         # ========== ANSWER GENERATION ==========
         if enable_generation and result.documents:
             generation_start = time.time()
-            try:
-                from .generation import AnswerGenerator
-                
+            if AnswerGenerator:
                 generator = AnswerGenerator(model=generation_model)
                 
                 # Prepare context from documents
@@ -546,11 +620,8 @@ async def unified_rag_pipeline(
         # ========== USER FEEDBACK ==========
         if collect_feedback:
             feedback_start = time.time()
-            try:
-                from .feedback_system import FeedbackCollector
-                import uuid
-                
-                collector = FeedbackCollector()
+            if UnifiedFeedbackSystem:
+                collector = UnifiedFeedbackSystem()
                 feedback_id = str(uuid.uuid4())
                 
                 # Record query for feedback
@@ -584,9 +655,7 @@ async def unified_rag_pipeline(
         # ========== RESULT HIGHLIGHTING ==========
         if highlight_results and result.documents:
             highlight_start = time.time()
-            try:
-                from .quick_wins import highlight_results as highlight_func
-                
+            if highlight_func:
                 for doc in result.documents:
                     doc.content = await highlight_func(
                         doc.content,
@@ -601,9 +670,7 @@ async def unified_rag_pipeline(
         
         # ========== COST TRACKING ==========
         if track_cost:
-            try:
-                from .quick_wins import track_llm_cost
-                
+            if track_llm_cost:
                 # Calculate estimated cost
                 total_tokens = sum(len(doc.content.split()) for doc in result.documents)
                 cost = await track_llm_cost(
@@ -621,12 +688,12 @@ async def unified_rag_pipeline(
         if enable_cache and not result.cache_hit and result.documents:
             try:
                 # Store in cache for future use
-                if adaptive_cache:
-                    from .semantic_cache import AdaptiveCache
+                if adaptive_cache and AdaptiveCache:
                     cache = AdaptiveCache(similarity_threshold=cache_threshold)
-                else:
-                    from .semantic_cache import SemanticCache
+                elif SemanticCache:
                     cache = SemanticCache(similarity_threshold=cache_threshold)
+                else:
+                    cache = None
                 
                 await cache.add(query, result.documents)
                 
@@ -635,9 +702,7 @@ async def unified_rag_pipeline(
         
         # ========== OBSERVABILITY ==========
         if enable_observability:
-            try:
-                from .observability import Tracer
-                
+            if Tracer:
                 tracer = Tracer()
                 await tracer.trace(
                     trace_id=trace_id or str(uuid.uuid4()),
@@ -652,9 +717,7 @@ async def unified_rag_pipeline(
         
         # ========== PERFORMANCE ANALYSIS ==========
         if enable_performance_analysis:
-            try:
-                from .performance_monitor import PerformanceMonitor
-                
+            if PerformanceMonitor:
                 monitor = PerformanceMonitor()
                 analysis = await monitor.analyze(
                     timings=result.timings,

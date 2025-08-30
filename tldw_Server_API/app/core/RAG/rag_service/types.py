@@ -42,6 +42,8 @@ class Citation:
         confidence: Confidence score (0-1) for this citation
         match_type: Type of match that produced this citation
         metadata: Additional metadata (author, date, URL, etc.)
+        location: Human-readable location (page, section, etc.)
+        formatted_citation: Pre-formatted citation string (MLA/APA/etc.)
     """
     document_id: str
     document_title: str
@@ -52,6 +54,8 @@ class Citation:
     confidence: float
     match_type: CitationType
     metadata: Dict[str, Any] = field(default_factory=dict)
+    location: Optional[str] = None  # "Chapter 3, Page 45" or "Section 2.1"
+    formatted_citation: Optional[str] = None  # Pre-formatted academic citation
     
     def __post_init__(self):
         """Validate citation data."""
@@ -95,14 +99,24 @@ class Document:
     # Citation support
     citations: List[Citation] = field(default_factory=list)
     
-    # Parent document support
+    # Enhanced chunk lineage tracking
+    source_document_id: Optional[str] = None  # Original document this chunk came from
+    source_document_metadata: Dict[str, Any] = field(default_factory=dict)  # Title, author, date, URL, etc.
+    
+    # Parent document support (for hierarchical chunking)
     parent_id: Optional[str] = None  # ID of parent document if this is a chunk
     children_ids: List[str] = field(default_factory=list)  # IDs of child chunks
-    chunk_index: Optional[int] = None  # Position in parent document
+    chunk_index: Optional[int] = None  # Position in parent document (0-based)
+    total_chunks: Optional[int] = None  # Total number of chunks in source document
     
     # Character positions for citation tracking
     start_char: Optional[int] = None  # Start position in original document
     end_char: Optional[int] = None  # End position in original document
+    
+    # Location information for academic citations
+    page_number: Optional[int] = None  # Page number in source document
+    section_title: Optional[str] = None  # Section/chapter title
+    paragraph_number: Optional[int] = None  # Paragraph number within section
     
     def __hash__(self):
         return hash(self.id)
@@ -119,6 +133,26 @@ class Document:
     def get_citations_by_type(self, citation_type: CitationType) -> List[Citation]:
         """Get citations of a specific type."""
         return [c for c in self.citations if c.match_type == citation_type]
+    
+    def get_source_info(self) -> Dict[str, Any]:
+        """Get source document information for citation generation."""
+        if self.source_document_metadata:
+            return self.source_document_metadata
+        # Fallback to regular metadata
+        return self.metadata
+    
+    def get_location_string(self) -> str:
+        """Get human-readable location within source document."""
+        parts = []
+        if self.section_title:
+            parts.append(f"Section: {self.section_title}")
+        if self.page_number:
+            parts.append(f"Page {self.page_number}")
+        if self.paragraph_number:
+            parts.append(f"Paragraph {self.paragraph_number}")
+        if self.chunk_index is not None and self.total_chunks:
+            parts.append(f"Chunk {self.chunk_index + 1}/{self.total_chunks}")
+        return ", ".join(parts) if parts else "Unknown location"
 
 
 @dataclass
