@@ -145,7 +145,7 @@ async def verify_api_key(
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={"error": {
-                    "message": str(e),
+                    "message": sanitize_error_message(e, "authentication"),
                     "type": "authentication_error",
                     "code": "invalid_token"
                 }}
@@ -201,6 +201,46 @@ async def check_evaluation_rate_limit(
 
 # ============= Error Handling =============
 
+def sanitize_error_message(error: Exception, context: str = "") -> str:
+    """Sanitize error messages to prevent information exposure.
+    
+    Args:
+        error: The exception to sanitize
+        context: Optional context about where the error occurred
+        
+    Returns:
+        A safe error message that doesn't expose sensitive information
+    """
+    # Log the full error details for debugging
+    logger.error(f"Error in {context}: {type(error).__name__}: {str(error)}")
+    
+    # Map specific exception types to safe messages
+    error_type = type(error).__name__
+    
+    # Common safe error messages
+    safe_messages = {
+        "FileNotFoundError": "The requested resource was not found",
+        "PermissionError": "Permission denied for this operation",
+        "ValueError": "Invalid input provided",
+        "KeyError": "Required data is missing",
+        "ConnectionError": "Connection failed. Please try again later",
+        "TimeoutError": "Operation timed out. Please try again",
+        "DatabaseError": "Database operation failed",
+        "IntegrityError": "Data integrity error occurred",
+        "NotFoundError": "The requested resource was not found",
+        "ValidationError": "Validation failed for the provided data",
+    }
+    
+    # Return safe message based on error type
+    if error_type in safe_messages:
+        return safe_messages[error_type]
+    
+    # For unknown errors, return a generic message
+    if context:
+        return f"An error occurred during {context}"
+    return "An internal error occurred. Please try again later"
+
+
 def create_error_response(
     message: str,
     error_type: str = "invalid_request_error",
@@ -251,7 +291,7 @@ async def create_evaluation(
     except Exception as e:
         logger.error(f"Failed to create evaluation: {e}")
         raise create_error_response(
-            message=f"Failed to create evaluation: {str(e)}",
+            message=f"Failed to create evaluation: {sanitize_error_message(e, 'evaluation creation')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -286,7 +326,7 @@ async def list_evaluations(
     except Exception as e:
         logger.error(f"Failed to list evaluations: {e}")
         raise create_error_response(
-            message=f"Failed to list evaluations: {str(e)}",
+            message=f"Failed to list evaluations: {sanitize_error_message(e, 'listing evaluations')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -315,7 +355,7 @@ async def get_evaluation(
     except Exception as e:
         logger.error(f"Failed to get evaluation {eval_id}: {e}")
         raise create_error_response(
-            message=f"Failed to get evaluation: {str(e)}",
+            message=f"Failed to get evaluation: {sanitize_error_message(e, 'retrieving evaluation')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -356,7 +396,7 @@ async def update_evaluation(
     except Exception as e:
         logger.error(f"Failed to update evaluation {eval_id}: {e}")
         raise create_error_response(
-            message=f"Failed to update evaluation: {str(e)}",
+            message=f"Failed to update evaluation: {sanitize_error_message(e, 'updating evaluation')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -383,7 +423,7 @@ async def delete_evaluation(
     except Exception as e:
         logger.error(f"Failed to delete evaluation {eval_id}: {e}")
         raise create_error_response(
-            message=f"Failed to delete evaluation: {str(e)}",
+            message=f"Failed to delete evaluation: {sanitize_error_message(e, 'deleting evaluation')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -414,7 +454,7 @@ async def create_run(
         
     except ValueError as e:
         raise create_error_response(
-            message=str(e),
+            message=sanitize_error_message(e, "creating run"),
             error_type="not_found_error",
             param="eval_id",
             status_code=status.HTTP_404_NOT_FOUND
@@ -422,7 +462,7 @@ async def create_run(
     except Exception as e:
         logger.error(f"Failed to create run: {e}")
         raise create_error_response(
-            message=f"Failed to create run: {str(e)}",
+            message=f"Failed to create run: {sanitize_error_message(e, 'creating run')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -459,7 +499,7 @@ async def list_runs(
     except Exception as e:
         logger.error(f"Failed to list runs: {e}")
         raise create_error_response(
-            message=f"Failed to list runs: {str(e)}",
+            message=f"Failed to list runs: {sanitize_error_message(e, 'listing runs')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -500,7 +540,7 @@ async def evaluate_geval(
         logger.error(f"G-Eval evaluation failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Evaluation failed: {str(e)}"
+            detail=f"Evaluation failed: {sanitize_error_message(e, 'G-Eval evaluation')}"
         )
 
 
@@ -541,7 +581,7 @@ async def evaluate_rag(
         logger.error(f"RAG evaluation failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"RAG evaluation failed: {str(e)}"
+            detail=f"RAG evaluation failed: {sanitize_error_message(e, 'RAG evaluation')}"
         )
 
 
@@ -577,7 +617,7 @@ async def evaluate_response_quality(
         logger.error(f"Response quality evaluation failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Quality evaluation failed: {str(e)}"
+            detail=f"Quality evaluation failed: {sanitize_error_message(e, 'quality evaluation')}"
         )
 
 
@@ -607,7 +647,7 @@ async def create_dataset(
     except Exception as e:
         logger.error(f"Failed to create dataset: {e}")
         raise create_error_response(
-            message=f"Failed to create dataset: {str(e)}",
+            message=f"Failed to create dataset: {sanitize_error_message(e, 'creating dataset')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -640,7 +680,7 @@ async def list_datasets(
     except Exception as e:
         logger.error(f"Failed to list datasets: {e}")
         raise create_error_response(
-            message=f"Failed to list datasets: {str(e)}",
+            message=f"Failed to list datasets: {sanitize_error_message(e, 'listing datasets')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -669,7 +709,7 @@ async def get_dataset(
     except Exception as e:
         logger.error(f"Failed to get dataset {dataset_id}: {e}")
         raise create_error_response(
-            message=f"Failed to get dataset: {str(e)}",
+            message=f"Failed to get dataset: {sanitize_error_message(e, 'retrieving dataset')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -696,7 +736,7 @@ async def delete_dataset(
     except Exception as e:
         logger.error(f"Failed to delete dataset {dataset_id}: {e}")
         raise create_error_response(
-            message=f"Failed to delete dataset: {str(e)}",
+            message=f"Failed to delete dataset: {sanitize_error_message(e, 'deleting dataset')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -743,7 +783,7 @@ async def get_metrics(request: Request):
         
     except Exception as e:
         logger.error(f"Failed to get metrics: {e}")
-        return {"error": str(e)}
+        return {"error": sanitize_error_message(e, "retrieving metrics")}
 
 
 # ============= Webhook Management Endpoints =============
@@ -771,7 +811,7 @@ async def register_webhook(
         logger.error(f"Failed to register webhook: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to register webhook: {str(e)}"
+            detail=f"Failed to register webhook: {sanitize_error_message(e, 'webhook registration')}"
         )
 
 
@@ -788,7 +828,7 @@ async def list_webhooks(
         logger.error(f"Failed to list webhooks: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list webhooks: {str(e)}"
+            detail=f"Failed to list webhooks: {sanitize_error_message(e, 'listing webhooks')}"
         )
 
 
@@ -815,7 +855,7 @@ async def unregister_webhook(
         logger.error(f"Failed to unregister webhook: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to unregister webhook: {str(e)}"
+            detail=f"Failed to unregister webhook: {sanitize_error_message(e, 'webhook removal')}"
         )
 
 
@@ -833,7 +873,7 @@ async def test_webhook(
         logger.error(f"Failed to test webhook: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to test webhook: {str(e)}"
+            detail=f"Failed to test webhook: {sanitize_error_message(e, 'webhook testing')}"
         )
 
 
@@ -852,7 +892,7 @@ async def get_rate_limit_status(
         logger.error(f"Failed to get rate limit status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get rate limit status: {str(e)}"
+            detail=f"Failed to get rate limit status: {sanitize_error_message(e, 'rate limit check')}"
         )
 
 
@@ -881,7 +921,7 @@ async def get_run(
     except Exception as e:
         logger.error(f"Failed to get run {run_id}: {e}")
         raise create_error_response(
-            message=f"Failed to get run: {str(e)}",
+            message=f"Failed to get run: {sanitize_error_message(e, 'retrieving run')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -910,7 +950,7 @@ async def cancel_run(
     except Exception as e:
         logger.error(f"Failed to cancel run {run_id}: {e}")
         raise create_error_response(
-            message=f"Failed to cancel run: {str(e)}",
+            message=f"Failed to cancel run: {sanitize_error_message(e, 'cancelling run')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

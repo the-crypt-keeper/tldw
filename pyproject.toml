@@ -340,7 +340,8 @@ markers = [
     "benchmark: marks performance benchmark tests",
     "slow: marks tests that take a long time to run",
     "load: marks load testing tests",
-    "property: marks property-based testing tests"
+    "property: marks property-based testing tests",
+    "requires_rag: marks tests that require RAG functionality"
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
