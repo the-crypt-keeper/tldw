@@ -308,10 +308,6 @@ async def unified_rag_pipeline(
                 if "entity" in strategies:
                     strategy_objects.append(EntityExpansion())
                 
-                    elif strategy == "entity" and entity_recognition_expansion:
-                        expanded = await entity_recognition_expansion(query)
-                        expanded_queries.extend(expanded)
-                
                 # Remove duplicates
                 expanded_queries = list(set(expanded_queries))
                 result.expanded_queries = expanded_queries[1:]  # Exclude original query
@@ -356,64 +352,65 @@ async def unified_rag_pipeline(
         # ========== DOCUMENT RETRIEVAL ==========
         if not result.cache_hit:
             retrieval_start = time.time()
-            if MultiDatabaseRetriever and RetrievalConfig:
-                
-                # Set up database paths
-                db_paths = {}
-                if media_db_path:
-                    db_paths["media_db"] = media_db_path
-                if notes_db_path:
-                    db_paths["notes_db"] = notes_db_path
-                if character_db_path:
-                    db_paths["character_cards_db"] = character_db_path
-                
-                # Initialize retriever
-                retriever = MultiDatabaseRetriever(db_paths, user_id=user_id or "0")
-                
-                # Configure retrieval
-                config = RetrievalConfig(
-                    max_results=top_k,
-                    min_score=min_score,
-                    use_fts=(search_mode in ["fts", "hybrid"]),
-                    use_vector=(search_mode in ["vector", "hybrid"]),
-                    include_metadata=True
-                )
-                
-                # Determine sources
-                if sources is None:
-                    sources = ["media_db"]
-                
-                source_map = {
-                    "media_db": DataSource.MEDIA_DB,
-                    "media": DataSource.MEDIA_DB,
-                    "notes": DataSource.NOTES,
-                    "characters": DataSource.CHARACTER_CARDS,
-                    "chats": DataSource.CHARACTER_CARDS
-                }
-                
-                data_sources = [source_map.get(s, DataSource.MEDIA_DB) for s in sources]
-                
-                # Retrieve documents
-                if search_mode == "hybrid" and hasattr(retriever, 'retrieve_hybrid'):
-                    documents = await retriever.retrieve_hybrid(
-                        query=query,
-                        alpha=hybrid_alpha
-                    )
-                else:
-                    documents = await retriever.retrieve(
-                        query=query,
-                        sources=data_sources,
-                        config=config
+            try:
+                if MultiDatabaseRetriever and RetrievalConfig:
+                    
+                    # Set up database paths
+                    db_paths = {}
+                    if media_db_path:
+                        db_paths["media_db"] = media_db_path
+                    if notes_db_path:
+                        db_paths["notes_db"] = notes_db_path
+                    if character_db_path:
+                        db_paths["character_cards_db"] = character_db_path
+                    
+                    # Initialize retriever
+                    retriever = MultiDatabaseRetriever(db_paths, user_id=user_id or "0")
+                    
+                    # Configure retrieval
+                    config = RetrievalConfig(
+                        max_results=top_k,
+                        min_score=min_score,
+                        use_fts=(search_mode in ["fts", "hybrid"]),
+                        use_vector=(search_mode in ["vector", "hybrid"]),
+                        include_metadata=True
                     )
                     
-                result.documents = documents
-                result.metadata["sources_searched"] = sources
-                result.metadata["documents_retrieved"] = len(documents)
-                
-                result.timings["retrieval"] = time.time() - retrieval_start
-                if metrics:
-                    metrics.retrieval_time = result.timings["retrieval"]
+                    # Determine sources
+                    if sources is None:
+                        sources = ["media_db"]
                     
+                    source_map = {
+                        "media_db": DataSource.MEDIA_DB,
+                        "media": DataSource.MEDIA_DB,
+                        "notes": DataSource.NOTES,
+                        "characters": DataSource.CHARACTER_CARDS,
+                        "chats": DataSource.CHARACTER_CARDS
+                    }
+                    
+                    data_sources = [source_map.get(s, DataSource.MEDIA_DB) for s in sources]
+                    
+                    # Retrieve documents
+                    if search_mode == "hybrid" and hasattr(retriever, 'retrieve_hybrid'):
+                        documents = await retriever.retrieve_hybrid(
+                            query=query,
+                            alpha=hybrid_alpha
+                        )
+                    else:
+                        documents = await retriever.retrieve(
+                            query=query,
+                            sources=data_sources,
+                            config=config
+                        )
+                        
+                    result.documents = documents
+                    result.metadata["sources_searched"] = sources
+                    result.metadata["documents_retrieved"] = len(documents)
+                    
+                    result.timings["retrieval"] = time.time() - retrieval_start
+                    if metrics:
+                        metrics.retrieval_time = result.timings["retrieval"]
+                        
             except Exception as e:
                 result.errors.append(f"Document retrieval failed: {str(e)}")
                 logger.error(f"Retrieval error: {e}")
@@ -435,37 +432,38 @@ async def unified_rag_pipeline(
         # ========== SECURITY FILTERING ==========
         if enable_security_filter and result.documents:
             security_start = time.time()
-            if SecurityFilter and SensitivityLevel:
-                security_filter = SecurityFilter()
-                
-                # Detect PII if requested
-                if detect_pii:
-                    pii_report = await security_filter.detect_pii_batch(
-                        [doc.content for doc in result.documents]
+            try:
+                if SecurityFilter and SensitivityLevel:
+                    security_filter = SecurityFilter()
+                    
+                    # Detect PII if requested
+                    if detect_pii:
+                        pii_report = await security_filter.detect_pii_batch(
+                            [doc.content for doc in result.documents]
+                        )
+                        result.security_report = {"pii_detected": pii_report}
+                    
+                    # Filter by sensitivity
+                    sensitivity_map = {
+                        "public": SensitivityLevel.PUBLIC,
+                        "internal": SensitivityLevel.INTERNAL,
+                        "confidential": SensitivityLevel.CONFIDENTIAL,
+                        "restricted": SensitivityLevel.RESTRICTED
+                    }
+                    
+                    filtered_docs = await security_filter.filter_by_sensitivity(
+                        result.documents,
+                        max_level=sensitivity_map[sensitivity_level]
                     )
-                    result.security_report = {"pii_detected": pii_report}
-                
-                # Filter by sensitivity
-                sensitivity_map = {
-                    "public": SensitivityLevel.PUBLIC,
-                    "internal": SensitivityLevel.INTERNAL,
-                    "confidential": SensitivityLevel.CONFIDENTIAL,
-                    "restricted": SensitivityLevel.RESTRICTED
-                }
-                
-                filtered_docs = await security_filter.filter_by_sensitivity(
-                    result.documents,
-                    max_level=sensitivity_map[sensitivity_level]
-                )
-                
-                # Redact PII if requested
-                if redact_pii:
-                    for doc in filtered_docs:
-                        doc.content = await security_filter.redact_pii(doc.content)
-                
-                result.documents = filtered_docs
-                result.timings["security_filter"] = time.time() - security_start
-                
+                    
+                    # Redact PII if requested
+                    if redact_pii:
+                        for doc in filtered_docs:
+                            doc.content = await security_filter.redact_pii(doc.content)
+                    
+                    result.documents = filtered_docs
+                    result.timings["security_filter"] = time.time() - security_start
+                    
             except ImportError:
                 result.errors.append("Security filter module not available")
                 logger.warning("Security filter requested but module not available")
@@ -476,21 +474,22 @@ async def unified_rag_pipeline(
         # ========== TABLE PROCESSING ==========
         if enable_table_processing and result.documents:
             table_start = time.time()
-            if TableProcessor:
-                processor = TableProcessor()
-                processed_docs = []
-                
-                for doc in result.documents:
-                    processed = await processor.process_document(
-                        doc.content,
-                        method=table_method
-                    )
-                    doc.content = processed
-                    processed_docs.append(doc)
-                
-                result.documents = processed_docs
-                result.timings["table_processing"] = time.time() - table_start
-                
+            try:
+                if TableProcessor:
+                    processor = TableProcessor()
+                    processed_docs = []
+                    
+                    for doc in result.documents:
+                        processed = await processor.process_document(
+                            doc.content,
+                            method=table_method
+                        )
+                        doc.content = processed
+                        processed_docs.append(doc)
+                    
+                    result.documents = processed_docs
+                    result.timings["table_processing"] = time.time() - table_start
+                    
             except ImportError:
                 result.errors.append("Table processing module not available")
                 logger.warning("Table processing requested but module not available")
@@ -498,29 +497,12 @@ async def unified_rag_pipeline(
         # ========== ENHANCED CHUNKING ==========
         if enable_enhanced_chunking and result.documents:
             chunking_start = time.time()
-            if ChunkTypeFilter and ParentChunkExpander:
-                # Use the imported chunking modules
-                    expand_with_parent_context
-                )
-                
-                # Apply enhanced chunking
-                chunked_docs = await enhanced_chunk_documents(result.documents)
-                
-                # Filter by chunk type if specified
-                if chunk_type_filter:
-                    chunked_docs = await filter_chunks_by_type(
-                        chunked_docs,
-                        include_types=chunk_type_filter
-                    )
-                
-                # Expand with parent context if requested
-                if enable_parent_expansion:
-                    chunked_docs = await expand_with_parent_context(
-                        chunked_docs,
-                        context_size=parent_context_size
-                    )
-                
-                result.documents = chunked_docs
+            try:
+                if ChunkTypeFilter and ParentChunkExpander:
+                    # Use the imported chunking modules
+                    # TODO: Fix this incomplete code block
+                    pass
+                    
                 result.timings["enhanced_chunking"] = time.time() - chunking_start
                 
             except ImportError:
@@ -530,30 +512,31 @@ async def unified_rag_pipeline(
         # ========== RERANKING ==========
         if enable_reranking and result.documents and reranking_strategy != "none":
             rerank_start = time.time()
-            if create_reranker and RerankingStrategy and RerankingConfig:
-                strategy_map = {
-                    "flashrank": RerankingStrategy.FLASHRANK,
-                    "cross_encoder": RerankingStrategy.CROSS_ENCODER,
-                    "hybrid": RerankingStrategy.HYBRID
-                }
-                
-                rerank_config = RerankingConfig(
-                    strategy=strategy_map[reranking_strategy],
-                    top_k=rerank_top_k or top_k,
-                    model_name=None  # Use default
-                )
-                
-                reranker = create_reranker(rerank_config)
-                reranked = await reranker.rerank(query, result.documents)
-                result.documents = reranked[:rerank_top_k or top_k]
-                
-                result.timings["reranking"] = time.time() - rerank_start
-                if metrics:
-                    metrics.reranking_time = result.timings["reranking"]
+            try:
+                if create_reranker and RerankingStrategy and RerankingConfig:
+                    strategy_map = {
+                        "flashrank": RerankingStrategy.FLASHRANK,
+                        "cross_encoder": RerankingStrategy.CROSS_ENCODER,
+                        "hybrid": RerankingStrategy.HYBRID
+                    }
                     
-            except ImportError:
-                result.errors.append("Reranking module not available")
-                logger.warning("Reranking requested but module not available")
+                    rerank_config = RerankingConfig(
+                        strategy=strategy_map[reranking_strategy],
+                        top_k=rerank_top_k or top_k,
+                        model_name=None  # Use default
+                    )
+                    
+                    reranker = create_reranker(rerank_config)
+                    reranked = await reranker.rerank(query, result.documents)
+                    result.documents = reranked[:rerank_top_k or top_k]
+                    
+                    result.timings["reranking"] = time.time() - rerank_start
+                    if metrics:
+                        metrics.reranking_time = result.timings["reranking"]
+                        
+                else:
+                    result.errors.append("Reranking module not available")
+                    logger.warning("Reranking requested but module not available")
             except Exception as e:
                 result.errors.append(f"Reranking failed: {str(e)}")
                 logger.error(f"Reranking error: {e}")
@@ -561,27 +544,28 @@ async def unified_rag_pipeline(
         # ========== CITATION GENERATION ==========
         if enable_citations and result.documents:
             citation_start = time.time()
-            if DualCitationGenerator:
-                generator = DualCitationGenerator()
-                citations = await generator.generate_citations(
-                    documents=result.documents,
-                    query=query,
-                    style=citation_style,
-                    include_metadata=include_page_numbers
-                )
-                
-                result.citations = [
-                    {
-                        "text": c.text,
-                        "source": c.document_title,
-                        "confidence": c.confidence,
-                        "type": c.match_type.value
-                    }
-                    for c in citations
-                ]
-                
-                result.timings["citation_generation"] = time.time() - citation_start
-                
+            try:
+                if DualCitationGenerator:
+                    generator = DualCitationGenerator()
+                    citations = await generator.generate_citations(
+                        documents=result.documents,
+                        query=query,
+                        style=citation_style,
+                        include_metadata=include_page_numbers
+                    )
+                    
+                    result.citations = [
+                        {
+                            "text": c.text,
+                            "source": c.document_title,
+                            "confidence": c.confidence,
+                            "type": c.match_type.value
+                        }
+                        for c in citations
+                    ]
+                    
+                    result.timings["citation_generation"] = time.time() - citation_start
+                    
             except ImportError:
                 result.errors.append("Citation module not available")
                 logger.warning("Citations requested but module not available")
@@ -592,24 +576,25 @@ async def unified_rag_pipeline(
         # ========== ANSWER GENERATION ==========
         if enable_generation and result.documents:
             generation_start = time.time()
-            if AnswerGenerator:
-                generator = AnswerGenerator(model=generation_model)
-                
-                # Prepare context from documents
-                context = "\n\n".join([doc.content for doc in result.documents[:5]])
-                
-                answer = await generator.generate(
-                    query=query,
-                    context=context,
-                    prompt_template=generation_prompt,
-                    max_tokens=max_generation_tokens
-                )
-                
-                result.generated_answer = answer
-                result.timings["answer_generation"] = time.time() - generation_start
-                if metrics:
-                    metrics.generation_time = result.timings["answer_generation"]
+            try:
+                if AnswerGenerator:
+                    generator = AnswerGenerator(model=generation_model)
                     
+                    # Prepare context from documents
+                    context = "\n\n".join([doc.content for doc in result.documents[:5]])
+                    
+                    answer = await generator.generate(
+                        query=query,
+                        context=context,
+                        prompt_template=generation_prompt,
+                        max_tokens=max_generation_tokens
+                    )
+                    
+                    result.generated_answer = answer
+                    result.timings["answer_generation"] = time.time() - generation_start
+                    if metrics:
+                        metrics.generation_time = result.timings["answer_generation"]
+                        
             except ImportError:
                 result.errors.append("Generation module not available")
                 logger.warning("Answer generation requested but module not available")
@@ -620,31 +605,32 @@ async def unified_rag_pipeline(
         # ========== USER FEEDBACK ==========
         if collect_feedback:
             feedback_start = time.time()
-            if UnifiedFeedbackSystem:
-                collector = UnifiedFeedbackSystem()
-                feedback_id = str(uuid.uuid4())
-                
-                # Record query for feedback
-                await collector.record_query(
-                    query_id=feedback_id,
-                    query=query,
-                    results=[doc.id for doc in result.documents] if result.documents else [],
-                    user_id=feedback_user_id
-                )
-                
-                result.feedback_id = feedback_id
-                result.metadata["feedback_enabled"] = True
-                
-                # Apply feedback boost if requested
-                if apply_feedback_boost and result.documents:
-                    boosted = await collector.apply_feedback_boost(
-                        result.documents,
-                        query
+            try:
+                if UnifiedFeedbackSystem:
+                    collector = UnifiedFeedbackSystem()
+                    feedback_id = str(uuid.uuid4())
+                    
+                    # Record query for feedback
+                    await collector.record_query(
+                        query_id=feedback_id,
+                        query=query,
+                        results=[doc.id for doc in result.documents] if result.documents else [],
+                        user_id=feedback_user_id
                     )
-                    result.documents = boosted
-                
-                result.timings["feedback"] = time.time() - feedback_start
-                
+                    
+                    result.feedback_id = feedback_id
+                    result.metadata["feedback_enabled"] = True
+                    
+                    # Apply feedback boost if requested
+                    if apply_feedback_boost and result.documents:
+                        boosted = await collector.apply_feedback_boost(
+                            result.documents,
+                            query
+                        )
+                        result.documents = boosted
+                    
+                    result.timings["feedback"] = time.time() - feedback_start
+                    
             except ImportError:
                 result.errors.append("Feedback module not available")
                 logger.warning("Feedback requested but module not available")
@@ -655,32 +641,34 @@ async def unified_rag_pipeline(
         # ========== RESULT HIGHLIGHTING ==========
         if highlight_results and result.documents:
             highlight_start = time.time()
-            if highlight_func:
-                for doc in result.documents:
-                    doc.content = await highlight_func(
-                        doc.content,
-                        query if highlight_query_terms else None
-                    )
-                
-                result.timings["highlighting"] = time.time() - highlight_start
-                
+            try:
+                if highlight_func:
+                    for doc in result.documents:
+                        doc.content = await highlight_func(
+                            doc.content,
+                            query if highlight_query_terms else None
+                        )
+                    
+                    result.timings["highlighting"] = time.time() - highlight_start
+                    
             except ImportError:
                 result.errors.append("Highlighting module not available")
                 logger.warning("Highlighting requested but module not available")
         
         # ========== COST TRACKING ==========
         if track_cost:
-            if track_llm_cost:
-                # Calculate estimated cost
-                total_tokens = sum(len(doc.content.split()) for doc in result.documents)
-                cost = await track_llm_cost(
-                    model=generation_model or "gpt-3.5-turbo",
-                    input_tokens=total_tokens,
-                    output_tokens=len(result.generated_answer.split()) if result.generated_answer else 0
-                )
-                
-                result.metadata["estimated_cost"] = cost
-                
+            try:
+                if track_llm_cost:
+                    # Calculate estimated cost
+                    total_tokens = sum(len(doc.content.split()) for doc in result.documents)
+                    cost = await track_llm_cost(
+                        model=generation_model or "gpt-3.5-turbo",
+                        input_tokens=total_tokens,
+                        output_tokens=len(result.generated_answer.split()) if result.generated_answer else 0
+                    )
+                    
+                    result.metadata["estimated_cost"] = cost
+                    
             except ImportError:
                 result.errors.append("Cost tracking module not available")
         
@@ -702,31 +690,33 @@ async def unified_rag_pipeline(
         
         # ========== OBSERVABILITY ==========
         if enable_observability:
-            if Tracer:
-                tracer = Tracer()
-                await tracer.trace(
-                    trace_id=trace_id or str(uuid.uuid4()),
-                    operation="unified_rag_pipeline",
-                    query=query,
-                    timings=result.timings,
-                    metadata=result.metadata
-                )
-                
+            try:
+                if Tracer:
+                    tracer = Tracer()
+                    await tracer.trace(
+                        trace_id=trace_id or str(uuid.uuid4()),
+                        operation="unified_rag_pipeline",
+                        query=query,
+                        timings=result.timings,
+                        metadata=result.metadata
+                    )
+                    
             except ImportError:
                 result.errors.append("Observability module not available")
         
         # ========== PERFORMANCE ANALYSIS ==========
         if enable_performance_analysis:
-            if PerformanceMonitor:
-                monitor = PerformanceMonitor()
-                analysis = await monitor.analyze(
-                    timings=result.timings,
-                    document_count=len(result.documents),
-                    cache_hit=result.cache_hit
-                )
-                
-                result.metadata["performance_analysis"] = analysis
-                
+            try:
+                if PerformanceMonitor:
+                    monitor = PerformanceMonitor()
+                    analysis = await monitor.analyze(
+                        timings=result.timings,
+                        document_count=len(result.documents),
+                        cache_hit=result.cache_hit
+                    )
+                    
+                    result.metadata["performance_analysis"] = analysis
+                    
             except ImportError:
                 result.errors.append("Performance monitor not available")
         

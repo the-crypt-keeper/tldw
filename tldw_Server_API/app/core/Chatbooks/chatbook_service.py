@@ -707,7 +707,7 @@ class ChatbookService:
         try:
             # Validate file first
             if not self._validate_zip_file(file_path):
-                return False, "Invalid or potentially malicious archive file", None
+                return False, "Error: Invalid or potentially malicious archive file", None
             
             # Extract chatbook to secure temp location
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -744,7 +744,7 @@ class ChatbookService:
             manifest_path = extract_dir / "manifest.json"
             if not manifest_path.exists():
                 shutil.rmtree(extract_dir)
-                return False, "Invalid chatbook: manifest.json not found", None
+                return False, "Error: Invalid chatbook - manifest.json not found", None
             
             with open(manifest_path, 'r', encoding='utf-8') as f:
                 manifest_data = json.load(f)

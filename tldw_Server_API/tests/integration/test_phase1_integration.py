@@ -107,15 +107,18 @@ class TestDictionaryAndWorldBookIntegration:
         
         # Process text through dictionary
         text = "The hero left the village and entered the forest to find the wizard"
-        processed_text, dict_metadata = chat_dict_service.process_text(text, token_budget=1000)
+        dict_result = chat_dict_service.process_text(text, token_budget=1000)
+        processed_text = dict_result["processed_text"]
         
         # Process through world book
         # The processed text should still contain "wizard" for matching
-        injected_content, wb_stats = world_book_service.process_context(
+        wb_result = world_book_service.process_context(
             text=processed_text,
             world_book_ids=[wb_id],  # Explicitly specify the world book
             token_budget=1000
         )
+        injected_content = wb_result["processed_context"]
+        wb_stats = wb_result
         
         # Verify combined processing
         assert "hamlet" in processed_text
@@ -157,11 +160,13 @@ class TestDictionaryAndWorldBookIntegration:
         world_book_service.attach_to_character(character_id, char_wb, enabled=True, priority=1)
         
         # Process with character context
-        injected_content, stats = world_book_service.process_context(
+        wb_result = world_book_service.process_context(
             text="Tell me about my sword",
             character_id=character_id,
             token_budget=500
         )
+        injected_content = wb_result["processed_context"]
+        stats = wb_result
         
         # Should prioritize character-specific entry
         assert "legendary" in injected_content.lower()
@@ -207,15 +212,15 @@ class TestDocumentGenerationIntegration:
                         api_key="test_key"
                     )
         
-        # Verify all succeeded
-        assert timeline["success"] == True
-        assert study_guide["success"] == True
-        assert briefing["success"] == True
+        # Verify all succeeded (returns strings, not dicts)
+        assert isinstance(timeline, str)
+        assert isinstance(study_guide, str)
+        assert isinstance(briefing, str)
         
         # Verify appropriate content
-        assert "Timeline" in timeline["content"]
-        assert "Study Guide" in study_guide["content"]
-        assert "Executive Briefing" in briefing["content"]
+        assert "Timeline" in timeline
+        assert "Study Guide" in study_guide
+        assert "Executive Briefing" in briefing
     
     def test_document_generation_with_processed_text(self, doc_gen_service, chat_dict_service, test_db, sample_conversation_data):
         """Test generating documents after dictionary processing."""
@@ -337,15 +342,15 @@ class TestCompleteWorkflow:
         
         # User 1 creates dictionary
         dict1 = service1.create_dictionary("User1 Dict", "Private dictionary")
-        service1.add_entry(dict1, "test", "user1_replacement", False)
+        service1.add_entry(dict1, "test", "user1_replacement", 100)  # probability=100
         
         # User 2 creates different dictionary
         dict2 = service2.create_dictionary("User2 Dict", "Different dictionary")
-        service2.add_entry(dict2, "test", "user2_replacement", False)
+        service2.add_entry(dict2, "test", "user2_replacement", 100)  # probability=100
         
         # Process same text for both users
-        result1 = service1.process_text("This is a test", 100)
-        result2 = service2.process_text("This is a test", 100)
+        result1 = service1.process_text("This is a test", token_budget=100)
+        result2 = service2.process_text("This is a test", token_budget=100)
         
         # Verify isolation
         assert "user1_replacement" in result1["processed_text"]
@@ -365,7 +370,7 @@ class TestErrorHandlingIntegration:
         try:
             chat_dict_service.add_entry(
                 dictionary_id=dict_id,
-                key="[invalid(regex",
+                key="/[invalid(regex/",  # Use regex format to trigger regex compilation
                 content="test"
             )
             assert False, "Should have raised ValueError"
@@ -379,7 +384,7 @@ class TestErrorHandlingIntegration:
     def test_document_generation_with_missing_conversation(self, doc_gen_service, test_db):
         """Test document generation when conversation doesn't exist."""
         with patch.object(test_db, 'get_conversation_by_id', return_value=None):
-            result = await doc_gen_service.generate_document(
+            result = doc_gen_service.generate_document(
                 conversation_id="nonexistent",
                 document_type=DocumentType.SUMMARY,
                 provider="openai",
@@ -413,11 +418,11 @@ class TestPerformanceIntegration:
         
         # Process text with many matches
         text = " ".join([f"word{i}" for i in range(50)])
-        processed_text, stats = chat_dict_service.process_text(text, token_budget=10000)
+        result = chat_dict_service.process_text(text, token_budget=10000)
         
         # Should handle all replacements efficiently
-        assert stats["replacements"] > 0
-        assert "replacement0" in processed_text
+        assert result["replacements"] > 0
+        assert "replacement0" in result["processed_text"]
     
     def test_world_book_with_many_entries(self, world_book_service):
         """Test world book with many entries and keyword matching."""
@@ -438,12 +443,12 @@ class TestPerformanceIntegration:
         
         # Process text with multiple keywords
         text = "Tell me about keyword5 and term10 and keyword15"
-        injected_content, stats = world_book_service.process_context(
+        result = world_book_service.process_context(
             text=text,
             character_id=None,
             token_budget=1000
         )
         
         # Should find and apply relevant entries
-        assert stats["entries_matched"] >= 3
-        assert "Lore entry" in injected_content
+        assert result["entries_matched"] >= 3
+        assert "Lore entry" in result["processed_context"]
