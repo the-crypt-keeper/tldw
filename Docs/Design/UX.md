@@ -63,6 +63,10 @@ https://customsvg.github.io/
 https://designdetails.fm/episodes
 https://blikket.co/ux-vs-cro-how-harmonizing-design-and-strategy-can-skyrocket-your-ecommerce-revenue/
 https://copycoder.ai/
+https://medium.com/@ryan.almeida86/10-tiny-ui-fixes-that-make-a-big-difference-951b1c98d4ec
+
+
+
 https://ieeexplore.ieee.org/document/5387632
 https://www.growthmates.news/p/how-an-ai-powered-user-onboardin
 https://www.nngroup.com/articles/serial-task-switching/g

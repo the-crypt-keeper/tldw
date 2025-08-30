@@ -4,20 +4,27 @@
 
 The RAG (Retrieval-Augmented Generation) module provides intelligent search and question-answering capabilities for the tldw_server application. It uses a **functional pipeline architecture** where composable functions are chained together to create custom retrieval and processing workflows.
 
-## Key Features
+⚠️ **Important**: This documentation reflects the intended architecture. For actual implementation status, see [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md). Approximately 40% of documented features are implemented but not yet connected to API endpoints.
 
+## Currently Available Features
+
+### ✅ Fully Functional
 - **Functional Pipeline**: Pure functions that compose into pipelines
-- **Multi-Database Search**: Query across media, notes, prompts, and character cards
+- **Multi-Database Search**: Query across media, notes, ~~prompts~~, and character cards
 - **Query Expansion**: Automatic query enhancement with synonyms, acronyms, and domain terms
 - **Hybrid Search**: Combines keyword (FTS5) and vector similarity search
 - **Smart Caching**: Semantic cache with adaptive thresholds
 - **Document Reranking**: Multiple strategies for relevance optimization
+- **Production Ready**: Optional resilience features (circuit breakers, retries, fallbacks)
+- **Performance Monitoring**: Built-in metrics and timing analysis
+
+### ❌ Implemented but Not Connected (Code exists but not accessible via API)
 - **Security Features**: PII detection, content filtering, and access control
 - **Batch Processing**: Efficient handling of multiple queries simultaneously
 - **User Feedback**: Collect and analyze user feedback to improve search quality
 - **Citation Generation**: Automatic citation extraction from search results
-- **Production Ready**: Optional resilience features (circuit breakers, retries, fallbacks)
-- **Performance Monitoring**: Built-in metrics and timing analysis
+- **Answer Generation**: Generate answers from retrieved context
+- **Observability**: System tracing and detailed metrics
 
 ## Quick Start
 
@@ -45,9 +52,11 @@ metadata = result.metadata
 ```
 RAG/
 ├── README.md                    # This file
+├── IMPLEMENTATION_STATUS.md     # Actual feature availability
+├── DEPRECATION_NOTICE.md       # Migration information
 ├── __init__.py                 # Module exports
 ├── exceptions.py               # Custom exceptions
-├── rag_audit_logger.py        # Audit logging
+├── rag_audit_logger.py        # Audit logging (not used)
 ├── rag_custom_metrics.py      # Metrics collection
 ├── rag_service/               # Core implementation
 │   ├── functional_pipeline.py # Main pipeline functions
@@ -211,13 +220,21 @@ When enabled, functions automatically:
 
 The RAG module is exposed through FastAPI endpoints:
 
-- `POST /api/v1/rag/search/simple` - Simple search interface
-- `POST /api/v1/rag/search/complex` - Advanced search with full options
-- `GET /api/v1/rag/health` - Health check endpoint with component status
-- `GET /api/v1/rag/pipelines` - List available pipeline presets
-- `GET /api/v1/rag/capabilities` - Get detailed service capabilities
+### Currently Active
+- `POST /api/v1/rag/search/simple` - Simple search interface with basic parameters
+- `POST /api/v1/rag/search/complex` - Advanced search with configuration options
+- `GET /api/v1/rag/health` - Basic health check endpoint
+- `GET /api/v1/rag/pipelines` - List available pipeline presets (minimal, standard, quality, enhanced)
+- `GET /api/v1/rag/capabilities` - Get service capabilities (static response)
 
-See [RAG API Documentation](/Docs/API-related/RAG_API_Documentation.md) for details.
+### Not Yet Implemented
+- Citation generation endpoint
+- User feedback endpoint
+- Security filter configuration
+- Batch processing endpoint
+- Observability metrics endpoint
+
+⚠️ Note: Documentation may reference endpoints that don't exist. Check IMPLEMENTATION_STATUS.md for current state.
 
 ## Testing
 
@@ -235,14 +252,17 @@ python -m pytest tests/RAG/ --cov=app.core.RAG --cov-report=html
 
 ## Advanced Features
 
-### Security & Privacy
+### ❌ Security & Privacy (NOT YET CONNECTED)
 
-The RAG module includes comprehensive security features:
+**Status**: Code exists but is not integrated into the pipeline or API.
+
+The RAG module includes security features code that is not yet accessible:
 
 ```python
+# This code exists but CANNOT be used via API currently
 from tldw_Server_API.app.core.RAG.rag_service.security_filters import SecurityFilter
 
-# Enable PII detection and filtering
+# The following would work if integrated:
 security_filter = SecurityFilter()
 filtered_docs = await security_filter.filter_documents(
     documents,
@@ -251,19 +271,21 @@ filtered_docs = await security_filter.filter_documents(
 )
 ```
 
-Features:
+Planned Features:
 - PII detection (emails, SSNs, credit cards, etc.)
 - Content filtering based on sensitivity levels
 - Access control enforcement
 - Audit logging for compliance
 
-### Batch Processing
+### ❌ Batch Processing (NOT YET CONNECTED)
 
-Process multiple queries efficiently:
+**Status**: Code exists in batch_processing.py but is not accessible via API.
 
 ```python
+# This code exists but CANNOT be used currently
 from tldw_Server_API.app.core.RAG.rag_service.batch_processing import BatchProcessor
 
+# Would work if integrated:
 processor = BatchProcessor(max_concurrent=5)
 batch_results = await processor.process_batch(
     queries=["query1", "query2", "query3"],
@@ -272,19 +294,21 @@ batch_results = await processor.process_batch(
 )
 ```
 
-Features:
+Planned Features:
 - Concurrent query processing
 - Priority-based scheduling
 - Resource management
 - Partial failure handling
 
-### Feedback System
+### ❌ Feedback System (NOT YET CONNECTED)
 
-Collect and utilize user feedback:
+**Status**: Code exists in feedback_system.py but no API endpoint or pipeline integration.
 
 ```python
+# This code exists but CANNOT be used currently
 from tldw_Server_API.app.core.RAG.rag_service.feedback_system import FeedbackCollector
 
+# Would work if integrated:
 collector = FeedbackCollector()
 await collector.record_feedback(
     query_id="...",
@@ -292,18 +316,17 @@ await collector.record_feedback(
     helpful=True,
     user_id="..."
 )
-
-# Use feedback to improve future searches
-improved_results = await collector.apply_feedback_boost(results, query)
 ```
 
-### Citation Generation
+### ❌ Citation Generation (NOT YET CONNECTED)
 
-Automatically extract citations from search results:
+**Status**: Code exists in citations.py but is not integrated into any pipeline.
 
 ```python
+# This code exists but CANNOT be used currently
 from tldw_Server_API.app.core.RAG.rag_service.citations import CitationGenerator
 
+# Would work if integrated:
 generator = CitationGenerator()
 citations = await generator.generate_citations(
     documents,
@@ -319,7 +342,7 @@ Typical pipeline execution times (on standard hardware):
 - Standard pipeline: ~200-300ms (with cache miss)
 - Standard pipeline: ~20-30ms (with cache hit)
 - Quality pipeline: ~500-800ms
-- Batch processing: ~100ms per query (concurrent)
+- ~~Batch processing: ~100ms per query (concurrent)~~ (Not yet connected)
 
 ## Migration from Old Architecture
 
