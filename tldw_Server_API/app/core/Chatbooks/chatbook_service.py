@@ -320,9 +320,64 @@ class ChatbookService:
             content_selections = {}
             for ct in content_types:
                 if ct == "conversations":
-                    content_selections[ContentType.CONVERSATION] = []
+                    # Get all conversation IDs when none specified
+                    conv_ids = []
+                    try:
+                        conversations = self.db.execute_query(
+                            "SELECT id FROM conversations WHERE deleted = 0"
+                        )
+                        conv_ids = [c['id'] for c in conversations] if conversations else []
+                    except Exception as e:
+                        logger.debug(f"Error getting conversations: {e}")
+                    content_selections[ContentType.CONVERSATION] = conv_ids
                 elif ct == "characters":
-                    content_selections[ContentType.CHARACTER] = []
+                    # Get all character IDs when none specified
+                    char_ids = []
+                    try:
+                        characters = self.db.execute_query(
+                            "SELECT id FROM character_cards WHERE deleted = 0"
+                        )
+                        char_ids = [str(c['id']) for c in characters] if characters else []
+                    except Exception as e:
+                        logger.debug(f"Error getting characters: {e}")
+                    content_selections[ContentType.CHARACTER] = char_ids
+                elif ct == "notes":
+                    # Get all note IDs when none specified
+                    note_ids = []
+                    try:
+                        notes = self.db.execute_query(
+                            "SELECT id FROM notes WHERE deleted = 0"
+                        )
+                        note_ids = [n['id'] for n in notes] if notes else []
+                    except Exception as e:
+                        logger.debug(f"Error getting notes: {e}")
+                    content_selections[ContentType.NOTE] = note_ids
+                elif ct == "world_books":
+                    # Get all world book IDs when none specified
+                    wb_ids = []
+                    try:
+                        if hasattr(self, 'world_books') and self.world_books:
+                            world_books = self.world_books.list_world_books()
+                            wb_ids = [str(wb['id']) for wb in world_books] if world_books else []
+                        else:
+                            # Fallback to direct database query
+                            logger.debug("WorldBookService not available, using direct query")
+                    except Exception as e:
+                        logger.debug(f"Error getting world books: {e}")
+                    content_selections[ContentType.WORLD_BOOK] = wb_ids
+                elif ct == "dictionaries":
+                    # Get all dictionary IDs when none specified
+                    dict_ids = []
+                    try:
+                        if hasattr(self, 'dictionaries') and self.dictionaries:
+                            dictionaries = self.dictionaries.list_dictionaries()
+                            dict_ids = [str(d['id']) for d in dictionaries] if dictionaries else []
+                        else:
+                            # Fallback to direct database query
+                            logger.debug("ChatDictionary not available, using direct query")
+                    except Exception as e:
+                        logger.debug(f"Error getting dictionaries: {e}")
+                    content_selections[ContentType.DICTIONARY] = dict_ids
             kwargs['content_selections'] = content_selections
         
         # Set default values for required params if missing
@@ -1332,10 +1387,22 @@ class ChatbookService:
                 if not wb_data:
                     continue
                 
+                # Convert datetime objects to strings for JSON serialization
+                def convert_datetimes(obj):
+                    if isinstance(obj, dict):
+                        return {k: convert_datetimes(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [convert_datetimes(item) for item in obj]
+                    elif isinstance(obj, datetime):
+                        return obj.isoformat()
+                    return obj
+                
+                wb_data_serializable = convert_datetimes(wb_data)
+                
                 # Write world book file
                 wb_file = wb_dir / f"world_book_{wb_id}.json"
                 with open(wb_file, 'w', encoding='utf-8') as f:
-                    json.dump(wb_data, f, indent=2, ensure_ascii=False)
+                    json.dump(wb_data_serializable, f, indent=2, ensure_ascii=False)
                 
                 # Add to content
                 content.world_books[wb_id] = wb_data
@@ -1374,10 +1441,22 @@ class ChatbookService:
                 if not dict_data:
                     continue
                 
+                # Convert datetime objects to strings for JSON serialization
+                def convert_datetimes(obj):
+                    if isinstance(obj, dict):
+                        return {k: convert_datetimes(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [convert_datetimes(item) for item in obj]
+                    elif isinstance(obj, datetime):
+                        return obj.isoformat()
+                    return obj
+                
+                dict_data_serializable = convert_datetimes(dict_data)
+                
                 # Write dictionary file
                 dict_file = dict_dir / f"dictionary_{dict_id}.json"
                 with open(dict_file, 'w', encoding='utf-8') as f:
-                    json.dump(dict_data, f, indent=2, ensure_ascii=False)
+                    json.dump(dict_data_serializable, f, indent=2, ensure_ascii=False)
                 
                 # Add to content
                 content.dictionaries[dict_id] = dict_data

@@ -21,6 +21,7 @@ import json
 from datetime import datetime
 
 from tldw_Server_API.app.core.Evaluations.rag_evaluator import RAGEvaluator
+from tldw_Server_API.app.core.Evaluations.evaluation_manager import EvaluationManager
 from tldw_Server_API.app.core.Evaluations.unified_evaluation_service import UnifiedEvaluationService, get_unified_evaluation_service
 from tldw_Server_API.app.core.DB_Management.migrations import migrate_evaluations_database, MigrationManager
 

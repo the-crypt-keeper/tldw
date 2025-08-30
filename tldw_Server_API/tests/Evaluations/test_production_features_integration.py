@@ -590,7 +590,8 @@ class TestIntegration:
             # Initialize components
             rate_limiter = UserRateLimiter(str(db_path))
             webhook_manager = WebhookManager(str(db_path))
-            metrics = AdvancedEvaluationMetrics()
+            from tldw_Server_API.app.core.Evaluations.metrics_advanced import get_advanced_metrics
+            metrics = get_advanced_metrics(use_separate_registry=True)
             
             user_id = "integration_user"
             
