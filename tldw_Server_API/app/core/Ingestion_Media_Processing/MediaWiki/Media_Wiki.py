@@ -87,7 +87,13 @@ def validate_file_path(file_path: str, allowed_dir: Optional[Path] = None) -> Pa
             allowed_dir = Path.cwd()
         
         allowed = Path(allowed_dir).resolve()
-        if not str(path).startswith(str(allowed) + os.sep) and path != allowed:
+        # Use os.path.commonpath for secure path containment check
+        try:
+            common_path = os.path.commonpath([str(path), str(allowed)])
+            if common_path != str(allowed):
+                raise ValueError(f"Access denied: Path is outside allowed directory")
+        except ValueError:
+            # Paths are on different drives (Windows) or otherwise incomparable
             raise ValueError(f"Access denied: Path is outside allowed directory")
         
         return path
@@ -151,8 +157,16 @@ def get_safe_checkpoint_path(wiki_name: str, checkpoint_dir: Optional[Path] = No
     checkpoint_filename = f"{safe_wiki_name}_import_checkpoint.json"
     checkpoint_path = base_dir / checkpoint_filename
     
-    # Verify the path is within the expected directory
-    if not str(checkpoint_path).startswith(str(base_dir) + os.sep):
+    # Verify the path is within the expected directory using secure method
+    try:
+        # Use os.path.commonpath for secure path containment check
+        checkpoint_resolved = checkpoint_path.resolve()
+        base_resolved = base_dir.resolve()
+        common_path = os.path.commonpath([str(checkpoint_resolved), str(base_resolved)])
+        if common_path != str(base_resolved):
+            raise ValueError("Invalid checkpoint path")
+    except ValueError:
+        # Paths are on different drives (Windows) or otherwise incomparable
         raise ValueError("Invalid checkpoint path")
     
     return checkpoint_path

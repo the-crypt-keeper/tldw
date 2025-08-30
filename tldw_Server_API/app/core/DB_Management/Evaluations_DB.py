@@ -457,33 +457,71 @@ class EvaluationsDatabase:
     
     def _row_to_eval_dict(self, row) -> Dict[str, Any]:
         """Convert database row to evaluation dictionary"""
+        # Parse created_at timestamp
+        if row["created_at"]:
+            if "T" in row["created_at"]:
+                # ISO format
+                created_timestamp = int(datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")).timestamp())
+            else:
+                # SQLite timestamp format
+                created_timestamp = int(datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S").timestamp())
+        else:
+            created_timestamp = int(datetime.now().timestamp())
+        
         return {
             "id": row["id"],
             "object": "evaluation",
-            "created": int(datetime.fromisoformat(row["created_at"]).timestamp()),
+            "created_at": created_timestamp,  # Fixed: use created_at instead of created
             "name": row["name"],
             "description": row["description"],
             "eval_type": row["eval_type"],
             "eval_spec": json.loads(row["eval_spec"]) if row["eval_spec"] else {},
             "dataset_id": row["dataset_id"],
+            "created_by": row["created_by"] or "unknown",  # Fixed: add created_by field
             "metadata": json.loads(row["metadata"]) if row["metadata"] else {}
         }
     
     def _row_to_run_dict(self, row) -> Dict[str, Any]:
         """Convert database row to run dictionary"""
+        # Parse created_at timestamp
+        if row["created_at"]:
+            if "T" in row["created_at"]:
+                # ISO format
+                created_timestamp = int(datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")).timestamp())
+            else:
+                # SQLite timestamp format
+                created_timestamp = int(datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S").timestamp())
+        else:
+            created_timestamp = int(datetime.now().timestamp())
+            
+        # Parse optional timestamps
+        started_at = None
+        if row["started_at"]:
+            try:
+                started_at = int(datetime.fromisoformat(row["started_at"].replace("Z", "+00:00")).timestamp())
+            except:
+                started_at = None
+                
+        completed_at = None
+        if row["completed_at"]:
+            try:
+                completed_at = int(datetime.fromisoformat(row["completed_at"].replace("Z", "+00:00")).timestamp())
+            except:
+                completed_at = None
+        
         return {
             "id": row["id"],
-            "object": "evaluation.run",
-            "created": int(datetime.fromisoformat(row["created_at"]).timestamp()),
+            "object": "run",  # Fixed: use "run" to match schema
+            "created_at": created_timestamp,  # Fixed: use created_at instead of created
             "eval_id": row["eval_id"],
             "status": row["status"],
-            "target_model": row["target_model"],
+            "target_model": row["target_model"] or "",  # Ensure not None
             "config": json.loads(row["config"]) if row["config"] else {},
-            "progress": json.loads(row["progress"]) if row["progress"] else {},
+            "progress": json.loads(row["progress"]) if row["progress"] else None,
             "results": json.loads(row["results"]) if row["results"] else None,
             "error_message": row["error_message"],
-            "started_at": row["started_at"],
-            "completed_at": row["completed_at"],
+            "started_at": started_at,
+            "completed_at": completed_at,
             "usage": json.loads(row["usage"]) if row["usage"] else None
         }
     

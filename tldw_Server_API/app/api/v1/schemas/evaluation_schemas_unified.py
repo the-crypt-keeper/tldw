@@ -29,6 +29,7 @@ def sanitize_html_text(value: Optional[str]) -> Optional[str]:
     v = v.replace("\r", "\n")
 
     if bleach is not None:
+        # Use bleach for proper HTML sanitization
         v = bleach.clean(
             v,
             tags=[],
@@ -38,12 +39,47 @@ def sanitize_html_text(value: Optional[str]) -> Optional[str]:
             strip_comments=True,
         )
     else:
-        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
+        # Fallback: More robust sanitization without bleach
+        # First, decode any HTML entities to catch encoded attacks
+        try:
+            import html as html_module
+            # Decode HTML entities multiple times to handle nested encoding
+            for _ in range(3):
+                decoded = html_module.unescape(v)
+                if decoded == v:
+                    break
+                v = decoded
+        except Exception:
+            pass
+        
+        # Remove all HTML tags and dangerous patterns more thoroughly
+        # Remove script tags and their content (case insensitive, handles broken tags)
+        v = re.sub(r'<\s*script[^>]*>.*?<\s*/\s*script\s*>', '', v, flags=re.IGNORECASE | re.DOTALL)
+        v = re.sub(r'<\s*script[^>]*>', '', v, flags=re.IGNORECASE)
+        
+        # Remove style tags and their content
+        v = re.sub(r'<\s*style[^>]*>.*?<\s*/\s*style\s*>', '', v, flags=re.IGNORECASE | re.DOTALL)
+        v = re.sub(r'<\s*style[^>]*>', '', v, flags=re.IGNORECASE)
+        
+        # Remove all event handlers (onclick, onload, etc.)
+        v = re.sub(r'\s*on\w+\s*=\s*["\']?[^"\'>\s]*["\']?', '', v, flags=re.IGNORECASE)
+        
+        # Remove javascript: protocol
+        v = re.sub(r'javascript\s*:', '', v, flags=re.IGNORECASE)
+        v = re.sub(r'data\s*:', '', v, flags=re.IGNORECASE)
+        v = re.sub(r'vbscript\s*:', '', v, flags=re.IGNORECASE)
+        
+        # Remove all remaining HTML tags
         v = re.sub(r'<[^>]+>', '', v)
+        
+        # Finally, escape any remaining HTML special characters
         v = html.escape(v)
 
+    # Remove null bytes and control characters
     v = v.replace('\x00', '')
     v = ''.join(ch for ch in v if ord(ch) >= 32 or ch in ('\n', '\t'))
+    
+    # Normalize whitespace
     v = re.sub(r'\n{3,}', '\n\n', v)
     v = re.sub(r' {2,}', ' ', v)
 

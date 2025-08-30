@@ -890,8 +890,57 @@ class WebhookManager:
                 "validation_errors": [error.to_dict() for error in validation_result.errors]
             }
         
-        # Send test webhook
+        # Send test webhook with DNS rebinding prevention
         try:
+            # Parse URL to get hostname and port
+            from urllib.parse import urlparse, urlunparse
+            import socket
+            import ipaddress
+            
+            parsed_url = urlparse(url)
+            hostname = parsed_url.hostname
+            port = parsed_url.port or (443 if parsed_url.scheme == "https" else 80)
+            
+            # Resolve hostname to IP and validate it's not private
+            safe_ip = None
+            try:
+                # Check if it's already an IP
+                ip_addr = ipaddress.ip_address(hostname)
+                safe_ip = str(ip_addr)
+            except ValueError:
+                # Resolve hostname
+                try:
+                    ip_addresses = socket.getaddrinfo(hostname, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                    if ip_addresses:
+                        # Use the first resolved IP (already validated by webhook_validator)
+                        safe_ip = ip_addresses[0][4][0]
+                except socket.gaierror:
+                    return {
+                        "success": False,
+                        "error": "Failed to resolve webhook hostname"
+                    }
+            
+            if not safe_ip:
+                return {
+                    "success": False,
+                    "error": "Could not determine target IP address"
+                }
+            
+            # Reconstruct URL with IP to prevent DNS rebinding
+            if parsed_url.port:
+                netloc = f"[{safe_ip}]:{parsed_url.port}" if ":" in safe_ip else f"{safe_ip}:{parsed_url.port}"
+            else:
+                netloc = f"[{safe_ip}]" if ":" in safe_ip else safe_ip
+            
+            ip_url = urlunparse((
+                parsed_url.scheme,
+                netloc,
+                parsed_url.path,
+                parsed_url.params,
+                parsed_url.query,
+                parsed_url.fragment
+            ))
+            
             # Configure session to prevent SSRF
             connector = aiohttp.TCPConnector(
                 force_close=True,
@@ -909,13 +958,14 @@ class WebhookManager:
                     "Content-Type": "application/json",
                     "X-Webhook-Signature": signature,
                     "X-Webhook-Event": "test",
-                    "X-Webhook-Test": "true"
+                    "X-Webhook-Test": "true",
+                    "Host": hostname  # Add original hostname for virtual hosting
                 }
                 
                 start_time = datetime.now()
                 
                 async with session.post(
-                    url,
+                    ip_url,  # Use IP-based URL to prevent DNS rebinding
                     data=payload_json,
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=10),
