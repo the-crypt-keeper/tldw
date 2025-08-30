@@ -3,6 +3,7 @@
 #
 # Imports
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
@@ -270,15 +271,26 @@ class JWTService:
     
     def hash_token(self, token: str) -> str:
         """
-        Create a SHA256 hash of a token for storage
+        Create a secure hash of a token for storage using HMAC-SHA256.
+        
+        This provides better security than plain SHA256 by using a secret key,
+        preventing length extension attacks and providing authentication.
+        
+        Note: We use HMAC-SHA256 instead of Argon2 because:
+        - Tokens are already high-entropy (cryptographically random)
+        - This hash is used for fast lookups on every request
+        - Argon2 would add unnecessary latency without security benefit
         
         Args:
             token: Token to hash
             
         Returns:
-            SHA256 hash of the token
+            HMAC-SHA256 hash of the token
         """
-        return hashlib.sha256(token.encode()).hexdigest()
+        # Use a portion of the JWT secret as HMAC key for consistency
+        # This ensures the same token always produces the same hash
+        hmac_key = self.secret_key[:32].encode() if len(self.secret_key) >= 32 else self.secret_key.encode()
+        return hmac.new(hmac_key, token.encode(), hashlib.sha256).hexdigest()
     
     def extract_jti(self, token: str) -> Optional[str]:
         """
