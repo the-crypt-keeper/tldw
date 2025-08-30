@@ -777,7 +777,8 @@ class UnifiedEvaluationService:
             return {"metrics_enabled": False}
         except Exception as e:
             logger.error(f"Failed to get metrics summary: {e}")
-            return {"error": str(e)}
+            # Do not expose internal error details to external clients
+            return {"error": "Failed to collect metrics"}
     
     async def health_check(self) -> Dict[str, Any]:
         """Check service health"""

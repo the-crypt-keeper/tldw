@@ -766,6 +766,22 @@ async def get_metrics(request: Request):
     try:
         metrics_summary = await get_evaluation_service().get_metrics_summary()
         
+        # Handle failure from service so error message is never exposed
+        if "error" in metrics_summary:
+            logger.error(f"Metrics endpoint service error: {metrics_summary['error']}")
+            # Return a generic error message in both text/plain and JSON responses
+            if "text/plain" in request.headers.get("accept", ""):
+                # Prometheus format error response
+                output = "# HELP evaluation_metrics_failed Metric collection failure\n"
+                output += "# TYPE evaluation_metrics_failed counter\n"
+                output += "evaluation_metrics_failed{} 1\n"
+                return Response(
+                    content=output,
+                    media_type="text/plain; version=0.0.4; charset=utf-8"
+                )
+            # Return JSON error response
+            return {"error": "Metrics are currently unavailable"}
+        
         # Format as Prometheus text format if requested
         if "text/plain" in request.headers.get("accept", ""):
             # Convert to Prometheus format (simplified)
@@ -783,7 +799,8 @@ async def get_metrics(request: Request):
         
     except Exception as e:
         logger.error(f"Failed to get metrics: {e}")
-        return {"error": sanitize_error_message(e, "retrieving metrics")}
+        # Do not expose internal error, return generic error
+        return {"error": "Metrics are currently unavailable"}
 
 
 # ============= Webhook Management Endpoints =============
