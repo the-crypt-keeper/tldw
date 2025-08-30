@@ -259,7 +259,7 @@ class TestPathTraversalSecurity:
             ("normal_file.txt", "normal_file.txt"),
             ("path/to/file.txt", "file.txt"),
             ("file/../other.txt", "other.txt"),
-            ("file<>:|?.txt", "file______.txt")
+            ("file<>:\"|?.txt", "file______.txt")
         ]
         
         for input_path, expected_output in test_cases:

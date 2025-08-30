@@ -170,7 +170,7 @@ class ChatbookValidator:
                     # Check for symlinks FIRST (they are never allowed)
                     # Symlinks have external_attr with 0xA1ED0000 (symlink mode in Unix)
                     if info.external_attr >> 16 == 0xA1ED:
-                        return False, "Archive contains symbolic links which are not allowed"
+                        return False, "Archive contains symlinks which are not allowed"
                     
                     # Check for path traversal (most important security check)
                     if cls._is_path_traversal(info.filename):
@@ -302,8 +302,9 @@ class ChatbookValidator:
         # Get only the final filename component from filtered parts
         safe_name = filtered_parts[-1] if filtered_parts else ''
         
-        # Remove any remaining dangerous patterns
-        safe_name = re.sub(r'[<>:"|?*]', '_', safe_name)
+        # Remove any remaining dangerous patterns - ensure all special chars are replaced
+        # Note: The question mark needs escaping in the regex
+        safe_name = re.sub(r'[<>:"|\?\*]', '_', safe_name)
         
         # Ensure no double dots
         safe_name = safe_name.replace('..', '_')
@@ -353,8 +354,12 @@ class ChatbookValidator:
         # Normalize path
         normalized = os.path.normpath(path)
         
-        # Check for absolute paths
+        # Check for absolute paths (Unix style)
         if os.path.isabs(normalized):
+            return True
+        
+        # Check for Windows absolute paths (C:\ or \\server\)
+        if re.match(r'^[A-Za-z]:[/\\]', path) or path.startswith('\\\\'):
             return True
         
         # Check for parent directory references

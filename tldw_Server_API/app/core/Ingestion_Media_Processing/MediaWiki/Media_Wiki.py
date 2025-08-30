@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import traceback
 from pathlib import Path
 from typing import List, Dict, Any, Iterator, Optional, Union
@@ -45,15 +46,66 @@ def load_mediawiki_import_config():
 media_wiki_import_config = load_mediawiki_import_config()
 
 
+def get_safe_log_path(log_filename: str) -> Optional[Path]:
+    """Generate safe log file path.
+    
+    Args:
+        log_filename: Name of the log file
+    
+    Returns:
+        Safe Path object for log file or None if unsafe
+    """
+    try:
+        # Validate log filename
+        if not re.match(r'^[a-zA-Z0-9_\-]+\.log$', log_filename):
+            logger.warning(f"Invalid log filename: {log_filename}")
+            return None
+        
+        # Check for path traversal attempts
+        if any(pattern in log_filename for pattern in ['..', '/', '\\', '\x00']):
+            logger.warning(f"Path traversal attempt in log filename: {log_filename}")
+            return None
+        
+        # Build safe log directory path
+        base_dir = Path(__file__).parent.resolve()
+        project_root = base_dir.parent.parent.parent.parent.resolve()
+        log_dir = project_root / 'Logs'
+        
+        # Create log directory if it doesn't exist
+        log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Construct full log path
+        log_path = (log_dir / log_filename).resolve()
+        
+        # Verify the path is within the log directory
+        try:
+            common_path = os.path.commonpath([str(log_path), str(log_dir)])
+            if common_path != str(log_dir):
+                logger.warning(f"Log file path outside log directory: {log_path}")
+                return None
+        except ValueError:
+            logger.warning(f"Invalid log file path: {log_path}")
+            return None
+        
+        return log_path
+    except Exception as e:
+        logger.error(f"Error creating safe log path: {e}")
+        return None
+
+
 def setup_media_wiki_logger(name: str, level: Union[int, str] = "INFO", log_file: Optional[str] = None) -> None:
     """Set up the logger with the given name and level."""
     logger.remove()
     logger.add(sys.stdout, format="{time} - {name} - {level} - {message}", level=level)
     if log_file:
-        logger.add(log_file, format="{time} - {name} - {level} - {message}", level=level)
+        safe_log_path = get_safe_log_path(log_file)
+        if safe_log_path:
+            logger.add(str(safe_log_path), format="{time} - {name} - {level} - {message}", level=level)
+        else:
+            logger.warning(f"Could not create log file: {log_file}. Logging to stdout only.")
 
 
-setup_media_wiki_logger('mediawiki_import', log_file='./Logs/mediawiki_import.log')
+setup_media_wiki_logger('mediawiki_import', log_file='mediawiki_import.log')
 
 
 #
@@ -75,6 +127,10 @@ def validate_file_path(file_path: str, allowed_dir: Optional[Path] = None) -> Pa
         ValueError: If path is invalid or attempts traversal
     """
     try:
+        # Check for null bytes which can truncate paths
+        if '\x00' in file_path:
+            raise ValueError("Null byte in path")
+        
         # Additional checks for suspicious patterns first
         if '../' in file_path or '..' + os.sep in file_path:
             raise ValueError("Path traversal attempt detected")
@@ -84,11 +140,18 @@ def validate_file_path(file_path: str, allowed_dir: Optional[Path] = None) -> Pa
         
         # Check if path exists
         if not path.exists():
-            raise ValueError(f"File does not exist: {file_path}")
+            raise ValueError("File does not exist")
         
-        # Check if it's a file (not a directory)
+        # Check if it's a file (not a directory or symlink to directory)
         if not path.is_file():
-            raise ValueError(f"Path is not a file: {file_path}")
+            raise ValueError("Path is not a regular file")
+        
+        # Check for symlink attacks
+        if path.is_symlink():
+            # Resolve the symlink and check if it's within allowed directory
+            real_path = path.resolve()
+            if allowed_dir and not str(real_path).startswith(str(allowed_dir)):
+                raise ValueError("Symlink points outside allowed directory")
         
         # Default to current working directory if no allowed_dir specified
         if allowed_dir is None:
@@ -101,15 +164,21 @@ def validate_file_path(file_path: str, allowed_dir: Optional[Path] = None) -> Pa
         try:
             common_path = os.path.commonpath([str(path), str(allowed)])
             if common_path != str(allowed):
-                raise ValueError(f"Access denied: Path is outside allowed directory")
+                raise ValueError("Access denied: Path is outside allowed directory")
         except ValueError:
             # Paths are on different drives (Windows) or otherwise incomparable
-            raise ValueError(f"Access denied: Path is outside allowed directory")
+            raise ValueError("Access denied: Path is outside allowed directory")
+        
+        # Check file size to prevent processing huge files
+        max_file_size = 1024 * 1024 * 1024  # 1GB limit
+        if path.stat().st_size > max_file_size:
+            raise ValueError("File size exceeds maximum allowed size")
         
         return path
     except (ValueError, OSError) as e:
-        logger.error(f"Path validation failed for {file_path}: {e}")
-        raise ValueError(f"Invalid file path: {e}")
+        # Log the error internally but don't expose the path in the error message
+        logger.error(f"Path validation failed: {e}")
+        raise ValueError(f"Invalid file path: {str(e).replace(file_path, '[REDACTED]')}")
 
 
 def sanitize_wiki_name(wiki_name: str) -> str:
@@ -124,13 +193,17 @@ def sanitize_wiki_name(wiki_name: str) -> str:
     Raises:
         ValueError: If wiki name contains invalid characters
     """
+    # Check for null bytes first
+    if '\x00' in wiki_name:
+        raise ValueError("Invalid wiki name: Contains null byte")
+    
     # Only allow alphanumeric, underscore, hyphen, and spaces
     if not re.match(r'^[a-zA-Z0-9_\- ]+$', wiki_name):
-        raise ValueError(f"Invalid wiki name: Only alphanumeric characters, underscores, hyphens, and spaces are allowed")
+        raise ValueError("Invalid wiki name: Only alphanumeric characters, underscores, hyphens, and spaces are allowed")
     
     # Additional security checks
-    if any(pattern in wiki_name for pattern in ['..', '/', '\\', '\x00']):
-        raise ValueError(f"Invalid wiki name: Contains forbidden characters")
+    if any(pattern in wiki_name for pattern in ['..', '/', '\\']):
+        raise ValueError("Invalid wiki name: Contains forbidden characters")
     
     # Replace spaces with underscores for filesystem safety
     safe_name = wiki_name.replace(' ', '_')
@@ -444,6 +517,10 @@ def load_checkpoint(file_path: str) -> int:
 
 
 def save_checkpoint(file_path: str, last_processed_id: int):
+    # Check for null bytes
+    if '\x00' in str(file_path):
+        raise ValueError("Null byte in checkpoint path")
+    
     # Validate the path is safe before any operations
     if '../' in str(file_path) or '..' + os.sep in str(file_path):
         raise ValueError("Path traversal attempt in checkpoint file")
@@ -463,10 +540,23 @@ def save_checkpoint(file_path: str, last_processed_id: int):
     except ValueError:
         raise ValueError("Invalid checkpoint file path")
     
-    # Now safe to create parent directories and write
+    # Use atomic write to prevent partial writes and race conditions
     safe_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(safe_path, 'w') as f:
-        json.dump({'last_processed_id': last_processed_id}, f)
+    
+    # Write to temporary file first
+    fd, temp_path = tempfile.mkstemp(dir=safe_path.parent, prefix='.tmp_', suffix='.json')
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump({'last_processed_id': last_processed_id}, f)
+        # Atomic rename (on POSIX systems)
+        Path(temp_path).replace(safe_path)
+    except Exception:
+        # Clean up temp file on error
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
 
 
 def import_mediawiki_dump(
