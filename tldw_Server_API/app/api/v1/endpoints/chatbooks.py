@@ -224,31 +224,40 @@ async def import_chatbook(
         
         # Save uploaded file to secure temp location with sanitized name
         import tempfile
-        base_temp = Path(tempfile.gettempdir())
+        base_temp = Path(tempfile.gettempdir()).resolve(strict=False)
         # Sanitize user.id to avoid path traversal and unsafe values
         import re
         safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '', str(user.id))
         if not safe_user_id or safe_user_id != str(user.id):
             raise HTTPException(status_code=400, detail="Invalid user id for path")
-        temp_dir = base_temp / f"tldw_uploads/{safe_user_id}"
-        
-        # Ensure temp directory path is canonical and secure
-        temp_dir = temp_dir.resolve()
-        base_temp_resolved = base_temp.resolve()
-        
-        # Verify the temp dir is within the expected base
-        if not str(temp_dir).startswith(str(base_temp_resolved)):
-            raise HTTPException(status_code=400, detail="Invalid temporary directory path")
-        
+
+        # Establish a fixed uploads root under the system temp and ensure it's not a symlink
+        uploads_root = base_temp / "tldw_uploads"
+        uploads_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if uploads_root.is_symlink():
+            raise HTTPException(status_code=400, detail="Insecure temporary upload directory")
+        uploads_root_resolved = uploads_root.resolve(strict=True)
+
+        # Verify uploads_root is within the expected base temp directory using commonpath
+        base_temp_resolved = base_temp.resolve(strict=False)
+        import os as _os
+        if _os.path.commonpath([str(uploads_root_resolved), str(base_temp_resolved)]) != str(base_temp_resolved):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory base")
+
+        # Create and validate per-user directory
+        temp_dir = uploads_root_resolved / safe_user_id
         temp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-        
+        if temp_dir.is_symlink():
+            raise HTTPException(status_code=400, detail="Insecure user temporary directory")
+        temp_dir = temp_dir.resolve(strict=True)
+        if _os.path.commonpath([str(temp_dir), str(uploads_root_resolved)]) != str(uploads_root_resolved):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory path")
+
+        # Build the destination file path without resolving the file itself
         temp_file = temp_dir / f"import_{safe_filename}"
-        temp_file = temp_file.resolve()
-        
-        # Ensure the file path stays within temp_dir
-        if not str(temp_file).startswith(str(temp_dir)):
+        if temp_file.parent != temp_dir:
             raise HTTPException(status_code=400, detail="Invalid file path")
-        
+
         with open(temp_file, 'wb') as f:
             shutil.copyfileobj(file.file, f)
         
@@ -355,26 +364,39 @@ async def preview_chatbook(
         
         # Save uploaded file to secure temp location with sanitized name
         import tempfile
-        base_temp = Path(tempfile.gettempdir())
-        temp_dir = base_temp / f"tldw_uploads/{user.id}"
-        
-        # Ensure temp directory path is canonical and secure
-        temp_dir = temp_dir.resolve()
-        base_temp_resolved = base_temp.resolve()
-        
-        # Verify the temp dir is within the expected base
-        if not str(temp_dir).startswith(str(base_temp_resolved)):
-            raise HTTPException(status_code=400, detail="Invalid temporary directory path")
-        
+        base_temp = Path(tempfile.gettempdir()).resolve(strict=False)
+        # Sanitize user.id to avoid path traversal and unsafe values
+        import re
+        safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '', str(user.id))
+        if not safe_user_id or safe_user_id != str(user.id):
+            raise HTTPException(status_code=400, detail="Invalid user id for path")
+
+        # Establish a fixed uploads root and ensure it's secure
+        uploads_root = base_temp / "tldw_uploads"
+        uploads_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if uploads_root.is_symlink():
+            raise HTTPException(status_code=400, detail="Insecure temporary upload directory")
+        uploads_root_resolved = uploads_root.resolve(strict=True)
+
+        # Verify uploads_root is within the system temp directory
+        import os as _os
+        if _os.path.commonpath([str(uploads_root_resolved), str(base_temp)]) != str(base_temp):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory base")
+
+        # Create and validate per-user directory
+        temp_dir = uploads_root_resolved / safe_user_id
         temp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-        
+        if temp_dir.is_symlink():
+            raise HTTPException(status_code=400, detail="Insecure user temporary directory")
+        temp_dir = temp_dir.resolve(strict=True)
+        if _os.path.commonpath([str(temp_dir), str(uploads_root_resolved)]) != str(uploads_root_resolved):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory path")
+
+        # Build the preview file path
         temp_file = temp_dir / f"preview_{safe_filename}"
-        temp_file = temp_file.resolve()
-        
-        # Ensure the file path stays within temp_dir
-        if not str(temp_file).startswith(str(temp_dir)):
+        if temp_file.parent != temp_dir:
             raise HTTPException(status_code=400, detail="Invalid file path")
-        
+
         with open(temp_file, 'wb') as f:
             shutil.copyfileobj(file.file, f)
         
@@ -681,7 +703,8 @@ async def download_chatbook(
         # Additional path containment check - ensure file is in expected user directory
         # The file should be within the user's export directory
         expected_base = Path(service.export_dir).resolve()
-        if not str(file_path).startswith(str(expected_base)):
+        import os as _os
+        if _os.path.commonpath([str(file_path), str(expected_base)]) != str(expected_base):
             logger.warning(f"Path traversal attempt detected for user {user.id}")
             # Log security event if audit logger is available
             if audit_logger:

@@ -87,6 +87,7 @@ tldw_server/
 - Writing assistance tools
 - Browser extension for web content capture
 - Sync server for multi-device support
+- **Evaluation Module**: Currently undergoing unification (combining OpenAI-compatible and tldw-specific implementations)
 
 ## Technical Architecture
 
@@ -327,6 +328,9 @@ The project follows these core principles (from Project_Guidelines.md):
 - `GET /api/v1/media/search` - Search ingested content
 - `POST /api/v1/notes/create` - Create a note
 - `GET /api/v1/prompts/list` - List prompts
+- `POST /api/v1/evaluations` - Create evaluation definitions (OpenAI-compatible)
+- `POST /api/v1/evaluations/geval` - G-Eval summarization evaluation
+- `POST /api/v1/evaluations/rag` - RAG system evaluation
 
 ### Environment Variables
 - `TLDW_CONFIG_PATH`: Path to config.txt

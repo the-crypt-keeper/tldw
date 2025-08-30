@@ -729,8 +729,16 @@ class ChatbookService:
                     import_status
                 )
             
-            # Cleanup
+            # Cleanup extracted contents
             shutil.rmtree(extract_dir)
+            
+            # Attempt to remove the original import archive if it still exists (uploaded temp file)
+            try:
+                fp = Path(file_path)
+                if fp.exists() and fp.is_file():
+                    fp.unlink()
+            except Exception as _e:
+                logger.debug(f"Could not remove import archive {file_path}: {_e}")
             
             # Build result message
             if import_status.successful_items > 0:
@@ -791,6 +799,14 @@ class ChatbookService:
             job.completed_at = datetime.utcnow()
             job.error_message = str(e)
             self._save_import_job(job)
+        finally:
+            # Ensure original import archive is removed for async mode
+            try:
+                fp = Path(file_path)
+                if fp.exists() and fp.is_file():
+                    fp.unlink()
+            except Exception as _e:
+                logger.debug(f"Could not remove import archive (async) {file_path}: {_e}")
     
     def preview_chatbook(self, file_path: str) -> Tuple[Optional[ChatbookManifest], Optional[str]]:
         """

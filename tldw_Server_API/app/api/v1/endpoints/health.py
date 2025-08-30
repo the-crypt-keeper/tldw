@@ -296,7 +296,7 @@ async def metrics() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Metrics collection failed: {e}")
         return {
-            "error": str(e),
+            "error": "ERROR - SEE LOGS",
             "timestamp": datetime.utcnow().isoformat()
         }
 
@@ -692,7 +692,7 @@ async def prometheus_metrics() -> Response:
     except Exception as e:
         logger.error(f"Prometheus metrics collection failed: {e}")
         return Response(
-            content=f"# Metrics collection failed: {e}\n",
+            content=f"# Metrics collection failed: ERROR - SEE LOGS",
             status_code=503,
             media_type="text/plain"
         )

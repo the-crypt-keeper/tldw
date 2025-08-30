@@ -15,6 +15,52 @@ from datetime import datetime
 import re
 import html
 
+try:
+    import bleach  # Robust HTML sanitizer
+except Exception:  # pragma: no cover - optional dependency fallback
+    bleach = None
+
+
+def sanitize_html_text(value: Optional[str]) -> Optional[str]:
+    """Sanitize user-provided text using a robust HTML sanitizer.
+    - Uses bleach to strip all tags, attributes, protocols, and comments when available.
+    - Falls back to conservative regex + html.escape if bleach is unavailable.
+    - Also removes null bytes/control characters and normalizes whitespace.
+    """
+    if value is None:
+        return None
+
+    v = value
+
+    # Normalize line endings first
+    v = v.replace("\r", "\n")
+
+    if bleach is not None:
+        # Strip all HTML tags and comments, keep only text content
+        v = bleach.clean(
+            v,
+            tags=[],
+            attributes={},
+            protocols=[],
+            strip=True,
+            strip_comments=True,
+        )
+    else:
+        # Fallback: remove script tags and all other tags, then escape
+        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
+        v = re.sub(r'<[^>]+>', '', v)
+        v = html.escape(v)
+
+    # Remove null bytes and most control characters except \n and \t
+    v = v.replace('\x00', '')
+    v = ''.join(ch for ch in v if ord(ch) >= 32 or ch in ('\n', '\t'))
+
+    # Collapse excessive whitespace
+    v = re.sub(r'\n{3,}', '\n\n', v)
+    v = re.sub(r' {2,}', ' ', v)
+
+    return v.strip() if v is not None else None
+
 
 class EvaluationMetric(BaseModel):
     """Base evaluation metric"""
@@ -53,23 +99,10 @@ class GEvalRequest(BaseModel):
         """Sanitize input text to prevent injection attacks"""
         if not v:
             raise ValueError("Text cannot be empty")
-        
-        # Remove any potential script tags or HTML
-        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
-        v = re.sub(r'<[^>]+>', '', v)  # Remove all HTML tags
-        
-        # Escape HTML entities
-        v = html.escape(v)
-        
-        # Remove null bytes and other control characters
-        v = v.replace('\x00', '').replace('\r', '\n')
-        v = ''.join(char for char in v if ord(char) >= 32 or char == '\n' or char == '\t')
-        
-        # Trim excessive whitespace
-        v = re.sub(r'\n{3,}', '\n\n', v)  # Max 2 consecutive newlines
-        v = re.sub(r' {2,}', ' ', v)  # Max 1 space
-        
-        return v.strip()
+        sanitized = sanitize_html_text(v)
+        if not sanitized:
+            raise ValueError("Text cannot be empty after sanitization")
+        return sanitized
     
     @field_validator('api_name')
     @classmethod
@@ -130,14 +163,7 @@ class RAGEvaluationRequest(BaseModel):
         """Sanitize input text"""
         if v is None:
             return None
-            
-        # Remove potential injection attempts
-        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
-        v = re.sub(r'<[^>]+>', '', v)
-        v = html.escape(v)
-        v = v.replace('\x00', '')
-        
-        return v.strip()
+        return sanitize_html_text(v)
     
     @field_validator('retrieved_contexts')
     @classmethod
@@ -150,14 +176,9 @@ class RAGEvaluationRequest(BaseModel):
         for context in v:
             if len(context) > 20000:  # 20KB per context limit
                 raise ValueError(f"Context too large: {len(context)} characters (max 20000)")
-            
-            # Sanitize each context
-            context = re.sub(r'<[^>]+>', '', context)
-            context = html.escape(context)
-            context = context.replace('\x00', '').strip()
-            
-            if context:  # Only add non-empty contexts
-                sanitized.append(context)
+            cleaned = sanitize_html_text(context)
+            if cleaned:
+                sanitized.append(cleaned)
         
         if not sanitized:
             raise ValueError("No valid contexts after sanitization")
@@ -206,14 +227,7 @@ class ResponseQualityRequest(BaseModel):
         """Sanitize input text"""
         if v is None:
             return None
-            
-        # Basic sanitization
-        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
-        v = re.sub(r'<[^>]+>', '', v)
-        v = html.escape(v)
-        v = v.replace('\x00', '').strip()
-        
-        return v
+        return sanitize_html_text(v)
     
     @field_validator('evaluation_criteria')
     @classmethod
@@ -226,10 +240,11 @@ class ResponseQualityRequest(BaseModel):
         for key, value in v.items():
             # Sanitize both keys and values
             key = re.sub(r'[^a-zA-Z0-9_-]', '', key)[:50]  # Limit key length
-            value = html.escape(str(value))[:500]  # Limit value length
+            value_str = sanitize_html_text(str(value)) or ''
+            value_str = value_str[:500]  # Limit value length
             
-            if key and value:
-                sanitized[key] = value
+            if key and value_str:
+                sanitized[key] = value_str
                 
         return sanitized
 

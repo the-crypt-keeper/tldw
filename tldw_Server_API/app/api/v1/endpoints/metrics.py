@@ -109,10 +109,10 @@ async def health_check_with_metrics() -> Dict[str, Any]:
             "message": "Service is operational"
         }
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error(f"Metrics Health check failed: {e}")
         return {
             "status": "unhealthy",
-            "message": f"Health check failed: {str(e)}",
+            "message": f"Metrics Health check failed: ERROR - SEE LOGS",
             "active_requests": -1,
             "active_streams": -1,
             "active_transactions": -1
