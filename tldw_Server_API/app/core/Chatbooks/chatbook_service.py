@@ -186,13 +186,16 @@ class ChatbookService:
                 # Fetch results from cursor
                 if cursor:
                     results = cursor.fetchall() if hasattr(cursor, 'fetchall') else []
+                    logger.debug(f"Direct query returned {len(results)} results")
                     if results and len(results) > 0:
-                        logger.debug(f"Found conversation via direct query")
+                        logger.debug(f"Found conversation via direct query: {results[0]}")
                         # Convert tuple to dict if needed
                         if isinstance(results[0], tuple):
                             # Assume standard column order
                             return {'id': results[0][0], 'title': results[0][1] if len(results[0]) > 1 else name}
                         return results[0]
+                else:
+                    logger.debug(f"Direct query returned None/empty cursor")
             
             logger.debug(f"No match found for '{name}' via FTS or direct query")
             return None
@@ -225,13 +228,16 @@ class ChatbookService:
                 # Fetch results from cursor
                 if cursor:
                     results = cursor.fetchall() if hasattr(cursor, 'fetchall') else []
+                    logger.debug(f"Direct query returned {len(results)} results for note")
                     if results and len(results) > 0:
-                        logger.debug(f"Found note via direct query")
+                        logger.debug(f"Found note via direct query: {results[0]}")
                         # Convert tuple to dict if needed
                         if isinstance(results[0], tuple):
                             # Assume standard column order
                             return {'id': results[0][0], 'title': results[0][1] if len(results[0]) > 1 else title}
                         return results[0]
+                else:
+                    logger.debug(f"Direct query returned None/empty cursor for note")
             
             logger.debug(f"No match found for note '{title}' via FTS or direct query")
             return None
@@ -815,13 +821,7 @@ class ChatbookService:
             # Cleanup extracted contents
             shutil.rmtree(extract_dir)
             
-            # Attempt to remove the original import archive if it still exists (uploaded temp file)
-            try:
-                fp = Path(file_path)
-                if fp.exists() and fp.is_file():
-                    fp.unlink()
-            except Exception as _e:
-                logger.debug(f"Could not remove import archive {file_path}: {_e}")
+            # Note: We do NOT delete the original import file - the caller owns it
             
             # Build result message
             logger.debug(f"Import status: total={import_status.total_items}, successful={import_status.successful_items}, skipped={import_status.skipped_items}, failed={import_status.failed_items}")
