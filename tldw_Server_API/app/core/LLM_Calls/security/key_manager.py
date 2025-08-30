@@ -164,34 +164,29 @@ class KeyManager:
         )
         return base64.b64encode(dk).decode('utf-8')
     
-    def _hash_key_hmac(self, api_key: str) -> str:
-        """
-        Create a quick HMAC-SHA256 hash for key identification.
-        
-        Args:
-            api_key: The API key to hash
-            
-        Returns:
-            Hex string of the HMAC hash
-        """
-        return hmac.new(
-            self._master_key,
-            api_key.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
-    
     def _hash_key(self, api_key: str) -> str:
         """
-        Create a secure hash of an API key for identification.
-        This uses HMAC-SHA256 for quick lookups.
+        Create a secure, deterministic hash of an API key for identification.
+        This uses PBKDF2-HMAC-SHA256 with a fixed "master" salt for quick lookups.
         
         Args:
             api_key: The API key to hash
             
         Returns:
-            Hex string of the hashed key
+            Hex string of the truncated PBKDF2 hash (used as identifier)
         """
-        return self._hash_key_hmac(api_key)
+        # Use a fixed master salt (e.g., derived from self._master_key)
+        master_salt = b"keyid-identifier-v1-" + self._master_key[:16]
+        iterations = 100000
+        dk = hashlib.pbkdf2_hmac(
+            'sha256',
+            api_key.encode('utf-8'),
+            master_salt,
+            iterations,
+            dklen=32
+        )
+        # Use a short, hex-encoded identifier (16 hex chars = 8 bytes)
+        return dk.hex()[:16]
     
     def _create_key_info(self, provider: str, api_key: str) -> APIKeyInfo:
         """
@@ -206,7 +201,7 @@ class KeyManager:
         """
         salt = self._generate_salt()
         key_hash = self._hash_key_pbkdf2(api_key, salt)
-        key_id = self._hash_key_hmac(api_key)[:16]  # Short ID for identification
+        key_id = self._hash_key(api_key)  # Short ID (from PBKDF2-based identifier)
         
         return APIKeyInfo(
             provider=provider,
