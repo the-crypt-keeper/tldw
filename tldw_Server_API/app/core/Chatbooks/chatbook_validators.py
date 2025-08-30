@@ -60,9 +60,14 @@ class ChatbookValidator:
         if len(base_filename) > cls.MAX_NAME_LENGTH:
             return False, f"Filename too long (max {cls.MAX_NAME_LENGTH} characters)", ""
         
-        # Check extension
-        extension = Path(base_filename).suffix.lower()
-        if extension not in cls.VALID_EXTENSIONS:
+        # Check extension - look for any valid extension in the filename
+        has_valid_extension = False
+        for valid_ext in cls.VALID_EXTENSIONS:
+            if valid_ext in base_filename.lower():
+                has_valid_extension = True
+                break
+        
+        if not has_valid_extension:
             return False, f"Invalid file type. Allowed: {', '.join(cls.VALID_EXTENSIONS)}", ""
         
         # Sanitize filename - remove dangerous characters
@@ -76,9 +81,13 @@ class ChatbookValidator:
                 name_part = parts[0].replace('.', '_')
                 sanitized = f"{name_part}.{parts[1]}"
         
-        # Ensure it still has valid extension after sanitization
+        # Ensure it ends with a valid extension after sanitization
         if not any(sanitized.lower().endswith(ext) for ext in cls.VALID_EXTENSIONS):
-            sanitized = sanitized.rsplit('.', 1)[0] + '.zip'
+            # Force it to end with .zip
+            if '.' in sanitized:
+                sanitized = sanitized.rsplit('.', 1)[0] + '.zip'
+            else:
+                sanitized = sanitized + '.zip'
         
         return True, None, sanitized
     
@@ -156,17 +165,23 @@ class ChatbookValidator:
                 for info in zf.filelist:
                     # Check for null bytes in filename (can cause issues)
                     if '\x00' in info.filename:
-                        return False, "Archive contains files with invalid characters in filename"
+                        return False, "Archive contains files with invalid characters"
                     
-                    # Check for symlinks (external file attribute indicates symlink in Unix)
+                    # Check for symlinks FIRST (they are never allowed)
                     # Symlinks have external_attr with 0xA1ED0000 (symlink mode in Unix)
                     if info.external_attr >> 16 == 0xA1ED:
                         return False, "Archive contains symbolic links which are not allowed"
                     
-                    # Check for path traversal
+                    # Check for path traversal (most important security check)
                     if cls._is_path_traversal(info.filename):
                         # Don't expose the actual path in error message
                         return False, "Archive contains files with unsafe paths"
+                    
+                    # Check for files without extensions (could indicate truncation or obfuscation)
+                    # Skip the manifest.json and directory entries
+                    if not info.filename.endswith('/') and info.filename != 'manifest.json':
+                        if '.' not in os.path.basename(info.filename):
+                            return False, "Archive contains files with invalid names"
                     
                     # Check individual file size
                     if info.file_size > cls.MAX_FILE_IN_ARCHIVE:
@@ -261,19 +276,39 @@ class ChatbookValidator:
         Returns:
             Sanitized path
         """
-        # Convert to Path object for normalization
-        path_obj = Path(path)
+        # Handle Windows paths by converting backslashes to forward slashes
+        normalized = path.replace('\\', '/')
         
-        # Get only the name component (no directory traversal)
-        safe_name = path_obj.name
+        # Remove any parent directory references
+        while '../' in normalized:
+            normalized = normalized.replace('../', '')
+        while '..' in normalized:
+            normalized = normalized.replace('..', '')
+        
+        # Remove leading slashes and drive letters
+        normalized = re.sub(r'^[A-Za-z]:', '', normalized)  # Remove drive letters
+        normalized = normalized.lstrip('/')
+        normalized = normalized.lstrip('~')
+        
+        # Remove any dangerous directory prefixes that are known system paths
+        # This ensures we remove things like "windows/system32/" prefix
+        parts = normalized.split('/')
+        # Filter out system directory names from the path components
+        filtered_parts = []
+        for part in parts:
+            if part.lower() not in {'windows', 'system32', 'system', 'etc', 'usr', 'bin', 'var', 'proc', 'sys', 'dev'}:
+                filtered_parts.append(part)
+        
+        # Get only the final filename component from filtered parts
+        safe_name = filtered_parts[-1] if filtered_parts else ''
         
         # Remove any remaining dangerous patterns
-        safe_name = re.sub(r'[^\w\s\-._]', '_', safe_name)
+        safe_name = re.sub(r'[<>:"|?*]', '_', safe_name)
         
         # Ensure no double dots
         safe_name = safe_name.replace('..', '_')
         
-        return safe_name
+        return safe_name if safe_name else 'unnamed'
     
     @classmethod
     def validate_content_selections(cls, 

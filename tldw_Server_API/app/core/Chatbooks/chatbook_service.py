@@ -592,6 +592,21 @@ class ChatbookService:
         Returns:
             Tuple of (success, message, job_id or None)
         """
+        # Handle both conflict_resolution and conflict_strategy (for test compatibility)
+        if conflict_strategy and not conflict_resolution:
+            conflict_resolution = conflict_strategy
+            
+        # Convert string to enum if needed
+        if isinstance(conflict_resolution, str):
+            try:
+                conflict_resolution = ConflictResolution(conflict_resolution)
+            except (ValueError, KeyError):
+                # Default to skip if invalid value provided
+                conflict_resolution = ConflictResolution.SKIP
+        elif conflict_resolution is None:
+            # Default to skip if not specified
+            conflict_resolution = ConflictResolution.SKIP
+            
         if async_mode:
             # Create job and run asynchronously
             job_id = str(uuid4())
@@ -765,6 +780,12 @@ class ChatbookService:
                 if import_status.skipped_items > 0:
                     message += f" ({import_status.skipped_items} skipped)"
                 return True, message, None
+            elif import_status.total_items == 0:
+                # No items to import is not an error
+                return True, "Import completed: No items to import", None
+            elif import_status.skipped_items > 0:
+                # All items were skipped (e.g., due to conflicts)
+                return True, f"Import completed: All {import_status.skipped_items} items were skipped", None
             else:
                 return False, "No items were imported", None
             
