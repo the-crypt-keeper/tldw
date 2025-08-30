@@ -253,9 +253,10 @@ class TestImportWorkflow:
             # Add manifest
             manifest = {
                 "version": "1.0.0",
+                "name": "Import Test",
+                "description": "Test chatbook for import functionality",
                 "exported_at": datetime.now().isoformat(),
                 "user_id": "other_user",
-                "name": "Import Test",
                 "content_summary": {"conversations": 1}
             }
             zf.writestr('manifest.json', json.dumps(manifest))

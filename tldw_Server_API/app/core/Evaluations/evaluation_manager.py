@@ -41,9 +41,11 @@ class EvaluationManager:
         else:
             db_path = "Databases/evaluations.db"
         
-        # Sanitize path to prevent directory traversal
+        # Sanitize path to prevent directory traversal and null byte injection
         # Remove any directory traversal attempts
         db_path = db_path.replace("..", "")
+        # Remove null bytes to prevent null byte injection attacks
+        db_path = db_path.replace("\x00", "")
         db_path = os.path.normpath(db_path)
         
         # Make absolute if relative
