@@ -471,13 +471,14 @@ class EvaluationsDatabase:
         return {
             "id": row["id"],
             "object": "evaluation",
-            "created_at": created_timestamp,  # Fixed: use created_at instead of created
+            "created": created_timestamp,  # Use 'created' for OpenAI compatibility
+            "created_at": created_timestamp,  # Also provide created_at for backwards compatibility
             "name": row["name"],
             "description": row["description"],
             "eval_type": row["eval_type"],
             "eval_spec": json.loads(row["eval_spec"]) if row["eval_spec"] else {},
             "dataset_id": row["dataset_id"],
-            "created_by": row["created_by"] or "unknown",  # Fixed: add created_by field
+            "created_by": row["created_by"] or "unknown",
             "metadata": json.loads(row["metadata"]) if row["metadata"] else {}
         }
     
@@ -511,11 +512,12 @@ class EvaluationsDatabase:
         
         return {
             "id": row["id"],
-            "object": "run",  # Fixed: use "run" to match schema
-            "created_at": created_timestamp,  # Fixed: use created_at instead of created
+            "object": "run",
+            "created": created_timestamp,  # Use 'created' for OpenAI compatibility
+            "created_at": created_timestamp,  # Also provide created_at for backwards compatibility
             "eval_id": row["eval_id"],
             "status": row["status"],
-            "target_model": row["target_model"] or "",  # Ensure not None
+            "target_model": row["target_model"] or "",
             "config": json.loads(row["config"]) if row["config"] else {},
             "progress": json.loads(row["progress"]) if row["progress"] else None,
             "results": json.loads(row["results"]) if row["results"] else None,
@@ -541,11 +543,12 @@ class EvaluationsDatabase:
         result = {
             "id": row["id"],
             "object": "dataset",
-            "created_at": created_timestamp,  # Fixed: use created_at instead of created
+            "created": created_timestamp,  # Use 'created' for OpenAI compatibility
+            "created_at": created_timestamp,  # Also provide created_at for backwards compatibility
             "name": row["name"],
             "description": row["description"],
             "sample_count": row["sample_count"] or 0,
-            "created_by": row["created_by"] or "unknown",  # Fixed: add created_by field
+            "created_by": row["created_by"] or "unknown",
             "metadata": json.loads(row["metadata"]) if row["metadata"] else {}
         }
         

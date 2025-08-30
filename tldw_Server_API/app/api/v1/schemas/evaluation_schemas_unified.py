@@ -218,9 +218,11 @@ class EvaluationResponse(BaseModel):
     eval_type: str
     eval_spec: Dict[str, Any]
     dataset_id: Optional[str] = None
-    created_at: int = Field(..., alias="created")  # OpenAI uses 'created'
+    created: int = Field(..., description="Creation timestamp (OpenAI-compatible)")
+    created_at: Optional[int] = Field(None, description="Creation timestamp (tldw-compatible)")
     created_by: str
-    updated_at: Optional[int] = Field(None, alias="updated")  # Add updated field
+    updated: Optional[int] = Field(None, description="Update timestamp (OpenAI-compatible)")
+    updated_at: Optional[int] = Field(None, description="Update timestamp (tldw-compatible)")
     metadata: Optional[Dict[str, Any]] = None
     
     class Config:
@@ -251,13 +253,17 @@ class RunResponse(BaseModel):
     eval_id: str
     status: RunStatus
     target_model: str
-    created_at: int
+    created: int = Field(..., description="Creation timestamp (OpenAI-compatible)")
+    created_at: Optional[int] = Field(None, description="Creation timestamp (tldw-compatible)")
     started_at: Optional[int] = None
     completed_at: Optional[int] = None
     progress: Optional[RunProgress] = None
     error_message: Optional[str] = None
     results: Optional[Dict[str, Any]] = None
     usage: Optional[Dict[str, int]] = None
+    
+    class Config:
+        allow_population_by_field_name = True
 
 
 class RunResultsResponse(BaseModel):
@@ -287,9 +293,13 @@ class DatasetResponse(BaseModel):
     name: str
     description: Optional[str] = None
     sample_count: int
-    created_at: int
+    created: int = Field(..., description="Creation timestamp (OpenAI-compatible)")
+    created_at: Optional[int] = Field(None, description="Creation timestamp (tldw-compatible)")
     created_by: str
     metadata: Optional[Dict[str, Any]] = None
+    
+    class Config:
+        allow_population_by_field_name = True
 
 
 # ============= List Responses =============

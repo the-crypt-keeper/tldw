@@ -56,6 +56,11 @@ async def health_check(
         "checks": {}
     }
     
+    # Include API key in test mode for E2E testing
+    import os
+    if os.getenv("TEST_MODE") == "true" and settings.AUTH_MODE == "single_user":
+        health["test_api_key"] = settings.SINGLE_USER_API_KEY
+    
     # Database check
     try:
         if settings.AUTH_MODE == "multi_user":
