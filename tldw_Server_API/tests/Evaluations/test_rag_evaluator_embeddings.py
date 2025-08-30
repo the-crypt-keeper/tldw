@@ -16,59 +16,47 @@ class TestRAGEvaluatorEmbeddings:
     """Test RAG evaluator with real embeddings integration."""
     
     @pytest.fixture
-    def mock_embeddings_integration(self):
-        """Create a mock embeddings integration for testing."""
-        mock = Mock()
-        mock.embed_query = AsyncMock(return_value=np.random.rand(1536))
-        mock.embed_documents = AsyncMock(return_value=np.random.rand(3, 1536))
-        mock.get_embedding_dimension = Mock(return_value=1536)
-        mock.close = Mock()
-        return mock
-    
-    @pytest.fixture
-    def mock_create_integration(self, mock_embeddings_integration):
-        """Mock the create_rag_embeddings_integration function."""
-        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_rag_embeddings_integration') as mock_create:
-            mock_create.return_value = mock_embeddings_integration
+    def mock_create_embedding(self):
+        """Mock the create_embedding function."""
+        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_embedding') as mock_create:
+            # Return a consistent embedding vector
+            mock_create.return_value = np.random.rand(1536).tolist()
             yield mock_create
     
     @pytest.mark.asyncio
-    async def test_evaluator_initialization_with_embeddings(self, mock_create_integration):
+    async def test_evaluator_initialization_with_embeddings(self, mock_create_embedding):
         """Test that RAGEvaluator properly initializes with embeddings."""
         evaluator = RAGEvaluator(
             embedding_provider="openai",
             embedding_model="text-embedding-3-small"
         )
         
-        assert evaluator.embedding_available is True
-        assert evaluator.embeddings_integration is not None
-        mock_create_integration.assert_called_once_with(
-            provider="openai",
-            model="text-embedding-3-small",
-            api_key=None
-        )
+        # Check that embeddings are available (lazy evaluation on first use)
+        assert evaluator.embedding_provider == "openai"
+        assert evaluator.embedding_model == "text-embedding-3-small"
     
     @pytest.mark.asyncio
     async def test_evaluator_initialization_fallback(self):
         """Test that RAGEvaluator falls back gracefully when embeddings fail."""
-        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_rag_embeddings_integration') as mock_create:
+        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_embedding') as mock_create:
             mock_create.side_effect = Exception("API key not found")
             
             evaluator = RAGEvaluator()
             
+            # Force evaluation of embedding_available property
             assert evaluator.embedding_available is False
-            assert evaluator.embeddings_integration is None
     
     @pytest.mark.asyncio
-    async def test_answer_similarity_with_embeddings(self, mock_create_integration, mock_embeddings_integration):
+    async def test_answer_similarity_with_embeddings(self, mock_create_embedding):
         """Test answer similarity evaluation using embeddings."""
         evaluator = RAGEvaluator()
+        evaluator.embedding_available = True  # Force embeddings to be available
         
         # Create embeddings with known similarity
-        response_embedding = np.array([1.0, 0.0, 0.0])
-        ground_truth_embedding = np.array([0.8, 0.6, 0.0])  # Cosine similarity ~0.8
+        response_embedding = [1.0, 0.0, 0.0]
+        ground_truth_embedding = [0.8, 0.6, 0.0]  # Cosine similarity ~0.8
         
-        mock_embeddings_integration.embed_query.side_effect = [
+        mock_create_embedding.side_effect = [
             response_embedding,
             ground_truth_embedding
         ]
@@ -85,15 +73,16 @@ class TestRAGEvaluatorEmbeddings:
         assert 1 <= result["raw_score"] <= 5
         
         # Verify embeddings were called
-        assert mock_embeddings_integration.embed_query.call_count == 2
+        assert mock_create_embedding.call_count == 2
     
     @pytest.mark.asyncio
-    async def test_answer_similarity_fallback_to_llm(self, mock_create_integration, mock_embeddings_integration):
+    async def test_answer_similarity_fallback_to_llm(self, mock_create_embedding):
         """Test that answer similarity falls back to LLM when embeddings fail."""
         evaluator = RAGEvaluator()
+        evaluator.embedding_available = True  # Initially available
         
         # Make embeddings fail
-        mock_embeddings_integration.embed_query.side_effect = Exception("Embedding service unavailable")
+        mock_create_embedding.side_effect = Exception("Embedding service unavailable")
         
         with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.asyncio.to_thread') as mock_thread:
             mock_thread.return_value = "4"  # LLM returns score of 4
@@ -126,12 +115,13 @@ class TestRAGEvaluatorEmbeddings:
             assert "Answer similarity evaluation failed" in str(exc_info.value)
     
     @pytest.mark.asyncio
-    async def test_evaluate_with_embeddings(self, mock_create_integration, mock_embeddings_integration):
+    async def test_evaluate_with_embeddings(self, mock_create_embedding):
         """Test full evaluation pipeline with embeddings."""
         evaluator = RAGEvaluator()
+        evaluator.embedding_available = True
         
         # Setup mock embeddings
-        mock_embeddings_integration.embed_query.return_value = np.random.rand(1536)
+        mock_create_embedding.return_value = np.random.rand(1536).tolist()
         
         with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.asyncio.to_thread') as mock_thread:
             mock_thread.return_value = "4"  # Mock LLM responses
@@ -152,30 +142,22 @@ class TestRAGEvaluatorEmbeddings:
             if evaluator.embedding_available:
                 assert results["metrics"]["answer_similarity"]["method"] == "embeddings"
     
-    def test_evaluator_cleanup(self, mock_create_integration, mock_embeddings_integration):
+    def test_evaluator_cleanup(self):
         """Test that evaluator properly cleans up resources."""
-        evaluator = RAGEvaluator()
-        evaluator.close()
-        
-        mock_embeddings_integration.close.assert_called_once()
-    
-    def test_evaluator_cleanup_with_error(self, mock_create_integration, mock_embeddings_integration):
-        """Test that evaluator handles cleanup errors gracefully."""
-        mock_embeddings_integration.close.side_effect = Exception("Cleanup error")
-        
         evaluator = RAGEvaluator()
         evaluator.close()  # Should not raise
     
     @pytest.mark.asyncio
-    async def test_cosine_similarity_calculation(self, mock_create_integration, mock_embeddings_integration):
+    async def test_cosine_similarity_calculation(self, mock_create_embedding):
         """Test that cosine similarity is calculated correctly."""
         evaluator = RAGEvaluator()
+        evaluator.embedding_available = True
         
         # Create orthogonal vectors (similarity = 0)
-        response_embedding = np.array([1.0, 0.0])
-        ground_truth_embedding = np.array([0.0, 1.0])
+        response_embedding = [1.0, 0.0]
+        ground_truth_embedding = [0.0, 1.0]
         
-        mock_embeddings_integration.embed_query.side_effect = [
+        mock_create_embedding.side_effect = [
             response_embedding,
             ground_truth_embedding
         ]
@@ -189,9 +171,9 @@ class TestRAGEvaluatorEmbeddings:
         assert result["raw_score"] < 1.5
         
         # Create identical vectors (similarity = 1)
-        mock_embeddings_integration.embed_query.side_effect = [
-            np.array([1.0, 0.0]),
-            np.array([1.0, 0.0])
+        mock_create_embedding.side_effect = [
+            [1.0, 0.0],
+            [1.0, 0.0]
         ]
         
         _, result = await evaluator._evaluate_answer_similarity(

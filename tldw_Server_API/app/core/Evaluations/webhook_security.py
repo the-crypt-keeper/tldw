@@ -667,9 +667,9 @@ class WebhookSecurityValidator:
 class WebhookPermissionManager:
     """Manages webhook permissions and ownership."""
     
-    def __init__(self, db_path: str):
-        """Initialize permission manager."""
-        self.db_path = db_path
+    def __init__(self, db_adapter):
+        """Initialize permission manager with database adapter."""
+        self.db_adapter = db_adapter
     
     async def check_webhook_permissions(
         self,
@@ -691,7 +691,7 @@ class WebhookPermissionManager:
             Tuple of (has_permission, error_message)
         """
         try:
-            with __import__('sqlite3').connect(self.db_path) as conn:
+            with self.db_adapter.transaction():
                 if webhook_id:
                     # Check by webhook ID
                     cursor = conn.execute("""
@@ -721,25 +721,26 @@ class WebhookPermissionManager:
                         return False, "Access denied: not webhook owner"
                 
                 elif url:
-                    # Check by URL
-                    cursor = conn.execute("""
-                        SELECT user_id FROM webhook_registrations
-                        WHERE user_id = ? AND url = ? AND active = 1
-                    """, (user_id, url))
-                    
-                    if not cursor.fetchone():
-                        return False, "Webhook not found or access denied"
+                    # Check by URL - only check ownership for non-register actions
+                    if action != "register":
+                        row = self.db_adapter.fetch_one("""
+                            SELECT user_id FROM webhook_registrations
+                            WHERE user_id = ? AND url = ? AND active = 1
+                        """, (user_id, url))
+                        
+                        if not row:
+                            return False, "Webhook not found or access denied"
                 
                 # Check rate limits for registration actions
                 if action == "register":
-                    user_webhook_count = self._get_user_webhook_count(user_id, conn)
+                    user_webhook_count = self._get_user_webhook_count(user_id)
                     max_webhooks = get_config("webhooks.registration_limits.per_user_max", 10)
                     
                     if user_webhook_count >= max_webhooks:
                         return False, f"Maximum webhook limit reached ({max_webhooks})"
                     
                     if url:
-                        url_registration_count = self._get_url_registration_count(url, conn)
+                        url_registration_count = self._get_url_registration_count(url)
                         max_per_url = get_config("webhooks.registration_limits.per_url_max", 1)
                         
                         if url_registration_count >= max_per_url:
@@ -751,21 +752,21 @@ class WebhookPermissionManager:
             logger.error(f"Permission check failed: {e}")
             return False, f"Permission check failed: {str(e)}"
     
-    def _get_user_webhook_count(self, user_id: str, conn) -> int:
+    def _get_user_webhook_count(self, user_id: str) -> int:
         """Get number of active webhooks for user."""
-        cursor = conn.execute("""
+        count = self.db_adapter.fetch_value("""
             SELECT COUNT(*) FROM webhook_registrations
             WHERE user_id = ? AND active = 1
         """, (user_id,))
-        return cursor.fetchone()[0]
+        return count or 0
     
-    def _get_url_registration_count(self, url: str, conn) -> int:
+    def _get_url_registration_count(self, url: str) -> int:
         """Get number of active registrations for URL."""
-        cursor = conn.execute("""
+        count = self.db_adapter.fetch_value("""
             SELECT COUNT(*) FROM webhook_registrations
             WHERE url = ? AND active = 1
         """, (url,))
-        return cursor.fetchone()[0]
+        return count or 0
 
 
 # Global instances

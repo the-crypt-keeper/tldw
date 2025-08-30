@@ -102,23 +102,25 @@ async def verify_api_key(
     settings = get_settings()
     
     # Check for X-API-KEY header first (for single-user mode)
-    if settings.AUTH_MODE == "single_user" and x_api_key:
+    token = None
+    if settings.AUTH_MODE == "single_user" and x_api_key and isinstance(x_api_key, str):
         token = x_api_key
     elif credentials:
         token = credentials.credentials
-    else:
+    
+    if not token:
         # No credentials provided
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {
                 "message": "Missing API key or token",
-                "type": "authentication_error",
+                "type": "authentication_error",  
                 "code": "missing_credentials"
             }}
         )
     
     # Remove Bearer prefix if present
-    if token.startswith("Bearer "):
+    if isinstance(token, str) and token.startswith("Bearer "):
         token = token[7:]
     
     # Handle based on authentication mode

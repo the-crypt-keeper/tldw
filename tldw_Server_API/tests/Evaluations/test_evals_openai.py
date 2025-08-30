@@ -313,7 +313,7 @@ class TestDatasetOperations:
         dataset_id = create_response.json()["id"]
         
         # Get it
-        response = client.get(f"/api/v1/datasets/{dataset_id}", headers=auth_headers)
+        response = client.get(f"/api/v1/evaluations/datasets/{dataset_id}", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == dataset_id
@@ -330,11 +330,11 @@ class TestDatasetOperations:
         dataset_id = create_response.json()["id"]
         
         # Delete it
-        response = client.delete(f"/api/v1/datasets/{dataset_id}", headers=auth_headers)
+        response = client.delete(f"/api/v1/evaluations/datasets/{dataset_id}", headers=auth_headers)
         assert response.status_code == 204
         
         # Verify it's deleted
-        get_response = client.get(f"/api/v1/datasets/{dataset_id}", headers=auth_headers)
+        get_response = client.get(f"/api/v1/evaluations/datasets/{dataset_id}", headers=auth_headers)
         assert get_response.status_code == 404
     
     def test_list_datasets(self, client, auth_headers, sample_dataset_request):
@@ -343,10 +343,10 @@ class TestDatasetOperations:
         for i in range(3):
             req = sample_dataset_request.copy()
             req["name"] = f"dataset_{i}"
-            client.post("/api/v1/datasets", json=req, headers=auth_headers)
+            client.post("/api/v1/evaluations/datasets", json=req, headers=auth_headers)
         
         # List them
-        response = client.get("/api/v1/datasets", headers=auth_headers)
+        response = client.get("/api/v1/evaluations/datasets", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["object"] == "list"
@@ -404,7 +404,7 @@ class TestEvaluationRuns:
             run_id = run_response.json()["id"]
             
             # Get status
-            response = client.get(f"/api/v1/runs/{run_id}", headers=auth_headers)
+            response = client.get(f"/api/v1/evaluations/runs/{run_id}", headers=auth_headers)
             assert response.status_code == 200
             data = response.json()
             assert data["id"] == run_id
@@ -431,7 +431,7 @@ class TestEvaluationRuns:
             run_id = run_response.json()["id"]
             
             # Cancel it (may already be completed)
-            response = client.post(f"/api/v1/runs/{run_id}/cancel", headers=auth_headers)
+            response = client.post(f"/api/v1/evaluations/runs/{run_id}/cancel", headers=auth_headers)
             assert response.status_code == 200
             data = response.json()
             assert data["status"] in ["cancelled", "cancelling", "completed"]
@@ -508,7 +508,7 @@ class TestErrorHandling:
                 for i in range(1000)
             ]
         }
-        response = client.post("/api/v1/datasets", json=large_dataset, headers=auth_headers)
+        response = client.post("/api/v1/evaluations/datasets", json=large_dataset, headers=auth_headers)
         assert response.status_code == 201
         data = response.json()
         assert len(data["samples"]) == 1000
@@ -555,7 +555,7 @@ class TestAsyncEvaluation:
             
             # Check status (should be pending, running, or completed)
             status_response = await async_client.get(
-                f"/api/v1/runs/{run_id}",
+                f"/api/v1/evaluations/runs/{run_id}",
                 headers=auth_headers
             )
             assert status_response.status_code == 200
@@ -567,7 +567,7 @@ class TestAsyncEvaluation:
             
             # Check results (might be completed)
             results_response = await async_client.get(
-                f"/api/v1/runs/{run_id}/results",
+                f"/api/v1/evaluations/runs/{run_id}/results",
                 headers=auth_headers
             )
             # Either still processing or completed

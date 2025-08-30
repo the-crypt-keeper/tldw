@@ -14,12 +14,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
-import sqlite3
 from pathlib import Path
 from loguru import logger
 import secrets
 
 from tldw_Server_API.app.core.Chatbooks.chatbook_service import audit_logger
+from tldw_Server_API.app.core.Evaluations.db_adapter import (
+    DatabaseAdapter, DatabaseConfig, DatabaseType, 
+    DatabaseAdapterFactory, get_database_adapter
+)
 # Import security enhancements
 from tldw_Server_API.app.core.Evaluations.webhook_security import (
     webhook_validator,
@@ -63,19 +66,27 @@ class WebhookPayload:
 class WebhookManager:
     """Manages webhook registrations and deliveries."""
     
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None, adapter: Optional[DatabaseAdapter] = None):
         """
         Initialize webhook manager with enhanced security.
         
         Args:
-            db_path: Path to database
+            db_path: Path to database (for backward compatibility)
+            adapter: Database adapter to use (if None, creates default)
         """
-        if db_path is None:
-            db_dir = Path(__file__).parent.parent.parent.parent / "Databases"
-            db_dir.mkdir(parents=True, exist_ok=True)
-            db_path = db_dir / "evaluations.db"
+        if adapter:
+            self.db_adapter = adapter
+        elif db_path:
+            # Create SQLite adapter for specific path
+            config = DatabaseConfig(
+                db_type=DatabaseType.SQLITE,
+                connection_string=db_path
+            )
+            self.db_adapter = DatabaseAdapterFactory.create(config)
+        else:
+            # Use global adapter
+            self.db_adapter = get_database_adapter()
         
-        self.db_path = str(db_path)
         self._init_database()
         
         # Load delivery configuration from external config
@@ -86,7 +97,8 @@ class WebhookManager:
         self.batch_size = delivery_config.get("batch_size", 10)
         
         # Security components
-        self.permission_manager = WebhookPermissionManager(self.db_path)
+        # Pass adapter to permission manager if it supports it
+        self.permission_manager = WebhookPermissionManager(self.db_adapter)
         
         # Metrics
         self.metrics = get_metrics()
@@ -96,52 +108,49 @@ class WebhookManager:
     
     def _init_database(self):
         """Initialize webhook tables."""
-        with get_connection() as conn:
-            # These tables are created in the migration
-            # but we ensure they exist here for standalone usage
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS webhook_registrations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    url TEXT NOT NULL,
-                    secret TEXT NOT NULL,
-                    events TEXT NOT NULL,
-                    active BOOLEAN DEFAULT 1,
-                    retry_count INTEGER DEFAULT 3,
-                    timeout_seconds INTEGER DEFAULT 30,
-                    total_deliveries INTEGER DEFAULT 0,
-                    successful_deliveries INTEGER DEFAULT 0,
-                    failed_deliveries INTEGER DEFAULT 0,
-                    last_delivery_at TIMESTAMP,
-                    last_error TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(user_id, url)
-                )
-            """)
+        # These tables are created in the migration
+        # but we ensure they exist here for standalone usage
+        schema_sql = """
+            CREATE TABLE IF NOT EXISTS webhook_registrations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL,
+                url TEXT NOT NULL,
+                secret TEXT NOT NULL,
+                events TEXT NOT NULL,
+                active BOOLEAN DEFAULT 1,
+                retry_count INTEGER DEFAULT 3,
+                timeout_seconds INTEGER DEFAULT 30,
+                total_deliveries INTEGER DEFAULT 0,
+                successful_deliveries INTEGER DEFAULT 0,
+                failed_deliveries INTEGER DEFAULT 0,
+                last_delivery_at TIMESTAMP,
+                last_error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, url)
+            );
             
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS webhook_deliveries (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    webhook_id INTEGER NOT NULL,
-                    evaluation_id TEXT NOT NULL,
-                    event_type TEXT NOT NULL,
-                    payload TEXT NOT NULL,
-                    signature TEXT NOT NULL,
-                    status_code INTEGER,
-                    response_body TEXT,
-                    response_time_ms INTEGER,
-                    delivered BOOLEAN DEFAULT 0,
-                    retry_count INTEGER DEFAULT 0,
-                    error_message TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    delivered_at TIMESTAMP,
-                    next_retry_at TIMESTAMP,
-                    FOREIGN KEY (webhook_id) REFERENCES webhook_registrations(id)
-                )
-            """)
-            
-            conn.commit()
+            CREATE TABLE IF NOT EXISTS webhook_deliveries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                webhook_id INTEGER NOT NULL,
+                evaluation_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                signature TEXT NOT NULL,
+                status_code INTEGER,
+                response_body TEXT,
+                response_time_ms INTEGER,
+                delivered BOOLEAN DEFAULT 0,
+                retry_count INTEGER DEFAULT 0,
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                delivered_at TIMESTAMP,
+                next_retry_at TIMESTAMP,
+                FOREIGN KEY (webhook_id) REFERENCES webhook_registrations(id)
+            );
+        """
+        
+        self.db_adapter.init_schema(schema_sql)
     
     async def register_webhook(
         self,
@@ -225,25 +234,21 @@ class WebhookManager:
             events_json = json.dumps([e.value for e in events])
             
             # Register webhook in database
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                
+            with self.db_adapter.transaction():
                 # Check if webhook already exists
-                cursor.execute("""
+                existing = self.db_adapter.fetch_one("""
                     SELECT id, secret, events FROM webhook_registrations
                     WHERE user_id = ? AND url = ?
                 """, (user_id, url))
-                
-                existing = cursor.fetchone()
                 webhook_id = None
                 
                 if existing:
-                    webhook_id = existing[0]
-                    existing_secret = existing[1]
-                    existing_events = existing[2]
+                    webhook_id = existing['id']
+                    existing_secret = existing['secret']
+                    existing_events = existing['events']
                     
                     # Update existing webhook
-                    cursor.execute("""
+                    self.db_adapter.update("""
                         UPDATE webhook_registrations
                         SET events = ?, active = 1, updated_at = CURRENT_TIMESTAMP
                         WHERE id = ?
@@ -256,8 +261,8 @@ class WebhookManager:
                     action = "Updated"
                     logger.info(f"Updated webhook {webhook_id} for user {user_id}")
                 else:
-                    # Create new webhook
-                    cursor.execute("""
+                    # Create new webhook  
+                    webhook_id = self.db_adapter.insert("""
                         INSERT INTO webhook_registrations (
                             user_id, url, secret, events, 
                             retry_count, timeout_seconds
@@ -266,12 +271,10 @@ class WebhookManager:
                         user_id, url, secret, events_json,
                         self.max_retries, self.timeout
                     ))
-                    
-                    webhook_id = cursor.lastrowid
                     action = "Registered"
                     logger.info(f"Registered webhook {webhook_id} for user {user_id}")
                 
-                conn.commit()
+                # Transaction auto-commits
             
             # Record metrics
             processing_time = asyncio.get_event_loop().time() - start_time
@@ -383,33 +386,30 @@ class WebhookManager:
                 }
             
             # Perform unregistration
-            with get_connection() as conn:
-                cursor = conn.cursor()
-                
+            with self.db_adapter.transaction():
                 # Get webhook details before unregistering
-                cursor.execute("""
+                webhook_data = self.db_adapter.fetch_one("""
                     SELECT id, events FROM webhook_registrations
                     WHERE user_id = ? AND url = ? AND active = 1
                 """, (user_id, url))
-                
-                webhook_data = cursor.fetchone()
                 if not webhook_data:
                     return {
                         "success": False,
                         "error": "Webhook not found or already inactive"
                     }
                 
-                webhook_id, events_json = webhook_data
+                webhook_id = webhook_data['id']
+                events_json = webhook_data['events']
                 
                 # Deactivate webhook
-                cursor.execute("""
+                rowcount = self.db_adapter.update("""
                     UPDATE webhook_registrations
                     SET active = 0, updated_at = CURRENT_TIMESTAMP
                     WHERE user_id = ? AND url = ?
                 """, (user_id, url))
                 
-                if cursor.rowcount > 0:
-                    conn.commit()
+                if rowcount > 0:
+                    # Transaction auto-commits
                     
                     # Audit log successful unregistration
                     audit_logger.log_event(
@@ -504,10 +504,8 @@ class WebhookManager:
         event: WebhookEvent
     ) -> List[Dict[str, Any]]:
         """Get active webhooks for user and event."""
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("""
+        with self.db_adapter.transaction():
+            rows = self.db_adapter.fetch_all("""
                 SELECT id, url, secret, retry_count, timeout_seconds
                 FROM webhook_registrations
                 WHERE user_id = ? AND active = 1
@@ -515,13 +513,13 @@ class WebhookManager:
             """, (user_id, f'%"{event.value}"%'))
             
             webhooks = []
-            for row in cursor.fetchall():
+            for row in rows:
                 webhooks.append({
-                    "id": row[0],
-                    "url": row[1],
-                    "secret": row[2],
-                    "retry_count": row[3],
-                    "timeout_seconds": row[4]
+                    "id": row['id'],
+                    "url": row['url'],
+                    "secret": row['secret'],
+                    "retry_count": row['retry_count'],
+                    "timeout_seconds": row['timeout_seconds']
                 })
             
             return webhooks
@@ -703,17 +701,12 @@ class WebhookManager:
         signature: str
     ) -> int:
         """Create delivery record in database."""
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("""
+        with self.db_adapter.transaction():
+            delivery_id = self.db_adapter.insert("""
                 INSERT INTO webhook_deliveries (
                     webhook_id, evaluation_id, event_type, payload, signature
                 ) VALUES (?, ?, ?, ?, ?)
             """, (webhook_id, evaluation_id, event_type, payload, signature))
-            
-            delivery_id = cursor.lastrowid
-            conn.commit()
             
             return delivery_id
     
@@ -728,8 +721,7 @@ class WebhookManager:
         error_message: Optional[str] = None
     ):
         """Update delivery record."""
-        with get_connection() as conn:
-            cursor = conn.cursor()
+        with self.db_adapter.transaction():
             
             cursor.execute("""
                 UPDATE webhook_deliveries
@@ -752,8 +744,7 @@ class WebhookManager:
         error: Optional[str] = None
     ):
         """Update webhook statistics."""
-        with get_connection() as conn:
-            cursor = conn.cursor()
+        with self.db_adapter.transaction():
             
             if success:
                 cursor.execute("""
@@ -791,8 +782,7 @@ class WebhookManager:
         Returns:
             List of webhook status information
         """
-        with get_connection() as conn:
-            cursor = conn.cursor()
+        with self.db_adapter.transaction():
             
             if url:
                 cursor.execute("""
@@ -847,8 +837,7 @@ class WebhookManager:
             Test result
         """
         # Get webhook details
-        with get_connection() as conn:
-            cursor = conn.cursor()
+        with self.db_adapter.transaction():
             
             cursor.execute("""
                 SELECT id, secret FROM webhook_registrations

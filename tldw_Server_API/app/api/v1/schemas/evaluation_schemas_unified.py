@@ -218,9 +218,13 @@ class EvaluationResponse(BaseModel):
     eval_type: str
     eval_spec: Dict[str, Any]
     dataset_id: Optional[str] = None
-    created_at: int
+    created_at: int = Field(..., alias="created")  # OpenAI uses 'created'
     created_by: str
+    updated_at: Optional[int] = Field(None, alias="updated")  # Add updated field
     metadata: Optional[Dict[str, Any]] = None
+    
+    class Config:
+        allow_population_by_field_name = True  # Allow both created and created_at
 
 
 class CreateRunRequest(BaseModel):
