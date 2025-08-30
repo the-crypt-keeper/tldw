@@ -292,7 +292,8 @@ class WebhookSecurityValidator:
             hostname_lower = hostname.lower()
             for pattern in localhost_patterns:
                 if hostname_lower.startswith(pattern):
-                    if self.security_level == WebhookSecurityLevel.STRICT:
+                    # Block private networks at STANDARD and STRICT levels for security
+                    if self.security_level in [WebhookSecurityLevel.STANDARD, WebhookSecurityLevel.STRICT]:
                         errors.append(WebhookValidationError(
                             code="PRIVATE_NETWORK",
                             message=f"Private network addresses are not allowed: {hostname}",
@@ -322,7 +323,8 @@ class WebhookSecurityValidator:
                         # Check if IP is in private networks
                         for network in self.private_networks:
                             if ip_addr in network:
-                                if self.security_level == WebhookSecurityLevel.STRICT:
+                                # Block private networks at STANDARD and STRICT levels for security
+                                if self.security_level in [WebhookSecurityLevel.STANDARD, WebhookSecurityLevel.STRICT]:
                                     errors.append(WebhookValidationError(
                                         code="PRIVATE_IP",
                                         message=f"Hostname resolves to private IP: {ip_str}",

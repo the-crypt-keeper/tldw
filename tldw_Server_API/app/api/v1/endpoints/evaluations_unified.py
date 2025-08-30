@@ -281,7 +281,7 @@ async def create_evaluation(
             eval_type=eval_request.eval_type,
             eval_spec=eval_request.eval_spec.dict(),
             dataset_id=eval_request.dataset_id,
-            dataset=eval_request.dataset,
+            dataset=[sample.dict() for sample in eval_request.dataset] if eval_request.dataset else None,
             metadata=eval_request.metadata.dict() if eval_request.metadata else None,
             created_by=user_id
         )

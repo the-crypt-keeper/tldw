@@ -343,7 +343,7 @@ class ChatbookService:
                 "file_path": result[2] if len(result) > 2 else None,
                 "job_id": result[2] if len(result) > 2 and kwargs.get('async_mode') else None,
                 "status": "pending" if kwargs.get('async_mode') else "completed",
-                "content_summary": {"conversations": 1}  # Mock for tests
+                "content_summary": result[3] if len(result) > 3 else {}
             }
         return result
     
@@ -557,11 +557,21 @@ class ChatbookService:
             # No direct filename access for security
             download_url = None  # Will be generated from job_id
             
-            return True, f"Chatbook created successfully", str(output_path)
+            # Create content summary
+            content_summary = {
+                "conversations": manifest.total_conversations,
+                "notes": manifest.total_notes,
+                "characters": manifest.total_characters,
+                "world_books": manifest.total_world_books,
+                "dictionaries": manifest.total_dictionaries,
+                "documents": manifest.total_documents
+            }
+            
+            return True, f"Chatbook created successfully", str(output_path), content_summary
             
         except Exception as e:
             logger.error(f"Error creating chatbook: {e}")
-            return False, f"Error creating chatbook: {str(e)}", None
+            return False, f"Error creating chatbook: {str(e)}", None, {}
     
     async def _create_chatbook_job_async(
         self,
@@ -2058,7 +2068,7 @@ class ChatbookService:
             if "character_count" in job.metadata:
                 result["content_summary"]["characters"] = job.metadata.get("character_count", 0)
         else:
-            result["content_summary"] = {"conversations": 5}  # Default for test compatibility
+            result["content_summary"] = {}
         
         return result
     
