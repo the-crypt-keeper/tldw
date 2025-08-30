@@ -11,6 +11,7 @@ Provides REST API endpoints for creating, importing, and managing chatbooks.
 import os
 import re
 import shutil
+import hashlib
 from typing import Optional
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks, Request
@@ -243,11 +244,11 @@ async def import_chatbook(
         # Sanitize user.id to avoid path traversal and unsafe values
         import re
         user_id_str = str(user.id)
-        safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '_', user_id_str)
-        # Additional sanitization to prevent path traversal
-        safe_user_id = safe_user_id.replace('..', '_').replace('/', '_').replace('\\', '_')
-        # Limit length to prevent excessively long paths
-        safe_user_id = safe_user_id[:255]
+        # Use a SHA256 hash of the user ID string for directory naming (hex digest, 64 chars, always safe)
+        safe_user_id = hashlib.sha256(user_id_str.encode('utf-8')).hexdigest()
+        # (No further sanitization/extremely robust to any user input)
+        # (Length always fixed at 64 characters)
+        # (If someone tries an empty string, hexdigest of empty string is safe but optionally can check)
         if not safe_user_id:
             raise HTTPException(status_code=400, detail="Invalid user id for path")
 
