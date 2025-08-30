@@ -54,7 +54,7 @@ def sanitize_html_text(value: Optional[str]) -> Optional[str]:
         
         # Remove all HTML tags and dangerous patterns more thoroughly
         # Remove script tags and their content (case insensitive, handles broken tags)
-        v = re.sub(r'<\s*script[^>]*>.*?<\s*/\s*script\s*>', '', v, flags=re.IGNORECASE | re.DOTALL)
+        v = re.sub(r'<\s*script[^>]*>.*?<\s*/\s*script\b[^>]*>', '', v, flags=re.IGNORECASE | re.DOTALL)
         v = re.sub(r'<\s*script[^>]*>', '', v, flags=re.IGNORECASE)
         
         # Remove style tags and their content
