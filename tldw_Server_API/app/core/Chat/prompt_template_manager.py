@@ -66,8 +66,8 @@ def load_template(template_name: str) -> Optional[PromptTemplate]:
         resolved_path = template_file.resolve()
         expected_dir = PROMPT_TEMPLATES_DIR.resolve()
         
-        # Check if the resolved path is within the templates directory
-        if not str(resolved_path).startswith(str(expected_dir) + os.sep) and resolved_path != expected_dir:
+        # Check if the resolved path is within the templates directory using commonpath
+        if os.path.commonpath([str(resolved_path), str(expected_dir)]) != str(expected_dir):
             logger.warning(f"Path traversal attempt blocked - resolved path outside template directory: {template_name}")
             return None
     except (ValueError, OSError) as e:
