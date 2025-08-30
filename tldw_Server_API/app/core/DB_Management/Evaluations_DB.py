@@ -527,13 +527,25 @@ class EvaluationsDatabase:
     
     def _row_to_dataset_dict(self, row, include_samples: bool = True) -> Dict[str, Any]:
         """Convert database row to dataset dictionary"""
+        # Parse created_at timestamp
+        if row["created_at"]:
+            if "T" in row["created_at"]:
+                # ISO format
+                created_timestamp = int(datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")).timestamp())
+            else:
+                # SQLite timestamp format
+                created_timestamp = int(datetime.strptime(row["created_at"], "%Y-%m-%d %H:%M:%S").timestamp())
+        else:
+            created_timestamp = int(datetime.now().timestamp())
+            
         result = {
             "id": row["id"],
             "object": "dataset",
-            "created": int(datetime.fromisoformat(row["created_at"]).timestamp()),
+            "created_at": created_timestamp,  # Fixed: use created_at instead of created
             "name": row["name"],
             "description": row["description"],
-            "sample_count": row["sample_count"],
+            "sample_count": row["sample_count"] or 0,
+            "created_by": row["created_by"] or "unknown",  # Fixed: add created_by field
             "metadata": json.loads(row["metadata"]) if row["metadata"] else {}
         }
         

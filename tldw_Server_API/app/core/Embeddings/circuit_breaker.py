@@ -16,30 +16,66 @@ from prometheus_client import Counter, Gauge
 # Type variables for generic typing
 T = TypeVar('T')
 
-# Prometheus metrics
-CIRCUIT_BREAKER_STATE = Gauge(
-    'circuit_breaker_state',
-    'Current state of circuit breaker (0=closed, 1=open, 2=half_open)',
-    ['service', 'operation']
-)
+# Prometheus metrics - use try/except to handle multiple registrations
+try:
+    CIRCUIT_BREAKER_STATE = Gauge(
+        'circuit_breaker_state',
+        'Current state of circuit breaker (0=closed, 1=open, 2=half_open)',
+        ['service', 'operation']
+    )
+except ValueError:
+    # Metric already registered, get existing one
+    from prometheus_client import REGISTRY
+    CIRCUIT_BREAKER_STATE = None
+    for collector in list(REGISTRY._collector_to_names.keys()):
+        if hasattr(collector, '_name') and collector._name == 'circuit_breaker_state':
+            CIRCUIT_BREAKER_STATE = collector
+            break
 
-CIRCUIT_BREAKER_FAILURES = Counter(
-    'circuit_breaker_failures_total',
-    'Total number of failures tracked by circuit breaker',
-    ['service', 'operation']
-)
+try:
+    CIRCUIT_BREAKER_FAILURES = Counter(
+        'circuit_breaker_failures_total',
+        'Total number of failures tracked by circuit breaker',
+        ['service', 'operation']
+    )
+except ValueError:
+    # Metric already registered, get existing one
+    from prometheus_client import REGISTRY
+    CIRCUIT_BREAKER_FAILURES = None
+    for collector in list(REGISTRY._collector_to_names.keys()):
+        if hasattr(collector, '_name') and collector._name == 'circuit_breaker_failures_total':
+            CIRCUIT_BREAKER_FAILURES = collector
+            break
 
-CIRCUIT_BREAKER_SUCCESSES = Counter(
-    'circuit_breaker_successes_total',
-    'Total number of successes tracked by circuit breaker',
-    ['service', 'operation']
-)
+try:
+    CIRCUIT_BREAKER_SUCCESSES = Counter(
+        'circuit_breaker_successes_total',
+        'Total number of successes tracked by circuit breaker',
+        ['service', 'operation']
+    )
+except ValueError:
+    # Metric already registered, get existing one
+    from prometheus_client import REGISTRY
+    CIRCUIT_BREAKER_SUCCESSES = None
+    for collector in list(REGISTRY._collector_to_names.keys()):
+        if hasattr(collector, '_name') and collector._name == 'circuit_breaker_successes_total':
+            CIRCUIT_BREAKER_SUCCESSES = collector
+            break
 
-CIRCUIT_BREAKER_TRIPS = Counter(
-    'circuit_breaker_trips_total',
-    'Total number of times circuit breaker has tripped',
-    ['service', 'operation']
-)
+try:
+    CIRCUIT_BREAKER_TRIPS = Counter(
+        'circuit_breaker_trips_total',
+        'Total number of times circuit breaker has tripped',
+        ['service', 'operation']
+    )
+except ValueError:
+    # Metric already registered, get existing one
+    from prometheus_client import REGISTRY
+    CIRCUIT_BREAKER_TRIPS = None
+    for collector in list(REGISTRY._collector_to_names.keys()):
+        if hasattr(collector, '_name') and collector._name == 'circuit_breaker_trips_total':
+            CIRCUIT_BREAKER_TRIPS = collector
+            break
 
 
 class CircuitState(Enum):

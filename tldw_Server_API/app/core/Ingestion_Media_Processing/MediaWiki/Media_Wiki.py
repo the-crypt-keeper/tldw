@@ -11,6 +11,7 @@ import traceback
 from pathlib import Path
 from typing import List, Dict, Any, Iterator, Optional, Union
 from datetime import datetime, timezone  # Added for default ingestion_date
+from urllib.parse import quote
 #
 # 3rd-Party Imports
 from loguru import logger
@@ -317,8 +318,11 @@ def process_single_item(
 
         media_id = None
         if store_to_db:
-            encoded_title = title.replace(" ", "_").replace("/", "_")  # Sanitize for URL part
-            url = f"mediawiki:{wiki_name}:{encoded_title}"
+            # Use URL-safe encoding to prevent injection attacks
+            encoded_title = quote(title, safe='')
+            # Sanitize wiki_name as well (already sanitized in import_mediawiki_dump, but double-check)
+            safe_wiki_name = sanitize_wiki_name(wiki_name)
+            url = f"mediawiki:{safe_wiki_name}:{encoded_title}"
             logging.debug(f"Generated Media URL: {url}")
 
             # Ensure ingestion_date is a string in 'YYYY-MM-DD' format
@@ -515,8 +519,21 @@ def import_mediawiki_dump(
 
         if store_to_db and checkpoint_file.exists():
             try:
-                checkpoint_file.unlink()
-                logging.info(f"Successfully removed checkpoint file: {checkpoint_file}")
+                # Validate checkpoint file path before deletion to ensure it's still safe
+                checkpoint_resolved = checkpoint_file.resolve()
+                checkpoints_dir = Path('./checkpoints').resolve()
+                
+                # Use os.path.commonpath to verify the file is still within expected directory
+                try:
+                    common_path = os.path.commonpath([str(checkpoint_resolved), str(checkpoints_dir)])
+                    if common_path == str(checkpoints_dir):
+                        checkpoint_file.unlink()
+                        logging.info(f"Successfully removed checkpoint file: {checkpoint_file}")
+                    else:
+                        logging.warning(f"Checkpoint file {checkpoint_file} is outside expected directory, not removing")
+                except ValueError:
+                    # Paths are on different drives or incomparable
+                    logging.warning(f"Checkpoint file {checkpoint_file} path validation failed, not removing")
             except OSError as e:
                 logging.warning(f"Could not remove checkpoint file {checkpoint_file}: {e}")
 

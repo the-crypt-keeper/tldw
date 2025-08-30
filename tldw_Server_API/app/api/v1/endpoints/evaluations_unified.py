@@ -66,8 +66,15 @@ router = APIRouter(prefix="/evaluations", tags=["Evaluations"])
 # Security
 security = HTTPBearer(auto_error=False)
 
-# Get evaluation service
-evaluation_service = get_unified_evaluation_service()
+# Lazy evaluation service initialization 
+_evaluation_service = None
+
+def get_evaluation_service():
+    """Get evaluation service with lazy initialization"""
+    global _evaluation_service
+    if _evaluation_service is None:
+        _evaluation_service = get_unified_evaluation_service()
+    return _evaluation_service
 
 
 # ============= Authentication =============
@@ -228,7 +235,7 @@ async def create_evaluation(
     This endpoint creates an evaluation that can be run multiple times with different models.
     """
     try:
-        evaluation = await evaluation_service.create_evaluation(
+        evaluation = await get_evaluation_service().create_evaluation(
             name=eval_request.name,
             description=eval_request.description,
             eval_type=eval_request.eval_type,
@@ -259,7 +266,7 @@ async def list_evaluations(
 ):
     """List evaluations with pagination"""
     try:
-        evaluations, has_more = await evaluation_service.list_evaluations(
+        evaluations, has_more = await get_evaluation_service().list_evaluations(
             limit=limit,
             after=after,
             eval_type=eval_type
@@ -292,7 +299,7 @@ async def get_evaluation(
 ):
     """Get evaluation by ID"""
     try:
-        evaluation = await evaluation_service.get_evaluation(eval_id)
+        evaluation = await get_evaluation_service().get_evaluation(eval_id)
         if not evaluation:
             raise create_error_response(
                 message=f"Evaluation {eval_id} not found",
@@ -329,7 +336,7 @@ async def update_evaluation(
                 error_type="invalid_request_error"
             )
         
-        success = await evaluation_service.update_evaluation(
+        success = await get_evaluation_service().update_evaluation(
             eval_id, updates, updated_by=user_id
         )
         
@@ -341,7 +348,7 @@ async def update_evaluation(
                 status_code=status.HTTP_404_NOT_FOUND
             )
         
-        evaluation = await evaluation_service.get_evaluation(eval_id)
+        evaluation = await get_evaluation_service().get_evaluation(eval_id)
         return EvaluationResponse(**evaluation)
         
     except HTTPException:
@@ -362,7 +369,7 @@ async def delete_evaluation(
 ):
     """Delete an evaluation"""
     try:
-        success = await evaluation_service.delete_evaluation(eval_id, deleted_by=user_id)
+        success = await get_evaluation_service().delete_evaluation(eval_id, deleted_by=user_id)
         if not success:
             raise create_error_response(
                 message=f"Evaluation {eval_id} not found",
@@ -394,7 +401,7 @@ async def create_run(
 ):
     """Create and start an evaluation run"""
     try:
-        run = await evaluation_service.create_run(
+        run = await get_evaluation_service().create_run(
             eval_id=eval_id,
             target_model=run_request.target_model,
             config=run_request.config.dict() if run_request.config else None,
@@ -431,7 +438,7 @@ async def list_runs(
 ):
     """List runs for an evaluation"""
     try:
-        runs, has_more = await evaluation_service.list_runs(
+        runs, has_more = await get_evaluation_service().list_runs(
             eval_id=eval_id,
             status=status,
             limit=limit,
@@ -471,7 +478,7 @@ async def evaluate_geval(
     G-Eval evaluates summaries on fluency, consistency, relevance, and coherence.
     """
     try:
-        result = await evaluation_service.evaluate_geval(
+        result = await get_evaluation_service().evaluate_geval(
             source_text=request.source_text,
             summary=request.summary,
             metrics=request.metrics,
@@ -508,7 +515,7 @@ async def evaluate_rag(
     Evaluates relevance, faithfulness, answer similarity, and context precision.
     """
     try:
-        result = await evaluation_service.evaluate_rag(
+        result = await get_evaluation_service().evaluate_rag(
             query=request.query,
             contexts=request.retrieved_contexts,
             response=request.generated_response,
@@ -549,7 +556,7 @@ async def evaluate_response_quality(
     Checks relevance, completeness, accuracy, and format compliance.
     """
     try:
-        result = await evaluation_service.evaluate_response_quality(
+        result = await get_evaluation_service().evaluate_response_quality(
             prompt=request.prompt,
             response=request.response,
             expected_format=request.expected_format,
@@ -583,7 +590,7 @@ async def create_dataset(
 ):
     """Create a new dataset"""
     try:
-        dataset_id = await evaluation_service.create_dataset(
+        dataset_id = await get_evaluation_service().create_dataset(
             name=dataset_request.name,
             description=dataset_request.description,
             samples=[s.dict() for s in dataset_request.samples],
@@ -591,7 +598,7 @@ async def create_dataset(
             created_by=user_id
         )
         
-        dataset = await evaluation_service.get_dataset(dataset_id)
+        dataset = await get_evaluation_service().get_dataset(dataset_id)
         if not dataset:
             raise ValueError("Failed to retrieve created dataset")
         
@@ -614,7 +621,7 @@ async def list_datasets(
 ):
     """List datasets with pagination"""
     try:
-        datasets, has_more = await evaluation_service.list_datasets(
+        datasets, has_more = await get_evaluation_service().list_datasets(
             limit=limit,
             after=after
         )
@@ -646,7 +653,7 @@ async def get_dataset(
 ):
     """Get dataset by ID"""
     try:
-        dataset = await evaluation_service.get_dataset(dataset_id)
+        dataset = await get_evaluation_service().get_dataset(dataset_id)
         if not dataset:
             raise create_error_response(
                 message=f"Dataset {dataset_id} not found",
@@ -675,7 +682,7 @@ async def delete_dataset(
 ):
     """Delete a dataset"""
     try:
-        success = await evaluation_service.delete_dataset(dataset_id, deleted_by=user_id)
+        success = await get_evaluation_service().delete_dataset(dataset_id, deleted_by=user_id)
         if not success:
             raise create_error_response(
                 message=f"Dataset {dataset_id} not found",
@@ -701,7 +708,7 @@ async def delete_dataset(
 async def health_check():
     """Check evaluation service health"""
     try:
-        health = await evaluation_service.health_check()
+        health = await get_evaluation_service().health_check()
         return HealthCheckResponse(**health)
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -717,7 +724,7 @@ async def health_check():
 async def get_metrics(request: Request):
     """Get Prometheus metrics"""
     try:
-        metrics_summary = await evaluation_service.get_metrics_summary()
+        metrics_summary = await get_evaluation_service().get_metrics_summary()
         
         # Format as Prometheus text format if requested
         if "text/plain" in request.headers.get("accept", ""):
@@ -858,7 +865,7 @@ async def get_run(
 ):
     """Get run status and details"""
     try:
-        run = await evaluation_service.get_run(run_id)
+        run = await get_evaluation_service().get_run(run_id)
         if not run:
             raise create_error_response(
                 message=f"Run {run_id} not found",
@@ -887,7 +894,7 @@ async def cancel_run(
 ):
     """Cancel a running evaluation"""
     try:
-        success = await evaluation_service.cancel_run(run_id, cancelled_by=user_id)
+        success = await get_evaluation_service().cancel_run(run_id, cancelled_by=user_id)
         
         if success:
             return {"status": "cancelled", "id": run_id}
