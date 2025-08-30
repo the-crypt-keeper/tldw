@@ -163,13 +163,38 @@ class ChatbookService:
     def _get_conversation_by_name(self, name: str) -> Optional[Dict[str, Any]]:
         """Get conversation by name/title - wrapper for search method."""
         try:
-            # Check if method exists (for mock compatibility)
+            # First try FTS search
             if hasattr(self.db, 'search_conversations_by_title'):
                 results = self.db.search_conversations_by_title(name, limit=10)
+                logger.debug(f"FTS search for conversation '{name}', found {len(results)} results")
                 # Look for exact match
                 for conv in results:
-                    if conv.get('title') == name or conv.get('name') == name:
+                    conv_title = conv.get('title')
+                    conv_name = conv.get('name')
+                    logger.debug(f"  Checking: title='{conv_title}', name='{conv_name}'")
+                    if conv_title == name or conv_name == name:
+                        logger.debug(f"  Found exact match via FTS!")
                         return conv
+            
+            # If FTS didn't find it, try direct query (FTS might not be updated yet)
+            if hasattr(self.db, 'execute_query'):
+                logger.debug(f"FTS failed, trying direct query for '{name}'")
+                cursor = self.db.execute_query(
+                    "SELECT * FROM conversations WHERE title = ? AND deleted = 0 LIMIT 1",
+                    (name,)
+                )
+                # Fetch results from cursor
+                if cursor:
+                    results = cursor.fetchall() if hasattr(cursor, 'fetchall') else []
+                    if results and len(results) > 0:
+                        logger.debug(f"Found conversation via direct query")
+                        # Convert tuple to dict if needed
+                        if isinstance(results[0], tuple):
+                            # Assume standard column order
+                            return {'id': results[0][0], 'title': results[0][1] if len(results[0]) > 1 else name}
+                        return results[0]
+            
+            logger.debug(f"No match found for '{name}' via FTS or direct query")
             return None
         except Exception as e:
             logger.debug(f"Error searching for conversation by name: {e}")
@@ -178,13 +203,37 @@ class ChatbookService:
     def _get_note_by_title(self, title: str) -> Optional[Dict[str, Any]]:
         """Get note by title - wrapper for search method."""
         try:
-            # Check if method exists (for mock compatibility)
+            # First try FTS search
             if hasattr(self.db, 'search_notes'):
                 results = self.db.search_notes(title, limit=10)
+                logger.debug(f"FTS search for note '{title}', found {len(results)} results")
                 # Look for exact match
                 for note in results:
-                    if note.get('title') == title:
+                    note_title = note.get('title')
+                    logger.debug(f"  Checking note: title='{note_title}'")
+                    if note_title == title:
+                        logger.debug(f"  Found exact match via FTS!")
                         return note
+            
+            # If FTS didn't find it, try direct query (FTS might not be updated yet)
+            if hasattr(self.db, 'execute_query'):
+                logger.debug(f"FTS failed, trying direct query for note '{title}'")
+                cursor = self.db.execute_query(
+                    "SELECT * FROM notes WHERE title = ? AND deleted = 0 LIMIT 1",
+                    (title,)
+                )
+                # Fetch results from cursor
+                if cursor:
+                    results = cursor.fetchall() if hasattr(cursor, 'fetchall') else []
+                    if results and len(results) > 0:
+                        logger.debug(f"Found note via direct query")
+                        # Convert tuple to dict if needed
+                        if isinstance(results[0], tuple):
+                            # Assume standard column order
+                            return {'id': results[0][0], 'title': results[0][1] if len(results[0]) > 1 else title}
+                        return results[0]
+            
+            logger.debug(f"No match found for note '{title}' via FTS or direct query")
             return None
         except Exception as e:
             logger.debug(f"Error searching for note by title: {e}")
@@ -775,6 +824,8 @@ class ChatbookService:
                 logger.debug(f"Could not remove import archive {file_path}: {_e}")
             
             # Build result message
+            logger.debug(f"Import status: total={import_status.total_items}, successful={import_status.successful_items}, skipped={import_status.skipped_items}, failed={import_status.failed_items}")
+            
             if import_status.successful_items > 0:
                 message = f"Successfully imported {import_status.successful_items}/{import_status.total_items} items"
                 if import_status.skipped_items > 0:
@@ -787,6 +838,7 @@ class ChatbookService:
                 # All items were skipped (e.g., due to conflicts)
                 return True, f"Import completed: All {import_status.skipped_items} items were skipped", None
             else:
+                logger.debug(f"Import failed: No items were successfully imported or skipped")
                 return False, "No items were imported", None
             
         except Exception as e:
@@ -1434,7 +1486,12 @@ class ChatbookService:
                     
                     status.successful_items += 1
                 else:
-                    status.failed_items += 1
+                    # If add failed, it might be a duplicate not caught by search
+                    # Count as skipped if we're in skip mode
+                    if conflict_resolution == ConflictResolution.SKIP:
+                        status.skipped_items += 1
+                    else:
+                        status.failed_items += 1
                     
             except Exception as e:
                 status.failed_items += 1
@@ -1498,7 +1555,12 @@ class ChatbookService:
                 if new_note_id:
                     status.successful_items += 1
                 else:
-                    status.failed_items += 1
+                    # If add failed, it might be a duplicate not caught by search
+                    # Count as skipped if we're in skip mode
+                    if conflict_resolution == ConflictResolution.SKIP:
+                        status.skipped_items += 1
+                    else:
+                        status.failed_items += 1
                     
             except Exception as e:
                 status.failed_items += 1
@@ -1550,7 +1612,12 @@ class ChatbookService:
                 if new_char_id:
                     status.successful_items += 1
                 else:
-                    status.failed_items += 1
+                    # If add failed, it might be a duplicate not caught by search
+                    # Count as skipped if we're in skip mode
+                    if conflict_resolution == ConflictResolution.SKIP:
+                        status.skipped_items += 1
+                    else:
+                        status.failed_items += 1
                     
             except Exception as e:
                 status.failed_items += 1

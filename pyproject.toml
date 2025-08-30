@@ -45,6 +45,7 @@ dependencies = [
   "apscheduler>=3.10.0",
   "argon2-cffi>=23.0.0",
   "asyncpg",
+  "bleach",
   "cachetools>=5.0.0",
   "click>=8.0.0",
   "click-completion>=0.5.2",

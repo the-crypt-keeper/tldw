@@ -39,6 +39,7 @@ https://www.figma.com/slides/eq8UzeTluT3qLKOpzlLj8y/LlamaIndex-Talk--Document-Ag
 https://ai.plainenglish.io/visual-grounding-rag-with-docling-9696d02054f2
 https://lukew.com/ff/entry.asp?2106?ref=sidebar
 https://github.com/topoteretes/cognee
+https://arxiv.org/abs/2412.02592
 https://arxiv.org/abs/2505.23052
 https://help.openai.com/en/articles/10169521-projects-in-chatgpt
 https://github.com/ag2ai/SimpleDoc

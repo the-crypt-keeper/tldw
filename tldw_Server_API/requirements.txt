@@ -18,6 +18,7 @@ aiofiles
 asyncpg
 aiosqlite
 apscheduler
+bleach
 cachetools
 defusedxml
 email-validator

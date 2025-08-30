@@ -46,9 +46,27 @@ def sanitize_html_text(value: Optional[str]) -> Optional[str]:
             strip_comments=True,
         )
     else:
-        # Fallback: remove script tags and all other tags, then escape
-        v = re.sub(r'<script[^>]*>.*?</script>', '', v, flags=re.IGNORECASE | re.DOTALL)
-        v = re.sub(r'<[^>]+>', '', v)
+        # Fallback: remove dangerous tags and all HTML, then escape
+        # Strategy: Remove script/style content blocks, then remove all HTML tags
+        
+        # Remove script tags with their content - handle multiple cases:
+        # 1. Well-formed script tags with closing tag
+        v = re.sub(r'<\s*script(?:\s+[^>]*)?>.*?<\s*/\s*script\s*>', '', v, 
+                   flags=re.IGNORECASE | re.DOTALL)
+        
+        # 2. Style tags with their content
+        v = re.sub(r'<\s*style(?:\s+[^>]*)?>.*?<\s*/\s*style\s*>', '', v, 
+                   flags=re.IGNORECASE | re.DOTALL)
+        
+        # 3. For orphaned opening script/style tags (no closing), we can't just remove
+        # everything after them, so we'll remove the tag itself and let content remain
+        # This is safer than potentially removing legitimate content
+        
+        # 4. Remove all HTML tags (including any remaining script/style tags)
+        # This catches malformed tags, orphaned tags, and all other HTML
+        v = re.sub(r'<[^>]*>', '', v)
+        
+        # 5. Escape the result for safe output
         v = html.escape(v)
 
     # Remove null bytes and most control characters except \n and \t

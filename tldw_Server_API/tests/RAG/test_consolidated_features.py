@@ -14,6 +14,12 @@ Tests for:
 """
 
 import pytest
+
+from tldw_Server_API.app.core.RAG import Document, DataSource
+from tldw_Server_API.app.core.RAG.rag_service.citations import Citation
+from tldw_Server_API.app.core.RAG.rag_service.types import CitationType
+from tldw_Server_API.tests.types import SearchResult
+
 # Skip all tests - deprecated v2 functionality
 pytestmark = pytest.mark.skip(reason="Tests deprecated v2 features - v3 uses functional pipeline")
 import asyncio
@@ -22,18 +28,6 @@ from pathlib import Path
 from typing import List, Dict, Any
 import tempfile
 
-from ..types import (
-    Document, Citation, CitationType, DataSource,
-    SearchResult, EnhancedSearchResult
-)
-from ..citation_retriever import CitationAwareRetriever, merge_citations
-from ..parent_retriever import ParentDocumentRetriever, HierarchicalRetriever
-from ..connection_pool import SQLiteConnectionPool, ConnectionPoolManager
-from ..query_expansion import (
-    SynonymExpansion, MultiQueryGeneration, HybridQueryExpansion,
-    QueryExpansionRetriever
-)
-from ..enhanced_chunking import EnhancedChunkingService, Chunk
 
 
 # Mock retriever for testing wrappers
