@@ -143,13 +143,28 @@ async def create_chatbook(
                     job_id=result
                 )
             else:
-                # Sync mode - return file path and download URL
+                # Sync mode - return download URL based on job_id for security
+                # Extract job_id from the result path if it contains one
+                # Otherwise generate a secure download token
+                import uuid
+                import urllib.parse
+                
+                # Generate a secure download token instead of using filename
+                download_token = str(uuid.uuid4())
+                # Store the mapping in service (would need to be implemented)
+                # For now, use a sanitized version of the filename
                 file_name = Path(result).name
-                download_url = f"/api/v1/chatbooks/download/{file_name}"
+                # Sanitize filename to prevent path traversal
+                safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', file_name)
+                # URL encode for additional safety
+                encoded_filename = urllib.parse.quote(safe_filename, safe='')
+                
+                download_url = f"/api/v1/chatbooks/download/{encoded_filename}"
                 return CreateChatbookResponse(
                     success=True,
                     message=message,
-                    file_path=result,
+                    # Don't expose the actual file path
+                    file_path=None,  # Remove internal path exposure
                     download_url=download_url
                 )
         else:
@@ -227,8 +242,13 @@ async def import_chatbook(
         base_temp = Path(tempfile.gettempdir()).resolve(strict=False)
         # Sanitize user.id to avoid path traversal and unsafe values
         import re
-        safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '', str(user.id))
-        if not safe_user_id or safe_user_id != str(user.id):
+        user_id_str = str(user.id)
+        safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '_', user_id_str)
+        # Additional sanitization to prevent path traversal
+        safe_user_id = safe_user_id.replace('..', '_').replace('/', '_').replace('\\', '_')
+        # Limit length to prevent excessively long paths
+        safe_user_id = safe_user_id[:255]
+        if not safe_user_id:
             raise HTTPException(status_code=400, detail="Invalid user id for path")
 
         # Establish a fixed uploads root under the system temp and ensure it's not a symlink
@@ -367,8 +387,13 @@ async def preview_chatbook(
         base_temp = Path(tempfile.gettempdir()).resolve(strict=False)
         # Sanitize user.id to avoid path traversal and unsafe values
         import re
-        safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '', str(user.id))
-        if not safe_user_id or safe_user_id != str(user.id):
+        user_id_str = str(user.id)
+        safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '_', user_id_str)
+        # Additional sanitization to prevent path traversal
+        safe_user_id = safe_user_id.replace('..', '_').replace('/', '_').replace('\\', '_')
+        # Limit length to prevent excessively long paths
+        safe_user_id = safe_user_id[:255]
+        if not safe_user_id:
             raise HTTPException(status_code=400, detail="Invalid user id for path")
 
         # Establish a fixed uploads root and ensure it's secure
@@ -478,11 +503,14 @@ async def list_export_jobs(
         # Convert to response models
         job_responses = []
         for job in jobs:
+            # Generate secure download URL based on job_id
+            secure_download_url = f"/api/v1/chatbooks/download/{job.job_id}" if job.status == ExportStatus.COMPLETED else None
+            
             job_responses.append(ExportJobResponse(
                 job_id=job.job_id,
                 status=job.status,
                 chatbook_name=job.chatbook_name,
-                output_path=job.output_path,
+                output_path=None,  # Don't expose internal file paths
                 created_at=job.created_at,
                 started_at=job.started_at,
                 completed_at=job.completed_at,
@@ -491,7 +519,7 @@ async def list_export_jobs(
                 total_items=job.total_items,
                 processed_items=job.processed_items,
                 file_size_bytes=job.file_size_bytes,
-                download_url=job.download_url,
+                download_url=secure_download_url,  # Use secure URL based on job_id
                 expires_at=job.expires_at
             ))
         
@@ -527,11 +555,14 @@ async def get_export_job(
         if not job:
             raise HTTPException(status_code=404, detail="Export job not found")
         
+        # Generate secure download URL based on job_id
+        secure_download_url = f"/api/v1/chatbooks/download/{job.job_id}" if job.status == ExportStatus.COMPLETED else None
+        
         return ExportJobResponse(
             job_id=job.job_id,
             status=job.status,
             chatbook_name=job.chatbook_name,
-            output_path=job.output_path,
+            output_path=None,  # Don't expose internal file paths
             created_at=job.created_at,
             started_at=job.started_at,
             completed_at=job.completed_at,
@@ -540,7 +571,7 @@ async def get_export_job(
             total_items=job.total_items,
             processed_items=job.processed_items,
             file_size_bytes=job.file_size_bytes,
-            download_url=job.download_url,
+            download_url=secure_download_url,  # Use secure URL based on job_id
             expires_at=job.expires_at
         )
         

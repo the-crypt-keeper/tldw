@@ -331,6 +331,7 @@ filterwarnings = [
     "ignore::DeprecationWarning:torch:"
 ]
 markers = [
+    "asyncio: mark test as async",
     "unit: marks tests as unit tests",
     "integration: marks tests as integration tests",
     "external_api: marks tests that require external API access",
@@ -351,7 +352,8 @@ addopts = [
     "--strict-markers",
     "--verbose",
     "--tb=short",
-    "--disable-warnings"
+    "--disable-warnings",
+    "-p pytest_asyncio"
 ]
 
 ###########################

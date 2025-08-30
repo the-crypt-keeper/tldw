@@ -88,6 +88,15 @@ class ChatbookService:
         # Get base path from environment or use appropriate default
         import os
         import tempfile
+        import re
+        
+        # Sanitize user_id to prevent path traversal
+        # Only allow alphanumeric characters, hyphens, and underscores
+        safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '_', str(user_id))
+        # Remove any path separators or dangerous patterns
+        safe_user_id = safe_user_id.replace('..', '_').replace('/', '_').replace('\\', '_')
+        # Limit length to prevent excessively long paths
+        safe_user_id = safe_user_id[:255]
         
         # Use environment variable, or temp dir for testing, or system default
         if os.environ.get('TLDW_USER_DATA_PATH'):
@@ -100,13 +109,13 @@ class ChatbookService:
             base_data_dir = Path('/var/lib/tldw/user_data')
         
         # Create secure user-specific directory with restricted permissions
-        self.user_data_dir = base_data_dir / 'users' / str(user_id) / 'chatbooks'
+        self.user_data_dir = base_data_dir / 'users' / safe_user_id / 'chatbooks'
         try:
             self.user_data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         except PermissionError:
             # Fallback to temp directory if system path is not writable
             base_data_dir = Path(tempfile.gettempdir()) / 'tldw_data'
-            self.user_data_dir = base_data_dir / 'users' / str(user_id) / 'chatbooks'
+            self.user_data_dir = base_data_dir / 'users' / safe_user_id / 'chatbooks'
             self.user_data_dir.mkdir(parents=True, exist_ok=True)
         
         # Separate directories for exports and imports
@@ -644,11 +653,21 @@ class ChatbookService:
                 
                 # Extract with path validation
                 for member in zf.namelist():
-                    # Prevent path traversal
-                    if os.path.isabs(member) or ".." in member:
+                    # Normalize and validate the path
+                    normalized_path = os.path.normpath(member)
+                    if os.path.isabs(normalized_path) or ".." in normalized_path or normalized_path.startswith("/"):
+                        shutil.rmtree(extract_dir, ignore_errors=True)
                         return False, f"Unsafe path in archive: {member}", None
                     
-                    # Extract individual file
+                    # Additional check: ensure the path stays within extract_dir
+                    target_path = os.path.join(extract_dir, member)
+                    real_extract_dir = os.path.realpath(extract_dir)
+                    real_target = os.path.realpath(os.path.dirname(target_path))
+                    if not real_target.startswith(real_extract_dir):
+                        shutil.rmtree(extract_dir, ignore_errors=True)
+                        return False, f"Path traversal attempt detected: {member}", None
+                    
+                    # Extract individual file safely
                     zf.extract(member, extract_dir)
             
             # Load manifest
@@ -823,8 +842,25 @@ class ChatbookService:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             extract_dir = self.temp_dir / f"preview_{timestamp}"
             
-            # Extract archive
+            # Extract archive with path validation
             with zipfile.ZipFile(file_path, 'r') as zf:
+                # Validate all paths before extraction to prevent path traversal
+                for member in zf.namelist():
+                    # Normalize and validate the path
+                    normalized_path = os.path.normpath(member)
+                    if os.path.isabs(normalized_path) or ".." in normalized_path or normalized_path.startswith("/"):
+                        shutil.rmtree(extract_dir, ignore_errors=True)
+                        return None, f"Unsafe path in archive: {member}"
+                    
+                    # Additional check: ensure the path stays within extract_dir
+                    target_path = os.path.join(extract_dir, member)
+                    real_extract_dir = os.path.realpath(extract_dir)
+                    real_target = os.path.realpath(os.path.dirname(target_path))
+                    if not real_target.startswith(real_extract_dir):
+                        shutil.rmtree(extract_dir, ignore_errors=True)
+                        return None, f"Path traversal attempt detected: {member}"
+                
+                # Safe to extract after validation
                 zf.extractall(extract_dir)
             
             # Load manifest
@@ -2478,8 +2514,15 @@ class ChatbookService:
             with zipfile.ZipFile(file_path, 'r') as zf:
                 # Check for path traversal attempts
                 for name in zf.namelist():
-                    if os.path.isabs(name) or ".." in name or name.startswith("/"):
+                    # Normalize and validate the path
+                    normalized_path = os.path.normpath(name)
+                    if os.path.isabs(normalized_path) or ".." in normalized_path or normalized_path.startswith("/"):
                         logger.warning(f"Unsafe path in ZIP: {name}")
+                        return False
+                    
+                    # Additional validation: check for suspicious patterns
+                    if any(pattern in normalized_path.lower() for pattern in ['..\\', '../', '..\x2f', '..\x5c']):
+                        logger.warning(f"Potential path traversal pattern in ZIP: {name}")
                         return False
                 
                 # Test CRC integrity

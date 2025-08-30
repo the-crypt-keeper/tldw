@@ -478,19 +478,82 @@ class WebhookSecurityValidator:
             # Test connectivity with a simple HEAD request
             timeout = aiohttp.ClientTimeout(total=10)
             
-            async with aiohttp.ClientSession(timeout=timeout) as session:
+            # Custom connector to prevent SSRF attacks
+            connector = aiohttp.TCPConnector(
+                ssl=ssl_context,
+                force_close=True,
+                enable_cleanup_closed=True
+            )
+            
+            async with aiohttp.ClientSession(
+                timeout=timeout,
+                connector=connector,
+                trust_env=False  # Disable automatic proxy detection
+            ) as session:
                 start_time = asyncio.get_event_loop().time()
                 
                 try:
+                    # Validate hostname and port before making request
+                    # This should already be done in _validate_hostname but double-check
+                    try:
+                        ip_addr = ipaddress.ip_address(hostname)
+                        # Check if IP is in private networks
+                        for network in self.private_networks:
+                            if ip_addr in network:
+                                result["error"] = f"Private network address not allowed: {hostname}"
+                                return result
+                    except ValueError:
+                        # Not a direct IP, resolve it
+                        try:
+                            import socket
+                            ip_addresses = socket.getaddrinfo(hostname, port)
+                            for addr_info in ip_addresses:
+                                ip_str = addr_info[4][0]
+                                try:
+                                    ip_addr = ipaddress.ip_address(ip_str)
+                                    for network in self.private_networks:
+                                        if ip_addr in network:
+                                            result["error"] = f"Hostname resolves to private IP: {ip_str}"
+                                            return result
+                                except ValueError:
+                                    pass
+                        except socket.gaierror as e:
+                            result["error"] = f"DNS resolution failed: {str(e)}"
+                            return result
+                    
                     async with session.head(
                         url,
                         ssl=ssl_context,
-                        allow_redirects=True
+                        allow_redirects=False,  # Disable automatic redirects to prevent SSRF
+                        max_redirects=0  # Additional protection against redirects
                     ) as response:
                         end_time = asyncio.get_event_loop().time()
                         result["response_time_ms"] = int((end_time - start_time) * 1000)
                         result["reachable"] = True
                         result["status_code"] = response.status
+                        
+                        # Check for redirect attempts
+                        if response.status in [301, 302, 303, 307, 308]:
+                            redirect_location = response.headers.get('Location', '')
+                            if redirect_location:
+                                # Parse and validate redirect location
+                                try:
+                                    redirect_parsed = urlparse(redirect_location)
+                                    if redirect_parsed.hostname:
+                                        # Validate redirect hostname
+                                        try:
+                                            redirect_ip = socket.getaddrinfo(redirect_parsed.hostname, None)[0][4][0]
+                                            redirect_addr = ipaddress.ip_address(redirect_ip)
+                                            for network in self.private_networks:
+                                                if redirect_addr in network:
+                                                    result["error"] = f"Redirect to private network blocked: {redirect_location}"
+                                                    result["reachable"] = False
+                                                    return result
+                                        except (socket.gaierror, ValueError):
+                                            pass
+                                    result["redirect_location"] = redirect_location[:200]  # Truncate for safety
+                                except Exception:
+                                    pass
                         
                         # Check SSL if HTTPS
                         if url.startswith("https://"):

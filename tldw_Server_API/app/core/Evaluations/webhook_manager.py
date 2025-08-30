@@ -536,6 +536,67 @@ class WebhookManager:
         url = webhook["url"]
         secret = webhook["secret"]
         
+        # Validate URL before delivery to prevent SSRF
+        from urllib.parse import urlparse
+        import ipaddress
+        import socket
+        
+        try:
+            parsed_url = urlparse(url)
+            if parsed_url.hostname:
+                # Check if hostname is an IP address
+                try:
+                    ip_addr = ipaddress.ip_address(parsed_url.hostname)
+                    # Check against private networks
+                    private_networks = [
+                        ipaddress.IPv4Network("10.0.0.0/8"),
+                        ipaddress.IPv4Network("172.16.0.0/12"),
+                        ipaddress.IPv4Network("192.168.0.0/16"),
+                        ipaddress.IPv4Network("169.254.0.0/16"),
+                        ipaddress.IPv4Network("127.0.0.0/8"),
+                        ipaddress.IPv6Network("::1/128"),
+                        ipaddress.IPv6Network("fc00::/7"),
+                        ipaddress.IPv6Network("fe80::/10"),
+                    ]
+                    for network in private_networks:
+                        if ip_addr in network:
+                            logger.error(f"Webhook URL points to private network: {url}")
+                            self._update_webhook_stats(webhook_id, success=False, error="URL points to private network")
+                            return
+                except ValueError:
+                    # Not an IP, resolve hostname
+                    try:
+                        resolved_ips = socket.getaddrinfo(parsed_url.hostname, None)
+                        for addr_info in resolved_ips:
+                            ip_str = addr_info[4][0]
+                            try:
+                                ip_addr = ipaddress.ip_address(ip_str)
+                                private_networks = [
+                                    ipaddress.IPv4Network("10.0.0.0/8"),
+                                    ipaddress.IPv4Network("172.16.0.0/12"),
+                                    ipaddress.IPv4Network("192.168.0.0/16"),
+                                    ipaddress.IPv4Network("169.254.0.0/16"),
+                                    ipaddress.IPv4Network("127.0.0.0/8"),
+                                    ipaddress.IPv6Network("::1/128"),
+                                    ipaddress.IPv6Network("fc00::/7"),
+                                    ipaddress.IPv6Network("fe80::/10"),
+                                ]
+                                for network in private_networks:
+                                    if ip_addr in network:
+                                        logger.error(f"Webhook hostname resolves to private IP: {url}")
+                                        self._update_webhook_stats(webhook_id, success=False, error="Hostname resolves to private IP")
+                                        return
+                            except ValueError:
+                                pass
+                    except socket.gaierror:
+                        logger.error(f"Failed to resolve webhook hostname: {url}")
+                        self._update_webhook_stats(webhook_id, success=False, error="DNS resolution failed")
+                        return
+        except Exception as e:
+            logger.error(f"URL validation failed: {e}")
+            self._update_webhook_stats(webhook_id, success=False, error=f"URL validation failed: {str(e)}")
+            return
+        
         # Generate signature
         payload_json = payload.to_json()
         signature = self._generate_signature(payload_json, secret)
@@ -553,8 +614,17 @@ class WebhookManager:
         success = False
         for attempt in range(webhook["retry_count"]):
             try:
+                # Configure session to prevent SSRF
+                connector = aiohttp.TCPConnector(
+                    force_close=True,
+                    enable_cleanup_closed=True
+                )
+                
                 # Send webhook
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(
+                    connector=connector,
+                    trust_env=False  # Disable automatic proxy detection
+                ) as session:
                     headers = {
                         "Content-Type": "application/json",
                         "X-Webhook-Signature": signature,
@@ -568,7 +638,8 @@ class WebhookManager:
                         url,
                         data=payload_json,
                         headers=headers,
-                        timeout=aiohttp.ClientTimeout(total=webhook["timeout_seconds"])
+                        timeout=aiohttp.ClientTimeout(total=webhook["timeout_seconds"]),
+                        allow_redirects=False  # Prevent SSRF via redirects
                     ) as response:
                         response_time = (datetime.now() - start_time).total_seconds() * 1000
                         response_body = await response.text()
@@ -805,9 +876,32 @@ class WebhookManager:
             }
         )
         
+        # Validate URL before test to prevent SSRF
+        validation_result = await webhook_validator.validate_webhook_url(
+            url=url,
+            user_id=user_id,
+            check_connectivity=False  # We'll test connectivity ourselves
+        )
+        
+        if not validation_result.valid:
+            return {
+                "success": False,
+                "error": "URL validation failed",
+                "validation_errors": [error.to_dict() for error in validation_result.errors]
+            }
+        
         # Send test webhook
         try:
-            async with aiohttp.ClientSession() as session:
+            # Configure session to prevent SSRF
+            connector = aiohttp.TCPConnector(
+                force_close=True,
+                enable_cleanup_closed=True
+            )
+            
+            async with aiohttp.ClientSession(
+                connector=connector,
+                trust_env=False  # Disable automatic proxy detection
+            ) as session:
                 payload_json = payload.to_json()
                 signature = self._generate_signature(payload_json, secret)
                 
@@ -824,7 +918,8 @@ class WebhookManager:
                     url,
                     data=payload_json,
                     headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=10)
+                    timeout=aiohttp.ClientTimeout(total=10),
+                    allow_redirects=False  # Prevent SSRF via redirects
                 ) as response:
                     response_time = (datetime.now() - start_time).total_seconds() * 1000
                     response_body = await response.text()

@@ -66,10 +66,15 @@ from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_api_route
 from tldw_Server_API.app.api.v1.endpoints.research import router as research_router
 #
 # Evaluation Endpoint (OLD - to be removed)
-from tldw_Server_API.app.api.v1.endpoints.evals import router as evaluation_router
+# Legacy evaluation endpoint - replaced by unified router
+# from tldw_Server_API.app.api.v1.endpoints.evals import router as evaluation_router
 #
 # OpenAI-compatible Evaluation Endpoint (NEW)
-from tldw_Server_API.app.api.v1.endpoints.evals_openai import router as openai_evals_router
+# Legacy OpenAI evaluation endpoint - replaced by unified router
+# from tldw_Server_API.app.api.v1.endpoints.evals_openai import router as openai_evals_router
+
+# Unified Evaluation endpoint
+from tldw_Server_API.app.api.v1.endpoints.evaluations_unified import router as unified_evaluation_router
 #
 # Benchmark Endpoint
 from tldw_Server_API.app.api.v1.endpoints.benchmark_api import router as benchmark_router
@@ -624,11 +629,8 @@ app.include_router(rag_api_router, tags=["RAG"])
 app.include_router(research_router, prefix=f"{API_V1_PREFIX}/research", tags=["research"])
 
 
-# Router for Evaluation endpoint
-app.include_router(evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
-
-# Router for OpenAI-compatible Evaluation endpoint (NEW)
-app.include_router(openai_evals_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
+# Router for Unified Evaluation endpoint (combines both legacy endpoints)
+app.include_router(unified_evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
 
 # Router for Benchmark endpoint (NEW)
 app.include_router(benchmark_router, prefix=f"{API_V1_PREFIX}", tags=["benchmarks"])

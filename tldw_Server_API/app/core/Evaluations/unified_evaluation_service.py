@@ -34,7 +34,7 @@ from tldw_Server_API.app.core.Evaluations.webhook_manager import webhook_manager
 from tldw_Server_API.app.core.Evaluations.metrics_advanced import advanced_metrics
 from tldw_Server_API.app.core.Evaluations.user_rate_limiter import user_rate_limiter, UserTier
 from tldw_Server_API.app.core.Evaluations.circuit_breaker import CircuitBreaker
-from tldw_Server_API.app.core.Evaluations.audit_logger import AuditLogger
+from tldw_Server_API.app.core.Evaluations.audit_logger import AuditLogger, AuditEventType
 
 
 class EvaluationType(str, Enum):
@@ -74,10 +74,14 @@ class UnifiedEvaluationService:
         self._quality_evaluator = None
         
         # Initialize circuit breaker for resilience
+        from tldw_Server_API.app.core.Evaluations.circuit_breaker import CircuitBreakerConfig
         self.circuit_breaker = CircuitBreaker(
-            failure_threshold=5,
-            recovery_timeout=60,
-            expected_exception=Exception
+            name="evaluation_service",
+            config=CircuitBreakerConfig(
+                failure_threshold=5,
+                recovery_timeout=60.0,
+                expected_exception=Exception
+            )
         )
         
         # Initialize audit logger
@@ -152,8 +156,9 @@ class UnifiedEvaluationService:
             )
             
             # Log audit event
-            await self.audit_logger.log_event(
-                event_type="evaluation_created",
+            self.audit_logger.log_event(
+                event_type=AuditEventType.EVALUATION_CREATE,
+                action="create",
                 user_id=created_by,
                 resource_id=eval_id,
                 details={"name": name, "type": eval_type}
@@ -218,8 +223,9 @@ class UnifiedEvaluationService:
             success = self.db.update_evaluation(eval_id, updates)
             
             if success:
-                await self.audit_logger.log_event(
-                    event_type="evaluation_updated",
+                self.audit_logger.log_event(
+                    event_type=AuditEventType.EVALUATION_UPDATE,
+                    action="update",
                     user_id=updated_by,
                     resource_id=eval_id,
                     details={"updates": list(updates.keys())}
@@ -241,8 +247,9 @@ class UnifiedEvaluationService:
             success = self.db.delete_evaluation(eval_id)
             
             if success:
-                await self.audit_logger.log_event(
-                    event_type="evaluation_deleted",
+                self.audit_logger.log_event(
+                    event_type=AuditEventType.EVALUATION_DELETE,
+                    action="delete",
                     user_id=deleted_by,
                     resource_id=eval_id
                 )
@@ -326,8 +333,9 @@ class UnifiedEvaluationService:
             )
             
             # Log audit event
-            await self.audit_logger.log_event(
-                event_type="run_created",
+            self.audit_logger.log_event(
+                event_type=AuditEventType.EVALUATION_RUN,
+                action="create",
                 user_id=created_by,
                 resource_id=run_id,
                 details={
@@ -353,14 +361,14 @@ class UnifiedEvaluationService:
     ):
         """Run evaluation asynchronously"""
         try:
-            # Use circuit breaker for resilience
-            async with self.circuit_breaker:
-                await self.runner.run_evaluation(
-                    run_id=run_id,
-                    eval_id=eval_id,
-                    eval_config=eval_config,
-                    background=False
-                )
+            # Run evaluation with circuit breaker protection
+            await self.circuit_breaker.call(
+                self.runner.run_evaluation,
+                run_id=run_id,
+                eval_id=eval_id,
+                eval_config=eval_config,
+                background=False
+            )
             
             # Send completion webhook
             if eval_config.get("webhook_url"):
@@ -428,8 +436,9 @@ class UnifiedEvaluationService:
                 # Update status directly if not in runner
                 self.db.update_run_status(run_id, "cancelled")
             
-            await self.audit_logger.log_event(
-                event_type="run_cancelled",
+            self.audit_logger.log_event(
+                event_type=AuditEventType.EVALUATION_RUN,
+                action="cancel",
                 user_id=cancelled_by,
                 resource_id=run_id
             )
@@ -666,8 +675,9 @@ class UnifiedEvaluationService:
                 metadata=metadata
             )
             
-            await self.audit_logger.log_event(
-                event_type="dataset_created",
+            self.audit_logger.log_event(
+                event_type=AuditEventType.EVALUATION_CREATE,
+                action="create",
                 user_id=created_by,
                 resource_id=dataset_id,
                 details={"name": name, "samples": len(samples)}
@@ -709,8 +719,9 @@ class UnifiedEvaluationService:
             success = self.db.delete_dataset(dataset_id)
             
             if success:
-                await self.audit_logger.log_event(
-                    event_type="dataset_deleted",
+                self.audit_logger.log_event(
+                    event_type=AuditEventType.EVALUATION_DELETE,
+                    action="delete",
                     user_id=deleted_by,
                     resource_id=dataset_id
                 )
@@ -775,7 +786,8 @@ class UnifiedEvaluationService:
             db_healthy = self.db.get_evaluation("test") is not None or True
             
             # Check circuit breaker
-            cb_healthy = not self.circuit_breaker.is_open
+            from tldw_Server_API.app.core.Evaluations.circuit_breaker import CircuitState
+            cb_healthy = self.circuit_breaker.state != CircuitState.OPEN
             
             return {
                 "status": "healthy" if (db_healthy and cb_healthy) else "degraded",
