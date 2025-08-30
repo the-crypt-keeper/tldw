@@ -28,7 +28,16 @@ from tldw_Server_API.app.core.Utils.Utils import logging
 # Functions:
 # Load configuration
 def load_mediawiki_import_config():
-    config_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'Config_Files', 'mediawiki_import_config.yaml')
+    # Build config path safely using Path
+    base_dir = Path(__file__).parent.resolve()
+    config_path = base_dir / '..' / '..' / '..' / '..' / 'Config_Files' / 'mediawiki_import_config.yaml'
+    config_path = config_path.resolve()
+    
+    # Verify the path is within the project structure
+    project_root = base_dir.parent.parent.parent.parent.resolve()
+    if not str(config_path).startswith(str(project_root)):
+        raise ValueError("Config file path is outside project directory")
+    
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
@@ -177,7 +186,9 @@ def parse_mediawiki_dump(file_path: str, namespaces: List[int] = None, skip_redi
     Dict[str, Any]]:
     # Validate file path
     safe_path = validate_file_path(file_path)
-    dump = mwxml.Dump.from_file(open(safe_path, encoding='utf-8'))
+    # Use context manager for file operations to prevent resource leaks
+    with open(safe_path, encoding='utf-8') as f:
+        dump = mwxml.Dump.from_file(f)
     for page in dump.pages:
         if skip_redirects and page.redirect:
             continue
@@ -433,14 +444,27 @@ def load_checkpoint(file_path: str) -> int:
 
 
 def save_checkpoint(file_path: str, last_processed_id: int):
-    # Convert to Path and ensure parent directory exists
-    safe_path = Path(file_path).resolve()
-    safe_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Validate the path is safe
+    # Validate the path is safe before any operations
     if '../' in str(file_path) or '..' + os.sep in str(file_path):
         raise ValueError("Path traversal attempt in checkpoint file")
     
+    # Convert to Path and resolve
+    safe_path = Path(file_path).resolve()
+    
+    # Ensure we're writing to the checkpoints directory
+    checkpoints_dir = Path('./checkpoints').resolve()
+    checkpoints_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Verify the resolved path is within checkpoints directory
+    try:
+        common_path = os.path.commonpath([str(safe_path), str(checkpoints_dir)])
+        if common_path != str(checkpoints_dir):
+            raise ValueError("Checkpoint file must be within checkpoints directory")
+    except ValueError:
+        raise ValueError("Invalid checkpoint file path")
+    
+    # Now safe to create parent directories and write
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
     with open(safe_path, 'w') as f:
         json.dump({'last_processed_id': last_processed_id}, f)
 
@@ -556,7 +580,9 @@ def count_pages(file_path: str, namespaces: List[int] = None, skip_redirects: bo
     try:
         # Validate file path
         safe_path = validate_file_path(file_path)
-        dump = mwxml.Dump.from_file(open(safe_path, encoding='utf-8'))
+        # Use context manager for file operations to prevent resource leaks
+        with open(safe_path, encoding='utf-8') as f:
+            dump = mwxml.Dump.from_file(f)
         for page in dump.pages:
             if skip_redirects and page.redirect:
                 continue
