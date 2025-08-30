@@ -9,6 +9,7 @@ Provides REST API endpoints for creating, importing, and managing chatbooks.
 """
 
 import os
+import re
 import shutil
 from typing import Optional
 from pathlib import Path
@@ -224,7 +225,12 @@ async def import_chatbook(
         # Save uploaded file to secure temp location with sanitized name
         import tempfile
         base_temp = Path(tempfile.gettempdir())
-        temp_dir = base_temp / f"tldw_uploads/{user.id}"
+        # Sanitize user.id to avoid path traversal and unsafe values
+        import re
+        safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '', str(user.id))
+        if not safe_user_id or safe_user_id != str(user.id):
+            raise HTTPException(status_code=400, detail="Invalid user id for path")
+        temp_dir = base_temp / f"tldw_uploads/{safe_user_id}"
         
         # Ensure temp directory path is canonical and secure
         temp_dir = temp_dir.resolve()
