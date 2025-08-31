@@ -188,11 +188,6 @@ data-tools = [
   "python-json-logger>=2.0.0"
 ]
 
-# Gradio UI (legacy)
-gradio = [
-  "gradio>=4.0.0"
-]
-
 # MediaWiki processing
 media_wiki = [
   "mwparserfromhell>=0.6.0",
