@@ -16,11 +16,10 @@ from tldw_Server_API.app.core.LLM_Calls.security import (
     validate_temperature,
     validate_max_tokens,
     validate_api_request,
-    validate_url,
-    validate_data_url,
     KeyManager,
     get_key_manager,
 )
+from tldw_Server_API.app.core.LLM_Calls.security.input_validator import validate_url, validate_data_url
 
 
 class TestInputValidation:
