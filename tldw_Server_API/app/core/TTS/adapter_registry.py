@@ -41,6 +41,7 @@ class TTSProvider(Enum):
     VIBEVOICE = "vibevoice"
     # Additional providers
     ALLTALK = "alltalk"  # TODO: Implement AllTalk adapter
+    MOCK = "mock"  # Mock provider for testing
 
 
 class TTSAdapterRegistry:

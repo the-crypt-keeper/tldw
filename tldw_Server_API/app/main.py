@@ -19,7 +19,7 @@ from starlette.staticfiles import StaticFiles
 # Auth Endpoint (NEW)
 from tldw_Server_API.app.api.v1.endpoints.auth import router as auth_router
 #
-# Audio Endpoint
+# Audio Endpoint (includes WebSocket streaming transcription)
 from tldw_Server_API.app.api.v1.endpoints.audio import router as audio_router
 #
 # Chat Endpoint
@@ -574,9 +574,8 @@ app.include_router(admin_router, prefix=f"{API_V1_PREFIX}", tags=["admin"])
 # Router for media endpoints/media file handling
 app.include_router(media_router, prefix=f"{API_V1_PREFIX}/media", tags=["media"])
 
-# Router for /audio/ endpoints
+# Router for /audio/ endpoints (includes WebSocket streaming at /audio/stream/transcribe)
 app.include_router(audio_router, prefix=f"{API_V1_PREFIX}/audio", tags=["audio"])
-
 
 # Router for chat endpoints/chat temp-file handling
 app.include_router(chat_router, prefix=f"{API_V1_PREFIX}/chat", tags=["chat"])

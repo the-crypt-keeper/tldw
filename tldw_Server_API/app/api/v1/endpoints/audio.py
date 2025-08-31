@@ -12,7 +12,7 @@ import numpy as np
 import soundfile as sf
 #
 # Third-party libraries
-from fastapi import APIRouter, Depends, HTTPException, Request, Header, File, Form, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, Header, File, Form, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse, Response, JSONResponse
 from starlette import status # For status codes
 from slowapi import Limiter
@@ -615,6 +615,167 @@ async def reset_tts_metrics(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to reset metrics: {str(e)}"
+        )
+
+######################################################################################################################
+# WebSocket Streaming Transcription Endpoints
+######################################################################################################################
+
+@router.websocket("/stream/transcribe")
+async def websocket_transcribe(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time audio transcription.
+    
+    Protocol:
+    1. Client connects via WebSocket
+    2. Client sends configuration message:
+       {"type": "config", "sample_rate": 16000, "language": "en", "model_variant": "mlx"}
+    3. Client sends audio chunks:
+       {"type": "audio", "data": "<base64_encoded_float32_audio>"}
+    4. Server responds with transcriptions:
+       {"type": "transcription", "text": "...", "timestamp": ..., "is_final": true}
+       {"type": "partial", "text": "...", "timestamp": ..., "is_final": false}
+    5. Client can send commit to finalize:
+       {"type": "commit"}
+    6. Server sends final transcript:
+       {"type": "full_transcript", "text": "..."}
+    """
+    await websocket.accept()
+    
+    try:
+        from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Streaming_Parakeet import (
+            handle_websocket_transcription,
+            StreamingConfig
+        )
+        
+        # Default configuration
+        config = StreamingConfig(
+            model_variant='mlx',  # Default to MLX variant
+            sample_rate=16000,
+            chunk_duration=2.0,
+            overlap_duration=0.5,
+            enable_partial=True,
+            partial_interval=0.5
+        )
+        
+        # Handle the WebSocket connection
+        await handle_websocket_transcription(websocket, config)
+        
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": str(e)
+            })
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
+@router.get("/stream/status", summary="Check streaming transcription availability")
+async def streaming_status():
+    """
+    Check if streaming transcription is available.
+    
+    Returns:
+        JSON with status and available models
+    """
+    try:
+        # Check available models
+        available_models = []
+        
+        # Check for MLX variant
+        try:
+            from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX import (
+                transcribe_with_parakeet_mlx
+            )
+            available_models.append("parakeet-mlx")
+        except ImportError:
+            pass
+        
+        # Check for standard variant
+        try:
+            from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo import (
+                load_parakeet_model
+            )
+            available_models.append("parakeet-standard")
+        except ImportError:
+            pass
+        
+        return JSONResponse({
+            "status": "available" if available_models else "unavailable",
+            "available_models": available_models,
+            "websocket_endpoint": "/api/v1/audio/stream/transcribe",
+            "supported_features": {
+                "partial_results": True,
+                "multiple_languages": True,
+                "concurrent_streams": True
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error checking streaming status: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": str(e)
+            }
+        )
+
+
+@router.post("/stream/test", summary="Test streaming transcription setup")
+async def test_streaming():
+    """
+    Test endpoint to verify streaming setup.
+    
+    Returns:
+        Test results
+    """
+    try:
+        from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Streaming_Parakeet import (
+            ParakeetStreamingTranscriber,
+            StreamingConfig
+        )
+        import base64
+        
+        # Try to initialize transcriber
+        config = StreamingConfig(model_variant='mlx')
+        transcriber = ParakeetStreamingTranscriber(config)
+        
+        # Generate test audio
+        sample_rate = 16000
+        duration = 0.5
+        t = np.linspace(0, duration, int(sample_rate * duration))
+        audio = (0.5 * np.sin(440 * 2 * np.pi * t)).astype(np.float32)
+        encoded = base64.b64encode(audio.tobytes()).decode('utf-8')
+        
+        # Try processing
+        result = await transcriber.process_audio_chunk(encoded)
+        
+        return JSONResponse({
+            "status": "success",
+            "test_passed": True,
+            "message": "Streaming transcription is working",
+            "test_result": result if result else "Buffer accumulating"
+        })
+        
+    except Exception as e:
+        logger.error(f"Streaming test failed: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "test_passed": False,
+                "message": str(e)
+            }
         )
 
 #
