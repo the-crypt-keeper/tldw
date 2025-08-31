@@ -150,7 +150,7 @@ async def health_check() -> Dict[str, Any]:
         return {
             "status": "unhealthy",
             "timestamp": datetime.now().isoformat(),
-            "error": str(e)
+            "error": "Error occured during RAG health check"
         }
 
 

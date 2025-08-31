@@ -530,7 +530,7 @@ class ChromaDBManager:
                 f"User '{self.user_id}': Embeddings type mismatch. Expected List[List[float]] or np.ndarray, got {type(embeddings)}.")
             raise TypeError("Embeddings must be a list of lists (vectors) or a 2D numpy array.")
 
-        if not embeddings_list or not isinstance(embeddings_list[0], list) or not embeddings_list[0]:
+        if not embeddings_list or not isinstance(embeddings_list[0], list) or len(embeddings_list[0]) == 0:
             logger.error(f"User '{self.user_id}': Embeddings list is empty or malformed after conversion.")
             raise ValueError("No valid embeddings provided after potential conversion.")
 
@@ -566,7 +566,8 @@ class ChromaDBManager:
                 elif not existing_dim_from_meta and target_collection.count() > 0:  # Has items but no dim in meta
                     # Fallback: get an existing embedding to check dimension
                     existing_item = target_collection.get(limit=1, include=['embeddings'])
-                    if existing_item['embeddings'] and existing_item['embeddings'][0]:
+                    embeddings_exist = existing_item.get('embeddings') is not None
+                    if embeddings_exist and len(existing_item['embeddings']) > 0:
                         existing_dim_from_sample = len(existing_item['embeddings'][0])
                         if existing_dim_from_sample != new_embedding_dim:
                             logger.warning(
@@ -597,9 +598,10 @@ class ChromaDBManager:
                     exc_info=True)
                 raise RuntimeError(f"ChromaDB operation failed: {ce}") from ce
             except Exception as e:
+                import traceback
+                tb = traceback.format_exc()
                 logger.error(
-                    f"User '{self.user_id}': Unexpected error in store_in_chroma for collection '{target_collection.name}': {e}",
-                    exc_info=True)
+                    f"User '{self.user_id}': Unexpected error in store_in_chroma for collection '{target_collection.name}': {e}\nTraceback:\n{tb}")
                 raise RuntimeError(f"Unexpected error during ChromaDB storage: {e}") from e
         return target_collection
 
@@ -915,10 +917,12 @@ def get_default_chroma_manager():
     global _default_chroma_manager
     with _manager_lock:
         if _default_chroma_manager is None:
-            # Use default user ID 0 for single-user mode
+            # Use default user ID 1 for single-user mode
             from tldw_Server_API.app.core.config import settings
-            user_id = str(settings.get("SINGLE_USER_FIXED_ID", "0"))
-            embedding_config = settings.get("EMBEDDING_CONFIG", {})
+            user_id = str(settings.get("SINGLE_USER_FIXED_ID", "1"))
+            # Get the embedding config and add USER_DB_BASE_DIR from main settings
+            embedding_config = settings.get("EMBEDDING_CONFIG", {}).copy()
+            embedding_config["USER_DB_BASE_DIR"] = settings.get("USER_DB_BASE_DIR")
             _default_chroma_manager = ChromaDBManager(user_id=user_id, user_embedding_config=embedding_config)
         return _default_chroma_manager
 
@@ -926,8 +930,7 @@ def get_default_chroma_manager():
 def store_in_chroma(texts, embeddings, ids, metadatas, collection_name="default_collection"):
     """Legacy function for storing embeddings in ChromaDB."""
     manager = get_default_chroma_manager()
-    return manager.store_in_chroma(texts=texts, embeddings=embeddings, ids=ids, 
-                                  metadatas=metadatas, collection_name=collection_name)
+    return manager.store_in_chroma(collection_name, texts, embeddings, ids, metadatas)
 
 # Create a chroma_client property for backward compatibility
 class ChromaClientProxy:

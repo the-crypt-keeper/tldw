@@ -22,19 +22,11 @@ from tldw_Server_API.app.api.v1.schemas.chunking_templates_schemas import (
 from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 from tldw_Server_API.app.core.Chunking.templates import TemplateProcessor, ChunkingTemplate, TemplateStage
 from tldw_Server_API.app.core.Chunking.chunker import Chunker
+# Dependencies for user-specific database access
+from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
+from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
 
 router = APIRouter(prefix="/chunking/templates", tags=["Chunking Templates"])
-
-
-def get_database() -> MediaDatabase:
-    """Get database instance."""
-    # TODO: Update this to use proper dependency injection with config
-    import os
-    db_path = os.environ.get('TLDW_DB_PATH', 'Databases/Media_DB_v2.db')
-    return MediaDatabase(
-        db_path=db_path,
-        client_id='api_client'
-    )
 
 
 @router.get("", response_model=ChunkingTemplateListResponse)
@@ -43,7 +35,8 @@ async def list_templates(
     include_custom: bool = Query(True, description="Include custom templates"),
     tags: Optional[List[str]] = Query(None, description="Filter by tags"),
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
-    db: MediaDatabase = Depends(get_database)
+    current_user: User = Depends(get_request_user),
+    db: MediaDatabase = Depends(get_media_db_for_user)
 ) -> ChunkingTemplateListResponse:
     """
     List all available chunking templates with optional filtering.
@@ -90,7 +83,8 @@ async def list_templates(
 @router.get("/{template_name}", response_model=ChunkingTemplateResponse)
 async def get_template(
     template_name: str,
-    db: MediaDatabase = Depends(get_database)
+    current_user: User = Depends(get_request_user),
+    db: MediaDatabase = Depends(get_media_db_for_user)
 ) -> ChunkingTemplateResponse:
     """
     Get a specific chunking template by name.
@@ -134,7 +128,8 @@ async def get_template(
 @router.post("", response_model=ChunkingTemplateResponse, status_code=201)
 async def create_template(
     template_data: ChunkingTemplateCreate,
-    db: MediaDatabase = Depends(get_database)
+    current_user: User = Depends(get_request_user),
+    db: MediaDatabase = Depends(get_media_db_for_user)
 ) -> ChunkingTemplateResponse:
     """
     Create a new chunking template.
@@ -191,7 +186,8 @@ async def create_template(
 async def update_template(
     template_name: str,
     template_update: ChunkingTemplateUpdate,
-    db: MediaDatabase = Depends(get_database)
+    current_user: User = Depends(get_request_user),
+    db: MediaDatabase = Depends(get_media_db_for_user)
 ) -> ChunkingTemplateResponse:
     """
     Update an existing chunking template.
@@ -261,7 +257,8 @@ async def update_template(
 async def delete_template(
     template_name: str,
     hard_delete: bool = Query(False, description="Permanently delete template"),
-    db: MediaDatabase = Depends(get_database)
+    current_user: User = Depends(get_request_user),
+    db: MediaDatabase = Depends(get_media_db_for_user)
 ) -> None:
     """
     Delete a chunking template.
@@ -303,7 +300,8 @@ async def delete_template(
 @router.post("/apply", response_model=ApplyTemplateResponse)
 async def apply_template(
     request: ApplyTemplateRequest,
-    db: MediaDatabase = Depends(get_database)
+    current_user: User = Depends(get_request_user),
+    db: MediaDatabase = Depends(get_media_db_for_user)
 ) -> ApplyTemplateResponse:
     """
     Apply a chunking template to text.

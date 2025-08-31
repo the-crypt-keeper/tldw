@@ -8,6 +8,13 @@
         <p>Create a new evaluation (OpenAI format).</p>
         
         <div class="form-group">
+            <label for="evalsCreate_model">Model:</label>
+            <select id="evalsCreate_model" class="llm-model-select" onchange="updateEvalsCreateJSON()">
+                <option value="">Loading models...</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
             <label for="evalsCreate_payload">Evaluation Configuration (JSON):</label>
             <textarea id="evalsCreate_payload" class="code-input" rows="15">{
   "name": "Math Problem Solving Eval",
@@ -76,6 +83,13 @@
             <span class="endpoint-path">/api/v1/evals/geval - G-Eval Evaluation</span>
         </h2>
         <p>Perform G-Eval evaluation on generated text.</p>
+        
+        <div class="form-group">
+            <label for="geval_model">Model:</label>
+            <select id="geval_model" class="llm-model-select" onchange="updateGEvalJSON()">
+                <option value="">Loading models...</option>
+            </select>
+        </div>
         
         <div class="form-group">
             <label for="geval_payload">G-Eval Request (JSON):</label>
@@ -190,3 +204,61 @@
         <pre id="datasetsList_response">---</pre>
     </div>
 </div>
+
+<script>
+// Update evaluation JSON when model is selected
+function updateEvalsCreateJSON() {
+    const modelSelect = document.getElementById('evalsCreate_model');
+    const payloadTextarea = document.getElementById('evalsCreate_payload');
+    
+    if (!modelSelect || !payloadTextarea) return;
+    
+    try {
+        const payload = JSON.parse(payloadTextarea.value);
+        if (modelSelect.value) {
+            // Extract just the model name from provider/model format
+            const modelName = modelSelect.value.split('/').pop();
+            payload.config.model = modelName;
+            payloadTextarea.value = JSON.stringify(payload, null, 2);
+        }
+    } catch (e) {
+        console.error('Error updating evaluation JSON:', e);
+    }
+}
+
+function updateGEvalJSON() {
+    const modelSelect = document.getElementById('geval_model');
+    const payloadTextarea = document.getElementById('geval_payload');
+    
+    if (!modelSelect || !payloadTextarea) return;
+    
+    try {
+        const payload = JSON.parse(payloadTextarea.value);
+        if (modelSelect.value) {
+            // Extract just the model name from provider/model format
+            const modelName = modelSelect.value.split('/').pop();
+            payload.model = modelName;
+            payloadTextarea.value = JSON.stringify(payload, null, 2);
+        }
+    } catch (e) {
+        console.error('Error updating G-Eval JSON:', e);
+    }
+}
+
+// Initialize evaluations tab
+function initializeEvaluationsTab() {
+    console.log('Evaluations tab initialized');
+    // Populate model dropdowns when tab is initialized
+    populateModelDropdowns();
+}
+
+// Call initialization when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if we're on the evaluations tab
+    if (document.querySelector('#tabEvalsOpenAI') || document.querySelector('#tabEvalsGEval')) {
+        setTimeout(() => {
+            populateModelDropdowns();
+        }, 500);
+    }
+});
+</script>

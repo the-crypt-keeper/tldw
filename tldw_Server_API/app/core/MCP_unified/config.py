@@ -27,13 +27,13 @@ class MCPConfig(BaseSettings):
     debug_mode: bool = Field(default=False, env="MCP_DEBUG")
     
     # Security Configuration - CRITICAL: No hardcoded secrets!
-    jwt_secret_key: SecretStr = Field(..., env="MCP_JWT_SECRET")
+    jwt_secret_key: Optional[SecretStr] = Field(default=None, env="MCP_JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", env="MCP_JWT_ALGORITHM")
     jwt_access_token_expire_minutes: int = Field(default=30, env="MCP_JWT_ACCESS_EXPIRE")
     jwt_refresh_token_expire_days: int = Field(default=7, env="MCP_JWT_REFRESH_EXPIRE")
     
     # API Key Configuration
-    api_key_salt: SecretStr = Field(..., env="MCP_API_KEY_SALT")
+    api_key_salt: Optional[SecretStr] = Field(default=None, env="MCP_API_KEY_SALT")
     api_key_iterations: int = Field(default=100000, env="MCP_API_KEY_ITERATIONS")
     
     # Database Configuration
@@ -117,6 +117,7 @@ class MCPConfig(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra fields that aren't in the schema
     
     @validator("jwt_secret_key", pre=True)
     def validate_jwt_secret(cls, v):
@@ -124,13 +125,16 @@ class MCPConfig(BaseSettings):
         if not v:
             # Generate a secure random secret if not provided
             logger.warning("JWT secret not provided, generating a random one (not suitable for production)")
-            return secrets.token_urlsafe(32)
+            return SecretStr(secrets.token_urlsafe(32))
         
-        if len(str(v)) < 32:
-            raise ValueError("JWT secret must be at least 32 characters long")
-        
-        if str(v) == "your-secret-key-change-this-in-production":
-            raise ValueError("Default JWT secret detected! Please set MCP_JWT_SECRET environment variable")
+        if isinstance(v, str):
+            if len(v) < 32:
+                raise ValueError("JWT secret must be at least 32 characters long")
+            
+            if v == "your-secret-key-change-this-in-production":
+                raise ValueError("Default JWT secret detected! Please set MCP_JWT_SECRET environment variable")
+            
+            return SecretStr(v)
         
         return v
     
@@ -139,10 +143,13 @@ class MCPConfig(BaseSettings):
         """Ensure API key salt is set and secure"""
         if not v:
             logger.warning("API key salt not provided, generating a random one")
-            return secrets.token_urlsafe(32)
+            return SecretStr(secrets.token_urlsafe(32))
         
-        if len(str(v)) < 32:
-            raise ValueError("API key salt must be at least 32 characters long")
+        if isinstance(v, str):
+            if len(v) < 32:
+                raise ValueError("API key salt must be at least 32 characters long")
+            
+            return SecretStr(v)
         
         return v
     

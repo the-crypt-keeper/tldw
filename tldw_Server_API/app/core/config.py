@@ -160,6 +160,40 @@ RAG_SERVICE_CONFIG = {
     }
 }
 
+# Configuration for speaker diarization
+DIARIZATION_CONFIG = {
+    # VAD (Voice Activity Detection) settings
+    "vad_threshold": 0.5,  # Silero VAD confidence threshold
+    "segment_duration": 30,  # Maximum segment duration in seconds
+    "speech_pad_ms": 400,  # Padding around speech segments in milliseconds
+    
+    # Embedding model settings
+    "embedding_model": "speechbrain/spkrec-ecapa-voxceleb",
+    "embedding_batch_size": 32,
+    "embedding_device": "auto",  # auto, cpu, cuda, or cuda:0
+    
+    # Clustering settings
+    "clustering_method": "spectral",  # spectral or agglomerative
+    "num_speakers": None,  # None for automatic detection
+    "min_speakers": 1,
+    "max_speakers": 10,
+    
+    # Post-processing settings
+    "min_segment_duration": 0.5,  # Minimum segment duration in seconds
+    "merge_threshold": 0.5,  # Threshold for merging adjacent segments
+    "overlap_detection": True,  # Enable overlap detection
+    "overlap_confidence_threshold": 0.7,
+    
+    # Performance settings
+    "num_threads": 4,  # Number of threads for processing
+    "use_auth_token": None,  # HuggingFace auth token if needed
+    "cache_dir": None,  # Directory for model cache
+    
+    # Output settings
+    "include_embeddings": False,  # Include embeddings in output
+    "include_vad_scores": False,  # Include VAD scores in output
+}
+
 
 def load_openai_mappings() -> Dict:
     # Determine path relative to this file.
@@ -218,7 +252,8 @@ def load_settings():
 
     # --- Single-User Settings ---
     # Use a fixed ID for the single user's database path and cache key
-    single_user_fixed_id = int(os.getenv("SINGLE_USER_FIXED_ID", "0")) # Ensure it's an int
+    # Default to 1 for single-user mode (0 is typically reserved for system/admin)
+    single_user_fixed_id = int(os.getenv("SINGLE_USER_FIXED_ID", "1")) # Default to user ID 1
     # API Key for accessing the single-user instance
     # Check both SINGLE_USER_API_KEY (AuthNZ standard) and API_KEY (legacy) environment variables
     single_user_api_key = os.getenv("SINGLE_USER_API_KEY") or os.getenv("API_KEY", "default-secret-key-for-single-user")
@@ -779,14 +814,19 @@ def load_and_log_configs():
         chunking_types = 'article', 'audio', 'book', 'document', 'mediawiki_article', 'mediawiki_dump', 'obsidian_note', 'podcast', 'text', 'video'
 
         # Retrieve Embedding model settings from the configuration file
-        embedding_model = config_parser_object.get('Embeddings', 'embedding_model', fallback='')
+        # Default to Qwen3-Embedding-4B-GGUF if not specified
+        embedding_model = config_parser_object.get('Embeddings', 'embedding_model', fallback='Qwen/Qwen3-Embedding-4B-GGUF')
         logger.trace(f"Embedding model set to: {embedding_model}")
-        embedding_provider = config_parser_object.get('Embeddings', 'embedding_provider', fallback='')
-        embedding_model = config_parser_object.get('Embeddings', 'embedding_model', fallback='')
+        embedding_provider = config_parser_object.get('Embeddings', 'embedding_provider', fallback='huggingface')
+        # Note: duplicate line removed - embedding_model already retrieved above
         onnx_model_path = config_parser_object.get('Embeddings', 'onnx_model_path', fallback="./App_Function_Libraries/onnx_models/text-embedding-3-small.onnx")
         model_dir = config_parser_object.get('Embeddings', 'model_dir', fallback="./App_Function_Libraries/onnx_models")
         embedding_api_url = config_parser_object.get('Embeddings', 'embedding_api_url', fallback="http://localhost:8080/v1/embeddings")
         embedding_api_key = config_parser_object.get('Embeddings', 'embedding_api_key', fallback='')
+        # Fallback model if primary model fails
+        embedding_fallback_model = config_parser_object.get('Embeddings', 'embedding_fallback_model', fallback='sentence-transformers/all-MiniLM-L6-v2')
+        # Auto-generate embeddings on upload
+        auto_generate_embeddings = config_parser_object.get('Embeddings', 'auto_generate_on_upload', fallback='false').lower() == 'true'
         chunk_size = config_parser_object.get('Embeddings', 'chunk_size', fallback=400)
         overlap = config_parser_object.get('Embeddings', 'overlap', fallback=200)
 
@@ -1294,6 +1334,8 @@ def load_and_log_configs():
             'embedding_config': {
                 'embedding_provider': embedding_provider,
                 'embedding_model': embedding_model,
+                'embedding_fallback_model': embedding_fallback_model,
+                'auto_generate_on_upload': auto_generate_embeddings,
                 'onnx_model_path': onnx_model_path,
                 'model_dir': model_dir,
                 'embedding_api_url': embedding_api_url,

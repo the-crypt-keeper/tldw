@@ -405,6 +405,9 @@
                 <button class="sub-tab-button" data-content-id="tabWebScraping" data-load-group="media" role="tab">
                     Web Scraping
                 </button>
+                <button class="sub-tab-button" data-content-id="tabMediaAnalysis" data-load-group="media" role="tab">
+                    Analysis
+                </button>
             </div>
         </div>
 
@@ -773,6 +776,19 @@
                     const payloadEl = document.getElementById(endpointId + '_payload');
                     if (payloadEl) {
                         body = JSON.parse(payloadEl.value);
+                    } else if (endpointId === 'embeddingsCreate') {
+                        // Special handling for embeddings endpoint - build from individual fields
+                        const inputEl = document.getElementById('embeddingsCreate_input');
+                        const modelEl = document.getElementById('embeddingsCreate_model');
+                        const formatEl = document.getElementById('embeddingsCreate_encoding_format');
+                        
+                        if (inputEl) {
+                            body = {
+                                input: inputEl.value || '',
+                                model: modelEl ? modelEl.value : 'text-embedding-ada-002',
+                                encoding_format: formatEl ? formatEl.value : 'float'
+                            };
+                        }
                     }
                 }
 

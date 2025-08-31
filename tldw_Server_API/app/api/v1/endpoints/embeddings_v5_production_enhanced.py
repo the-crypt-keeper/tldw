@@ -740,7 +740,7 @@ def require_admin(user: User) -> None:
     status_code=status.HTTP_200_OK,
     summary="Create embeddings (enhanced with circuit breaker)"
 )
-@apply_rate_limit("60/minute")
+@apply_rate_limit("5/second")
 async def create_embedding_endpoint(
     request: Request,
     embedding_request: CreateEmbeddingRequest = Body(...),
@@ -758,10 +758,40 @@ async def create_embedding_endpoint(
         provider = x_provider or "openai"
         model = embedding_request.model
         
+        # Auto-detect provider based on model name if not specified
         if ":" in model:
             parts = model.split(":", 1)
             provider = parts[0]
             model = parts[1]
+        elif not x_provider:  # Only auto-detect if provider not explicitly set
+            # Common HuggingFace model prefixes/patterns
+            huggingface_patterns = [
+                "sentence-transformers/",
+                "BAAI/",  # Beijing Academy of AI models like bge
+                "thenlper/",  # gte models
+                "intfloat/",  # e5 models
+                "hkunlp/",  # instructor models
+                "Qwen/",  # Qwen embedding models
+                "microsoft/",  # Microsoft embedding models
+                "google/",  # Google embedding models (on HF)
+                "facebook/",  # Facebook/Meta models on HF
+                "bert-",  # BERT variants
+                "roberta-",  # RoBERTa variants
+                "xlm-",  # XLM models
+                "distilbert-",  # DistilBERT variants
+                "all-MiniLM-",  # MiniLM models without org prefix
+                "all-mpnet-",  # MPNet models without org prefix
+            ]
+            
+            # Check if model matches any HuggingFace pattern
+            for pattern in huggingface_patterns:
+                if model.startswith(pattern) or "/" in model:
+                    # If it contains a slash, it's likely a HF model (org/model format)
+                    # unless it's a known OpenAI model
+                    openai_models = ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"]
+                    if model not in openai_models:
+                        provider = "huggingface"
+                        break
         
         try:
             provider_enum = EmbeddingProvider(provider.lower())

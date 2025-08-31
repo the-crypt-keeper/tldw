@@ -14,6 +14,7 @@ https://www.fuzzycomputer.com/posts/onboarding?=&aid=recqrDNk2WPeiRuha
 
 https://www.npmjs.com/package/@nendo/tree-sitter-mcp
 https://potpie.ai/
+https://github.com/presstab/jrdev
 
 
 

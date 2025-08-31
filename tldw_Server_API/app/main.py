@@ -40,6 +40,8 @@ from tldw_Server_API.app.api.v1.endpoints.embeddings_v5_production_enhanced impo
 #
 # Media Endpoint
 from tldw_Server_API.app.api.v1.endpoints.media import router as media_router
+# Media Embeddings Endpoint (for generating embeddings for uploaded media)
+from tldw_Server_API.app.api.v1.endpoints.media_embeddings import router as media_embeddings_router
 #
 # Notes Endpoint
 from tldw_Server_API.app.api.v1.endpoints.notes import router as notes_router
@@ -56,7 +58,7 @@ from tldw_Server_API.app.api.v1.endpoints.prompt_studio_websocket import router 
 from tldw_Server_API.app.api.v1.endpoints.prompt_studio_evaluations import router as prompt_studio_evaluations_router
 #
 # RAG Endpoints
-from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_api_router  # Production RAG API using functional pipeline
+from tldw_Server_API.app.api.v1.endpoints.rag_unified import router as rag_unified_router  # Unified RAG API with all features as parameters
 # Legacy RAG Endpoint (Deprecated)
 # from tldw_Server_API.app.api.v1.endpoints.rag import router as retrieval_agent_router
 #
@@ -64,10 +66,15 @@ from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_api_route
 from tldw_Server_API.app.api.v1.endpoints.research import router as research_router
 #
 # Evaluation Endpoint (OLD - to be removed)
-from tldw_Server_API.app.api.v1.endpoints.evals import router as evaluation_router
+# Legacy evaluation endpoint - replaced by unified router
+# from tldw_Server_API.app.api.v1.endpoints.evals import router as evaluation_router
 #
 # OpenAI-compatible Evaluation Endpoint (NEW)
-from tldw_Server_API.app.api.v1.endpoints.evals_openai import router as openai_evals_router
+# Legacy OpenAI evaluation endpoint - replaced by unified router
+# from tldw_Server_API.app.api.v1.endpoints.evals_openai import router as openai_evals_router
+
+# Unified Evaluation endpoint
+from tldw_Server_API.app.api.v1.endpoints.evaluations_unified import router as unified_evaluation_router
 #
 # Benchmark Endpoint
 from tldw_Server_API.app.api.v1.endpoints.benchmark_api import router as benchmark_router
@@ -89,6 +96,9 @@ from tldw_Server_API.app.api.v1.endpoints.mcp_unified_endpoint import router as 
 #
 # Chatbooks Endpoint
 from tldw_Server_API.app.api.v1.endpoints.chatbooks import router as chatbooks_router
+#
+# LLM Providers Endpoint
+from tldw_Server_API.app.api.v1.endpoints.llm_providers import router as llm_providers_router
 #
 # Metrics and Telemetry
 from tldw_Server_API.app.core.Metrics import (
@@ -255,7 +265,7 @@ async def lifespan(app: FastAPI):
     logger.info("App Startup: Initializing TTS service...")
     try:
         from tldw_Server_API.app.core.TTS.tts_generation import get_tts_service
-        from tldw_Server_API.app.core.Utils.Utils import load_comprehensive_config
+        from tldw_Server_API.app.core.config import load_comprehensive_config
         
         # Load TTS configuration
         tts_config = load_comprehensive_config()
@@ -289,6 +299,31 @@ async def lifespan(app: FastAPI):
         logger.info("App Startup: Unified audit service initialized")
     except Exception as e:
         logger.error(f"App Startup: Failed to initialize audit service: {e}")
+    
+    # Display authentication mode and API key for single-user mode
+    try:
+        from tldw_Server_API.app.core.AuthNZ.settings import get_settings, is_single_user_mode
+        settings = get_settings()
+        
+        logger.info("=" * 60)
+        logger.info("🚀 TLDW Server Started Successfully")
+        logger.info("=" * 60)
+        
+        if is_single_user_mode():
+            logger.info(f"🔐 Authentication Mode: SINGLE USER")
+            logger.info(f"🔑 API Key: {settings.SINGLE_USER_API_KEY}")
+            logger.info("=" * 60)
+            logger.info("Use this API key in the X-API-KEY header for requests")
+        else:
+            logger.info(f"🔐 Authentication Mode: MULTI USER")
+            logger.info("JWT Bearer tokens required for authentication")
+            logger.info("=" * 60)
+        
+        logger.info(f"📍 API Documentation: http://127.0.0.1:8000/docs")
+        logger.info(f"🌐 WebUI: http://127.0.0.1:8000/webui/")
+        logger.info("=" * 60)
+    except Exception as e:
+        logger.error(f"Failed to display startup info: {e}")
     
     yield
     
@@ -395,6 +430,38 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Display API key information on startup for single user mode
+from tldw_Server_API.app.core.AuthNZ.settings import get_settings, is_single_user_mode
+
+@app.on_event("startup")
+async def display_startup_info():
+    """Display important startup information including API key in single user mode."""
+    if is_single_user_mode():
+        settings = get_settings()
+        api_key = settings.SINGLE_USER_API_KEY
+        
+        # Create a visually prominent display
+        logger.info("="*70)
+        logger.info("🚀 TLDW Server Started in SINGLE USER MODE")
+        logger.info("="*70)
+        logger.info("")
+        logger.info("📌 API Key for authentication:")
+        logger.info(f"   {api_key}")
+        logger.info("")
+        logger.info("🌐 Access URLs:")
+        logger.info("   WebUI:    http://localhost:8000/webui/")
+        logger.info("   API Docs: http://localhost:8000/docs")
+        logger.info("   ReDoc:    http://localhost:8000/redoc")
+        logger.info("")
+        logger.info("💡 The WebUI will automatically use this API key")
+        logger.info("="*70)
+    else:
+        logger.info("="*70)
+        logger.info("🚀 TLDW Server Started in MULTI-USER MODE")
+        logger.info("="*70)
+        logger.info("Authentication required via JWT tokens")
+        logger.info("="*70)
+
 # --- FIX: Add CORS Middleware ---
 # Import from config
 from tldw_Server_API.app.core.config import ALLOWED_ORIGINS, API_V1_PREFIX
@@ -418,6 +485,49 @@ add_csrf_protection(app)
 
 # Static files serving
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+# WebUI serving - Serve the WebUI from the same origin to avoid CORS issues
+WEBUI_DIR = BASE_DIR.parent / "WebUI"
+if WEBUI_DIR.exists():
+    # First, add a dynamic config endpoint for single user mode
+    @app.get("/webui/config.json", include_in_schema=False)
+    async def get_webui_config():
+        """Dynamically generate WebUI configuration with API key in single user mode."""
+        from tldw_Server_API.app.core.AuthNZ.settings import get_settings, is_single_user_mode
+        from tldw_Server_API.app.api.v1.endpoints.llm_providers import get_configured_providers
+        from fastapi.responses import JSONResponse
+        
+        config = {
+            "apiUrl": "",  # Empty means use same origin
+            "apiKey": "",  # Default empty
+            "_comment": "Auto-generated configuration"
+        }
+        
+        # In single user mode, include the API key
+        if is_single_user_mode():
+            settings = get_settings()
+            config["apiKey"] = settings.SINGLE_USER_API_KEY
+            config["mode"] = "single-user"
+            config["_comment"] = "Auto-configured for single user mode"
+        else:
+            config["mode"] = "multi-user"
+            config["_comment"] = "Multi-user mode - manual authentication required"
+        
+        # Add LLM providers information
+        try:
+            providers_info = get_configured_providers()
+            config["llm_providers"] = providers_info
+        except Exception as e:
+            logger.warning(f"Failed to get LLM providers for config: {e}")
+            config["llm_providers"] = {"providers": [], "default_provider": "openai", "total_configured": 0}
+        
+        return JSONResponse(content=config)
+    
+    # Mount the WebUI static files (except config.json which is handled dynamically)
+    app.mount("/webui", StaticFiles(directory=str(WEBUI_DIR), html=True), name="webui")
+    logger.info(f"WebUI mounted at /webui from {WEBUI_DIR}")
+else:
+    logger.warning(f"WebUI directory not found at {WEBUI_DIR}")
 
 # Favicon serving
 @app.get("/favicon.ico", include_in_schema=False)
@@ -490,6 +600,8 @@ app.include_router(chunking_templates_router, prefix=f"{API_V1_PREFIX}", tags=["
 # Router for Embedding Endpoint (OpenAI-compatible path)
 app.include_router(embeddings_router, prefix=f"{API_V1_PREFIX}", tags=["embeddings"])
 
+# Router for Media Embeddings Endpoint
+app.include_router(media_embeddings_router, prefix=f"{API_V1_PREFIX}", tags=["media-embeddings"])
 
 # Router for Note Management endpoints
 app.include_router(notes_router, prefix=f"{API_V1_PREFIX}/notes", tags=["notes"])
@@ -510,18 +622,15 @@ app.include_router(prompt_studio_websocket_router, tags=["Prompt Studio"])
 
 # Router for RAG endpoints
 # RAG API - Production API using functional pipeline
-app.include_router(rag_api_router, tags=["RAG"])
+app.include_router(rag_unified_router, tags=["RAG - Unified"])
 
 
 # Router for Research endpoint
 app.include_router(research_router, prefix=f"{API_V1_PREFIX}/research", tags=["research"])
 
 
-# Router for Evaluation endpoint
-app.include_router(evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
-
-# Router for OpenAI-compatible Evaluation endpoint (NEW)
-app.include_router(openai_evals_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
+# Router for Unified Evaluation endpoint (combines both legacy endpoints)
+app.include_router(unified_evaluation_router, prefix=f"{API_V1_PREFIX}", tags=["evaluations"])
 
 # Router for Benchmark endpoint (NEW)
 app.include_router(benchmark_router, prefix=f"{API_V1_PREFIX}", tags=["benchmarks"])
@@ -544,6 +653,8 @@ app.include_router(mcp_unified_router, prefix=f"{API_V1_PREFIX}", tags=["MCP Uni
 
 # Router for Chatbooks - import/export functionality
 app.include_router(chatbooks_router, prefix=f"{API_V1_PREFIX}", tags=["chatbooks"])
+# Router for LLM providers endpoint
+app.include_router(llm_providers_router, prefix=f"{API_V1_PREFIX}", tags=["llm"])
 
 # Router for trash endpoints - deletion of media items / trash file handling (FIXME: Secure delete vs lag on delete?)
 #app.include_router(trash_router, prefix=f"{API_V1_PREFIX}/trash", tags=["trash"])

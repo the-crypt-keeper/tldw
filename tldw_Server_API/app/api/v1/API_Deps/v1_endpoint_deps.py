@@ -22,9 +22,21 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=F
 #
 # Functions:
 
-async def verify_token(Token: str = Header(None)):  # Token is the API key itself
-    if not Token:  # FastAPI will pass None if header is missing
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authentication token.")
+async def verify_token(
+    Token: str = Header(None),
+    x_api_key: str = Header(None, alias="X-API-KEY")
+):  # Check both Token and X-API-KEY headers
+    # In single-user mode, check X-API-KEY; in multi-user mode, check Token
+    if settings.get("SINGLE_USER_MODE"):
+        # Single-user mode uses X-API-KEY header
+        auth_token = x_api_key or Token  # Check X-API-KEY first, fallback to Token
+        if not auth_token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authentication token (X-API-KEY required).")
+    else:
+        # Multi-user mode uses Token header (JWT)
+        auth_token = Token
+        if not auth_token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authentication token.")
 
     if settings.get("SINGLE_USER_MODE"):
         # Get the API key from AuthNZ settings which is the canonical source
@@ -37,8 +49,8 @@ async def verify_token(Token: str = Header(None)):  # Token is the API key itsel
                                 detail="Server authentication misconfigured (API key missing).")
 
         # Direct comparison, no "Bearer " prefix stripping
-        if Token != expected_token:
-            logger.warning(f"Invalid token received. Expected: '{expected_token[:5]}...', Got: '{Token[:10]}...'")
+        if auth_token != expected_token:
+            logger.warning(f"Invalid token received. Expected: '{expected_token[:5]}...', Got: '{auth_token[:10]}...'")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token.")
     else:
         # Multi-user mode: Validate JWT token
@@ -46,7 +58,7 @@ async def verify_token(Token: str = Header(None)):  # Token is the API key itsel
         try:
             # In multi-user mode, the token should be a JWT (not prefixed with "Bearer ")
             # since this is a header token, not from the Authorization header
-            payload = jwt_service.decode_access_token(Token)
+            payload = jwt_service.decode_access_token(auth_token)
             
             # Check if token has valid user information
             user_id = payload.get("user_id") or payload.get("sub")

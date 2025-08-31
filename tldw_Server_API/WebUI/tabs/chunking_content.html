@@ -1,0 +1,291 @@
+<!-- Chunking Operations Tab -->
+<div id="tabChunkingOperations" class="tab-content">
+    <div class="endpoint-section" id="chunkingChunk">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/chunking/chunk - Chunk Text</span>
+        </h2>
+        <p>Chunk text using various methods (sentences, paragraphs, tokens, semantic, etc.).</p>
+        
+        <div class="form-group">
+            <label for="chunkingChunk_payload">Chunking Request (JSON):</label>
+            <textarea id="chunkingChunk_payload" class="code-input" rows="20">{
+  "text": "Your long text to be chunked goes here. This can be multiple paragraphs or even pages of content that you want to split into manageable chunks for processing.",
+  "method": "sentences",
+  "parameters": {
+    "max_chunk_size": 500,
+    "min_chunk_size": 100,
+    "overlap": 50,
+    "separator": "\\n\\n",
+    "preserve_formatting": true,
+    "remove_empty": true
+  },
+  "options": {
+    "language": "en",
+    "encoding": "cl100k_base",
+    "return_metadata": true,
+    "include_statistics": true
+  }
+}</textarea>
+            <small>Methods: sentences, paragraphs, tokens, semantic, recursive, markdown, code</small>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('chunkingChunk', 'POST', '/api/v1/chunking/chunk', 'json')">
+            Chunk Text
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="chunkingChunk_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="chunkingChunk_response">---</pre>
+    </div>
+</div>
+
+<!-- Chunking Templates Tab -->
+<div id="tabChunkingTemplates" class="tab-content">
+    <div class="endpoint-section" id="chunkingTemplatesList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/chunking-templates - List Templates</span>
+        </h2>
+        <p>List all available chunking templates.</p>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="chunkingTemplatesList_category">Category (Optional):</label>
+                    <select id="chunkingTemplatesList_category">
+                        <option value="">All Categories</option>
+                        <option value="general">General</option>
+                        <option value="technical">Technical</option>
+                        <option value="academic">Academic</option>
+                        <option value="media">Media</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+            </div>
+            <div class="column">
+                <div class="form-group">
+                    <label for="chunkingTemplatesList_active">Active Only:</label>
+                    <input type="checkbox" id="chunkingTemplatesList_active" checked>
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('chunkingTemplatesList', 'GET', '/api/v1/chunking-templates', 'query')">
+            List Templates
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="chunkingTemplatesList_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="chunkingTemplatesList_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="chunkingTemplatesGet">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/chunking-templates/{name} - Get Template</span>
+        </h2>
+        <p>Get details of a specific chunking template.</p>
+        
+        <div class="form-group">
+            <label for="chunkingTemplatesGet_name">Template Name:</label>
+            <input type="text" id="chunkingTemplatesGet_name" placeholder="e.g., default_semantic">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('chunkingTemplatesGet', 'GET', '/api/v1/chunking-templates/{name}', 'none')">
+            Get Template
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="chunkingTemplatesGet_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="chunkingTemplatesGet_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="chunkingTemplatesCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/chunking-templates - Create Template</span>
+        </h2>
+        <p>Create a new chunking template for reuse.</p>
+        
+        <div class="form-group">
+            <label for="chunkingTemplatesCreate_payload">Template Configuration (JSON):</label>
+            <textarea id="chunkingTemplatesCreate_payload" class="code-input" rows="25">{
+  "name": "my_custom_template",
+  "description": "Custom template for technical documentation",
+  "category": "technical",
+  "method": "recursive",
+  "parameters": {
+    "chunk_size": 1000,
+    "chunk_overlap": 200,
+    "separators": ["\\n\\n", "\\n", ". ", " "],
+    "length_function": "tiktoken",
+    "keep_separator": true,
+    "add_start_index": false
+  },
+  "preprocessing": {
+    "remove_extra_whitespace": true,
+    "normalize_unicode": true,
+    "remove_urls": false,
+    "remove_emails": false,
+    "lowercase": false
+  },
+  "postprocessing": {
+    "min_chunk_length": 100,
+    "max_chunk_length": 2000,
+    "ensure_complete_sentences": true,
+    "remove_duplicates": false
+  },
+  "metadata": {
+    "author": "admin",
+    "version": "1.0.0",
+    "tags": ["documentation", "technical", "recursive"]
+  },
+  "active": true
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('chunkingTemplatesCreate', 'POST', '/api/v1/chunking-templates', 'json')">
+            Create Template
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="chunkingTemplatesCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="chunkingTemplatesCreate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="chunkingTemplatesUpdate">
+        <h2>
+            <span class="endpoint-method put">PUT</span>
+            <span class="endpoint-path">/api/v1/chunking-templates/{name} - Update Template</span>
+        </h2>
+        <p>Update an existing chunking template.</p>
+        
+        <div class="form-group">
+            <label for="chunkingTemplatesUpdate_name">Template Name:</label>
+            <input type="text" id="chunkingTemplatesUpdate_name" placeholder="my_custom_template">
+        </div>
+        
+        <div class="form-group">
+            <label for="chunkingTemplatesUpdate_payload">Updated Configuration (JSON):</label>
+            <textarea id="chunkingTemplatesUpdate_payload" class="code-input" rows="15">{
+  "description": "Updated description for the template",
+  "parameters": {
+    "chunk_size": 1500,
+    "chunk_overlap": 300
+  },
+  "metadata": {
+    "version": "1.1.0",
+    "last_modified": "2025-01-27"
+  },
+  "active": true
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('chunkingTemplatesUpdate', 'PUT', '/api/v1/chunking-templates/{name}', 'json')">
+            Update Template
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="chunkingTemplatesUpdate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="chunkingTemplatesUpdate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="chunkingTemplatesDelete">
+        <h2>
+            <span class="endpoint-method delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/chunking-templates/{name} - Delete Template</span>
+        </h2>
+        <p>Delete a chunking template.</p>
+        
+        <div class="form-group">
+            <label for="chunkingTemplatesDelete_name">Template Name:</label>
+            <input type="text" id="chunkingTemplatesDelete_name" placeholder="template_to_delete">
+        </div>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Are you sure you want to delete this template?')) makeRequest('chunkingTemplatesDelete', 'DELETE', '/api/v1/chunking-templates/{name}', 'none')">
+            Delete Template
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="chunkingTemplatesDelete_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="chunkingTemplatesDelete_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="chunkingTemplatesPreview">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/chunking-templates/preview - Preview Template</span>
+        </h2>
+        <p>Preview how a template will chunk text without saving.</p>
+        
+        <div class="form-group">
+            <label for="chunkingTemplatesPreview_payload">Preview Request (JSON):</label>
+            <textarea id="chunkingTemplatesPreview_payload" class="code-input" rows="20">{
+  "template_name": "default_semantic",
+  "text": "This is a sample text that will be chunked using the specified template. You can include multiple paragraphs here to see how the template handles different types of content.\\n\\nThis is a second paragraph to demonstrate paragraph-based chunking.\\n\\nAnd here's a third paragraph with some technical content: function example() { return 'code'; }",
+  "override_parameters": {
+    "chunk_size": 200,
+    "chunk_overlap": 50
+  },
+  "preview_options": {
+    "max_chunks": 5,
+    "show_metadata": true,
+    "show_statistics": true,
+    "highlight_overlaps": true
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('chunkingTemplatesPreview', 'POST', '/api/v1/chunking-templates/preview', 'json')">
+            Preview Chunking
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="chunkingTemplatesPreview_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="chunkingTemplatesPreview_response">---</pre>
+    </div>
+</div>
+
+<style>
+.code-input {
+    font-family: var(--font-family-mono);
+    font-size: 0.9rem;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    width: 100%;
+    color: var(--color-text);
+}
+
+.btn-danger {
+    background: var(--color-error);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: var(--color-error-dark);
+}
+
+small {
+    display: block;
+    margin-top: var(--spacing-xs);
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+}
+</style>

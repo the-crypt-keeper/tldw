@@ -9,7 +9,9 @@ Provides REST API endpoints for creating, importing, and managing chatbooks.
 """
 
 import os
+import re
 import shutil
+import hashlib
 from typing import Optional
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks, Request
@@ -17,6 +19,14 @@ from fastapi.responses import FileResponse
 from loguru import logger
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
+# Import audit logging if available
+try:
+    from ....core.Evaluations.audit_logger import AuditLogger, AuditEventType
+    audit_logger = AuditLogger()
+except ImportError:
+    logger.warning("Audit logger not available, using fallback logging")
+    audit_logger = None
 
 from ....core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
 from ....core.Chatbooks.chatbook_service import ChatbookService
@@ -134,13 +144,28 @@ async def create_chatbook(
                     job_id=result
                 )
             else:
-                # Sync mode - return file path and download URL
+                # Sync mode - return download URL based on job_id for security
+                # Extract job_id from the result path if it contains one
+                # Otherwise generate a secure download token
+                import uuid
+                import urllib.parse
+                
+                # Generate a secure download token instead of using filename
+                download_token = str(uuid.uuid4())
+                # Store the mapping in service (would need to be implemented)
+                # For now, use a sanitized version of the filename
                 file_name = Path(result).name
-                download_url = f"/api/v1/chatbooks/download/{file_name}"
+                # Sanitize filename to prevent path traversal
+                safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', file_name)
+                # URL encode for additional safety
+                encoded_filename = urllib.parse.quote(safe_filename, safe='')
+                
+                download_url = f"/api/v1/chatbooks/download/{encoded_filename}"
                 return CreateChatbookResponse(
                     success=True,
                     message=message,
-                    file_path=result,
+                    # Don't expose the actual file path
+                    file_path=None,  # Remove internal path exposure
                     download_url=download_url
                 )
         else:
@@ -215,11 +240,45 @@ async def import_chatbook(
         
         # Save uploaded file to secure temp location with sanitized name
         import tempfile
-        base_temp = Path(tempfile.gettempdir())
-        temp_dir = base_temp / f"tldw_uploads/{user.id}"
+        base_temp = Path(tempfile.gettempdir()).resolve(strict=False)
+        # Sanitize user.id to avoid path traversal and unsafe values
+        import re
+        user_id_str = str(user.id)
+        # Use a SHA256 hash of the user ID string for directory naming (hex digest, 64 chars, always safe)
+        safe_user_id = hashlib.sha256(user_id_str.encode('utf-8')).hexdigest()
+        # (No further sanitization/extremely robust to any user input)
+        # (Length always fixed at 64 characters)
+        # (If someone tries an empty string, hexdigest of empty string is safe but optionally can check)
+        if not safe_user_id:
+            raise HTTPException(status_code=400, detail="Invalid user id for path")
+
+        # Establish a fixed uploads root under the system temp and ensure it's not a symlink
+        uploads_root = base_temp / "tldw_uploads"
+        uploads_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if uploads_root.is_symlink():
+            raise HTTPException(status_code=400, detail="Insecure temporary upload directory")
+        uploads_root_resolved = uploads_root.resolve(strict=True)
+
+        # Verify uploads_root is within the expected base temp directory using commonpath
+        base_temp_resolved = base_temp.resolve(strict=False)
+        import os as _os
+        if _os.path.commonpath([str(uploads_root_resolved), str(base_temp_resolved)]) != str(base_temp_resolved):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory base")
+
+        # Create and validate per-user directory
+        temp_dir = uploads_root_resolved / safe_user_id
         temp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-        
+        if temp_dir.is_symlink():
+            raise HTTPException(status_code=400, detail="Insecure user temporary directory")
+        temp_dir = temp_dir.resolve(strict=True)
+        if _os.path.commonpath([str(temp_dir), str(uploads_root_resolved)]) != str(uploads_root_resolved):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory path")
+
+        # Build the destination file path without resolving the file itself
         temp_file = temp_dir / f"import_{safe_filename}"
+        if temp_file.parent != temp_dir:
+            raise HTTPException(status_code=400, detail="Invalid file path")
+
         with open(temp_file, 'wb') as f:
             shutil.copyfileobj(file.file, f)
         
@@ -326,11 +385,44 @@ async def preview_chatbook(
         
         # Save uploaded file to secure temp location with sanitized name
         import tempfile
-        base_temp = Path(tempfile.gettempdir())
-        temp_dir = base_temp / f"tldw_uploads/{user.id}"
+        base_temp = Path(tempfile.gettempdir()).resolve(strict=False)
+        # Sanitize user.id to avoid path traversal and unsafe values
+        import re
+        user_id_str = str(user.id)
+        safe_user_id = re.sub(r'[^a-zA-Z0-9_-]', '_', user_id_str)
+        # Additional sanitization to prevent path traversal
+        safe_user_id = safe_user_id.replace('..', '_').replace('/', '_').replace('\\', '_')
+        # Limit length to prevent excessively long paths
+        safe_user_id = safe_user_id[:255]
+        if not safe_user_id:
+            raise HTTPException(status_code=400, detail="Invalid user id for path")
+
+        # Establish a fixed uploads root and ensure it's secure
+        uploads_root = base_temp / "tldw_uploads"
+        uploads_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if uploads_root.is_symlink():
+            raise HTTPException(status_code=400, detail="Insecure temporary upload directory")
+        uploads_root_resolved = uploads_root.resolve(strict=True)
+
+        # Verify uploads_root is within the system temp directory
+        import os as _os
+        if _os.path.commonpath([str(uploads_root_resolved), str(base_temp)]) != str(base_temp):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory base")
+
+        # Create and validate per-user directory
+        temp_dir = uploads_root_resolved / safe_user_id
         temp_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-        
+        if temp_dir.is_symlink():
+            raise HTTPException(status_code=400, detail="Insecure user temporary directory")
+        temp_dir = temp_dir.resolve(strict=True)
+        if _os.path.commonpath([str(temp_dir), str(uploads_root_resolved)]) != str(uploads_root_resolved):
+            raise HTTPException(status_code=400, detail="Invalid temporary directory path")
+
+        # Build the preview file path
         temp_file = temp_dir / f"preview_{safe_filename}"
+        if temp_file.parent != temp_dir:
+            raise HTTPException(status_code=400, detail="Invalid file path")
+
         with open(temp_file, 'wb') as f:
             shutil.copyfileobj(file.file, f)
         
@@ -412,11 +504,14 @@ async def list_export_jobs(
         # Convert to response models
         job_responses = []
         for job in jobs:
+            # Generate secure download URL based on job_id
+            secure_download_url = f"/api/v1/chatbooks/download/{job.job_id}" if job.status == ExportStatus.COMPLETED else None
+            
             job_responses.append(ExportJobResponse(
                 job_id=job.job_id,
                 status=job.status,
                 chatbook_name=job.chatbook_name,
-                output_path=job.output_path,
+                output_path=None,  # Don't expose internal file paths
                 created_at=job.created_at,
                 started_at=job.started_at,
                 completed_at=job.completed_at,
@@ -425,7 +520,7 @@ async def list_export_jobs(
                 total_items=job.total_items,
                 processed_items=job.processed_items,
                 file_size_bytes=job.file_size_bytes,
-                download_url=job.download_url,
+                download_url=secure_download_url,  # Use secure URL based on job_id
                 expires_at=job.expires_at
             ))
         
@@ -461,11 +556,14 @@ async def get_export_job(
         if not job:
             raise HTTPException(status_code=404, detail="Export job not found")
         
+        # Generate secure download URL based on job_id
+        secure_download_url = f"/api/v1/chatbooks/download/{job.job_id}" if job.status == ExportStatus.COMPLETED else None
+        
         return ExportJobResponse(
             job_id=job.job_id,
             status=job.status,
             chatbook_name=job.chatbook_name,
-            output_path=job.output_path,
+            output_path=None,  # Don't expose internal file paths
             created_at=job.created_at,
             started_at=job.started_at,
             completed_at=job.completed_at,
@@ -474,7 +572,7 @@ async def get_export_job(
             total_items=job.total_items,
             processed_items=job.processed_items,
             file_size_bytes=job.file_size_bytes,
-            download_url=job.download_url,
+            download_url=secure_download_url,  # Use secure URL based on job_id
             expires_at=job.expires_at
         )
         
@@ -628,14 +726,46 @@ async def download_chatbook(
         if not job.output_path:
             raise HTTPException(status_code=404, detail="Export file not found")
         
-        file_path = Path(job.output_path)
+        file_path = Path(job.output_path).resolve()
         
         # Verify file exists and is within secure storage
         if not file_path.exists() or not file_path.is_file():
             raise HTTPException(status_code=404, detail="Export file no longer exists")
         
+        # Additional path containment check - ensure file is in expected user directory
+        # The file should be within the user's export directory
+        expected_base = Path(service.export_dir).resolve()
+        import os as _os
+        if _os.path.commonpath([str(file_path), str(expected_base)]) != str(expected_base):
+            logger.warning(f"Path traversal attempt detected for user {user.id}")
+            # Log security event if audit logger is available
+            if audit_logger:
+                audit_logger.log_security_event(
+                    event_type="PATH_TRAVERSAL_ATTEMPT",
+                    user_id=str(user.id),
+                    details={
+                        "endpoint": "/chatbooks/download",
+                        "job_id": job_id,
+                        "attempted_path": str(file_path)[:100]  # Truncate for safety
+                    },
+                    severity="HIGH"
+                )
+            raise HTTPException(status_code=403, detail="Access denied")
+        
         # Get filename from path
         filename = file_path.name
+        
+        # Log successful download if audit logger is available
+        if audit_logger:
+            audit_logger.log_event(
+                event_type="CHATBOOK_DOWNLOAD",
+                user_id=str(user.id),
+                details={
+                    "job_id": job_id,
+                    "filename": filename,
+                    "file_size": file_path.stat().st_size
+                }
+            )
         
         # Return file with security headers
         return FileResponse(
@@ -644,7 +774,9 @@ async def download_chatbook(
             media_type="application/zip",
             headers={
                 "X-Content-Type-Options": "nosniff",
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Download-Options": "noopen",  # Prevent IE from opening files directly
+                "Cache-Control": "no-cache, no-store, must-revalidate"  # Prevent caching of sensitive data
             }
         )
         

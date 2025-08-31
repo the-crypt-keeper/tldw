@@ -20,6 +20,7 @@ from loguru import logger
 
 from .types import Document, SearchResult, DataSource
 from .config import RAGConfig
+from .metrics_collector import MetricsCollector, QueryMetrics
 
 # Import enhanced chunking functions
 try:
@@ -48,10 +49,12 @@ class RAGPipelineContext:
     errors: List[Dict[str, Any]] = field(default_factory=list)
     resilience_enabled: bool = field(default=False)
     circuit_breaker_configs: Dict[str, Any] = field(default_factory=dict)
+    metrics: Optional[QueryMetrics] = None
+    metrics_collector: Optional[MetricsCollector] = None
 
 
 def timer(func_name: Optional[str] = None):
-    """Decorator to time pipeline functions."""
+    """Decorator to time pipeline functions and collect metrics."""
     def decorator(func):
         @wraps(func)
         async def wrapper(context: RAGPipelineContext, *args, **kwargs):
@@ -59,11 +62,36 @@ def timer(func_name: Optional[str] = None):
             start = time.time()
             try:
                 result = await func(context, *args, **kwargs)
-                context.timings[name] = time.time() - start
+                duration = time.time() - start
+                context.timings[name] = duration
+                
+                # Update metrics if available
+                if context.metrics:
+                    if name == "expansion":
+                        context.metrics.expansion_time = duration
+                    elif name == "retrieval":
+                        context.metrics.retrieval_time = duration
+                    elif name == "reranking":
+                        context.metrics.reranking_time = duration
+                    elif name == "generation":
+                        context.metrics.generation_time = duration
+                    elif name == "cache_lookup":
+                        context.metrics.cache_lookup_time = duration
+                
+                # Collect metric to collector if available
+                if context.metrics_collector:
+                    await context.metrics_collector.record_timer(f"rag.{name}.duration", duration)
+                
                 return result
             except Exception as e:
-                context.timings[name] = time.time() - start
+                duration = time.time() - start
+                context.timings[name] = duration
                 context.errors.append({"function": name, "error": str(e)})
+                
+                # Record error metric
+                if context.metrics_collector:
+                    await context.metrics_collector.record_error(f"rag.{name}.error", str(e))
+                
                 logger.error(f"Error in {name}: {e}")
                 raise
         return wrapper
@@ -209,7 +237,7 @@ async def check_cache(context: RAGPipelineContext,
     threshold = threshold or context.config.get("cache_threshold", 0.85)
     use_adaptive = context.config.get("use_adaptive_cache", True)
     
-    cache = AdaptiveCache(initial_threshold=threshold) if use_adaptive else SemanticCache(similarity_threshold=threshold)
+    cache = AdaptiveCache(similarity_threshold=threshold) if use_adaptive else SemanticCache(similarity_threshold=threshold)
     
     cached_result = await cache.find_similar(context.query)
     
@@ -236,13 +264,11 @@ async def store_in_cache(context: RAGPipelineContext) -> RAGPipelineContext:
     if not context.config.get("enable_cache", True):
         return context
     
-    from .semantic_cache import SemanticCache
-    
-    cache = SemanticCache()
-    await cache.add(context.query, context.documents)
-    
-    context.metadata["cached_for_future"] = True
-    logger.debug(f"Cached {len(context.documents)} documents")
+    # Note: The semantic cache stores results automatically when accessed via get()
+    # This function is a placeholder for future cache storage implementation
+    # For now, we just mark that caching was attempted
+    context.metadata["cache_storage_attempted"] = True
+    logger.debug(f"Cache storage placeholder for {len(context.documents)} documents")
     
     return context
 
@@ -271,34 +297,59 @@ async def retrieve_documents(context: RAGPipelineContext,
     sources = sources or context.config.get("sources", [DataSource.MEDIA_DB])
     
     # Initialize retriever with database paths from config
+    # Check both nested and flat config structure for backward compatibility
     db_config = context.config.get("databases", {})
     db_paths = {
-        "media_db": db_config.get("media_db_path"),
-        "notes_db": db_config.get("notes_db_path"),
-        "prompts_db": db_config.get("prompts_db_path"),
-        "character_cards_db": db_config.get("character_cards_db_path")
+        "media_db": db_config.get("media_db_path") or context.config.get("media_db_path"),
+        "notes_db": db_config.get("notes_db_path") or context.config.get("notes_db_path"),
+        "prompts_db": db_config.get("prompts_db_path") or context.config.get("prompts_db_path"),
+        "character_cards_db": db_config.get("character_cards_db_path") or context.config.get("chacha_db_path") or context.config.get("character_cards_db_path")
     }
-    # Remove None values
+    # Remove None values and convert Path objects to strings
+    db_paths = {k: str(v) if v is not None else None for k, v in db_paths.items()}
     db_paths = {k: v for k, v in db_paths.items() if v is not None}
     
-    retriever = MultiDatabaseRetriever(db_paths)
+    # Get user_id from config for vector store access
+    user_id = str(context.config.get("user_id", "0"))
+    retriever = MultiDatabaseRetriever(db_paths, user_id=user_id)
     
     # Create retrieval config
     retrieval_config = RetrievalConfig(
         max_results=context.config.get("top_k", 10),
         min_score=context.config.get("min_score", 0.0),
         use_fts=context.config.get("use_fts", True),
-        use_vector=context.config.get("use_vector", False),
+        use_vector=context.config.get("use_vector", True),  # Enable by default for hybrid
         include_metadata=True
     )
     
-    # Retrieve documents
+    # Determine search mode and call appropriate method
+    search_mode = context.config.get("search_mode", "hybrid")
+    hybrid_alpha = context.config.get("hybrid_alpha", 0.7)
+    
+    # Retrieve documents based on search mode
     try:
-        documents = await retriever.retrieve(
-            query=context.query,
-            sources=sources,
-            config=retrieval_config
-        )
+        # For media database with enhanced retriever
+        if DataSource.MEDIA_DB in sources and hasattr(retriever, 'retrieve_hybrid'):
+            if search_mode == "hybrid" and retrieval_config.use_vector and retrieval_config.use_fts:
+                documents = await retriever.retrieve_hybrid(
+                    query=context.query,
+                    alpha=hybrid_alpha
+                )
+            elif search_mode == "vector" and retrieval_config.use_vector:
+                documents = await retriever._retrieve_vector(
+                    query=context.query
+                )
+            else:  # FTS mode or fallback
+                documents = await retriever._retrieve_fts(
+                    query=context.query
+                )
+        else:
+            # Standard retrieval for other sources
+            documents = await retriever.retrieve(
+                query=context.query,
+                sources=sources,
+                config=retrieval_config
+            )
         context.documents = documents
         context.metadata["sources_searched"] = [s.value for s in sources]
         context.metadata["documents_retrieved"] = len(documents)
@@ -307,6 +358,39 @@ async def retrieve_documents(context: RAGPipelineContext,
         logger.error(f"Error retrieving documents: {e}")
         context.errors.append({"function": "retrieve_documents", "error": str(e)})
         context.documents = []
+    
+    return context
+
+
+# Document Filtering Functions
+
+@timer("keyword_filtering")
+async def filter_by_keywords(context: RAGPipelineContext,
+                            keywords: List[str] = None) -> RAGPipelineContext:
+    """Filter retrieved documents by keywords."""
+    keywords = keywords or context.config.get("keyword_filters", [])
+    
+    if not keywords or not context.documents:
+        return context
+    
+    # Convert keywords to lowercase for case-insensitive matching
+    keywords_lower = [kw.lower() for kw in keywords]
+    
+    # Filter documents that contain at least one keyword
+    filtered_docs = []
+    for doc in context.documents:
+        content_lower = doc.content.lower()
+        # Check if any keyword is present in the content
+        if any(keyword in content_lower for keyword in keywords_lower):
+            filtered_docs.append(doc)
+    
+    # Update context with filtered documents
+    context.documents = filtered_docs
+    context.metadata["keyword_filtered"] = True
+    context.metadata["keywords_used"] = keywords
+    context.metadata["documents_after_filter"] = len(filtered_docs)
+    
+    logger.debug(f"Keyword filtering: {len(context.documents)} documents remain after filtering by {keywords}")
     
     return context
 

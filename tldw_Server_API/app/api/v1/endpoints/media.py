@@ -32,6 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple, Callable, Literal, Union, S
 from fastapi import (
     APIRouter,
     BackgroundTasks,
+    Body,
     Depends,
     File,
     Form,
@@ -61,6 +62,7 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
 # Database Instance Dependency (Gets DB based on User)
 from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
+from tldw_Server_API.app.core.AuthNZ.jwt_service import verify_token
 from tldw_Server_API.app.core.DB_Management.DB_Manager import (
     get_paginated_files,
 )
@@ -72,7 +74,6 @@ from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import (
     get_document_version,
     check_media_exists,
     fetch_keywords_for_media,
-    get_all_content_from_database,
 )
 from tldw_Server_API.app.api.v1.API_Deps.validations_deps import file_validator_instance
 from tldw_Server_API.app.api.v1.schemas.media_response_models import PaginationInfo, MediaListResponse, MediaListItem, \
@@ -298,6 +299,10 @@ def get_add_media_form(
     custom_chapter_pattern: Optional[str] = Form(None, description="Regex pattern for custom chapter splitting"),
     perform_rolling_summarization: bool = Form(False, description="Perform rolling summarization"),
     summarize_recursively: bool = Form(False, description="Perform recursive summarization"),
+    # Embedding options
+    generate_embeddings: bool = Form(False, description="Generate embeddings after media processing"),
+    embedding_model: Optional[str] = Form(None, description="Specific embedding model to use"),
+    embedding_provider: Optional[str] = Form(None, description="Embedding provider (huggingface, openai, etc)"),
     # Don't need token here, it's a Header dep
     # Don't need files here, it's a File dep
     # Don't need db here, it's a separate Depends
@@ -343,6 +348,9 @@ def get_add_media_form(
             custom_chapter_pattern=custom_chapter_pattern,
             perform_rolling_summarization=perform_rolling_summarization,
             summarize_recursively=summarize_recursively,
+            generate_embeddings=generate_embeddings,
+            embedding_model=embedding_model,
+            embedding_provider=embedding_provider,
         )
         return form_instance
     except ValidationError as e:
@@ -532,124 +540,7 @@ async def get_media_item(
     except Exception as e:
         logger.error(f"Unexpected error fetching details for media {media_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An unexpected error occurred retrieving media details")
-# async def get_media_item( # Changed to `async def` for consistency
-#     media_id: int,
-#     # --- Use the new DB dependency ---
-#     db: Database = Depends(get_media_db_for_user) # Inject the Database instance
-# ):
-#     """
-#     **Retrieve Media Item by ID**
-#
-#     Fetches the details for a specific *active* (non-deleted, non-trash) media item,
-#     including its associated keywords and the prompt/analysis from its latest version.
-#     """
-#     logger.debug(f"Attempting to fetch details for media_id: {media_id}")
-#     try:
-#         # --- 1. Fetch the main Media record (active only) ---
-#         # Use the instance method get_media_by_id, asking for non-deleted/non-trash
-#         media_record = db.get_media_by_id(media_id, include_deleted=False, include_trash=False)
-#
-#         if not media_record:
-#             logger.warning(f"Media not found or not active for ID: {media_id}")
-#             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found or is inactive/trashed")
-#
-#         logger.debug(f"Found active media record for ID: {media_id}")
-#         # Convert row object to dict if not already (depends on DB class setup)
-#         # Assuming db.get_media_by_id returns a dict-like object or row factory handles it
-#         if not isinstance(media_record, dict):
-#              # Explicitly convert if needed, though db.get_media_by_id SHOULD return a dict
-#              try:
-#                   media_record = dict(media_record)
-#              except TypeError:
-#                    logger.error(f"Could not convert media_record to dict for ID {media_id}")
-#                    raise HTTPException(status_code=500, detail="Internal server error processing media data format.")
-#
-#
-#         # --- 2. Fetch Associated Keywords (active only) ---
-#         # Use the standalone function from the new DB library
-#         keywords_list = fetch_keywords_for_media(media_id=media_id, db_instance=db)
-#         logger.debug(f"Fetched keywords for media ID {media_id}: {keywords_list}")
-#
-#         # --- 3. Fetch Latest Prompt & Analysis from DocumentVersions ---
-#         latest_version_info = None
-#         prompt = None
-#         analysis = None
-#         try:
-#              # Use the standalone function, get latest by passing version_number=None
-#              # Don't include full content to save bandwidth/processing
-#              latest_version_info = get_document_version(
-#                  db_instance=db,
-#                  media_id=media_id,
-#                  version_number=None, # Explicitly get latest
-#                  include_content=False # We only need prompt/analysis from here
-#              )
-#              if latest_version_info:
-#                   prompt = latest_version_info.get('prompt')
-#                   analysis = latest_version_info.get('analysis_content')
-#                   logger.debug(f"Fetched latest version info (prompt/analysis) for media ID {media_id}")
-#              else:
-#                    logger.warning(f"No active document version found for media ID {media_id}")
-#
-#         except DatabaseError as dv_e:
-#             # Log error fetching version, but don't fail the whole request
-#             logger.error(f"Database error fetching latest document version for media {media_id}: {dv_e}")
-#         except Exception as dv_e:
-#             logger.error(f"Unexpected error fetching latest document version for media {media_id}: {dv_e}", exc_info=True)
-#
-#         # --- 4. Prepare Response ---
-#         # Extract data primarily from the main media_record
-#         # NOTE: Metadata like 'duration', 'webpage_url', and detailed 'timestamps'
-#         # are NOT standard fields in the new `Media` table schema provided.
-#         # They would need to be added to the schema or stored differently (e.g., in content or a dedicated metadata field/table)
-#         # if they are required. The response below reflects data *available* in the new schema.
-#
-#         content_text = media_record.get('content', '') # Main content/transcript
-#         word_count = len(content_text.split()) if content_text else 0
-#
-#         # Reconstruct the response structure using available data
-#         response_data = {
-#             "media_id": media_id,
-#             "uuid": media_record.get('uuid'), # Add UUID
-#             "source": {
-#                 "url": media_record.get('url'), # Original URL if available
-#                 "title": media_record.get('title'),
-#                 "duration": None, # <<< Not directly available in schema
-#                 "type": media_record.get('type')
-#             },
-#             "processing": {
-#                 "prompt": prompt, # From latest version
-#                 "analysis": analysis, # From latest version
-#                 "model": media_record.get('transcription_model'), # From Media table
-#                 "timestamp_option": None # <<< Not directly available, unclear how determined
-#             },
-#             "content": {
-#                 # 'metadata' dictionary is unclear how it would be populated now
-#                 # If you stored JSON in a 'metadata' TEXT column, parse it here.
-#                 "metadata": {}, # <<< Placeholder, needs clarification
-#                 "text": content_text, # Main content from Media table
-#                 "word_count": word_count
-#             },
-#             "keywords": keywords_list if keywords_list else [], # Use fetched list
-#             "timestamps": [], # <<< Not directly available in schema/content format
-#             "author": media_record.get('author'),
-#             "ingestion_date": media_record.get('ingestion_date'),
-#             "last_modified": media_record.get('last_modified'),
-#             "version": media_record.get('version'), # Sync version
-#         }
-#
-#         return response_data
-#
-#     except HTTPException: # Re-raise HTTP exceptions directly
-#         raise
-#     except DatabaseError as e: # Catch specific DB errors
-#         logger.error(f"Database error fetching details for media {media_id}: {e}", exc_info=True)
-#         raise HTTPException(status_code=500, detail="Database error retrieving media details")
-#     except Exception as e: # Catch other potential errors
-#         logger.error(f"Unexpected error fetching details for media {media_id}: {e}", exc_info=True)
-#         # Print traceback if needed during debugging:
-#         # import traceback
-#         # traceback.print_exc()
-#         raise HTTPException(status_code=500, detail="An unexpected error occurred retrieving media details")
+
 
 ##############################################################################
 ############################## MEDIA Versioning ##############################
@@ -1383,8 +1274,8 @@ async def search_media_items(
 
 
         except ValidationError as ve:
-            logger.error(f"Pydantic validation error creating MediaListResponse for search: {ve.errors()}", exc_info=True)
             logger.debug(f"Data causing validation error in search: items_count={len(formatted_items)}, pagination={pagination_info.model_dump_json(indent=2) if pagination_info else 'None'}")
+            logger.error(f"Pydantic validation error creating MediaListResponse for search: {ve.errors()}", exc_info=True)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error: Response creation failed.")
 
     except ValueError as ve: # Catch custom ValueErrors from db.search_media_db or param validation
@@ -2467,7 +2358,7 @@ async def add_media(
     # # --- Use Dependency Injection for Form Data ---
     form_data: AddMediaForm = Depends(get_add_media_form),
     # --- Keep File and Header Dependencies Separate ---
-    token: str = Header(..., description="Authentication token"), # Placeholder for auth
+    # token: str = Header(..., description="Authentication token"), # Auth handled by get_media_db_for_user
     files: Optional[List[UploadFile]] = File(None, description="List of files to upload"),
     # --- DB Dependency ---
     db: MediaDatabase = Depends(get_media_db_for_user) # Use the correct dependency
@@ -2615,7 +2506,47 @@ async def add_media(
                 individual_results = await asyncio.gather(*tasks)
                 results.extend(individual_results)
 
-        # --- 7. Determine Final Status Code and Return Response (Success Path) ---
+        # --- 7. Generate Embeddings if Requested ---
+        logger.info(f"generate_embeddings flag: {form_data.generate_embeddings}")
+        if form_data.generate_embeddings:
+            logger.info("Generating embeddings for successfully processed media items...")
+            embedding_tasks = []
+            
+            for result in results:
+                # Only generate embeddings for successfully stored items
+                if result.get("status") == "Success" and result.get("db_id"):
+                    media_id = result["db_id"]
+                    logger.info(f"Scheduling embedding generation for media ID {media_id}")
+                    
+                    # Add background task for embedding generation
+                    async def generate_embeddings_task(media_id: int):
+                        try:
+                            from tldw_Server_API.app.api.v1.endpoints.media_embeddings import (
+                                generate_embeddings_for_media,
+                                get_media_content
+                            )
+                            
+                            media_content = await get_media_content(media_id, db)
+                            embedding_model = form_data.embedding_model or "Qwen/Qwen3-Embedding-4B-GGUF"
+                            embedding_provider = form_data.embedding_provider or "huggingface"
+                            
+                            result = await generate_embeddings_for_media(
+                                media_id=media_id,
+                                media_content=media_content,
+                                embedding_model=embedding_model,
+                                embedding_provider=embedding_provider,
+                                chunk_size=form_data.chunk_size or 1000,
+                                chunk_overlap=form_data.overlap or 200
+                            )
+                            logger.info(f"Embedding generation result for media {media_id}: {result}")
+                        except Exception as e:
+                            logger.error(f"Failed to generate embeddings for media {media_id}: {e}")
+                    
+                    # Run embedding generation in background
+                    background_tasks.add_task(generate_embeddings_task, media_id)
+                    result["embeddings_scheduled"] = True
+        
+        # --- 8. Determine Final Status Code and Return Response (Success Path) ---
         # TempDirManager handles cleanup automatically on exit from 'with' block
         final_status_code = _determine_final_status(results)
         log_level = "INFO" if final_status_code == status.HTTP_200_OK else "WARNING"
@@ -4444,6 +4375,7 @@ def get_process_pdfs_form(
             timestamp_option=timestamp_option,
             vad_use=vad_use,
             perform_confabulation_check_of_analysis=perform_confabulation_check_of_analysis,
+
         )
         return form_instance
     # --- Keep the exact same error handling as get_process_videos_form ---
@@ -5599,6 +5531,7 @@ async def _download_url_async(
             except OSError as e:
                 logger.debug(f"Failed to remove temporary file {target_path}: {e}")
         raise RuntimeError(f"Failed to download or save {url}: {e}") from e  # Use RuntimeError for unexpected
+
 
 #
 # End of media.py

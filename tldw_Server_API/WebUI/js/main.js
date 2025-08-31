@@ -170,6 +170,29 @@ class WebUI {
         if (contentId === 'tabChatCompletions' && typeof initializeChatCompletionsTab === 'function') {
             initializeChatCompletionsTab();
         }
+        
+        if (contentId === 'tabEvalsOpenAI' || contentId === 'tabEvalsGEval') {
+            if (typeof initializeEvaluationsTab === 'function') {
+                initializeEvaluationsTab();
+            }
+        }
+        
+        // Initialize model dropdowns for tabs that have LLM selection
+        // This includes chat, media processing, and evaluation tabs
+        const tabsWithModelSelection = [
+            'tabChatCompletions', 'tabCharacterChat', 'tabConversations',
+            'tabMediaIngestion', 'tabMediaProcessingNoDB', 
+            'tabEvalsOpenAI', 'tabEvalsGEval'
+        ];
+        
+        if (tabsWithModelSelection.includes(contentId)) {
+            // Small delay to ensure DOM is ready
+            setTimeout(() => {
+                if (typeof populateModelDropdowns === 'function') {
+                    populateModelDropdowns();
+                }
+            }, 100);
+        }
     }
 
     async loadContentGroup(groupName, targetContentId) {
@@ -184,6 +207,23 @@ class WebUI {
 
         // Re-initialize form handlers for newly loaded content
         this.initFormHandlers();
+        
+        // After loading content, ensure all newly loaded tabs are hidden initially
+        // This is important when loading multiple tabs from a single HTML file
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        
+        // Initialize model dropdowns for groups that contain LLM-using tabs
+        const groupsWithModelSelection = ['chat', 'media', 'evaluations'];
+        if (groupsWithModelSelection.includes(groupName)) {
+            // Populate dropdowns after DOM is updated
+            setTimeout(() => {
+                if (typeof populateModelDropdowns === 'function') {
+                    populateModelDropdowns();
+                }
+            }, 100);
+        }
     }
 
     showContent(contentId) {
@@ -196,6 +236,9 @@ class WebUI {
         const content = document.getElementById(contentId);
         if (content) {
             content.classList.add('active');
+            console.log(`Showing tab: ${contentId}`);
+        } else {
+            console.warn(`Tab content not found: ${contentId}`);
         }
     }
 

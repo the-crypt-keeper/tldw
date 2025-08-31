@@ -1,0 +1,230 @@
+<!-- Characters Tab -->
+<div id="tabCharacters" class="tab-content">
+    <div class="endpoint-section" id="charactersCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/characters - Create Character</span>
+        </h2>
+        <p>Create a new character for roleplay or conversation.</p>
+        
+        <div class="form-group">
+            <label for="charactersCreate_name">Character Name <span class="required">*</span>:</label>
+            <input type="text" id="charactersCreate_name" placeholder="e.g., Assistant, Teacher, Expert">
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_description">Description:</label>
+            <textarea id="charactersCreate_description" rows="3" placeholder="Brief character description..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_personality">Personality:</label>
+            <textarea id="charactersCreate_personality" rows="3" placeholder="Character personality traits..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_system_prompt">System Prompt:</label>
+            <textarea id="charactersCreate_system_prompt" rows="5" placeholder="System instructions for the character...">You are a helpful AI assistant.</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_first_message">First Message:</label>
+            <textarea id="charactersCreate_first_message" rows="3" placeholder="Character's greeting or first message...">Hello! How can I assist you today?</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersCreate_tags">Tags (comma-separated):</label>
+            <input type="text" id="charactersCreate_tags" placeholder="e.g., helpful, technical, friendly">
+        </div>
+        
+        <button class="api-button" onclick="createCharacter()">
+            Create Character
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersCreate_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="charactersList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/characters - List Characters</span>
+        </h2>
+        <p>List all available characters.</p>
+        
+        <button class="api-button" onclick="listCharacters()">
+            List Characters
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersList_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="charactersGet">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/characters/{character_id} - Get Character</span>
+        </h2>
+        <p>Get details of a specific character.</p>
+        
+        <div class="form-group">
+            <label for="charactersGet_id">Character ID <span class="required">*</span>:</label>
+            <input type="text" id="charactersGet_id" placeholder="Enter character ID">
+        </div>
+        
+        <button class="api-button" onclick="getCharacter()">
+            Get Character
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersGet_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="charactersUpdate">
+        <h2>
+            <span class="endpoint-method put">PUT</span>
+            <span class="endpoint-path">/api/v1/characters/{character_id} - Update Character</span>
+        </h2>
+        <p>Update an existing character.</p>
+        
+        <div class="form-group">
+            <label for="charactersUpdate_id">Character ID <span class="required">*</span>:</label>
+            <input type="text" id="charactersUpdate_id" placeholder="Enter character ID">
+        </div>
+        
+        <div class="form-group">
+            <label for="charactersUpdate_payload">Update Data (JSON):</label>
+            <textarea id="charactersUpdate_payload" class="code-input" rows="15">{
+  "name": "Updated Character Name",
+  "description": "Updated description",
+  "personality": "Updated personality traits",
+  "system_prompt": "Updated system prompt",
+  "first_message": "Updated greeting message",
+  "tags": ["tag1", "tag2"]
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="updateCharacter()">
+            Update Character
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersUpdate_response">---</pre>
+    </div>
+    
+    <div class="endpoint-section" id="charactersDelete">
+        <h2>
+            <span class="endpoint-method delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/characters/{character_id} - Delete Character</span>
+        </h2>
+        <p>Delete a character.</p>
+        
+        <div class="form-group">
+            <label for="charactersDelete_id">Character ID <span class="required">*</span>:</label>
+            <input type="text" id="charactersDelete_id" placeholder="Enter character ID">
+        </div>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Delete this character?')) deleteCharacter()">
+            Delete Character
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="charactersDelete_response">---</pre>
+    </div>
+</div>
+
+<script>
+async function createCharacter() {
+    const responseEl = document.getElementById('charactersCreate_response');
+    try {
+        responseEl.textContent = 'Creating character...';
+        
+        const tags = document.getElementById('charactersCreate_tags').value;
+        const tagsArray = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
+        
+        const body = {
+            name: document.getElementById('charactersCreate_name').value,
+            description: document.getElementById('charactersCreate_description').value,
+            personality: document.getElementById('charactersCreate_personality').value,
+            system_prompt: document.getElementById('charactersCreate_system_prompt').value,
+            first_message: document.getElementById('charactersCreate_first_message').value,
+            tags: tagsArray
+        };
+        
+        const response = await apiClient.makeRequest('POST', '/api/v1/characters', { body });
+        responseEl.textContent = JSON.stringify(response, null, 2);
+        Toast.success('Character created successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to create character: ${error.message}`);
+    }
+}
+
+async function listCharacters() {
+    const responseEl = document.getElementById('charactersList_response');
+    try {
+        responseEl.textContent = 'Loading characters...';
+        const response = await apiClient.makeRequest('GET', '/api/v1/characters');
+        responseEl.textContent = JSON.stringify(response, null, 2);
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to list characters: ${error.message}`);
+    }
+}
+
+async function getCharacter() {
+    const responseEl = document.getElementById('charactersGet_response');
+    try {
+        const characterId = document.getElementById('charactersGet_id').value;
+        if (!characterId) {
+            throw new Error('Character ID is required');
+        }
+        
+        responseEl.textContent = 'Loading character...';
+        const response = await apiClient.makeRequest('GET', `/api/v1/characters/${characterId}`);
+        responseEl.textContent = JSON.stringify(response, null, 2);
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to get character: ${error.message}`);
+    }
+}
+
+async function updateCharacter() {
+    const responseEl = document.getElementById('charactersUpdate_response');
+    try {
+        const characterId = document.getElementById('charactersUpdate_id').value;
+        if (!characterId) {
+            throw new Error('Character ID is required');
+        }
+        
+        const payload = document.getElementById('charactersUpdate_payload').value;
+        const body = JSON.parse(payload);
+        
+        responseEl.textContent = 'Updating character...';
+        const response = await apiClient.makeRequest('PUT', `/api/v1/characters/${characterId}`, { body });
+        responseEl.textContent = JSON.stringify(response, null, 2);
+        Toast.success('Character updated successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to update character: ${error.message}`);
+    }
+}
+
+async function deleteCharacter() {
+    const responseEl = document.getElementById('charactersDelete_response');
+    try {
+        const characterId = document.getElementById('charactersDelete_id').value;
+        if (!characterId) {
+            throw new Error('Character ID is required');
+        }
+        
+        responseEl.textContent = 'Deleting character...';
+        const response = await apiClient.makeRequest('DELETE', `/api/v1/characters/${characterId}`);
+        responseEl.textContent = response ? JSON.stringify(response, null, 2) : 'Character deleted successfully';
+        Toast.success('Character deleted successfully');
+    } catch (error) {
+        responseEl.textContent = `Error: ${error.message}`;
+        Toast.error(`Failed to delete character: ${error.message}`);
+    }
+}
+</script>

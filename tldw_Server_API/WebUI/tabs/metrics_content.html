@@ -1,0 +1,469 @@
+<!-- Metrics Dashboard Tab -->
+<div id="tabMetricsDashboard" class="tab-content">
+    <div class="endpoint-section">
+        <h2>System Metrics Dashboard</h2>
+        <p>Real-time monitoring of system performance and health metrics.</p>
+        
+        <div class="metrics-controls">
+            <button class="btn btn-primary" onclick="refreshMetrics()">
+                Refresh Metrics
+            </button>
+            <button class="btn btn-secondary" onclick="startAutoRefresh()">
+                Auto-Refresh (5s)
+            </button>
+            <button class="btn btn-secondary" onclick="stopAutoRefresh()">
+                Stop Auto-Refresh
+            </button>
+        </div>
+        
+        <div class="metrics-grid mt-3">
+            <div class="metric-card">
+                <h3>API Health</h3>
+                <div class="metric-value" id="metric-api-health">--</div>
+                <div class="metric-label">Status</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Request Rate</h3>
+                <div class="metric-value" id="metric-request-rate">--</div>
+                <div class="metric-label">req/min</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Response Time</h3>
+                <div class="metric-value" id="metric-response-time">--</div>
+                <div class="metric-label">ms (p50)</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Active Connections</h3>
+                <div class="metric-value" id="metric-active-connections">--</div>
+                <div class="metric-label">connections</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Error Rate</h3>
+                <div class="metric-value" id="metric-error-rate">--</div>
+                <div class="metric-label">errors/min</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>CPU Usage</h3>
+                <div class="metric-value" id="metric-cpu-usage">--</div>
+                <div class="metric-label">percent</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Memory Usage</h3>
+                <div class="metric-value" id="metric-memory-usage">--</div>
+                <div class="metric-label">MB</div>
+            </div>
+            
+            <div class="metric-card">
+                <h3>Database Size</h3>
+                <div class="metric-value" id="metric-database-size">--</div>
+                <div class="metric-label">MB</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Metrics Endpoints Tab -->
+<div id="tabMetricsEndpoints" class="tab-content">
+    <div class="endpoint-section" id="metricsPrometheus">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/metrics - Prometheus Metrics</span>
+        </h2>
+        <p>Get metrics in Prometheus format for scraping by monitoring systems.</p>
+        
+        <button class="api-button" onclick="makeRequest('metricsPrometheus', 'GET', '/metrics', 'none')">
+            Get Prometheus Metrics
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="metricsPrometheus_curl">---</pre>
+        
+        <h3>Response (Prometheus Format):</h3>
+        <pre id="metricsPrometheus_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="metricsJSON">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/metrics - JSON Metrics</span>
+        </h2>
+        <p>Get current metrics in JSON format for custom monitoring solutions.</p>
+        
+        <div class="form-group">
+            <label for="metricsJSON_category">Metric Category:</label>
+            <select id="metricsJSON_category">
+                <option value="">All Metrics</option>
+                <option value="system">System Metrics</option>
+                <option value="api">API Metrics</option>
+                <option value="database">Database Metrics</option>
+                <option value="cache">Cache Metrics</option>
+                <option value="llm">LLM Metrics</option>
+            </select>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('metricsJSON', 'GET', '/api/v1/metrics', 'query')">
+            Get JSON Metrics
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="metricsJSON_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="metricsJSON_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="metricsHealth">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/metrics/health - Metrics Service Health</span>
+        </h2>
+        <p>Check the health status of the metrics collection service.</p>
+        
+        <button class="api-button" onclick="makeRequest('metricsHealth', 'GET', '/api/v1/metrics/health', 'none')">
+            Check Metrics Health
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="metricsHealth_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="metricsHealth_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="metricsReset">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/metrics/reset - Reset Metrics</span>
+        </h2>
+        <p>Reset metrics counters. Use with caution in production.</p>
+        
+        <div class="form-group">
+            <label for="metricsReset_payload">Reset Configuration (JSON):</label>
+            <textarea id="metricsReset_payload" class="code-input" rows="10">{
+  "categories": ["api", "cache"],
+  "preserve_history": true,
+  "reset_timestamp": true,
+  "reason": "Manual reset for testing",
+  "admin_token": "your_admin_token"
+}</textarea>
+        </div>
+        
+        <button class="api-button btn-warning" onclick="if(confirm('Are you sure you want to reset metrics?')) makeRequest('metricsReset', 'POST', '/api/v1/metrics/reset', 'json')">
+            Reset Metrics
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="metricsReset_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="metricsReset_response">---</pre>
+    </div>
+</div>
+
+<!-- Metrics Analysis Tab -->
+<div id="tabMetricsAnalysis" class="tab-content">
+    <div class="endpoint-section">
+        <h2>Metrics Analysis Tools</h2>
+        <p>Analyze historical metrics data and generate insights.</p>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="metricsAnalysis_timeRange">Time Range:</label>
+                    <select id="metricsAnalysis_timeRange">
+                        <option value="1h">Last Hour</option>
+                        <option value="6h">Last 6 Hours</option>
+                        <option value="24h" selected>Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                    </select>
+                </div>
+            </div>
+            <div class="column">
+                <div class="form-group">
+                    <label for="metricsAnalysis_metric">Metric Type:</label>
+                    <select id="metricsAnalysis_metric">
+                        <option value="response_time">Response Time</option>
+                        <option value="error_rate">Error Rate</option>
+                        <option value="throughput">Throughput</option>
+                        <option value="cpu_usage">CPU Usage</option>
+                        <option value="memory_usage">Memory Usage</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="metricsAnalysis_aggregation">Aggregation:</label>
+            <select id="metricsAnalysis_aggregation">
+                <option value="avg">Average</option>
+                <option value="min">Minimum</option>
+                <option value="max">Maximum</option>
+                <option value="p50">Median (p50)</option>
+                <option value="p95">95th Percentile</option>
+                <option value="p99">99th Percentile</option>
+            </select>
+        </div>
+        
+        <button class="btn btn-primary" onclick="runMetricsAnalysis()">
+            Run Analysis
+        </button>
+        
+        <div id="metricsAnalysis_chart" class="chart-container mt-3">
+            <!-- Chart will be rendered here -->
+        </div>
+        
+        <div id="metricsAnalysis_insights" class="insights-panel mt-3">
+            <!-- Insights will appear here -->
+        </div>
+    </div>
+    
+    <div class="endpoint-section mt-4">
+        <h2>Alerts Configuration</h2>
+        <p>Set up alerts based on metric thresholds.</p>
+        
+        <div class="form-group">
+            <label for="metricsAlerts_config">Alert Configuration (JSON):</label>
+            <textarea id="metricsAlerts_config" class="code-input" rows="20">{
+  "alerts": [
+    {
+      "name": "High Error Rate",
+      "metric": "error_rate",
+      "condition": "greater_than",
+      "threshold": 5,
+      "duration_minutes": 5,
+      "severity": "critical",
+      "notification": {
+        "email": "admin@example.com",
+        "webhook": "https://hooks.example.com/alerts"
+      }
+    },
+    {
+      "name": "High Response Time",
+      "metric": "response_time_p95",
+      "condition": "greater_than",
+      "threshold": 1000,
+      "duration_minutes": 10,
+      "severity": "warning"
+    },
+    {
+      "name": "Low Throughput",
+      "metric": "throughput",
+      "condition": "less_than",
+      "threshold": 100,
+      "duration_minutes": 15,
+      "severity": "info"
+    }
+  ]
+}</textarea>
+        </div>
+        
+        <button class="btn btn-primary" onclick="saveMetricsAlerts()">
+            Save Alerts
+        </button>
+    </div>
+</div>
+
+<script>
+let metricsAutoRefresh = null;
+
+function refreshMetrics() {
+    // Fetch and update metrics display
+    fetch('/api/v1/metrics')
+        .then(response => response.json())
+        .then(data => {
+            // Update metric cards with data
+            document.getElementById('metric-api-health').textContent = data.health || 'Healthy';
+            document.getElementById('metric-request-rate').textContent = data.request_rate || '0';
+            document.getElementById('metric-response-time').textContent = data.response_time_p50 || '0';
+            document.getElementById('metric-active-connections').textContent = data.active_connections || '0';
+            document.getElementById('metric-error-rate').textContent = data.error_rate || '0';
+            document.getElementById('metric-cpu-usage').textContent = (data.cpu_usage || 0).toFixed(1) + '%';
+            document.getElementById('metric-memory-usage').textContent = (data.memory_mb || 0).toFixed(0);
+            document.getElementById('metric-database-size').textContent = (data.database_mb || 0).toFixed(1);
+        })
+        .catch(error => {
+            console.error('Failed to fetch metrics:', error);
+        });
+}
+
+function startAutoRefresh() {
+    if (metricsAutoRefresh) {
+        clearInterval(metricsAutoRefresh);
+    }
+    refreshMetrics(); // Initial refresh
+    metricsAutoRefresh = setInterval(refreshMetrics, 5000);
+    Toast.success('Auto-refresh enabled (5 seconds)');
+}
+
+function stopAutoRefresh() {
+    if (metricsAutoRefresh) {
+        clearInterval(metricsAutoRefresh);
+        metricsAutoRefresh = null;
+        Toast.info('Auto-refresh stopped');
+    }
+}
+
+function runMetricsAnalysis() {
+    const timeRange = document.getElementById('metricsAnalysis_timeRange').value;
+    const metric = document.getElementById('metricsAnalysis_metric').value;
+    const aggregation = document.getElementById('metricsAnalysis_aggregation').value;
+    
+    // Simulate analysis results
+    const chartContainer = document.getElementById('metricsAnalysis_chart');
+    chartContainer.innerHTML = `
+        <div class="chart-placeholder">
+            <p>Chart: ${metric} over ${timeRange} (${aggregation})</p>
+            <div class="chart-bars">
+                <div class="chart-bar" style="height: 60%;"></div>
+                <div class="chart-bar" style="height: 80%;"></div>
+                <div class="chart-bar" style="height: 45%;"></div>
+                <div class="chart-bar" style="height: 90%;"></div>
+                <div class="chart-bar" style="height: 70%;"></div>
+                <div class="chart-bar" style="height: 85%;"></div>
+                <div class="chart-bar" style="height: 50%;"></div>
+            </div>
+        </div>
+    `;
+    
+    const insightsPanel = document.getElementById('metricsAnalysis_insights');
+    insightsPanel.innerHTML = `
+        <div class="insights">
+            <h4>Analysis Insights</h4>
+            <ul>
+                <li>Peak ${metric} occurred at 14:30 UTC</li>
+                <li>Average ${aggregation} value: 234ms</li>
+                <li>Detected anomaly at 12:15 UTC (3σ deviation)</li>
+                <li>Trend: Increasing by 12% over selected period</li>
+            </ul>
+        </div>
+    `;
+}
+
+function saveMetricsAlerts() {
+    const config = document.getElementById('metricsAlerts_config').value;
+    // Would save alerts configuration
+    Toast.success('Alerts configuration saved');
+}
+
+// Initialize metrics on tab load
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.querySelector('#tabMetricsDashboard.active')) {
+        refreshMetrics();
+    }
+});
+</script>
+
+<style>
+.metrics-controls {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+.metric-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+    transition: var(--transition-fast);
+}
+
+.metric-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.metric-card h3 {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    margin: 0 0 var(--spacing-sm) 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin: var(--spacing-sm) 0;
+}
+
+.metric-label {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
+.chart-container {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    min-height: 300px;
+}
+
+.chart-placeholder {
+    text-align: center;
+}
+
+.chart-bars {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 200px;
+    margin-top: var(--spacing-lg);
+}
+
+.chart-bar {
+    width: 40px;
+    background: var(--color-primary);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transition: var(--transition-fast);
+}
+
+.chart-bar:hover {
+    background: var(--color-primary-dark);
+}
+
+.insights-panel {
+    background: var(--color-surface-alt);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+}
+
+.insights h4 {
+    margin-top: 0;
+    color: var(--color-text);
+}
+
+.insights ul {
+    margin: var(--spacing-md) 0 0 0;
+    padding-left: var(--spacing-lg);
+}
+
+.insights li {
+    margin: var(--spacing-sm) 0;
+    color: var(--color-text-secondary);
+}
+
+.btn-warning {
+    background: var(--color-warning);
+    color: white;
+}
+
+.btn-warning:hover {
+    background: var(--color-warning-dark);
+}
+</style>

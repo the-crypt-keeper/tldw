@@ -82,6 +82,11 @@ class RAGEvaluator:
                 logger.warning(f"Embeddings not available for {self.embedding_provider}/{self.embedding_model}. Using LLM-based fallback.")
         return self._embedding_available
     
+    @embedding_available.setter
+    def embedding_available(self, value: bool):
+        """Set embedding availability (for testing)."""
+        self._embedding_available = value
+    
     def _test_embeddings(self) -> bool:
         """Test if embeddings are available."""
         try:

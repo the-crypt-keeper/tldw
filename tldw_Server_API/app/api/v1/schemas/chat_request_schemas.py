@@ -240,12 +240,30 @@ class ChatCompletionRequest(BaseModel):
     # topp: Optional[float] = Field(None, description="[Extension] Explicit Top-P if needed separately from top_p.") # Uncomment if needed
 
     # --- Prompt templating ---
-    prompt_template_name: Optional[str] = Field(None, description="Name of the prompt template to apply.")
+    prompt_template_name: Optional[str] = Field(None, description="Name of the prompt template to apply. Must contain only alphanumeric characters, underscores, and hyphens.")
 
     # --- Optional Character Chat Parameters ---
     character_id: Optional[str] = Field(None, description="Optional ID of the character to use for context.")
     conversation_id: Optional[str] = Field(None, description="Optional ID of the conversation to use for context.")
     model_config = ConfigDict(extra="allow")
+    
+    @field_validator('prompt_template_name')
+    @classmethod
+    def validate_template_name(cls, v: Optional[str]) -> Optional[str]:
+        """Validate prompt template name to prevent path traversal attacks."""
+        if v is None:
+            return v
+        
+        import re
+        # Only allow alphanumeric, underscore, and hyphen
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError(f"Invalid template name format. Only alphanumeric characters, underscores, and hyphens are allowed.")
+        
+        # Additional security check for path traversal patterns
+        if '/' in v or '\\' in v or '..' in v:
+            raise ValueError(f"Invalid template name. Path traversal patterns are not allowed.")
+        
+        return v
 
     @model_validator(mode='before')
     def check_logprobs(cls, values):

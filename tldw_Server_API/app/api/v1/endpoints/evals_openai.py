@@ -12,7 +12,7 @@ Provides endpoints for:
 import os
 from datetime import datetime
 from typing import List, Optional, Dict, Any, AsyncGenerator
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status, Query, Security, Request
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status, Query, Security, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
@@ -87,32 +87,40 @@ eval_runner = EvaluationRunner(db_path)
 
 # ============= Authentication =============
 
-async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)) -> str:
+async def verify_api_key(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+    x_api_key: Optional[str] = Header(None, alias="X-API-KEY")
+) -> str:
     """
     Verify API key or JWT token based on authentication mode.
     
     Supports:
-    - Single-user mode: API key from environment or config
-    - Multi-user mode: JWT tokens
+    - Single-user mode: API key from environment or config (X-API-KEY header or Bearer token)
+    - Multi-user mode: JWT tokens (Bearer token)
     - OpenAI compatibility: sk- prefixed keys
     """
     settings = get_settings()
     
-    # Always require credentials for production security
-    if not credentials:
+    # Check for X-API-KEY header first (for single-user mode)
+    token = None
+    if settings.AUTH_MODE == "single_user" and x_api_key and isinstance(x_api_key, str):
+        token = x_api_key
+    elif credentials:
+        token = credentials.credentials
+    
+    if not token:
+        # No credentials provided
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {
                 "message": "Missing API key or token",
-                "type": "authentication_error",
+                "type": "authentication_error",  
                 "code": "missing_credentials"
             }}
         )
     
-    token = credentials.credentials
-    
     # Remove Bearer prefix if present
-    if token.startswith("Bearer "):
+    if isinstance(token, str) and token.startswith("Bearer "):
         token = token[7:]
     
     # Handle based on authentication mode
@@ -159,7 +167,7 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={"error": {
-                    "message": str(e),
+                    "message": sanitize_error_message(e, "authentication"),
                     "type": "authentication_error",
                     "code": "invalid_token"
                 }}
@@ -177,6 +185,44 @@ async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = S
 
 
 # ============= Error Handling =============
+
+def sanitize_error_message(error: Exception, context: str = "") -> str:
+    """Sanitize error messages to prevent information exposure.
+    
+    Args:
+        error: The exception to sanitize
+        context: Optional context about where the error occurred
+        
+    Returns:
+        A safe error message that doesn't expose sensitive information
+    """
+    # Log the full error details for debugging
+    logger.error(f"Error in {context}: {type(error).__name__}: {str(error)}")
+    
+    # Map specific exception types to safe messages
+    error_type = type(error).__name__
+    
+    # Common safe error messages
+    safe_messages = {
+        "FileNotFoundError": "The requested resource was not found",
+        "PermissionError": "Permission denied for this operation",
+        "ValueError": "Invalid input provided",
+        "KeyError": "Required data is missing",
+        "ConnectionError": "Connection failed. Please try again later",
+        "TimeoutError": "Operation timed out. Please try again",
+        "DatabaseError": "Database operation failed",
+        "IntegrityError": "Data integrity error occurred",
+    }
+    
+    # Return safe message based on error type
+    if error_type in safe_messages:
+        return safe_messages[error_type]
+    
+    # For unknown errors, return a generic message
+    if context:
+        return f"An error occurred during {context}"
+    return "An internal error occurred. Please try again later"
+
 
 def create_error_response(
     message: str,
@@ -258,7 +304,7 @@ async def create_evaluation(
     except Exception as e:
         logger.error(f"Failed to create evaluation: {e}")
         raise create_error_response(
-            message=f"Failed to create evaluation: {str(e)}",
+            message=f"Failed to create evaluation: {sanitize_error_message(e, 'evaluation creation')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -295,7 +341,7 @@ async def list_evaluations(
     except Exception as e:
         logger.error(f"Failed to list evaluations: {e}")
         raise create_error_response(
-            message=f"Failed to list evaluations: {str(e)}",
+            message=f"Failed to list evaluations: {sanitize_error_message(e, 'listing evaluations')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -324,7 +370,7 @@ async def get_evaluation(
     except Exception as e:
         logger.error(f"Failed to get evaluation {eval_id}: {e}")
         raise create_error_response(
-            message=f"Failed to get evaluation: {str(e)}",
+            message=f"Failed to get evaluation: {sanitize_error_message(e, 'retrieving evaluation')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -367,7 +413,7 @@ async def update_evaluation(
     except Exception as e:
         logger.error(f"Failed to update evaluation {eval_id}: {e}")
         raise create_error_response(
-            message=f"Failed to update evaluation: {str(e)}",
+            message=f"Failed to update evaluation: {sanitize_error_message(e, 'updating evaluation')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -397,7 +443,7 @@ async def delete_evaluation(
     except Exception as e:
         logger.error(f"Failed to delete evaluation {eval_id}: {e}")
         raise create_error_response(
-            message=f"Failed to delete evaluation: {str(e)}",
+            message=f"Failed to delete evaluation: {sanitize_error_message(e, 'deleting evaluation')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -482,7 +528,7 @@ async def create_run(
     except Exception as e:
         logger.error(f"Failed to create run for evaluation {eval_id}: {e}")
         raise create_error_response(
-            message=f"Failed to create run: {str(e)}",
+            message=f"Failed to create run: {sanitize_error_message(e, 'creating run')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -531,7 +577,7 @@ async def list_runs(
     except Exception as e:
         logger.error(f"Failed to list runs for evaluation {eval_id}: {e}")
         raise create_error_response(
-            message=f"Failed to list runs: {str(e)}",
+            message=f"Failed to list runs: {sanitize_error_message(e, 'listing runs')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -571,7 +617,7 @@ async def get_run(
     except Exception as e:
         logger.error(f"Failed to get run {run_id}: {e}")
         raise create_error_response(
-            message=f"Failed to get run: {str(e)}",
+            message=f"Failed to get run: {sanitize_error_message(e, 'retrieving run')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -628,7 +674,7 @@ async def get_run_results(
     except Exception as e:
         logger.error(f"Failed to get results for run {run_id}: {e}")
         raise create_error_response(
-            message=f"Failed to get run results: {str(e)}",
+            message=f"Failed to get run results: {sanitize_error_message(e, 'retrieving run results')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -669,7 +715,7 @@ async def cancel_run(
     except Exception as e:
         logger.error(f"Failed to cancel run {run_id}: {e}")
         raise create_error_response(
-            message=f"Failed to cancel run: {str(e)}",
+            message=f"Failed to cancel run: {sanitize_error_message(e, 'cancelling run')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -746,7 +792,8 @@ async def stream_run_progress(
                 
         except Exception as e:
             logger.error(f"Error streaming progress for run {run_id}: {e}")
-            yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+            safe_error_msg = sanitize_error_message(e, f"streaming progress for run {run_id}")
+            yield f"event: error\ndata: {json.dumps({'message': safe_error_msg})}\n\n"
     
     return StreamingResponse(
         generate_events(),
@@ -785,7 +832,7 @@ async def create_dataset(
     except Exception as e:
         logger.error(f"Failed to create dataset: {e}")
         raise create_error_response(
-            message=f"Failed to create dataset: {str(e)}",
+            message=f"Failed to create dataset: {sanitize_error_message(e, 'creating dataset')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -818,7 +865,7 @@ async def list_datasets(
     except Exception as e:
         logger.error(f"Failed to list datasets: {e}")
         raise create_error_response(
-            message=f"Failed to list datasets: {str(e)}",
+            message=f"Failed to list datasets: {sanitize_error_message(e, 'listing datasets')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -847,7 +894,7 @@ async def get_dataset(
     except Exception as e:
         logger.error(f"Failed to get dataset {dataset_id}: {e}")
         raise create_error_response(
-            message=f"Failed to get dataset: {str(e)}",
+            message=f"Failed to get dataset: {sanitize_error_message(e, 'retrieving dataset')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -877,7 +924,7 @@ async def delete_dataset(
     except Exception as e:
         logger.error(f"Failed to delete dataset {dataset_id}: {e}")
         raise create_error_response(
-            message=f"Failed to delete dataset: {str(e)}",
+            message=f"Failed to delete dataset: {sanitize_error_message(e, 'deleting dataset')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

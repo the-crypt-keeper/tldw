@@ -26,6 +26,47 @@ from tldw_Server_API.app.core.Prompt_Management.prompt_studio.event_broadcaster 
 )
 
 ########################################################################################################################
+# Error Handling Utilities
+
+def sanitize_error_message(error: Exception, context: str = "") -> str:
+    """Sanitize error messages to prevent information exposure.
+    
+    Args:
+        error: The exception to sanitize
+        context: Optional context about where the error occurred
+        
+    Returns:
+        A safe error message that doesn't expose sensitive information
+    """
+    # Log the full error details for debugging
+    logger.error(f"Error in {context}: {type(error).__name__}: {str(error)}")
+    
+    # Map specific exception types to safe messages
+    error_type = type(error).__name__
+    
+    # Common safe error messages for WebSocket operations
+    safe_messages = {
+        "WebSocketDisconnect": "WebSocket connection closed",
+        "ConnectionError": "Connection error occurred",
+        "TimeoutError": "Operation timed out",
+        "ValueError": "Invalid message format",
+        "KeyError": "Required data is missing",
+        "JSONDecodeError": "Invalid JSON message",
+        "PermissionError": "Permission denied for this operation",
+        "FileNotFoundError": "Requested resource not found",
+        "RuntimeError": "Operation failed",
+    }
+    
+    # Return safe message based on error type
+    if error_type in safe_messages:
+        return safe_messages[error_type]
+    
+    # For unknown errors, return a generic message
+    if context:
+        return f"An error occurred during {context}"
+    return "An internal error occurred"
+
+########################################################################################################################
 # Connection Manager
 
 class ConnectionManager:
@@ -272,9 +313,10 @@ async def websocket_endpoint(
                 })
             except Exception as e:
                 logger.error(f"Error processing WebSocket message: {e}")
+                safe_error_msg = sanitize_error_message(e, "message processing")
                 await websocket.send_json({
                     "type": "error",
-                    "message": str(e),
+                    "message": safe_error_msg,
                     "timestamp": datetime.utcnow().isoformat()
                 })
     
@@ -329,7 +371,8 @@ async def sse_endpoint(
             raise
         except Exception as e:
             logger.error(f"SSE error: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            safe_error_msg = sanitize_error_message(e, "SSE streaming")
+            yield f"data: {json.dumps({'type': 'error', 'message': safe_error_msg})}\n\n"
     
     return StreamingResponse(
         event_generator(),

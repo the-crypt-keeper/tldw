@@ -883,7 +883,7 @@ async def check_configuration_health():
         return Response(
             content=json.dumps({
                 "status": "error",
-                "message": f"Health check failed: {str(e)}"
+                "message": f"Health check failed: ERROR - SEE LOGS"
             }),
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             media_type="application/json"

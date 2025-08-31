@@ -16,11 +16,13 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 from loguru import logger
 import numpy as np
 
 from .types import Document, DataSource
+from .vector_stores import VectorStoreFactory, VectorStoreConfig, VectorStoreType
 
 
 @dataclass
@@ -137,18 +139,48 @@ class BaseRetriever(ABC):
     ) -> List[Tuple]:
         """Execute SQL query and return results."""
         try:
+            logger.debug(f"Executing query: {query[:100]}...")
+            logger.debug(f"With params: {params}")
+            logger.debug(f"Database path: {self.db_path}")
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute(query, params)
-                return cursor.fetchall()
+                results = cursor.fetchall()
+                logger.debug(f"Query returned {len(results)} results")
+                return results
         except Exception as e:
             logger.error(f"Database query error: {e}")
+            logger.error(f"Query was: {query}")
+            logger.error(f"Params were: {params}")
+            logger.error(f"Database path: {self.db_path}")
             return []
 
 
 class MediaDBRetriever(BaseRetriever):
     """Retriever for Media_DB (main content database)."""
+    
+    def __init__(self, db_path: str, config: Optional[RetrievalConfig] = None, user_id: str = "0"):
+        """Initialize MediaDBRetriever with optional vector store."""
+        super().__init__(db_path, config)
+        self.user_id = user_id
+        self.vector_store = None
+        self._initialize_vector_store()
+    
+    def _initialize_vector_store(self):
+        """Initialize vector store adapter if configured."""
+        try:
+            # Try to get vector store from settings
+            from tldw_Server_API.app.core.config import settings
+            if settings.get("RAG", {}).get("vector_store_type"):
+                self.vector_store = VectorStoreFactory.create_from_settings(
+                    settings, 
+                    user_id=self.user_id
+                )
+                logger.info(f"Vector store adapter initialized for MediaDBRetriever with user_id={self.user_id}")
+        except Exception as e:
+            logger.warning(f"Could not initialize vector store: {e}")
+            self.vector_store = None
     
     async def retrieve(
         self,
@@ -177,9 +209,9 @@ class MediaDBRetriever(BaseRetriever):
                 m.id,
                 m.title,
                 m.content,
-                m.media_type,
+                m.type,
                 m.url,
-                m.created_at,
+                m.ingestion_date,
                 m.transcription_model,
                 bm25(media_fts) as rank
             FROM media_fts
@@ -191,13 +223,13 @@ class MediaDBRetriever(BaseRetriever):
         
         # Add media type filter
         if media_type:
-            sql += " AND m.media_type = ?"
+            sql += " AND m.type = ?"
             params.append(media_type)
         
         # Add date filter
         if self.config.date_filter:
             start_date, end_date = self.config.date_filter
-            sql += " AND m.created_at BETWEEN ? AND ?"
+            sql += " AND m.ingestion_date BETWEEN ? AND ?"
             params.extend([start_date.isoformat(), end_date.isoformat()])
         
         # Add ordering and limit
@@ -212,11 +244,12 @@ class MediaDBRetriever(BaseRetriever):
             doc = Document(
                 id=str(row["id"]),
                 content=row["content"],
+                source=DataSource.MEDIA_DB,  # Add required source parameter
                 metadata={
                     "title": row["title"],
-                    "media_type": row["media_type"],
+                    "media_type": row["type"],
                     "url": row["url"],
-                    "created_at": row["created_at"],
+                    "created_at": row["ingestion_date"],
                     "transcription_model": row["transcription_model"],
                     "source": "media_db"
                 },
@@ -247,6 +280,193 @@ class MediaDBRetriever(BaseRetriever):
             documents = filtered_docs
         
         return documents
+    
+    async def _retrieve_fts(
+        self,
+        query: str,
+        media_type: Optional[str] = None,
+        **kwargs
+    ) -> List[Document]:
+        """Internal method for FTS retrieval (same as retrieve)."""
+        return await self.retrieve(query, media_type, **kwargs)
+    
+    async def _retrieve_vector(
+        self,
+        query: str,
+        media_type: Optional[str] = None,
+        **kwargs
+    ) -> List[Document]:
+        """
+        Retrieve documents using vector search.
+        
+        Args:
+            query: Search query text
+            media_type: Optional media type filter
+            
+        Returns:
+            List of documents from vector search
+        """
+        if not self.vector_store:
+            logger.warning("Vector store not initialized, falling back to FTS")
+            return await self._retrieve_fts(query, media_type, **kwargs)
+        
+        try:
+            # Initialize vector store if needed
+            if not self.vector_store._initialized:
+                await self.vector_store.initialize()
+            
+            # Generate query embedding
+            from tldw_Server_API.app.core.Embeddings.Embeddings_Server.Embeddings_Create import create_embeddings
+            
+            # Get embedding for query
+            try:
+                embeddings = await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    create_embeddings,
+                    [query],  # texts
+                    None,     # model (use default)
+                    None,     # provider (use default)
+                    None,     # api_key
+                    None      # config
+                )
+                
+                if not embeddings or not embeddings[0]:
+                    logger.error("Failed to generate query embedding")
+                    return []
+                
+                query_vector = embeddings[0]
+                if hasattr(query_vector, 'tolist'):
+                    query_vector = query_vector.tolist()
+                    
+            except Exception as e:
+                logger.error(f"Failed to generate query embedding: {e}")
+                return []
+            
+            # Build filter for vector search
+            filter_dict = {}
+            if media_type:
+                filter_dict["media_type"] = media_type
+            
+            # Search in user-specific media collection
+            # Format: user_{user_id}_media_embeddings
+            # Use the user_id from the MediaDBRetriever instance
+            collection_name = f"user_{self.user_id}_media_embeddings"
+            
+            # Perform vector search
+            results = await self.vector_store.search(
+                collection_name=collection_name,
+                query_vector=query_vector,
+                k=self.config.max_results,
+                filter=filter_dict if filter_dict else None,
+                include_metadata=True
+            )
+            
+            # Convert to Document format
+            documents = []
+            for result in results:
+                doc = Document(
+                    id=result.metadata.get("media_id", result.id),
+                    content=result.content,
+                    metadata=result.metadata,
+                    score=result.score,
+                    source=DataSource.MEDIA_DB
+                )
+                documents.append(doc)
+            
+            logger.debug(f"Retrieved {len(documents)} documents from vector search")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Vector search failed: {e}")
+            # Fallback to FTS
+            return await self._retrieve_fts(query, media_type, **kwargs)
+    
+    async def retrieve_hybrid(
+        self,
+        query: str,
+        media_type: Optional[str] = None,
+        alpha: float = 0.7,
+        **kwargs
+    ) -> List[Document]:
+        """
+        Retrieve documents using hybrid search (FTS + Vector).
+        
+        Args:
+            query: Search query
+            media_type: Optional media type filter
+            alpha: Weight for vector search (0=FTS only, 1=Vector only)
+            
+        Returns:
+            Merged and re-ranked documents
+        """
+        # Perform both searches in parallel
+        fts_task = self._retrieve_fts(query, media_type, **kwargs)
+        vector_task = self._retrieve_vector(query, media_type, **kwargs)
+        
+        fts_docs, vector_docs = await asyncio.gather(fts_task, vector_task)
+        
+        # Merge using reciprocal rank fusion
+        return self._reciprocal_rank_fusion(fts_docs, vector_docs, alpha)
+    
+    def _reciprocal_rank_fusion(
+        self,
+        fts_docs: List[Document],
+        vector_docs: List[Document],
+        alpha: float = 0.7,
+        k: int = 60
+    ) -> List[Document]:
+        """
+        Merge FTS and vector results using reciprocal rank fusion.
+        
+        Args:
+            fts_docs: Documents from FTS search
+            vector_docs: Documents from vector search
+            alpha: Weight for vector search (0=FTS only, 1=Vector only)
+            k: Constant for RRF (typically 60)
+            
+        Returns:
+            Merged and re-ranked documents
+        """
+        # Create score dictionaries
+        fts_scores = {}
+        vector_scores = {}
+        doc_map = {}
+        
+        # Calculate RRF scores for FTS results
+        for rank, doc in enumerate(fts_docs):
+            doc_id = doc.id
+            fts_scores[doc_id] = 1.0 / (k + rank + 1)
+            doc_map[doc_id] = doc
+        
+        # Calculate RRF scores for vector results
+        for rank, doc in enumerate(vector_docs):
+            doc_id = doc.id
+            vector_scores[doc_id] = 1.0 / (k + rank + 1)
+            if doc_id not in doc_map:
+                doc_map[doc_id] = doc
+        
+        # Combine scores with weighting
+        final_scores = {}
+        all_doc_ids = set(fts_scores.keys()) | set(vector_scores.keys())
+        
+        for doc_id in all_doc_ids:
+            fts_score = fts_scores.get(doc_id, 0)
+            vector_score = vector_scores.get(doc_id, 0)
+            # Weighted combination
+            final_scores[doc_id] = (1 - alpha) * fts_score + alpha * vector_score
+        
+        # Sort by final score
+        sorted_ids = sorted(final_scores.keys(), key=lambda x: final_scores[x], reverse=True)
+        
+        # Create final document list
+        merged_docs = []
+        for doc_id in sorted_ids[:self.config.max_results]:
+            doc = doc_map[doc_id]
+            doc.score = final_scores[doc_id]
+            merged_docs.append(doc)
+        
+        logger.debug(f"Hybrid search merged {len(merged_docs)} documents")
+        return merged_docs
     
     async def get_metadata(self, doc_id: str) -> Dict[str, Any]:
         """Get full metadata for a media item."""
@@ -365,6 +585,7 @@ class NotesDBRetriever(BaseRetriever):
             doc = Document(
                 id=f"note_{row['id']}",
                 content=f"# {row['title']}\n\n{row['content']}",
+                source=DataSource.NOTES,  # Add required source parameter
                 metadata={
                     "title": row["title"],
                     "notebook": row["notebook_name"],
@@ -483,6 +704,7 @@ class PromptsDBRetriever(BaseRetriever):
             doc = Document(
                 id=f"prompt_{row['id']}",
                 content=f"**{row['name']}**\n\n{row['prompt']}",
+                source=DataSource.PROMPTS,  # Add required source parameter
                 metadata={
                     "name": row["name"],
                     "category": row["category"],
@@ -582,6 +804,7 @@ class CharacterCardsRetriever(BaseRetriever):
             doc = Document(
                 id=f"character_{row['id']}",
                 content=content,
+                source=DataSource.CHARACTER_CARDS,  # Add required source parameter
                 metadata={
                     "name": row["name"],
                     "creator": row["creator"],
@@ -621,6 +844,7 @@ class CharacterCardsRetriever(BaseRetriever):
                 doc = Document(
                     id=f"chat_{row['id']}",
                     content=content,
+                    source=DataSource.CHAT_HISTORY,  # Add required source parameter
                     metadata={
                         "sender": row["sender"],
                         "timestamp": row["timestamp"],
@@ -667,19 +891,20 @@ class CharacterCardsRetriever(BaseRetriever):
 class MultiDatabaseRetriever:
     """Orchestrates retrieval across multiple databases."""
     
-    def __init__(self, db_paths: Dict[str, str]):
+    def __init__(self, db_paths: Dict[str, str], user_id: str = "0"):
         """
         Initialize multi-database retriever.
         
         Args:
             db_paths: Mapping of database names to paths
+            user_id: User ID for vector store access
         """
         self.retrievers = {}
         
         # Initialize retrievers for available databases
         if "media_db" in db_paths:
             self.retrievers[DataSource.MEDIA_DB] = MediaDBRetriever(
-                db_paths["media_db"]
+                db_paths["media_db"], user_id=user_id
             )
         
         if "notes_db" in db_paths:
@@ -814,6 +1039,7 @@ class MultiDatabaseRetriever:
             Document(
                 id=item["doc"].id,
                 content=item["doc"].content,
+                source=item["doc"].source,  # Preserve original source
                 metadata=item["doc"].metadata,
                 score=item["score"]
             )
@@ -857,6 +1083,7 @@ class MultiDatabaseRetriever:
             Document(
                 id=item["doc"].id,
                 content=item["doc"].content,
+                source=item["doc"].source,  # Preserve original source
                 metadata=item["doc"].metadata,
                 score=item["score"]
             )

@@ -5,7 +5,7 @@ Benchmark evaluation commands for the CLI.
 import json
 import asyncio
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 import click
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn

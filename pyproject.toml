@@ -40,10 +40,12 @@ authors = [
 dependencies = [
   # API Server Core
   "aiofiles>=23.0.0",
+  "aiohttp",
   "aiosqlite",
   "apscheduler>=3.10.0",
   "argon2-cffi>=23.0.0",
   "asyncpg",
+  "bleach",
   "cachetools>=5.0.0",
   "click>=8.0.0",
   "click-completion>=0.5.2",
@@ -89,11 +91,6 @@ dependencies = [
   
   # Audio/Video Processing
   "faster-whisper>=0.10.0",
-  "pyannote.audio>=3.0.0",
-  "pyannote.core>=5.0.0",
-  "pyannote.database>=5.0.0",
-  "pyannote.metrics>=3.2.0",
-  "pyannote.pipeline>=3.0.0",
   "PyAudio>=0.2.0",
   "sounddevice>=0.4.0",
   "soundfile>=0.12.0",
@@ -140,10 +137,16 @@ dependencies = [
   
   # Vector Database
   "chromadb>=0.4.0",
-  
+
+  # Evals
+  "matplotlib",
+
+  # HTML sanitization
+  "bleach>=6.1.0",
+
   # Template/UI Utilities
   "Jinja2>=3.1.0",
-  "Pillow>=10.0.0"
+  "Pillow>=10.0.0",
 ]
 
 [project.urls]
@@ -206,6 +209,14 @@ web_research = [
 # Windows audio recording
 audio_recording_windows = [
   "PyAudioWPatch>=0.2.12"
+]
+
+# Speaker Diarization (optional)
+diarization = [
+  "speechbrain>=0.5.15",
+  "torch>=2.0.0",
+  "torchaudio>=2.0.0",
+  "scikit-learn>=1.3.0",
 ]
 
 # Speech-to-Text with NVIDIA NeMo
@@ -316,12 +327,12 @@ tldw_Server_API = [
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources:",
-    "ignore::DeprecationWarning:pyannote.core.notebook:",
     "ignore::DeprecationWarning:speechbrain.pretrained:",
     "ignore::DeprecationWarning:transformers:",
     "ignore::DeprecationWarning:torch:"
 ]
 markers = [
+    "asyncio: mark test as async",
     "unit: marks tests as unit tests",
     "integration: marks tests as integration tests",
     "external_api: marks tests that require external API access",
@@ -330,7 +341,8 @@ markers = [
     "benchmark: marks performance benchmark tests",
     "slow: marks tests that take a long time to run",
     "load: marks load testing tests",
-    "property: marks property-based testing tests"
+    "property: marks property-based testing tests",
+    "requires_rag: marks tests that require RAG functionality"
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -342,7 +354,8 @@ addopts = [
     "--strict-markers",
     "--verbose",
     "--tb=short",
-    "--disable-warnings"
+    "--disable-warnings",
+    "-p pytest_asyncio"
 ]
 
 ###########################

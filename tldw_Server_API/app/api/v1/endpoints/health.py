@@ -14,10 +14,10 @@ from loguru import logger
 # Local imports
 from tldw_Server_API.app.core.AuthNZ.database import DatabasePool, get_db_pool
 from tldw_Server_API.app.core.AuthNZ.settings import Settings, get_settings
+from tldw_Server_API.app.core.Chatbooks.chatbook_service import audit_logger
 from tldw_Server_API.app.core.Evaluations.circuit_breaker import CircuitBreaker, CircuitState
 from tldw_Server_API.app.core.Evaluations.evaluation_manager import EvaluationManager
 from tldw_Server_API.app.core.Evaluations.metrics import get_metrics
-from tldw_Server_API.app.core.Evaluations.audit_logger import audit_logger
 from tldw_Server_API.app.core.Security.secret_manager import secret_manager
 from tldw_Server_API.app.core.Evaluations.connection_pool import get_connection_health, get_connection_stats
 
@@ -55,6 +55,11 @@ async def health_check(
         "auth_mode": settings.AUTH_MODE,
         "checks": {}
     }
+    
+    # Include API key in test mode for E2E testing
+    import os
+    if os.getenv("TEST_MODE") == "true" and settings.AUTH_MODE == "single_user":
+        health["test_api_key"] = settings.SINGLE_USER_API_KEY
     
     # Database check
     try:
@@ -296,7 +301,7 @@ async def metrics() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Metrics collection failed: {e}")
         return {
-            "error": str(e),
+            "error": "ERROR - SEE LOGS",
             "timestamp": datetime.utcnow().isoformat()
         }
 
@@ -692,7 +697,7 @@ async def prometheus_metrics() -> Response:
     except Exception as e:
         logger.error(f"Prometheus metrics collection failed: {e}")
         return Response(
-            content=f"# Metrics collection failed: {e}\n",
+            content=f"# Metrics collection failed: ERROR - SEE LOGS",
             status_code=503,
             media_type="text/plain"
         )

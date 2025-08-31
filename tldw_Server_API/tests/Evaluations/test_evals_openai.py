@@ -30,7 +30,7 @@ test_config.reset_settings()
 
 # Import the FastAPI app
 from tldw_Server_API.app.main import app
-from tldw_Server_API.app.api.v1.schemas.openai_eval_schemas import (
+from tldw_Server_API.app.api.v1.schemas.evaluation_schemas_unified import (
     CreateEvaluationRequest, CreateRunRequest, CreateDatasetRequest,
     EvaluationSpec, EvaluationResponse, RunResponse
 )
@@ -139,7 +139,7 @@ class TestAuthentication:
     def test_missing_auth_header(self, client):
         """Test request without authentication header"""
         # Should always require authentication for security
-        response = client.get("/api/v1/evals")
+        response = client.get("/api/v1/evaluations")
         # Should get 401 without authentication
         assert response.status_code == 401
         data = response.json()
@@ -148,7 +148,7 @@ class TestAuthentication:
     def test_invalid_auth_header(self, client):
         """Test request with invalid authentication header"""
         headers = {"Authorization": "Bearer invalid-key-12345"}
-        response = client.get("/api/v1/evals", headers=headers)
+        response = client.get("/api/v1/evaluations", headers=headers)
         # Should get 401 with invalid key
         assert response.status_code == 401
         data = response.json()
@@ -160,7 +160,7 @@ class TestAuthentication:
     
     def test_valid_default_key(self, client, auth_headers):
         """Test request with valid default API key"""
-        response = client.get("/api/v1/evals", headers=auth_headers)
+        response = client.get("/api/v1/evaluations", headers=auth_headers)
         assert response.status_code in [200, 404]  # 404 if no evals exist yet
     
     def test_valid_sk_key(self, client):
@@ -168,7 +168,7 @@ class TestAuthentication:
         # For OpenAI compatibility, sk- keys are accepted but only if they match the expected key
         # Using a random sk- key should fail
         headers = {"Authorization": f"Bearer {TEST_SK_KEY}"}
-        response = client.get("/api/v1/evals", headers=headers)
+        response = client.get("/api/v1/evaluations", headers=headers)
         # Should fail because this sk- key doesn't match the configured API key
         assert response.status_code == 401
         
@@ -182,7 +182,7 @@ class TestEvaluationCRUD:
     def test_create_evaluation(self, client, auth_headers, sample_evaluation_request):
         """Test creating a new evaluation"""
         response = client.post(
-            "/api/v1/evals",
+            "/api/v1/evaluations",
             json=sample_evaluation_request,
             headers=auth_headers
         )
@@ -198,14 +198,14 @@ class TestEvaluationCRUD:
         """Test getting an evaluation by ID"""
         # First create an evaluation
         create_response = client.post(
-            "/api/v1/evals",
+            "/api/v1/evaluations",
             json=sample_evaluation_request,
             headers=auth_headers
         )
         eval_id = create_response.json()["id"]
         
         # Then retrieve it
-        response = client.get(f"/api/v1/evals/{eval_id}", headers=auth_headers)
+        response = client.get(f"/api/v1/evaluations/{eval_id}", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == eval_id
@@ -215,7 +215,7 @@ class TestEvaluationCRUD:
         """Test updating an evaluation"""
         # Create evaluation
         create_response = client.post(
-            "/api/v1/evals",
+            "/api/v1/evaluations",
             json=sample_evaluation_request,
             headers=auth_headers
         )
@@ -227,7 +227,7 @@ class TestEvaluationCRUD:
             "metadata": {"updated": True}
         }
         response = client.patch(
-            f"/api/v1/evals/{eval_id}",
+            f"/api/v1/evaluations/{eval_id}",
             json=update_data,
             headers=auth_headers
         )
@@ -240,18 +240,18 @@ class TestEvaluationCRUD:
         """Test deleting an evaluation"""
         # Create evaluation
         create_response = client.post(
-            "/api/v1/evals",
+            "/api/v1/evaluations",
             json=sample_evaluation_request,
             headers=auth_headers
         )
         eval_id = create_response.json()["id"]
         
         # Delete it
-        response = client.delete(f"/api/v1/evals/{eval_id}", headers=auth_headers)
+        response = client.delete(f"/api/v1/evaluations/{eval_id}", headers=auth_headers)
         assert response.status_code == 204
         
         # Verify it's deleted (soft delete, so might still be retrievable)
-        get_response = client.get(f"/api/v1/evals/{eval_id}", headers=auth_headers)
+        get_response = client.get(f"/api/v1/evaluations/{eval_id}", headers=auth_headers)
         # Should either be not found or marked as deleted
         assert get_response.status_code in [404, 200]
     
@@ -262,11 +262,11 @@ class TestEvaluationCRUD:
         for i in range(3):
             req = sample_evaluation_request.copy()
             req["name"] = f"test_eval_{i}"
-            response = client.post("/api/v1/evals", json=req, headers=auth_headers)
+            response = client.post("/api/v1/evaluations", json=req, headers=auth_headers)
             eval_ids.append(response.json()["id"])
         
         # List them
-        response = client.get("/api/v1/evals?limit=2", headers=auth_headers)
+        response = client.get("/api/v1/evaluations?limit=2", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["object"] == "list"
@@ -276,7 +276,7 @@ class TestEvaluationCRUD:
     
     def test_evaluation_not_found(self, client, auth_headers):
         """Test getting non-existent evaluation"""
-        response = client.get("/api/v1/evals/eval_nonexistent", headers=auth_headers)
+        response = client.get("/api/v1/evaluations/eval_nonexistent", headers=auth_headers)
         assert response.status_code == 404
         data = response.json()
         # Handle FastAPI error response format
@@ -313,7 +313,7 @@ class TestDatasetOperations:
         dataset_id = create_response.json()["id"]
         
         # Get it
-        response = client.get(f"/api/v1/datasets/{dataset_id}", headers=auth_headers)
+        response = client.get(f"/api/v1/evaluations/datasets/{dataset_id}", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == dataset_id
@@ -330,11 +330,11 @@ class TestDatasetOperations:
         dataset_id = create_response.json()["id"]
         
         # Delete it
-        response = client.delete(f"/api/v1/datasets/{dataset_id}", headers=auth_headers)
+        response = client.delete(f"/api/v1/evaluations/datasets/{dataset_id}", headers=auth_headers)
         assert response.status_code == 204
         
         # Verify it's deleted
-        get_response = client.get(f"/api/v1/datasets/{dataset_id}", headers=auth_headers)
+        get_response = client.get(f"/api/v1/evaluations/datasets/{dataset_id}", headers=auth_headers)
         assert get_response.status_code == 404
     
     def test_list_datasets(self, client, auth_headers, sample_dataset_request):
@@ -343,10 +343,10 @@ class TestDatasetOperations:
         for i in range(3):
             req = sample_dataset_request.copy()
             req["name"] = f"dataset_{i}"
-            client.post("/api/v1/datasets", json=req, headers=auth_headers)
+            client.post("/api/v1/evaluations/datasets", json=req, headers=auth_headers)
         
         # List them
-        response = client.get("/api/v1/datasets", headers=auth_headers)
+        response = client.get("/api/v1/evaluations/datasets", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["object"] == "list"
@@ -365,7 +365,7 @@ class TestEvaluationRuns:
         
         # Create evaluation first
         eval_response = client.post(
-            "/api/v1/evals",
+            "/api/v1/evaluations",
             json=sample_evaluation_request,
             headers=auth_headers
         )
@@ -373,7 +373,7 @@ class TestEvaluationRuns:
         
         # Create run
         response = client.post(
-            f"/api/v1/evals/{eval_id}/runs",
+            f"/api/v1/evaluations/{eval_id}/runs",
             json=sample_run_request,
             headers=auth_headers
         )
@@ -390,21 +390,21 @@ class TestEvaluationRuns:
         with patch('tldw_Server_API.app.core.Evaluations.eval_runner.EvaluationRunner.run_evaluation_async'):
             # Create evaluation and run
             eval_response = client.post(
-                "/api/v1/evals",
+                "/api/v1/evaluations",
                 json=sample_evaluation_request,
                 headers=auth_headers
             )
             eval_id = eval_response.json()["id"]
             
             run_response = client.post(
-                f"/api/v1/evals/{eval_id}/runs",
+                f"/api/v1/evaluations/{eval_id}/runs",
                 json=sample_run_request,
                 headers=auth_headers
             )
             run_id = run_response.json()["id"]
             
             # Get status
-            response = client.get(f"/api/v1/runs/{run_id}", headers=auth_headers)
+            response = client.get(f"/api/v1/evaluations/runs/{run_id}", headers=auth_headers)
             assert response.status_code == 200
             data = response.json()
             assert data["id"] == run_id
@@ -417,21 +417,21 @@ class TestEvaluationRuns:
         with patch('tldw_Server_API.app.core.Evaluations.eval_runner.EvaluationRunner.run_evaluation_async'):
             # Create evaluation and run
             eval_response = client.post(
-                "/api/v1/evals",
+                "/api/v1/evaluations",
                 json=sample_evaluation_request,
                 headers=auth_headers
             )
             eval_id = eval_response.json()["id"]
             
             run_response = client.post(
-                f"/api/v1/evals/{eval_id}/runs",
+                f"/api/v1/evaluations/{eval_id}/runs",
                 json=sample_run_request,
                 headers=auth_headers
             )
             run_id = run_response.json()["id"]
             
             # Cancel it (may already be completed)
-            response = client.post(f"/api/v1/runs/{run_id}/cancel", headers=auth_headers)
+            response = client.post(f"/api/v1/evaluations/runs/{run_id}/cancel", headers=auth_headers)
             assert response.status_code == 200
             data = response.json()
             assert data["status"] in ["cancelled", "cancelling", "completed"]
@@ -442,7 +442,7 @@ class TestEvaluationRuns:
         with patch('tldw_Server_API.app.core.Evaluations.eval_runner.EvaluationRunner.run_evaluation_async'):
             # Create evaluation
             eval_response = client.post(
-                "/api/v1/evals",
+                "/api/v1/evaluations",
                 json=sample_evaluation_request,
                 headers=auth_headers
             )
@@ -451,13 +451,13 @@ class TestEvaluationRuns:
             # Create multiple runs
             for _ in range(3):
                 client.post(
-                    f"/api/v1/evals/{eval_id}/runs",
+                    f"/api/v1/evaluations/{eval_id}/runs",
                     json=sample_run_request,
                     headers=auth_headers
                 )
             
             # List them
-            response = client.get(f"/api/v1/evals/{eval_id}/runs", headers=auth_headers)
+            response = client.get(f"/api/v1/evaluations/{eval_id}/runs", headers=auth_headers)
             assert response.status_code == 200
             data = response.json()
             assert data["object"] == "list"
@@ -474,19 +474,19 @@ class TestErrorHandling:
             "eval_type": "invalid_type",
             "eval_spec": {"evaluator_model": "gpt-4"}
         }
-        response = client.post("/api/v1/evals", json=request, headers=auth_headers)
+        response = client.post("/api/v1/evaluations", json=request, headers=auth_headers)
         assert response.status_code == 422  # Validation error
     
     def test_missing_required_fields(self, client, auth_headers):
         """Test creating evaluation with missing fields"""
         request = {"name": "incomplete_eval"}  # Missing eval_type and eval_spec
-        response = client.post("/api/v1/evals", json=request, headers=auth_headers)
+        response = client.post("/api/v1/evaluations", json=request, headers=auth_headers)
         assert response.status_code == 422
     
     def test_run_for_nonexistent_eval(self, client, auth_headers, sample_run_request):
         """Test creating run for non-existent evaluation"""
         response = client.post(
-            "/api/v1/evals/eval_nonexistent/runs",
+            "/api/v1/evaluations/eval_nonexistent/runs",
             json=sample_run_request,
             headers=auth_headers
         )
@@ -508,7 +508,7 @@ class TestErrorHandling:
                 for i in range(1000)
             ]
         }
-        response = client.post("/api/v1/datasets", json=large_dataset, headers=auth_headers)
+        response = client.post("/api/v1/evaluations/datasets", json=large_dataset, headers=auth_headers)
         assert response.status_code == 201
         data = response.json()
         assert len(data["samples"]) == 1000
@@ -537,7 +537,7 @@ class TestAsyncEvaluation:
             
             # Create evaluation
             eval_response = await async_client.post(
-                "/api/v1/evals",
+                "/api/v1/evaluations",
                 json=sample_evaluation_request,
                 headers=auth_headers
             )
@@ -546,7 +546,7 @@ class TestAsyncEvaluation:
             
             # Start run
             run_response = await async_client.post(
-                f"/api/v1/evals/{eval_id}/runs",
+                f"/api/v1/evaluations/{eval_id}/runs",
                 json=sample_run_request,
                 headers=auth_headers
             )
@@ -555,7 +555,7 @@ class TestAsyncEvaluation:
             
             # Check status (should be pending, running, or completed)
             status_response = await async_client.get(
-                f"/api/v1/runs/{run_id}",
+                f"/api/v1/evaluations/runs/{run_id}",
                 headers=auth_headers
             )
             assert status_response.status_code == 200
@@ -567,7 +567,7 @@ class TestAsyncEvaluation:
             
             # Check results (might be completed)
             results_response = await async_client.get(
-                f"/api/v1/runs/{run_id}/results",
+                f"/api/v1/evaluations/runs/{run_id}/results",
                 headers=auth_headers
             )
             # Either still processing or completed
@@ -583,10 +583,10 @@ class TestPagination:
         for i in range(10):
             req = sample_evaluation_request.copy()
             req["name"] = f"eval_{i:02d}"
-            client.post("/api/v1/evals", json=req, headers=auth_headers)
+            client.post("/api/v1/evaluations", json=req, headers=auth_headers)
         
         # Test different limits
-        response = client.get("/api/v1/evals?limit=5", headers=auth_headers)
+        response = client.get("/api/v1/evaluations?limit=5", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) <= 5
@@ -595,7 +595,7 @@ class TestPagination:
         # Test with after parameter
         if data["data"]:
             last_id = data["last_id"]
-            response2 = client.get(f"/api/v1/evals?limit=5&after={last_id}", headers=auth_headers)
+            response2 = client.get(f"/api/v1/evaluations?limit=5&after={last_id}", headers=auth_headers)
             assert response2.status_code == 200
             data2 = response2.json()
             # Should get different evaluations
@@ -612,10 +612,10 @@ class TestPagination:
                 "eval_type": eval_type,
                 "eval_spec": {"threshold": 0.5}
             }
-            client.post("/api/v1/evals", json=request, headers=auth_headers)
+            client.post("/api/v1/evaluations", json=request, headers=auth_headers)
         
         # Filter by type
-        response = client.get("/api/v1/evals?eval_type=model_graded", headers=auth_headers)
+        response = client.get("/api/v1/evaluations?eval_type=model_graded", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         # All returned evaluations should be of the filtered type
@@ -637,7 +637,7 @@ class TestConcurrency:
                 "eval_spec": {"evaluator_model": "gpt-4", "threshold": 0.7},
                 "dataset": [{"input": {"text": f"Test {index}"}, "expected": {"score": 0.8}}]
             }
-            response = client.post("/api/v1/evals", json=request, headers=auth_headers)
+            response = client.post("/api/v1/evaluations", json=request, headers=auth_headers)
             return response.status_code, response.json()
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -656,7 +656,7 @@ class TestConcurrency:
         with patch('tldw_Server_API.app.core.Evaluations.eval_runner.EvaluationRunner.run_evaluation_async'):
             # Create evaluation
             eval_response = await async_client.post(
-                "/api/v1/evals",
+                "/api/v1/evaluations",
                 json=sample_evaluation_request,
                 headers=auth_headers
             )
@@ -668,7 +668,7 @@ class TestConcurrency:
                 req = sample_run_request.copy()
                 req["config"]["temperature"] = i * 0.2
                 task = async_client.post(
-                    f"/api/v1/evals/{eval_id}/runs",
+                    f"/api/v1/evaluations/{eval_id}/runs",
                     json=req,
                     headers=auth_headers
                 )

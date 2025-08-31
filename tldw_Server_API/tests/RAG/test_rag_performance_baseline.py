@@ -21,7 +21,6 @@ from pathlib import Path
 # Import REAL RAG components
 from tldw_Server_API.app.core.RAG.rag_service.functional_pipeline import standard_pipeline, RAGPipelineContext
 from tldw_Server_API.app.core.RAG.rag_service.config import RAGConfig
-from tldw_Server_API.app.core.RAG.rag_service.enhanced_chunking_integration import EnhancedChunkingService
 from tldw_Server_API.app.core.DB_Management.Media_DB_v2 import MediaDatabase
 
 

@@ -1,0 +1,701 @@
+<!-- Prompt Studio Projects Tab -->
+<div id="tabPromptStudioProjects" class="tab-content">
+    <div class="endpoint-section" id="promptStudioProjectsList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/projects - List Projects</span>
+        </h2>
+        <p>List all Prompt Studio projects with optional filtering.</p>
+        
+        <div class="columns">
+            <div class="column">
+                <div class="form-group">
+                    <label for="promptStudioProjectsList_skip">Skip (Pagination):</label>
+                    <input type="number" id="promptStudioProjectsList_skip" value="0" min="0">
+                </div>
+            </div>
+            <div class="column">
+                <div class="form-group">
+                    <label for="promptStudioProjectsList_limit">Limit:</label>
+                    <input type="number" id="promptStudioProjectsList_limit" value="10" min="1" max="100">
+                </div>
+            </div>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioProjectsList', 'GET', '/api/v1/prompt-studio/projects', 'query')">
+            List Projects
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioProjectsList_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioProjectsList_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptStudioProjectsCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/projects - Create Project</span>
+        </h2>
+        <p>Create a new Prompt Studio project for prompt engineering and optimization.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioProjectsCreate_payload">Project Configuration (JSON):</label>
+            <textarea id="promptStudioProjectsCreate_payload" class="code-input" rows="15">{
+  "name": "My Prompt Project",
+  "description": "Project for optimizing customer service prompts",
+  "settings": {
+    "default_model": "gpt-4",
+    "temperature": 0.7,
+    "max_tokens": 1000,
+    "evaluation_metrics": ["accuracy", "coherence", "relevance"],
+    "optimization_goals": ["reduce_tokens", "improve_accuracy"]
+  },
+  "tags": ["customer-service", "optimization"],
+  "metadata": {
+    "team": "support",
+    "priority": "high"
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioProjectsCreate', 'POST', '/api/v1/prompt-studio/projects', 'json')">
+            Create Project
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioProjectsCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioProjectsCreate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptStudioProjectsGet">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/projects/get/{project_id} - Get Project</span>
+        </h2>
+        <p>Get detailed information about a specific project.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioProjectsGet_project_id">Project ID:</label>
+            <input type="text" id="promptStudioProjectsGet_project_id" placeholder="project_123">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioProjectsGet', 'GET', '/api/v1/prompt-studio/projects/get/{project_id}', 'none')">
+            Get Project
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioProjectsGet_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioProjectsGet_response">---</pre>
+    </div>
+</div>
+
+<!-- Prompt Studio Prompts Tab -->
+<div id="tabPromptStudioPrompts" class="tab-content">
+    <div class="endpoint-section" id="promptStudioPromptsList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/projects/{project_id}/prompts - List Prompts</span>
+        </h2>
+        <p>List all prompt versions for a project.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioPromptsList_project_id">Project ID:</label>
+            <input type="text" id="promptStudioPromptsList_project_id" placeholder="project_123">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioPromptsList', 'GET', '/api/v1/prompt-studio/projects/{project_id}/prompts', 'none')">
+            List Prompts
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioPromptsList_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioPromptsList_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptStudioPromptsCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/projects/{project_id}/prompts - Create Prompt</span>
+        </h2>
+        <p>Create a new prompt version in a project.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioPromptsCreate_project_id">Project ID:</label>
+            <input type="text" id="promptStudioPromptsCreate_project_id" placeholder="project_123">
+        </div>
+        
+        <div class="form-group">
+            <label for="promptStudioPromptsCreate_payload">Prompt Configuration (JSON):</label>
+            <textarea id="promptStudioPromptsCreate_payload" class="code-input" rows="20">{
+  "name": "Customer Query Handler v2",
+  "version": "2.0.0",
+  "system_prompt": "You are a helpful customer service assistant. Be concise and professional.",
+  "user_prompt_template": "Customer Query: {query}\nContext: {context}\n\nPlease provide a helpful response.",
+  "parameters": {
+    "temperature": 0.7,
+    "max_tokens": 500,
+    "top_p": 0.9,
+    "frequency_penalty": 0.2,
+    "presence_penalty": 0.1
+  },
+  "variables": [
+    {
+      "name": "query",
+      "type": "string",
+      "required": true,
+      "description": "The customer's question"
+    },
+    {
+      "name": "context",
+      "type": "string",
+      "required": false,
+      "description": "Additional context about the customer"
+    }
+  ],
+  "tags": ["customer-service", "v2"],
+  "notes": "Improved version with better context handling"
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioPromptsCreate', 'POST', '/api/v1/prompt-studio/projects/{project_id}/prompts', 'json')">
+            Create Prompt
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioPromptsCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioPromptsCreate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptStudioPromptsTest">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/prompts/{prompt_id}/test - Test Prompt</span>
+        </h2>
+        <p>Test a prompt with sample inputs to see the output.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioPromptsTest_prompt_id">Prompt ID:</label>
+            <input type="text" id="promptStudioPromptsTest_prompt_id" placeholder="prompt_456">
+        </div>
+        
+        <div class="form-group">
+            <label for="promptStudioPromptsTest_payload">Test Input (JSON):</label>
+            <textarea id="promptStudioPromptsTest_payload" class="code-input" rows="10">{
+  "variables": {
+    "query": "How do I reset my password?",
+    "context": "Customer has been locked out for 24 hours"
+  },
+  "model": "gpt-4",
+  "stream": false,
+  "override_parameters": {
+    "temperature": 0.5
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioPromptsTest', 'POST', '/api/v1/prompt-studio/prompts/{prompt_id}/test', 'json')">
+            Test Prompt
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioPromptsTest_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioPromptsTest_response">---</pre>
+    </div>
+</div>
+
+<!-- Prompt Studio Test Cases Tab -->
+<div id="tabPromptStudioTestCases" class="tab-content">
+    <div class="endpoint-section" id="promptStudioTestCasesList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/projects/{project_id}/test-cases - List Test Cases</span>
+        </h2>
+        <p>List all test cases for a project.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioTestCasesList_project_id">Project ID:</label>
+            <input type="text" id="promptStudioTestCasesList_project_id" placeholder="project_123">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioTestCasesList', 'GET', '/api/v1/prompt-studio/projects/{project_id}/test-cases', 'none')">
+            List Test Cases
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioTestCasesList_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioTestCasesList_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptStudioTestCasesCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/projects/{project_id}/test-cases - Create Test Case</span>
+        </h2>
+        <p>Create a new test case for prompt evaluation.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioTestCasesCreate_project_id">Project ID:</label>
+            <input type="text" id="promptStudioTestCasesCreate_project_id" placeholder="project_123">
+        </div>
+        
+        <div class="form-group">
+            <label for="promptStudioTestCasesCreate_payload">Test Case Configuration (JSON):</label>
+            <textarea id="promptStudioTestCasesCreate_payload" class="code-input" rows="15">{
+  "name": "Password Reset Test",
+  "description": "Test case for password reset queries",
+  "input": {
+    "query": "I forgot my password and can't login",
+    "context": "Customer account created 2 years ago"
+  },
+  "expected_output": "I can help you reset your password. Please click the 'Forgot Password' link on the login page...",
+  "evaluation_criteria": {
+    "must_include": ["reset", "password", "link"],
+    "must_not_include": ["old password", "security question"],
+    "max_length": 200,
+    "tone": "helpful and professional"
+  },
+  "tags": ["password", "authentication"],
+  "priority": "high"
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioTestCasesCreate', 'POST', '/api/v1/prompt-studio/projects/{project_id}/test-cases', 'json')">
+            Create Test Case
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioTestCasesCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioTestCasesCreate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptStudioTestCasesBatch">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/projects/{project_id}/test-cases/batch - Run Batch Tests</span>
+        </h2>
+        <p>Run multiple test cases against a prompt version.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioTestCasesBatch_project_id">Project ID:</label>
+            <input type="text" id="promptStudioTestCasesBatch_project_id" placeholder="project_123">
+        </div>
+        
+        <div class="form-group">
+            <label for="promptStudioTestCasesBatch_payload">Batch Test Configuration (JSON):</label>
+            <textarea id="promptStudioTestCasesBatch_payload" class="code-input" rows="10">{
+  "prompt_id": "prompt_456",
+  "test_case_ids": ["test_001", "test_002", "test_003"],
+  "parallel": true,
+  "stop_on_failure": false,
+  "timeout_seconds": 30,
+  "save_results": true
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioTestCasesBatch', 'POST', '/api/v1/prompt-studio/projects/{project_id}/test-cases/batch', 'json')">
+            Run Batch Tests
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioTestCasesBatch_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioTestCasesBatch_response">---</pre>
+    </div>
+</div>
+
+<!-- Prompt Studio Optimization Tab -->
+<div id="tabPromptStudioOptimization" class="tab-content">
+    <div class="endpoint-section" id="promptStudioOptimize">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/prompts/{prompt_id}/optimize - Optimize Prompt</span>
+        </h2>
+        <p>Run optimization algorithms to improve prompt performance.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioOptimize_prompt_id">Prompt ID:</label>
+            <input type="text" id="promptStudioOptimize_prompt_id" placeholder="prompt_456">
+        </div>
+        
+        <div class="form-group">
+            <label for="promptStudioOptimize_payload">Optimization Configuration (JSON):</label>
+            <textarea id="promptStudioOptimize_payload" class="code-input" rows="20">{
+  "optimization_goals": [
+    "reduce_tokens",
+    "improve_accuracy",
+    "enhance_consistency"
+  ],
+  "strategies": [
+    "prompt_compression",
+    "few_shot_learning",
+    "chain_of_thought",
+    "instruction_tuning"
+  ],
+  "test_cases": ["test_001", "test_002", "test_003"],
+  "constraints": {
+    "max_tokens": 500,
+    "min_accuracy": 0.85,
+    "preserve_tone": true
+  },
+  "iterations": 10,
+  "population_size": 20,
+  "mutation_rate": 0.1,
+  "crossover_rate": 0.7,
+  "selection_method": "tournament",
+  "early_stopping": {
+    "enabled": true,
+    "patience": 3,
+    "min_improvement": 0.01
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioOptimize', 'POST', '/api/v1/prompt-studio/prompts/{prompt_id}/optimize', 'json')">
+            Start Optimization
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioOptimize_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioOptimize_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptStudioOptimizationStatus">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/optimization/{job_id} - Get Optimization Status</span>
+        </h2>
+        <p>Check the status of an ongoing optimization job.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioOptimizationStatus_job_id">Job ID:</label>
+            <input type="text" id="promptStudioOptimizationStatus_job_id" placeholder="opt_job_789">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioOptimizationStatus', 'GET', '/api/v1/prompt-studio/optimization/{job_id}', 'none')">
+            Check Status
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioOptimizationStatus_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioOptimizationStatus_response">---</pre>
+    </div>
+</div>
+
+<!-- Prompt Studio Evaluations Tab -->
+<div id="tabPromptStudioEvaluations" class="tab-content">
+    <div class="endpoint-section" id="promptStudioEvaluationsCreate">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/evaluations - Create Evaluation</span>
+        </h2>
+        <p>Create a comprehensive evaluation of prompt performance.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioEvaluationsCreate_payload">Evaluation Configuration (JSON):</label>
+            <textarea id="promptStudioEvaluationsCreate_payload" class="code-input" rows="20">{
+  "project_id": "project_123",
+  "prompt_ids": ["prompt_456", "prompt_457"],
+  "test_case_ids": ["test_001", "test_002", "test_003"],
+  "evaluation_metrics": [
+    "accuracy",
+    "coherence",
+    "relevance",
+    "toxicity",
+    "hallucination",
+    "response_time",
+    "token_usage"
+  ],
+  "comparison_mode": "a_b_testing",
+  "sample_size": 100,
+  "confidence_level": 0.95,
+  "models": ["gpt-4", "gpt-3.5-turbo"],
+  "human_evaluation": {
+    "enabled": false,
+    "evaluators": [],
+    "criteria": []
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioEvaluationsCreate', 'POST', '/api/v1/prompt-studio/evaluations', 'json')">
+            Create Evaluation
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioEvaluationsCreate_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioEvaluationsCreate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="promptStudioEvaluationsCompare">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/evaluations/compare - Compare Evaluations</span>
+        </h2>
+        <p>Compare multiple evaluation results to identify the best performing prompts.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioEvaluationsCompare_payload">Comparison Request (JSON):</label>
+            <textarea id="promptStudioEvaluationsCompare_payload" class="code-input" rows="12">{
+  "evaluation_ids": ["eval_001", "eval_002", "eval_003"],
+  "metrics": ["accuracy", "token_usage", "response_time"],
+  "visualization": "radar_chart",
+  "statistical_tests": [
+    "t_test",
+    "anova",
+    "mann_whitney"
+  ],
+  "export_format": "json"
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('promptStudioEvaluationsCompare', 'POST', '/api/v1/prompt-studio/evaluations/compare', 'json')">
+            Compare Evaluations
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="promptStudioEvaluationsCompare_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="promptStudioEvaluationsCompare_response">---</pre>
+    </div>
+</div>
+
+<!-- Prompt Studio WebSocket Tab -->
+<div id="tabPromptStudioWebSocket" class="tab-content">
+    <div class="endpoint-section">
+        <h2>
+            <span class="endpoint-method websocket">WebSocket</span>
+            <span class="endpoint-path">/api/v1/prompt-studio/ws/{project_id} - Real-time Updates</span>
+        </h2>
+        <p>Connect to WebSocket for real-time updates on project activities, optimization progress, and test results.</p>
+        
+        <div class="form-group">
+            <label for="promptStudioWebSocket_project_id">Project ID:</label>
+            <input type="text" id="promptStudioWebSocket_project_id" placeholder="project_123">
+        </div>
+        
+        <div class="form-group">
+            <label for="promptStudioWebSocket_events">Subscribe to Events:</label>
+            <div class="checkbox-group">
+                <label><input type="checkbox" checked> Optimization Progress</label>
+                <label><input type="checkbox" checked> Test Results</label>
+                <label><input type="checkbox" checked> Evaluation Updates</label>
+                <label><input type="checkbox"> Debug Messages</label>
+            </div>
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="connectPromptStudioWebSocket()">
+                Connect WebSocket
+            </button>
+            <button class="btn btn-secondary" onclick="disconnectPromptStudioWebSocket()">
+                Disconnect
+            </button>
+            <button class="btn btn-secondary" onclick="clearPromptStudioWebSocketLog()">
+                Clear Log
+            </button>
+        </div>
+        
+        <h3>Connection Status: <span id="promptStudioWebSocket_status" class="status-indicator">Disconnected</span></h3>
+        
+        <h3>Message Log:</h3>
+        <div id="promptStudioWebSocket_log" class="websocket-log">
+            <!-- WebSocket messages will appear here -->
+        </div>
+        
+        <div class="form-group mt-3">
+            <label for="promptStudioWebSocket_message">Send Message:</label>
+            <textarea id="promptStudioWebSocket_message" rows="3" placeholder='{"type": "subscribe", "events": ["optimization_progress"]}'></textarea>
+            <button class="btn btn-primary mt-2" onclick="sendPromptStudioWebSocketMessage()">
+                Send Message
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Prompt Studio WebSocket handling
+let promptStudioWs = null;
+
+function connectPromptStudioWebSocket() {
+    const projectId = document.getElementById('promptStudioWebSocket_project_id').value;
+    if (!projectId) {
+        alert('Please enter a Project ID');
+        return;
+    }
+    
+    const baseUrl = (Utils.getFromStorage('baseUrl') || 'http://localhost:8000').replace('http', 'ws');
+    const wsUrl = `${baseUrl}/api/v1/prompt-studio/ws/${projectId}`;
+    
+    try {
+        promptStudioWs = new WebSocket(wsUrl);
+        
+        promptStudioWs.onopen = () => {
+            document.getElementById('promptStudioWebSocket_status').textContent = 'Connected';
+            document.getElementById('promptStudioWebSocket_status').className = 'status-indicator connected';
+            logPromptStudioMessage('system', 'Connected to Prompt Studio WebSocket');
+        };
+        
+        promptStudioWs.onmessage = (event) => {
+            logPromptStudioMessage('received', event.data);
+        };
+        
+        promptStudioWs.onerror = (error) => {
+            logPromptStudioMessage('error', 'WebSocket error: ' + error);
+        };
+        
+        promptStudioWs.onclose = () => {
+            document.getElementById('promptStudioWebSocket_status').textContent = 'Disconnected';
+            document.getElementById('promptStudioWebSocket_status').className = 'status-indicator disconnected';
+            logPromptStudioMessage('system', 'Disconnected from Prompt Studio WebSocket');
+        };
+    } catch (error) {
+        alert('Failed to connect: ' + error.message);
+    }
+}
+
+function disconnectPromptStudioWebSocket() {
+    if (promptStudioWs) {
+        promptStudioWs.close();
+        promptStudioWs = null;
+    }
+}
+
+function sendPromptStudioWebSocketMessage() {
+    if (!promptStudioWs || promptStudioWs.readyState !== WebSocket.OPEN) {
+        alert('WebSocket is not connected');
+        return;
+    }
+    
+    const message = document.getElementById('promptStudioWebSocket_message').value;
+    if (!message) {
+        alert('Please enter a message');
+        return;
+    }
+    
+    try {
+        promptStudioWs.send(message);
+        logPromptStudioMessage('sent', message);
+        document.getElementById('promptStudioWebSocket_message').value = '';
+    } catch (error) {
+        alert('Failed to send message: ' + error.message);
+    }
+}
+
+function logPromptStudioMessage(type, message) {
+    const log = document.getElementById('promptStudioWebSocket_log');
+    const entry = document.createElement('div');
+    entry.className = `websocket-message ${type}`;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    entry.innerHTML = `<span class="timestamp">[${timestamp}]</span> <span class="message-type">${type.toUpperCase()}:</span> <pre>${message}</pre>`;
+    
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+}
+
+function clearPromptStudioWebSocketLog() {
+    document.getElementById('promptStudioWebSocket_log').innerHTML = '';
+}
+</script>
+
+<style>
+.websocket-log {
+    background: var(--color-surface-alt);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: var(--font-family-mono);
+    font-size: 0.9rem;
+}
+
+.websocket-message {
+    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+}
+
+.websocket-message.system {
+    background: var(--color-info-light);
+    color: var(--color-info);
+}
+
+.websocket-message.sent {
+    background: var(--color-success-light);
+    color: var(--color-success);
+}
+
+.websocket-message.received {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+}
+
+.websocket-message.error {
+    background: var(--color-error-light);
+    color: var(--color-error);
+}
+
+.websocket-message .timestamp {
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+}
+
+.websocket-message .message-type {
+    font-weight: 600;
+}
+
+.websocket-message pre {
+    margin: var(--spacing-xs) 0 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.status-indicator {
+    font-weight: 600;
+}
+
+.status-indicator.connected {
+    color: var(--color-success);
+}
+
+.status-indicator.disconnected {
+    color: var(--color-text-muted);
+}
+
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: 0.9rem;
+}
+</style>

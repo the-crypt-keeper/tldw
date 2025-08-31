@@ -27,6 +27,9 @@ from pathlib import Path
 BASE_URL = os.getenv("E2E_TEST_BASE_URL", "http://localhost:8000")
 API_PREFIX = "/api/v1"
 TEST_TIMEOUT = 120  # seconds for each request (increased for video transcription)
+RATE_LIMIT_RETRY_DELAY = float(os.getenv("E2E_RATE_LIMIT_DELAY", "0.5"))  # Delay after rate limit
+MAX_RETRIES = int(os.getenv("E2E_MAX_RETRIES", "3"))  # Max retries for rate limit errors
+SERVER_STARTUP_TIMEOUT = int(os.getenv("E2E_SERVER_STARTUP_TIMEOUT", "30"))  # Max time to wait for server
 
 
 class APIClient:
@@ -40,6 +43,22 @@ class APIClient:
         self.user_id: Optional[int] = None
         
         # Note: TEST_MODE must be set on the server, not passed as header
+    
+    def _handle_rate_limit(self, func: Callable, *args, **kwargs) -> Any:
+        """Handle rate limiting with retry logic."""
+        for attempt in range(MAX_RETRIES):
+            try:
+                return func(*args, **kwargs)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    if attempt < MAX_RETRIES - 1:
+                        # Exponential backoff with jitter
+                        delay = RATE_LIMIT_RETRY_DELAY * (2 ** attempt) + (time.time() % 0.1)
+                        print(f"Rate limited, retrying in {delay:.2f}s (attempt {attempt + 1}/{MAX_RETRIES})")
+                        time.sleep(delay)
+                        continue
+                raise
+        return func(*args, **kwargs)
         
     def set_auth_token(self, token: str, refresh_token: Optional[str] = None):
         """Set authentication tokens."""
@@ -116,7 +135,8 @@ class APIClient:
             return {"username": "single_user", "id": 1}
     
     # Media endpoints
-    def upload_media(self, file_path: str, title: str, media_type: str = "document") -> Dict[str, Any]:
+    def upload_media(self, file_path: str, title: str, media_type: str = "document", 
+                     generate_embeddings: bool = False) -> Dict[str, Any]:
         """Upload a media file."""
         with open(file_path, "rb") as f:
             # The endpoint expects 'files' (plural) not 'file'
@@ -125,7 +145,8 @@ class APIClient:
                 "title": title,
                 "media_type": media_type,
                 "overwrite_existing": "true",  # Allow overwrite for test re-runs
-                "keep_original_file": "false"
+                "keep_original_file": "false",
+                "generate_embeddings": str(generate_embeddings).lower()  # Convert bool to string
             }
             response = self.client.post(
                 f"{API_PREFIX}/media/add",
@@ -274,16 +295,24 @@ class APIClient:
     def chat_completion(self, messages: List[Dict[str, str]], 
                         model: str = "gpt-3.5-turbo",
                         temperature: float = 0.7,
+                        character_id: Optional[int] = None,
+                        conversation_id: Optional[str] = None,
                         stream: bool = False) -> Dict[str, Any]:
-        """Send chat completion request."""
+        """Send chat completion request with optional character context."""
+        data = {
+            "messages": messages,
+            "model": model,
+            "temperature": temperature,
+            "stream": stream
+        }
+        if character_id is not None:
+            data["character_id"] = str(character_id)  # API expects string
+        if conversation_id is not None:
+            data["conversation_id"] = conversation_id
+        
         response = self.client.post(
             f"{API_PREFIX}/chat/completions",
-            json={
-                "messages": messages,
-                "model": model,
-                "temperature": temperature,
-                "stream": stream
-            }
+            json=data
         )
         response.raise_for_status()
         return response.json()
@@ -291,40 +320,49 @@ class APIClient:
     # Notes endpoints
     def create_note(self, title: str, content: str, keywords: Optional[List[str]] = None) -> Dict[str, Any]:
         """Create a new note."""
-        data = {
-            "title": title,
-            "content": content
-        }
-        if keywords:
-            data["keywords"] = keywords
-            
-        response = self.client.post(f"{API_PREFIX}/notes/", json=data)
-        response.raise_for_status()
-        return response.json()
+        def _create():
+            data = {
+                "title": title,
+                "content": content
+            }
+            if keywords:
+                data["keywords"] = keywords
+                
+            response = self.client.post(f"{API_PREFIX}/notes/", json=data)
+            response.raise_for_status()
+            return response.json()
+        
+        return self._handle_rate_limit(_create)
     
     def get_notes(self, limit: int = 50, offset: int = 0) -> Dict[str, Any]:
         """Get list of notes."""
-        response = self.client.get(
-            f"{API_PREFIX}/notes/",
-            params={"limit": limit, "offset": offset}
-        )
-        response.raise_for_status()
-        return response.json()
+        def _get():
+            response = self.client.get(
+                f"{API_PREFIX}/notes/",
+                params={"limit": limit, "offset": offset}
+            )
+            response.raise_for_status()
+            return response.json()
+        
+        return self._handle_rate_limit(_get)
     
     def update_note(self, note_id: str, title: Optional[str] = None, 
                    content: Optional[str] = None, version: int = 1) -> Dict[str, Any]:
         """Update an existing note."""
-        data = {}
-        if title:
-            data["title"] = title
-        if content:
-            data["content"] = content
-            
-        # Add expected version header for optimistic locking
-        headers = {"expected-version": str(version)}
-        response = self.client.put(f"{API_PREFIX}/notes/{note_id}", json=data, headers=headers)
-        response.raise_for_status()
-        return response.json()
+        def _update():
+            data = {}
+            if title:
+                data["title"] = title
+            if content:
+                data["content"] = content
+                
+            # Add expected version header for optimistic locking
+            headers = {"expected-version": str(version)}
+            response = self.client.put(f"{API_PREFIX}/notes/{note_id}", json=data, headers=headers)
+            response.raise_for_status()
+            return response.json()
+        
+        return self._handle_rate_limit(_update)
     
     def delete_note(self, note_id: int) -> Dict[str, Any]:
         """Delete a note."""
@@ -383,6 +421,22 @@ class APIClient:
         response.raise_for_status()
         return response.json()
     
+    def get_character(self, character_id: int) -> Dict[str, Any]:
+        """Get a specific character by ID."""
+        response = self.client.get(f"{API_PREFIX}/characters/{character_id}")
+        response.raise_for_status()
+        return response.json()
+    
+    def update_character(self, character_id: int, expected_version: int, **kwargs) -> Dict[str, Any]:
+        """Update a character with optimistic locking."""
+        response = self.client.put(
+            f"{API_PREFIX}/characters/{character_id}",
+            json=kwargs,
+            params={"expected_version": expected_version}
+        )
+        response.raise_for_status()
+        return response.json()
+    
     def delete_character(self, character_id: int) -> Dict[str, Any]:
         """Delete a character."""
         response = self.client.delete(f"{API_PREFIX}/characters/{character_id}")
@@ -392,10 +446,36 @@ class APIClient:
     # RAG/Search endpoints
     def search_media(self, query: str, limit: int = 10) -> Dict[str, Any]:
         """Search media content."""
+        def _search():
+            response = self.client.post(
+                f"{API_PREFIX}/media/search",
+                json={"query": query},
+                params={"limit": limit}
+            )
+            response.raise_for_status()
+            return response.json()
+        
+        return self._handle_rate_limit(_search)
+    
+    def rag_simple_search(self, query: str, databases: List[str] = None, **kwargs) -> Dict[str, Any]:
+        """Perform simple RAG search."""
+        data = {
+            "query": query,
+            "databases": databases or ["media"],
+            **kwargs
+        }
         response = self.client.post(
-            f"{API_PREFIX}/media/search",
-            json={"query": query},
-            params={"limit": limit}
+            f"{API_PREFIX}/rag/search/simple",  # Fixed path: /rag/search/simple instead of /rag/simple/search
+            json=data
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def rag_advanced_search(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform advanced RAG search with full configuration."""
+        response = self.client.post(
+            f"{API_PREFIX}/rag/search/complex",  # Fixed path: /rag/search/complex for consistency
+            json=config
         )
         response.raise_for_status()
         return response.json()
@@ -412,25 +492,72 @@ class APIClient:
         self.client.close()
 
 
+def ensure_server_running(base_url: str = BASE_URL, timeout: int = SERVER_STARTUP_TIMEOUT) -> Dict[str, Any]:
+    """
+    Ensure the API server is running and accessible.
+    This simulates a user trying to connect to the application.
+    
+    Returns:
+        Server health information
+    
+    Raises:
+        pytest.skip if server is not available
+    """
+    health_url = f"{base_url}{API_PREFIX}/health"
+    start_time = time.time()
+    last_error = None
+    
+    print(f"🔍 Checking if API server is available at {base_url}...")
+    
+    while time.time() - start_time < timeout:
+        try:
+            with httpx.Client(timeout=5) as temp_client:
+                response = temp_client.get(health_url)
+                if response.status_code == 200:
+                    health_data = response.json()
+                    print(f"✅ API server is running in {health_data.get('auth_mode', 'unknown')} mode")
+                    return health_data
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            last_error = e
+            time.sleep(1)  # Wait before retrying
+            continue
+    
+    # Server not available after timeout
+    error_msg = (
+        f"❌ API server not available at {base_url} after {timeout} seconds.\n"
+        f"Please ensure the server is running:\n"
+        f"  python -m uvicorn tldw_Server_API.app.main:app --reload\n"
+        f"Last error: {last_error}"
+    )
+    pytest.skip(error_msg)
+
+
 @pytest.fixture(scope="session")
 def api_client():
-    """Create an API client for the test session."""
+    """Create an API client for the test session - simulating a user connecting to the app."""
+    # First ensure server is running - like a user would check if app is accessible
+    health_info = ensure_server_running()
+    
     client = APIClient()
+    
     # Check if single-user mode and set token
     try:
-        health = client.health_check()
-        if health.get("auth_mode") == "single_user":
-            # Single-user mode uses the default API key or from environment
-            # Try to get the actual API key from settings
-            try:
-                from tldw_Server_API.app.core.AuthNZ.settings import get_settings
-                settings = get_settings()
-                api_key = settings.SINGLE_USER_API_KEY
-            except:
-                api_key = os.getenv("SINGLE_USER_API_KEY", "test-api-key-12345")
+        if health_info.get("auth_mode") == "single_user":
+            # In test mode, get API key from health endpoint
+            if health_info.get("test_api_key"):
+                api_key = health_info.get("test_api_key")
+                print(f"Using test API key from health endpoint: {api_key[:8]}...")
+            else:
+                # Fallback to environment variable or settings
+                try:
+                    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+                    settings = get_settings()
+                    api_key = settings.SINGLE_USER_API_KEY
+                except:
+                    api_key = os.getenv("SINGLE_USER_API_KEY", "test-api-key-12345")
             client.set_auth_token(api_key)
-    except:
-        pass
+    except Exception as e:
+        print(f"Warning: Failed to set API key: {e}")
     yield client
     client.close()
 
@@ -453,18 +580,22 @@ def authenticated_client(api_client, test_user_credentials):
     try:
         health = api_client.health_check()
         if health.get("auth_mode") == "single_user":
-            # Single-user mode uses the default API key or from environment
-            # Try to get the actual API key from settings
-            try:
-                from tldw_Server_API.app.core.AuthNZ.settings import get_settings
-                settings = get_settings()
-                api_key = settings.SINGLE_USER_API_KEY
-            except:
-                api_key = os.getenv("SINGLE_USER_API_KEY", "test-api-key-12345")
+            # In test mode, get API key from health endpoint
+            if health.get("test_api_key"):
+                api_key = health.get("test_api_key")
+                print(f"Authenticated client using test API key: {api_key[:8]}...")
+            else:
+                # Fallback to environment variable or settings
+                try:
+                    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+                    settings = get_settings()
+                    api_key = settings.SINGLE_USER_API_KEY
+                except:
+                    api_key = os.getenv("SINGLE_USER_API_KEY", "test-api-key-12345")
             api_client.set_auth_token(api_key)
             return api_client
-    except:
-        pass
+    except Exception as e:
+        print(f"Warning in authenticated_client: {e}")
     
     # Multi-user mode - try to register and login
     try:
@@ -1217,6 +1348,135 @@ Test content without proper boundary end""".encode()
         except:
             return b'\xff\xfe\xff\xfe'
 
+
+# ============================================================================
+# STRONG ASSERTION HELPERS - Enhanced validation with exact value checking
+# ============================================================================
+
+class StrongAssertionHelpers:
+    """Enhanced assertion helpers with strict value checking."""
+    
+    @staticmethod
+    def assert_exact_value(actual, expected, field_name="field"):
+        """Assert exact value match with helpful error message."""
+        assert actual == expected, \
+            f"{field_name}: expected '{expected}', got '{actual}'"
+    
+    @staticmethod
+    def assert_value_in_range(value, min_val, max_val, field_name="value"):
+        """Assert numeric value is within range."""
+        assert isinstance(value, (int, float)), \
+            f"{field_name} must be numeric, got {type(value).__name__}"
+        assert min_val <= value <= max_val, \
+            f"{field_name} {value} not in range [{min_val}, {max_val}]"
+    
+    @staticmethod
+    def assert_non_empty_string(value, field_name="field", min_length=1):
+        """Assert string is non-empty with minimum length."""
+        assert isinstance(value, str), \
+            f"{field_name} must be string, got {type(value).__name__}"
+        assert len(value) >= min_length, \
+            f"{field_name} too short: {len(value)} < {min_length}"
+    
+    @staticmethod
+    def assert_valid_timestamp(timestamp_str, field_name="timestamp"):
+        """Assert valid ISO format timestamp."""
+        from datetime import datetime
+        try:
+            datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        except (ValueError, AttributeError) as e:
+            pytest.fail(f"Invalid {field_name}: {timestamp_str} - {e}")
+    
+    @staticmethod
+    def assert_character_response(character_data):
+        """Validate character response structure and values."""
+        required = ["id", "name", "version"]
+        for field in required:
+            assert field in character_data, f"Missing required field: {field}"
+        
+        # Type validation
+        assert isinstance(character_data["id"], int), \
+            f"ID must be int, got {type(character_data['id']).__name__}"
+        assert isinstance(character_data["name"], str), \
+            f"Name must be string, got {type(character_data['name']).__name__}"
+        assert isinstance(character_data["version"], int), \
+            f"Version must be int, got {type(character_data['version']).__name__}"
+        
+        # Value validation
+        assert character_data["id"] > 0, f"Invalid ID: {character_data['id']}"
+        assert len(character_data["name"]) > 0, "Name is empty"
+        assert character_data["version"] >= 1, f"Invalid version: {character_data['version']}"
+        
+        # Optional fields validation when present
+        if "tags" in character_data:
+            assert isinstance(character_data["tags"], list), \
+                f"Tags must be list, got {type(character_data['tags']).__name__}"
+        if "description" in character_data:
+            assert isinstance(character_data["description"], str), \
+                f"Description must be string, got {type(character_data['description']).__name__}"
+    
+    @staticmethod
+    def assert_rag_result_quality(result, query_terms=None):
+        """Validate RAG search result quality and structure."""
+        assert "content" in result, "Result missing 'content'"
+        
+        # Content validation
+        content = result["content"]
+        assert isinstance(content, str), f"Content must be string, got {type(content).__name__}"
+        assert len(content) > 10, f"Content too short: {len(content)} chars"
+        
+        # Score validation if present
+        if "score" in result:
+            score = result["score"]
+            assert isinstance(score, (int, float)), \
+                f"Score must be numeric, got {type(score).__name__}"
+            assert 0.0 <= score <= 1.0, f"Score out of range: {score}"
+        
+        # Source validation if present
+        if "source" in result:
+            source = result["source"]
+            assert isinstance(source, dict), \
+                f"Source must be dict, got {type(source).__name__}"
+            assert "type" in source, "Source missing 'type'"
+            assert source["type"] in ["media", "note", "character", "chat"], \
+                f"Invalid source type: {source['type']}"
+            if "id" in source:
+                assert isinstance(source["id"], (int, str)), \
+                    f"Source ID must be int or string, got {type(source['id']).__name__}"
+        
+        # Relevance check if query terms provided
+        if query_terms:
+            content_lower = content.lower()
+            has_term = any(term.lower() in content_lower for term in query_terms)
+            if not has_term and result.get("score", 0) > 0.5:
+                print(f"Warning: High score {result.get('score')} but no query terms found in content")
+    
+    @staticmethod
+    def assert_chat_response_quality(response, min_length=10):
+        """Validate chat response quality and structure."""
+        assert "choices" in response, "Response missing 'choices'"
+        choices = response["choices"]
+        assert isinstance(choices, list), f"Choices must be list, got {type(choices).__name__}"
+        assert len(choices) > 0, "No choices in response"
+        
+        # Validate first choice
+        choice = choices[0]
+        assert isinstance(choice, dict), f"Choice must be dict, got {type(choice).__name__}"
+        assert "message" in choice, "Choice missing 'message'"
+        
+        # Validate message
+        message = choice["message"]
+        assert isinstance(message, dict), f"Message must be dict, got {type(message).__name__}"
+        assert "role" in message, "Message missing 'role'"
+        assert "content" in message, "Message missing 'content'"
+        
+        # Validate content
+        content = message["content"]
+        assert isinstance(content, str), f"Content must be string, got {type(content).__name__}"
+        assert len(content) >= min_length, \
+            f"Response too short: {len(content)} < {min_length}"
+        
+        return content
 
 # Test markers would be defined in pytest.ini or pyproject.toml
 # For now, commenting out to avoid errors

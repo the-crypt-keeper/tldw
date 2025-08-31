@@ -931,27 +931,37 @@ async def audit_operation(
 
 
 # ============================================================================
-# Global Service Instance
+# Deprecated Global Service Instance
 # ============================================================================
-
-_unified_audit_service: Optional[UnifiedAuditService] = None
-
+# NOTE: The global singleton pattern is deprecated. Use dependency injection instead:
+# from tldw_Server_API.app.api.v1.API_Deps.Audit_DB_Deps import get_audit_service_for_user
 
 async def get_unified_audit_service() -> UnifiedAuditService:
-    """Get or create the global unified audit service"""
-    global _unified_audit_service
+    """
+    DEPRECATED: This global singleton pattern is no longer supported.
+    Use dependency injection with get_audit_service_for_user instead.
     
-    if _unified_audit_service is None:
-        _unified_audit_service = UnifiedAuditService()
-        await _unified_audit_service.initialize()
-    
-    return _unified_audit_service
+    Migration guide:
+    Old: audit_service = await get_unified_audit_service()
+    New: audit_service: UnifiedAuditService = Depends(get_audit_service_for_user)
+    """
+    raise DeprecationWarning(
+        "Global audit service is deprecated. "
+        "Use dependency injection: "
+        "from tldw_Server_API.app.api.v1.API_Deps.Audit_DB_Deps import get_audit_service_for_user"
+    )
 
 
 async def shutdown_audit_service():
-    """Shutdown the global audit service"""
-    global _unified_audit_service
+    """
+    DEPRECATED: Use shutdown_all_audit_services from Audit_DB_Deps instead.
     
-    if _unified_audit_service:
-        await _unified_audit_service.stop()
-        _unified_audit_service = None
+    Migration guide:
+    Old: await shutdown_audit_service()
+    New: from tldw_Server_API.app.api.v1.API_Deps.Audit_DB_Deps import shutdown_all_audit_services
+         await shutdown_all_audit_services()
+    """
+    raise DeprecationWarning(
+        "Global shutdown is deprecated. "
+        "Use: from tldw_Server_API.app.api.v1.API_Deps.Audit_DB_Deps import shutdown_all_audit_services"
+    )
