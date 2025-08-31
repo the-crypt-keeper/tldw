@@ -13,7 +13,7 @@ https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Ma
 https://www.fuzzycomputer.com/posts/onboarding?=&aid=recqrDNk2WPeiRuha
 
 https://www.npmjs.com/package/@nendo/tree-sitter-mcp
-
+https://potpie.ai/
 
 
 

@@ -16,7 +16,7 @@ https://github.com/jamesponddotco/llm-prompts/blob/trunk/data/brainstorm-specifi
 https://github.com/jamesponddotco/llm-prompts/blob/trunk/data/brainstorm-critique.md
 https://github.com/jamesponddotco/llm-prompts/blob/trunk/data/socratic-coder.md
 https://news.ycombinator.com/item?id=44838018
-
+https://www.turingpost.com/p/topic25
 
 
 https://ai-sdk.dev/elements/components/prompt-input
