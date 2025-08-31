@@ -212,20 +212,22 @@ def transcribe_with_parakeet_mlx(
         import soundfile as sf
         
         # Handle different input types
+        audio_file_path = None
+        
         if isinstance(audio_data, (str, Path)):
-            # Load audio from file
+            # Already a file path
             audio_path = Path(audio_data)
             if not audio_path.exists():
                 return f"[Error: Audio file not found: {audio_path}]"
             
-            # Load audio
+            # Check if we need to resample
             audio_np, file_sr = sf.read(str(audio_path))
             
             # Convert to mono if stereo
             if len(audio_np.shape) > 1:
                 audio_np = np.mean(audio_np, axis=1)
             
-            # Resample if needed (Parakeet expects 16kHz)
+            # Only create new file if resampling is needed
             if file_sr != 16000:
                 import librosa
                 audio_np = librosa.resample(
@@ -233,8 +235,10 @@ def transcribe_with_parakeet_mlx(
                     orig_sr=file_sr, 
                     target_sr=16000
                 )
-            
-            audio_data = audio_np
+                audio_data = audio_np  # Will be saved to temp file later
+            else:
+                # Can use the original file directly
+                audio_file_path = str(audio_path)
         
         elif isinstance(audio_data, np.ndarray):
             # Ensure float32
@@ -256,27 +260,39 @@ def transcribe_with_parakeet_mlx(
         else:
             return "[Error: Invalid audio data type]"
         
-        # Normalize audio to [-1, 1] range
-        if np.abs(audio_data).max() > 1.0:
+        # Normalize audio to [-1, 1] range (only if we have numpy array)
+        if isinstance(audio_data, np.ndarray) and np.abs(audio_data).max() > 1.0:
             audio_data = audio_data / np.abs(audio_data).max()
         
         # Transcribe using parakeet-mlx
         if verbose:
-            logging.info(f"Transcribing audio of length {len(audio_data)/16000:.2f} seconds")
+            if isinstance(audio_data, np.ndarray):
+                logging.info(f"Transcribing audio of length {len(audio_data)/16000:.2f} seconds")
+            else:
+                logging.info(f"Transcribing audio file")
         
-        # The parakeet-mlx model expects specific input format
-        # Convert numpy array to MLX array
-        import mlx.core as mx
-        audio_mlx = mx.array(audio_data)
-        
-        # Call the model's transcribe method or forward pass
-        if hasattr(model, 'transcribe'):
-            transcription = model.transcribe(audio_mlx)
-        elif hasattr(model, 'decode'):
-            transcription = model.decode(audio_mlx)
+        # The parakeet-mlx model expects an audio file path for decode
+        # Use existing file path if available, otherwise create temp file
+        if audio_file_path:
+            # We already have a file path that doesn't need resampling
+            transcription = model.decode(audio_file_path)
+        elif isinstance(audio_data, np.ndarray):
+            # Need to save numpy array to temp file
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
+                sf.write(tmp_file.name, audio_data, 16000, format='WAV')
+                temp_audio_path = tmp_file.name
+            
+            # Use the decode method with file path
+            transcription = model.decode(temp_audio_path)
+            
+            # Clean up temp file
+            try:
+                os.remove(temp_audio_path)
+            except:
+                pass
         else:
-            # Direct forward pass
-            transcription = model(audio_mlx)
+            # Shouldn't happen, but handle gracefully
+            return "[Error: Invalid audio data format]"
         
         if isinstance(transcription, dict):
             # Handle structured output
