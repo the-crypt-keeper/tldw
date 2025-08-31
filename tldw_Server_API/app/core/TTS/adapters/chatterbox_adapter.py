@@ -20,6 +20,18 @@ from .base import (
     VoiceInfo,
     ProviderStatus
 )
+from ..tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError,
+    TTSModelLoadError,
+    TTSGenerationError,
+    TTSResourceError,
+    TTSGPUError,
+    TTSInvalidVoiceReferenceError
+)
+from ..tts_validation import validate_tts_request
+from ..tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -100,9 +112,8 @@ class ChatterboxAdapter(TTSAdapter):
             try:
                 import chatterbox_tts
                 from chatterbox_tts import ChatterboxModel, ChatterboxProcessor
-            except ImportError:
-                logger.error(f"{self.provider_name}: chatterbox-tts library not installed")
-                logger.error(
+            except ImportError as e:
+                error_msg = (
                     f"{self.provider_name}: Required libraries not installed. "
                     f"To use Chatterbox, follow these steps:\n"
                     f"1. Install Chatterbox (when available):\n"
@@ -114,8 +125,14 @@ class ChatterboxAdapter(TTSAdapter):
                     f"   huggingface-cli download resemble-ai/chatterbox --local-dir models/chatterbox/\n"
                     f"4. Ensure CUDA is available for optimal performance (4GB+ VRAM recommended)"
                 )
+                logger.error(f"{self.provider_name}: chatterbox-tts library not installed")
+                logger.error(error_msg)
                 self._status = ProviderStatus.NOT_CONFIGURED
-                return False
+                raise TTSModelLoadError(
+                    "Failed to import chatterbox-tts library",
+                    provider=self.provider_name,
+                    details={"error": str(e), "suggestion": error_msg}
+                )
             
             # Load processor
             logger.info(f"{self.provider_name}: Loading processor...")

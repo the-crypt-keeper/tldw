@@ -19,6 +19,22 @@ from .base import (
     VoiceInfo,
     ProviderStatus
 )
+from ..tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSAuthenticationError,
+    TTSRateLimitError,
+    TTSNetworkError,
+    TTSTimeoutError,
+    TTSProviderError,
+    TTSGenerationError,
+    auth_error,
+    rate_limit_error,
+    network_error,
+    timeout_error
+)
+from ..tts_validation import validate_tts_request
+from ..tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -154,14 +170,16 @@ class ElevenLabsAdapter(TTSAdapter):
         """Initialize the ElevenLabs adapter"""
         try:
             if not self.api_key:
-                logger.warning(f"{self.provider_name}: No API key provided")
+                error_msg = f"{self.provider_name}: No API key provided"
+                logger.warning(error_msg)
                 self._status = ProviderStatus.NOT_CONFIGURED
-                return False
+                raise TTSProviderNotConfiguredError(error_msg, provider=self.provider_name)
             
-            # Initialize HTTP client
-            self.client = httpx.AsyncClient(
-                timeout=httpx.Timeout(30.0, connect=5.0),
-                limits=httpx.Limits(max_keepalive_connections=5)
+            # Get HTTP client from resource manager
+            resource_manager = await get_resource_manager()
+            self.client = await resource_manager.get_http_client(
+                provider=self.provider_name.lower(),
+                base_url=self.base_url
             )
             
             # Test API connection and fetch user voices
@@ -171,10 +189,16 @@ class ElevenLabsAdapter(TTSAdapter):
             self._status = ProviderStatus.AVAILABLE
             return True
             
+        except TTSProviderNotConfiguredError:
+            return False
         except Exception as e:
             logger.error(f"{self.provider_name}: Initialization failed: {e}")
             self._status = ProviderStatus.ERROR
-            return False
+            raise TTSProviderInitializationError(
+                f"Failed to initialize {self.provider_name}",
+                provider=self.provider_name,
+                details={"error": str(e)}
+            )
     
     async def _fetch_user_voices(self):
         """Fetch available voices from ElevenLabs API"""
@@ -241,12 +265,17 @@ class ElevenLabsAdapter(TTSAdapter):
     async def generate(self, request: TTSRequest) -> TTSResponse:
         """Generate speech using ElevenLabs TTS"""
         if not await self.ensure_initialized():
-            raise ValueError(f"{self.provider_name} not initialized")
+            raise TTSProviderNotConfiguredError(
+                f"{self.provider_name} not initialized",
+                provider=self.provider_name
+            )
         
-        # Validate request
-        is_valid, error = await self.validate_request(request)
-        if not is_valid:
-            raise ValueError(error)
+        # Validate request using new validation system
+        try:
+            validate_tts_request(request, provider=self.provider_name.lower())
+        except Exception as e:
+            logger.error(f"{self.provider_name} request validation failed: {e}")
+            raise
         
         # Prepare voice ID
         voice_id = self._get_voice_id(request.voice or "rachel")
@@ -292,9 +321,15 @@ class ElevenLabsAdapter(TTSAdapter):
                     provider=self.provider_name
                 )
                 
+        except (TTSProviderNotConfiguredError, TTSAuthenticationError, TTSRateLimitError):
+            raise
         except Exception as e:
             logger.error(f"{self.provider_name} generation error: {e}")
-            raise
+            raise TTSGenerationError(
+                f"Failed to generate speech with {self.provider_name}",
+                provider=self.provider_name,
+                details={"error": str(e), "error_type": type(e).__name__}
+            )
     
     async def _stream_audio_elevenlabs(
         self,

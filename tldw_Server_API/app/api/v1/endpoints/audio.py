@@ -57,8 +57,16 @@ router = APIRouter(
 # V2 TTS Service handles all provider mapping internally
 # No need for manual model/voice mappings here
 
-# Import the V2 TTS service
+# Import the V2 TTS service and validation
 from tldw_Server_API.app.core.TTS.tts_service_v2 import get_tts_service_v2, TTSServiceV2
+from tldw_Server_API.app.core.TTS.tts_exceptions import (
+    TTSError,
+    TTSValidationError,
+    TTSProviderNotConfiguredError,
+    TTSAuthenticationError,
+    TTSRateLimitError
+)
+from tldw_Server_API.app.core.TTS.tts_validation import TTSInputValidator
 
 async def get_tts_service() -> TTSServiceV2:
     """Get the V2 TTS service instance."""
@@ -104,19 +112,29 @@ async def create_speech(
                 headers={"WWW-Authenticate": f"{AUTH_BEARER_PREFIX}"},
             )
     
-    # Input validation
-    if not request_data.input or len(request_data.input.strip()) == 0:
+    # Input validation using the new validation system
+    try:
+        # Create validator instance
+        validator = TTSInputValidator()
+        
+        # Validate and sanitize input text
+        sanitized_text = validator.sanitize_text(request_data.input)
+        
+        # Check for empty input after sanitization
+        if not sanitized_text or len(sanitized_text.strip()) == 0:
+            raise TTSValidationError(
+                "Input text cannot be empty after sanitization",
+                details={"original_length": len(request_data.input)}
+            )
+        
+        # Update request with sanitized text
+        request_data.input = sanitized_text
+        
+    except TTSValidationError as e:
+        logger.warning(f"TTS validation error: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Input text cannot be empty."
-        )
-    
-    # Limit input length to prevent abuse
-    MAX_INPUT_LENGTH = 4096  # Maximum characters
-    if len(request_data.input) > MAX_INPUT_LENGTH:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Input text exceeds maximum length of {MAX_INPUT_LENGTH} characters."
+            detail=str(e)
         )
     logger.info(f"Received speech request: model={request_data.model}, voice={request_data.voice}, format={request_data.response_format}")
 
@@ -144,6 +162,7 @@ async def create_speech(
     async def audio_chunk_generator():
         try:
             # V2 service uses generate_speech with different parameters
+            # The service will handle additional validation internally
             async for audio_chunk_bytes in tts_service.generate_speech(
                 request_data, 
                 provider=None,  # Let service determine provider from model
@@ -155,17 +174,37 @@ async def create_speech(
                 yield audio_chunk_bytes
         except HTTPException: # Re-raise HTTPExceptions directly
             raise
+        except TTSProviderNotConfiguredError as e:
+            logger.error(f"TTS provider not configured: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"TTS service unavailable: {str(e)}"
+            )
+        except TTSAuthenticationError as e:
+            logger.error(f"TTS authentication error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="TTS provider authentication failed"
+            )
+        except TTSRateLimitError as e:
+            logger.warning(f"TTS rate limit exceeded: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="TTS provider rate limit exceeded. Please try again later."
+            )
+        except TTSError as e:
+            # Handle other TTS-specific errors
+            logger.error(f"TTS error during streaming: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"TTS error: {str(e)}"
+            )
         except Exception as e:
-            logger.error(f"Error during audio streaming: {e}", exc_info=True)
-            # Important: Don't yield anything here if an error occurs,
-            # let FastAPI handle the error response.
-            # For a production system, you might want to yield a specific error chunk
-            # if the protocol requires it, but for simple streaming, just raising is often enough.
-            # If you raise HTTPException here, it should be caught by FastAPI.
-            # If you raise a standard Python exception, it will result in a 500.
-            # Consider how to signal errors in the stream if the client expects it.
-            # For now, we'll let it become a 500 or be handled by the `tts_service` itself.
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+            logger.error(f"Unexpected error during audio streaming: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unexpected error occurred during audio generation"
+            )
 
 
     if request_data.stream:
@@ -201,9 +240,37 @@ async def create_speech(
             )
         except HTTPException:
             raise
+        except TTSProviderNotConfiguredError as e:
+            logger.error(f"TTS provider not configured: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"TTS service unavailable: {str(e)}"
+            )
+        except TTSAuthenticationError as e:
+            logger.error(f"TTS authentication error: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="TTS provider authentication failed"
+            )
+        except TTSRateLimitError as e:
+            logger.warning(f"TTS rate limit exceeded: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="TTS provider rate limit exceeded. Please try again later."
+            )
+        except TTSError as e:
+            # Handle other TTS-specific errors
+            logger.error(f"TTS error during non-streaming generation: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"TTS error: {str(e)}"
+            )
         except Exception as e:
-            logger.error(f"Error during non-streaming audio generation: {e}", exc_info=True)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+            logger.error(f"Unexpected error during non-streaming audio generation: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unexpected error occurred during audio generation"
+            )
 
 
 @router.post("/transcriptions", summary="Transcribes audio into text (OpenAI Compatible)")

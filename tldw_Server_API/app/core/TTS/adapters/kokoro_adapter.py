@@ -20,6 +20,17 @@ from .base import (
     VoiceInfo,
     ProviderStatus
 )
+from ..tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError,
+    TTSModelLoadError,
+    TTSGenerationError,
+    TTSResourceError,
+    TTSInsufficientMemoryError
+)
+from ..tts_validation import validate_tts_request
+from ..tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -159,12 +170,18 @@ class KokoroAdapter(TTSAdapter):
             
             # Check model files exist
             if not os.path.exists(self.model_path):
-                logger.error(f"Kokoro ONNX model not found at {self.model_path}")
-                return False
+                raise TTSModelNotFoundError(
+                    f"Kokoro ONNX model not found at {self.model_path}",
+                    provider=self.provider_name,
+                    details={"model_path": self.model_path}
+                )
             
             if not os.path.exists(self.voices_json):
-                logger.error(f"Kokoro voices.json not found at {self.voices_json}")
-                return False
+                raise TTSModelNotFoundError(
+                    f"Kokoro voices.json not found at {self.voices_json}",
+                    provider=self.provider_name,
+                    details={"voices_json": self.voices_json}
+                )
             
             # Configure eSpeak
             espeak_lib = os.getenv("PHONEMIZER_ESPEAK_LIBRARY")
@@ -180,12 +197,22 @@ class KokoroAdapter(TTSAdapter):
             logger.info(f"{self.provider_name}: ONNX model loaded successfully")
             return True
             
-        except ImportError:
+        except ImportError as e:
             logger.error(f"{self.provider_name}: kokoro_onnx library not installed")
-            return False
+            raise TTSModelLoadError(
+                "Failed to import kokoro_onnx library",
+                provider=self.provider_name,
+                details={"error": str(e), "suggestion": "pip install kokoro-onnx"}
+            )
+        except TTSModelNotFoundError:
+            raise
         except Exception as e:
             logger.error(f"{self.provider_name}: ONNX initialization error: {e}")
-            return False
+            raise TTSModelLoadError(
+                "Failed to initialize ONNX model",
+                provider=self.provider_name,
+                details={"error": str(e), "model_path": self.model_path}
+            )
     
     async def _initialize_pytorch(self) -> bool:
         """Initialize PyTorch backend"""
@@ -224,12 +251,17 @@ class KokoroAdapter(TTSAdapter):
     async def generate(self, request: TTSRequest) -> TTSResponse:
         """Generate speech using Kokoro TTS"""
         if not await self.ensure_initialized():
-            raise ValueError(f"{self.provider_name} not initialized")
+            raise TTSProviderNotConfiguredError(
+                f"{self.provider_name} not initialized",
+                provider=self.provider_name
+            )
         
-        # Validate request
-        is_valid, error = await self.validate_request(request)
-        if not is_valid:
-            raise ValueError(error)
+        # Validate request using new validation system
+        try:
+            validate_tts_request(request, provider=self.provider_name.lower())
+        except Exception as e:
+            logger.error(f"{self.provider_name} request validation failed: {e}")
+            raise
         
         # Process voice (support for voice mixing like "af_bella(2)+af_sky(1)")
         voice = self._process_voice(request.voice or "af_bella")

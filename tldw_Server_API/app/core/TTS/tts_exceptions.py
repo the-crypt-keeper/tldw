@@ -1,0 +1,337 @@
+# tts_exceptions.py
+# Description: Custom exception hierarchy for TTS module
+#
+# Imports
+from typing import Optional, Dict, Any
+#
+#######################################################################################################################
+#
+# TTS Exception Hierarchy
+
+class TTSError(Exception):
+    """Base exception for all TTS-related errors"""
+    
+    def __init__(
+        self, 
+        message: str, 
+        provider: Optional[str] = None, 
+        error_code: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None
+    ):
+        """
+        Initialize TTS error.
+        
+        Args:
+            message: Human-readable error message
+            provider: Name of the TTS provider that failed
+            error_code: Machine-readable error code
+            details: Additional error details
+        """
+        super().__init__(message)
+        self.message = message
+        self.provider = provider
+        self.error_code = error_code
+        self.details = details or {}
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert exception to dictionary for API responses"""
+        return {
+            "error_type": self.__class__.__name__,
+            "message": self.message,
+            "provider": self.provider,
+            "error_code": self.error_code,
+            "details": self.details
+        }
+
+
+# Configuration and Initialization Errors
+class TTSConfigurationError(TTSError):
+    """Error in TTS configuration or setup"""
+    pass
+
+
+class TTSProviderNotConfiguredError(TTSConfigurationError):
+    """TTS provider is not properly configured"""
+    pass
+
+
+class TTSProviderInitializationError(TTSConfigurationError):
+    """Error initializing TTS provider"""
+    pass
+
+
+class TTSModelNotFoundError(TTSConfigurationError):
+    """Requested TTS model not found"""
+    pass
+
+
+# Request and Validation Errors
+class TTSValidationError(TTSError):
+    """Error validating TTS request"""
+    pass
+
+
+class TTSInvalidInputError(TTSValidationError):
+    """Invalid input text for TTS generation"""
+    pass
+
+
+class TTSUnsupportedFormatError(TTSValidationError):
+    """Requested audio format not supported"""
+    pass
+
+
+class TTSUnsupportedLanguageError(TTSValidationError):
+    """Requested language not supported by provider"""
+    pass
+
+
+class TTSVoiceNotFoundError(TTSValidationError):
+    """Requested voice not found"""
+    pass
+
+
+class TTSTextTooLongError(TTSValidationError):
+    """Input text exceeds maximum length limit"""
+    pass
+
+
+class TTSInvalidVoiceReferenceError(TTSValidationError):
+    """Invalid voice reference audio for voice cloning"""
+    pass
+
+
+# Provider and API Errors
+class TTSProviderError(TTSError):
+    """General TTS provider error"""
+    pass
+
+
+class TTSProviderUnavailableError(TTSProviderError):
+    """TTS provider is currently unavailable"""
+    pass
+
+
+class TTSAuthenticationError(TTSProviderError):
+    """Authentication failed with TTS provider"""
+    pass
+
+
+class TTSRateLimitError(TTSProviderError):
+    """Rate limit exceeded for TTS provider"""
+    pass
+
+
+class TTSQuotaExceededError(TTSProviderError):
+    """Usage quota exceeded for TTS provider"""
+    pass
+
+
+class TTSNetworkError(TTSProviderError):
+    """Network error communicating with TTS provider"""
+    pass
+
+
+class TTSTimeoutError(TTSProviderError):
+    """Timeout waiting for TTS provider response"""
+    pass
+
+
+# Generation and Processing Errors
+class TTSGenerationError(TTSError):
+    """Error during TTS audio generation"""
+    pass
+
+
+class TTSStreamingError(TTSGenerationError):
+    """Error during streaming TTS generation"""
+    pass
+
+
+class TTSAudioProcessingError(TTSGenerationError):
+    """Error processing generated audio"""
+    pass
+
+
+class TTSFormatConversionError(TTSAudioProcessingError):
+    """Error converting audio format"""
+    pass
+
+
+class TTSVoiceCloningError(TTSGenerationError):
+    """Error during voice cloning process"""
+    pass
+
+
+# Circuit Breaker and Fallback Errors
+class TTSCircuitOpenError(TTSProviderError):
+    """Circuit breaker is open for provider"""
+    pass
+
+
+class TTSAllProvidersFailedError(TTSError):
+    """All available TTS providers failed"""
+    pass
+
+
+class TTSFallbackExhaustedError(TTSError):
+    """All fallback providers exhausted"""
+    pass
+
+
+# Resource and System Errors
+class TTSResourceError(TTSError):
+    """Error with system resources"""
+    pass
+
+
+class TTSInsufficientMemoryError(TTSResourceError):
+    """Insufficient memory for TTS generation"""
+    pass
+
+
+class TTSInsufficientStorageError(TTSResourceError):
+    """Insufficient storage space"""
+    pass
+
+
+class TTSModelLoadError(TTSResourceError):
+    """Error loading TTS model"""
+    pass
+
+
+class TTSGPUError(TTSResourceError):
+    """Error with GPU processing"""
+    pass
+
+
+# Convenience functions for common error patterns
+def validation_error(message: str, provider: Optional[str] = None, **kwargs) -> TTSValidationError:
+    """Create a validation error with standard format"""
+    return TTSValidationError(message, provider=provider, **kwargs)
+
+
+def provider_error(message: str, provider: str, error_code: Optional[str] = None, **kwargs) -> TTSProviderError:
+    """Create a provider error with standard format"""
+    return TTSProviderError(message, provider=provider, error_code=error_code, **kwargs)
+
+
+def network_error(message: str, provider: str, **kwargs) -> TTSNetworkError:
+    """Create a network error with standard format"""
+    return TTSNetworkError(message, provider=provider, error_code="NETWORK_ERROR", **kwargs)
+
+
+def auth_error(message: str, provider: str, **kwargs) -> TTSAuthenticationError:
+    """Create an authentication error with standard format"""
+    return TTSAuthenticationError(message, provider=provider, error_code="AUTH_ERROR", **kwargs)
+
+
+def rate_limit_error(provider: str, retry_after: Optional[int] = None, **kwargs) -> TTSRateLimitError:
+    """Create a rate limit error with standard format"""
+    details = kwargs.get("details", {})
+    if retry_after:
+        details["retry_after"] = retry_after
+    
+    return TTSRateLimitError(
+        f"Rate limit exceeded for {provider}",
+        provider=provider,
+        error_code="RATE_LIMIT",
+        details=details,
+        **kwargs
+    )
+
+
+def timeout_error(provider: str, timeout_duration: Optional[float] = None, **kwargs) -> TTSTimeoutError:
+    """Create a timeout error with standard format"""
+    details = kwargs.get("details", {})
+    if timeout_duration:
+        details["timeout_duration"] = timeout_duration
+    
+    return TTSTimeoutError(
+        f"Timeout waiting for {provider} response",
+        provider=provider,
+        error_code="TIMEOUT",
+        details=details,
+        **kwargs
+    )
+
+
+# Error categorization helper
+def categorize_error(error: Exception) -> str:
+    """
+    Categorize error for better handling decisions.
+    
+    Args:
+        error: Exception to categorize
+        
+    Returns:
+        Error category string
+    """
+    if isinstance(error, (TTSNetworkError, TTSTimeoutError)):
+        return "network"
+    elif isinstance(error, (TTSRateLimitError, TTSQuotaExceededError)):
+        return "rate_limit"
+    elif isinstance(error, TTSAuthenticationError):
+        return "auth"
+    elif isinstance(error, (TTSProviderUnavailableError, TTSProviderError)):
+        return "provider_error"
+    elif isinstance(error, (TTSValidationError, TTSInvalidInputError)):
+        return "validation_error"
+    elif isinstance(error, TTSResourceError):
+        return "resource_error"
+    elif isinstance(error, TTSConfigurationError):
+        return "config_error"
+    else:
+        return "unknown"
+
+
+# HTTP status code mapping for API responses
+ERROR_STATUS_CODES = {
+    TTSValidationError: 400,
+    TTSInvalidInputError: 400,
+    TTSUnsupportedFormatError: 400,
+    TTSUnsupportedLanguageError: 400,
+    TTSVoiceNotFoundError: 400,
+    TTSTextTooLongError: 400,
+    TTSInvalidVoiceReferenceError: 400,
+    TTSAuthenticationError: 401,
+    TTSRateLimitError: 429,
+    TTSQuotaExceededError: 429,
+    TTSProviderUnavailableError: 503,
+    TTSNetworkError: 503,
+    TTSTimeoutError: 504,
+    TTSConfigurationError: 500,
+    TTSProviderNotConfiguredError: 500,
+    TTSProviderInitializationError: 500,
+    TTSModelNotFoundError: 500,
+    TTSGenerationError: 500,
+    TTSStreamingError: 500,
+    TTSAudioProcessingError: 500,
+    TTSFormatConversionError: 500,
+    TTSVoiceCloningError: 500,
+    TTSCircuitOpenError: 503,
+    TTSAllProvidersFailedError: 503,
+    TTSFallbackExhaustedError: 503,
+    TTSResourceError: 500,
+    TTSInsufficientMemoryError: 507,
+    TTSInsufficientStorageError: 507,
+    TTSModelLoadError: 500,
+    TTSGPUError: 500,
+}
+
+
+def get_http_status_code(error: TTSError) -> int:
+    """
+    Get appropriate HTTP status code for TTS error.
+    
+    Args:
+        error: TTS error instance
+        
+    Returns:
+        HTTP status code
+    """
+    return ERROR_STATUS_CODES.get(type(error), 500)
+
+#
+# End of tts_exceptions.py
+#######################################################################################################################

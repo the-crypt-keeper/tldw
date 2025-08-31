@@ -21,7 +21,7 @@ import logging
 import tempfile
 import subprocess
 from pathlib import Path
-from typing import Optional, Union, Dict, Any, List
+from typing import Optional, Union, Dict, Any, List, Callable
 import numpy as np
 
 # Check if we're on macOS
@@ -184,7 +184,10 @@ def transcribe_with_parakeet_mlx(
     sample_rate: int = 16000,
     language: Optional[str] = None,
     batch_size: int = 1,
-    verbose: bool = False
+    verbose: bool = False,
+    chunk_duration: Optional[float] = None,
+    overlap_duration: float = 15.0,
+    chunk_callback: Optional[Callable[[int, int], None]] = None
 ) -> str:
     """
     Transcribe audio using Parakeet MLX model.
@@ -195,6 +198,9 @@ def transcribe_with_parakeet_mlx(
         language: Language hint (not used by Parakeet, included for compatibility)
         batch_size: Batch size for processing
         verbose: Enable verbose output
+        chunk_duration: Duration in seconds for chunking long audio (None = no chunking)
+        overlap_duration: Overlap between chunks in seconds (default 15.0)
+        chunk_callback: Callback function for chunk progress (current, total)
     
     Returns:
         Transcribed text string
@@ -239,6 +245,7 @@ def transcribe_with_parakeet_mlx(
             else:
                 # Can use the original file directly
                 audio_file_path = str(audio_path)
+                audio_data = None  # Clear audio_data to avoid processing it later
         
         elif isinstance(audio_data, np.ndarray):
             # Ensure float32
@@ -271,19 +278,35 @@ def transcribe_with_parakeet_mlx(
             else:
                 logging.info(f"Transcribing audio file")
         
-        # The parakeet-mlx model expects an audio file path for decode
+        # The parakeet-mlx model's transcribe method expects a file path
         # Use existing file path if available, otherwise create temp file
         if audio_file_path:
             # We already have a file path that doesn't need resampling
-            transcription = model.decode(audio_file_path)
+            # Build kwargs for transcribe method
+            transcribe_kwargs = {}
+            if chunk_duration is not None:
+                transcribe_kwargs['chunk_duration'] = chunk_duration
+                transcribe_kwargs['overlap_duration'] = overlap_duration
+            if chunk_callback is not None:
+                transcribe_kwargs['chunk_callback'] = chunk_callback
+            
+            result = model.transcribe(audio_file_path, **transcribe_kwargs)
         elif isinstance(audio_data, np.ndarray):
             # Need to save numpy array to temp file
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp_file:
                 sf.write(tmp_file.name, audio_data, 16000, format='WAV')
                 temp_audio_path = tmp_file.name
             
-            # Use the decode method with file path
-            transcription = model.decode(temp_audio_path)
+            # Build kwargs for transcribe method
+            transcribe_kwargs = {}
+            if chunk_duration is not None:
+                transcribe_kwargs['chunk_duration'] = chunk_duration
+                transcribe_kwargs['overlap_duration'] = overlap_duration
+            if chunk_callback is not None:
+                transcribe_kwargs['chunk_callback'] = chunk_callback
+            
+            # Use the transcribe method with file path and chunking parameters
+            result = model.transcribe(temp_audio_path, **transcribe_kwargs)
             
             # Clean up temp file
             try:
@@ -293,6 +316,13 @@ def transcribe_with_parakeet_mlx(
         else:
             # Shouldn't happen, but handle gracefully
             return "[Error: Invalid audio data format]"
+        
+        # The transcribe method returns an AlignedResult object
+        # Extract the text from it
+        if hasattr(result, 'text'):
+            transcription = result.text
+        else:
+            transcription = result
         
         if isinstance(transcription, dict):
             # Handle structured output
@@ -310,7 +340,9 @@ def transcribe_with_parakeet_mlx(
         logging.error(f"Missing required library: {e}")
         return f"[Error: Missing required library: {e}]"
     except Exception as e:
+        import traceback
         logging.error(f"Error during Parakeet MLX transcription: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return f"[Error: Transcription failed: {str(e)}]"
 
 

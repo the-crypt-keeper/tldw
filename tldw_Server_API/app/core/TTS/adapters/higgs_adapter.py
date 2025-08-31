@@ -20,6 +20,18 @@ from .base import (
     VoiceInfo,
     ProviderStatus
 )
+from ..tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError,
+    TTSModelLoadError,
+    TTSGenerationError,
+    TTSResourceError,
+    TTSInsufficientMemoryError,
+    TTSGPUError
+)
+from ..tts_validation import validate_tts_request
+from ..tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -101,14 +113,29 @@ class HiggsAdapter(TTSAdapter):
         try:
             logger.info(f"{self.provider_name}: Loading Higgs Audio V2 model...")
             
+            # Get resource manager for memory monitoring
+            resource_manager = await get_resource_manager()
+            
+            # Check memory before loading model
+            if resource_manager.memory_monitor.is_memory_critical():
+                raise TTSInsufficientMemoryError(
+                    "Insufficient memory to load Higgs model",
+                    provider=self.provider_name,
+                    details=resource_manager.memory_monitor.get_memory_usage()
+                )
+            
             # Check if boson_multimodal library is available
             try:
                 from boson_multimodal.serve.serve_engine import HiggsAudioServeEngine
-            except ImportError:
+            except ImportError as e:
                 logger.error(f"{self.provider_name}: boson_multimodal library not installed")
                 logger.info("Install Higgs Audio dependencies from: https://github.com/boson-ai/higgs-audio")
                 self._status = ProviderStatus.NOT_CONFIGURED
-                return False
+                raise TTSModelLoadError(
+                    "Failed to import boson_multimodal library",
+                    provider=self.provider_name,
+                    details={"error": str(e), "suggestion": "Install from https://github.com/boson-ai/higgs-audio"}
+                )
             
             # Initialize HiggsAudioServeEngine
             logger.info(f"{self.provider_name}: Initializing HiggsAudioServeEngine...")
@@ -118,6 +145,14 @@ class HiggsAdapter(TTSAdapter):
                 device=self.device
             )
             
+            # Register model with resource manager
+            if self.serve_engine:
+                resource_manager.register_model(
+                    provider=self.provider_name.lower(),
+                    model_instance=self.serve_engine,
+                    cleanup_callback=self._cleanup_resources
+                )
+            
             logger.info(
                 f"{self.provider_name}: Initialized successfully "
                 f"(Device: {self.device})"
@@ -125,10 +160,24 @@ class HiggsAdapter(TTSAdapter):
             self._status = ProviderStatus.AVAILABLE
             return True
             
+        except (TTSInsufficientMemoryError, TTSModelLoadError):
+            raise
+        except RuntimeError as e:
+            if "CUDA" in str(e) or "GPU" in str(e):
+                raise TTSGPUError(
+                    f"GPU error initializing {self.provider_name}",
+                    provider=self.provider_name,
+                    details={"error": str(e), "device": self.device}
+                )
+            raise
         except Exception as e:
             logger.error(f"{self.provider_name}: Initialization failed: {e}")
             self._status = ProviderStatus.ERROR
-            return False
+            raise TTSProviderInitializationError(
+                f"Failed to initialize {self.provider_name}",
+                provider=self.provider_name,
+                details={"error": str(e), "model_path": self.model_path}
+            )
     
     async def get_capabilities(self) -> TTSCapabilities:
         """Get Higgs Audio V2 capabilities"""
@@ -162,12 +211,17 @@ class HiggsAdapter(TTSAdapter):
     async def generate(self, request: TTSRequest) -> TTSResponse:
         """Generate speech using Higgs Audio V2"""
         if not await self.ensure_initialized():
-            raise ValueError(f"{self.provider_name} not initialized")
+            raise TTSProviderNotConfiguredError(
+                f"{self.provider_name} not initialized",
+                provider=self.provider_name
+            )
         
-        # Validate request
-        is_valid, error = await self.validate_request(request)
-        if not is_valid:
-            raise ValueError(error)
+        # Validate request using new validation system
+        try:
+            validate_tts_request(request, provider=self.provider_name.lower())
+        except Exception as e:
+            logger.error(f"{self.provider_name} request validation failed: {e}")
+            raise
         
         # Prepare generation parameters
         voice = request.voice or "conversational"

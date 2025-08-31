@@ -415,7 +415,7 @@ class ChatbookService:
         tags: List[str] = None,
         categories: List[str] = None,
         async_mode: bool = False
-    ) -> Tuple[bool, str, Optional[str]]:
+    ) -> Tuple[bool, str, Optional[str], Dict[str, int]]:
         """
         Create a chatbook from selected content.
         
@@ -433,7 +433,7 @@ class ChatbookService:
             async_mode: Run as background job
             
         Returns:
-            Tuple of (success, message, job_id or file_path)
+            Tuple of (success, message, job_id or file_path, content_summary)
         """
         if async_mode:
             # Create job and run asynchronously
@@ -455,7 +455,7 @@ class ChatbookService:
                 include_generated_content, tags, categories
             ))
             
-            return True, f"Export job started: {job_id}", job_id
+            return True, f"Export job started: {job_id}", job_id, {}
         else:
             # Run synchronously (wrapped in async)
             return await self._create_chatbook_sync_wrapper(
@@ -622,11 +622,11 @@ class ChatbookService:
                 "documents": manifest.total_documents
             }
             
-            return True, f"Chatbook created successfully", str(output_path)
+            return True, f"Chatbook created successfully", str(output_path), content_summary
             
         except Exception as e:
             logger.error(f"Error creating chatbook: {e}")
-            return False, f"Error creating chatbook: {str(e)}", None
+            return False, f"Error creating chatbook: {str(e)}", None, {}
     
     async def _create_chatbook_job_async(
         self,

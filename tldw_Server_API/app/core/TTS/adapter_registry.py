@@ -18,6 +18,12 @@ from .adapters.dia_adapter import DiaAdapter
 from .adapters.chatterbox_adapter import ChatterboxAdapter
 from .adapters.elevenlabs_adapter import ElevenLabsAdapter
 from .adapters.vibevoice_adapter import VibeVoiceAdapter
+from .tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError
+)
+from .tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -86,10 +92,17 @@ class TTSAdapterRegistry:
             
         Returns:
             Initialized adapter instance or None if unavailable
+            
+        Raises:
+            TTSProviderNotConfiguredError: If provider is not registered
         """
         if provider not in self._adapter_classes:
-            logger.error(f"No adapter registered for provider {provider.value}")
-            return None
+            error_msg = f"No adapter registered for provider {provider.value}"
+            logger.error(error_msg)
+            raise TTSProviderNotConfiguredError(
+                error_msg,
+                provider=provider.value
+            )
         
         # Check if adapter already exists
         if provider in self._adapters:
@@ -118,6 +131,9 @@ class TTSAdapterRegistry:
             
         Returns:
             True if initialization successful
+            
+        Raises:
+            TTSProviderInitializationError: If initialization fails
         """
         try:
             # Get adapter class
@@ -129,6 +145,14 @@ class TTSAdapterRegistry:
             # Check if provider is enabled
             if not provider_config.get(f"{provider.value}_enabled", True):
                 logger.info(f"Provider {provider.value} is disabled in configuration")
+                return False
+            
+            # Get resource manager for monitoring
+            resource_manager = await get_resource_manager()
+            
+            # Check memory before initializing new adapter
+            if resource_manager.memory_monitor.is_memory_critical():
+                logger.warning(f"Skipping {provider.value} initialization due to memory constraints")
                 return False
             
             # Create adapter instance
@@ -144,12 +168,22 @@ class TTSAdapterRegistry:
                 logger.info(f"Successfully initialized {provider.value} adapter")
                 return True
             else:
-                logger.error(f"Failed to initialize {provider.value} adapter")
-                return False
+                error_msg = f"Failed to initialize {provider.value} adapter"
+                logger.error(error_msg)
+                raise TTSProviderInitializationError(
+                    error_msg,
+                    provider=provider.value
+                )
                 
+        except TTSProviderInitializationError:
+            raise
         except Exception as e:
             logger.error(f"Error initializing {provider.value} adapter: {e}")
-            return False
+            raise TTSProviderInitializationError(
+                f"Unexpected error initializing {provider.value}",
+                provider=provider.value,
+                details={"error": str(e), "error_type": type(e).__name__}
+            )
     
     def _get_provider_config(self, provider: TTSProvider) -> Dict[str, Any]:
         """
@@ -268,19 +302,41 @@ class TTSAdapterRegistry:
         return default_priority
     
     async def close_all(self):
-        """Close all initialized adapters"""
+        """Close all initialized adapters and clean up resources"""
         logger.info("Closing all TTS adapters...")
+        
+        # Get resource manager for cleanup
+        try:
+            resource_manager = await get_resource_manager()
+        except Exception as e:
+            logger.warning(f"Could not get resource manager for cleanup: {e}")
+            resource_manager = None
         
         tasks = []
         for provider, adapter in self._adapters.items():
             logger.info(f"Closing {provider.value} adapter...")
             tasks.append(adapter.close())
+            
+            # Unregister from resource manager if available
+            if resource_manager:
+                try:
+                    await resource_manager.unregister_model(provider.value)
+                except Exception as e:
+                    logger.warning(f"Error unregistering {provider.value} from resource manager: {e}")
         
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         
         self._adapters.clear()
         self._initialized_providers.clear()
+        
+        # Clean up resource manager connections
+        if resource_manager:
+            try:
+                await resource_manager.cleanup_all()
+            except Exception as e:
+                logger.warning(f"Error during resource manager cleanup: {e}")
+        
         logger.info("All TTS adapters closed")
     
     def get_status_summary(self) -> Dict[str, Any]:

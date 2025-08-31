@@ -22,6 +22,18 @@ from .base import (
     VoiceInfo,
     ProviderStatus
 )
+from ..tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError,
+    TTSModelLoadError,
+    TTSGenerationError,
+    TTSResourceError,
+    TTSInsufficientMemoryError,
+    TTSGPUError
+)
+from ..tts_validation import validate_tts_request
+from ..tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -116,15 +128,18 @@ class VibeVoiceAdapter(TTSAdapter):
         # Model instances
         self.model = None
         self.processor = None
-        self.vibe_encoder = None  # For encoding emotional context
         
-        # Vibe/tone settings
-        self.default_vibe = self.config.get("vibevoice_default_vibe", "friendly")
-        self.vibe_intensity = self.config.get("vibevoice_intensity", 1.0)  # 0.0 to 2.0
+        # Speaker settings (VibeVoice supports up to 4 speakers)
+        self.max_speakers = 4
+        self.default_speaker = self.config.get("vibevoice_default_speaker", 1)
         
         # Context awareness
         self.enable_context = self.config.get("vibevoice_context", True)
         self.context_window = self.config.get("vibevoice_context_window", 512)
+        
+        # VibeVoice specific features
+        self.enable_background_music = self.config.get("vibevoice_background_music", False)
+        self.enable_singing = self.config.get("vibevoice_enable_singing", False)
         
         # Performance settings
         self.use_fp16 = self.config.get("vibevoice_use_fp16", True) and self.device == "cuda"
@@ -138,6 +153,17 @@ class VibeVoiceAdapter(TTSAdapter):
         """Initialize the VibeVoice TTS model"""
         try:
             logger.info(f"{self.provider_name}: Initializing VibeVoice TTS (variant: {self.variant}, model: {self.model_path})...")
+            
+            # Get resource manager for memory monitoring
+            resource_manager = await get_resource_manager()
+            
+            # Check memory before loading model
+            if resource_manager.memory_monitor.is_memory_critical():
+                raise TTSInsufficientMemoryError(
+                    "Insufficient memory to load VibeVoice model",
+                    provider=self.provider_name,
+                    details=resource_manager.memory_monitor.get_memory_usage()
+                )
             
             # Check for model files
             if not self._check_model_files():
@@ -169,12 +195,10 @@ class VibeVoiceAdapter(TTSAdapter):
                     local_files_only=self.model_dir.exists()
                 )
                 
-                # Load vibe encoder for emotional context
-                self.vibe_encoder = self._initialize_vibe_encoder()
+                # Model is ready for use
                 
             except ImportError as e:
-                logger.error(f"{self.provider_name}: Required libraries not installed: {e}")
-                logger.error(
+                error_msg = (
                     f"{self.provider_name}: Required libraries not installed. "
                     f"To use VibeVoice, follow these steps:\n"
                     f"1. Clone the VibeVoice repository:\n"
@@ -189,12 +213,25 @@ class VibeVoiceAdapter(TTSAdapter):
                     f"4. The {self.variant} model will auto-download on first use from:\n"
                     f"   {self.model_path}"
                 )
+                logger.error(f"{self.provider_name}: Required libraries not installed: {e}")
+                logger.error(error_msg)
                 self._status = ProviderStatus.NOT_CONFIGURED
-                return False
+                raise TTSModelLoadError(
+                    "Failed to import required libraries",
+                    provider=self.provider_name,
+                    details={"error": str(e), "suggestion": error_msg}
+                )
             
             # Set to evaluation mode
             if self.model:
                 self.model.eval()
+                
+                # Register model with resource manager
+                resource_manager.register_model(
+                    provider=self.provider_name.lower(),
+                    model_instance=self.model,
+                    cleanup_callback=self._cleanup_resources
+                )
             
             # Warm up the model
             await self._warmup_model()
@@ -206,10 +243,24 @@ class VibeVoiceAdapter(TTSAdapter):
             self._status = ProviderStatus.AVAILABLE
             return True
             
+        except (TTSInsufficientMemoryError, TTSModelLoadError):
+            raise
+        except RuntimeError as e:
+            if "CUDA" in str(e) or "GPU" in str(e):
+                raise TTSGPUError(
+                    f"GPU error initializing {self.provider_name}",
+                    provider=self.provider_name,
+                    details={"error": str(e), "device": self.device}
+                )
+            raise
         except Exception as e:
             logger.error(f"{self.provider_name}: Initialization failed: {e}")
             self._status = ProviderStatus.ERROR
-            return False
+            raise TTSProviderInitializationError(
+                f"Failed to initialize {self.provider_name}",
+                provider=self.provider_name,
+                details={"error": str(e), "model_path": self.model_path}
+            )
     
     def _check_model_files(self) -> bool:
         """Check if model files exist locally"""
@@ -255,12 +306,6 @@ class VibeVoiceAdapter(TTSAdapter):
             logger.error(f"{self.provider_name}: Model download failed: {e}")
             return False
     
-    def _initialize_vibe_encoder(self):
-        """Initialize the vibe/emotion encoder"""
-        # This would load a specialized encoder for emotional context
-        # For now, return a placeholder
-        return None
-    
     async def _warmup_model(self):
         """Warm up the model with a test generation"""
         if not self.model:
@@ -299,7 +344,7 @@ class VibeVoiceAdapter(TTSAdapter):
             max_text_length=self.context_length,  # Use variant-specific context length
             supports_streaming=True,
             supports_voice_cloning=False,  # VibeVoice doesn't support cloning per Microsoft docs
-            supports_emotion_control=False,  # Uses vibes/tones instead
+            supports_emotion_control=False,  # Does not have direct emotion control
             supports_speech_rate=True,
             supports_pitch_control=False,
             supports_volume_control=True,
@@ -324,17 +369,23 @@ class VibeVoiceAdapter(TTSAdapter):
     async def generate(self, request: TTSRequest) -> TTSResponse:
         """Generate speech using VibeVoice TTS"""
         if not await self.ensure_initialized():
-            raise ValueError(f"{self.provider_name} not initialized")
+            raise TTSProviderNotConfiguredError(
+                f"{self.provider_name} not initialized",
+                provider=self.provider_name
+            )
         
-        # Validate request
-        is_valid, error = await self.validate_request(request)
-        if not is_valid:
-            raise ValueError(error)
+        # Validate request using new validation system
+        try:
+            validate_tts_request(request, provider=self.provider_name.lower())
+        except Exception as e:
+            logger.error(f"{self.provider_name} request validation failed: {e}")
+            raise
         
-        # Process voice and vibe
+        # Process voice and speaker settings
         voice = request.voice or "aurora"
-        vibe = request.extra_params.get("vibe", self.default_vibe)
-        vibe_intensity = request.extra_params.get("vibe_intensity", self.vibe_intensity)
+        speaker_id = request.extra_params.get("speaker_id", self.default_speaker)
+        # Ensure speaker_id is within valid range (1-4)
+        speaker_id = max(1, min(4, speaker_id))
         
         # Handle voice cloning if reference provided
         voice_reference_path = None
@@ -343,37 +394,34 @@ class VibeVoiceAdapter(TTSAdapter):
             # Use "cloned" as voice identifier when using reference
             voice = "cloned" if voice_reference_path else voice
         
-        # Analyze text for contextual vibe if enabled
-        if self.enable_context:
-            detected_vibe = await self._analyze_text_vibe(request.text)
-            if detected_vibe and not request.extra_params.get("vibe"):
-                vibe = detected_vibe
-                logger.debug(f"{self.provider_name}: Auto-detected vibe: {vibe}")
+        # Process multi-speaker if needed
+        speakers = request.speakers if hasattr(request, 'speakers') else None
         
         logger.info(
             f"{self.provider_name}: Generating speech with voice={voice}, "
-            f"vibe={vibe}, intensity={vibe_intensity}, format={request.format.value}"
+            f"speaker_id={speaker_id}, format={request.format.value}"
         )
         
         try:
             if request.stream:
                 # Return streaming response
                 return TTSResponse(
-                    audio_stream=self._stream_audio_vibevoice(request, voice, vibe, vibe_intensity, voice_reference_path),
+                    audio_stream=self._stream_audio_vibevoice(request, voice, speaker_id, voice_reference_path),
                     format=request.format,
                     sample_rate=self.sample_rate,
                     channels=1,
                     voice_used=voice,
                     provider=self.provider_name,
                     metadata={
-                        "vibe": vibe,
-                        "vibe_intensity": vibe_intensity,
-                        "context_enabled": self.enable_context
+                        "speaker_id": speaker_id,
+                        "context_enabled": self.enable_context,
+                        "background_music": self.enable_background_music,
+                        "singing_enabled": self.enable_singing
                     }
                 )
             else:
                 # Generate complete audio
-                audio_data = await self._generate_complete_vibevoice(request, voice, vibe, vibe_intensity, voice_reference_path)
+                audio_data = await self._generate_complete_vibevoice(request, voice, speaker_id, voice_reference_path)
                 return TTSResponse(
                     audio_data=audio_data,
                     format=request.format,
@@ -382,55 +430,37 @@ class VibeVoiceAdapter(TTSAdapter):
                     voice_used=voice,
                     provider=self.provider_name,
                     metadata={
-                        "vibe": vibe,
-                        "vibe_intensity": vibe_intensity,
-                        "context_enabled": self.enable_context
+                        "speaker_id": speaker_id,
+                        "context_enabled": self.enable_context,
+                        "background_music": self.enable_background_music,
+                        "singing_enabled": self.enable_singing
                     }
                 )
                 
+        except (TTSProviderNotConfiguredError, TTSModelLoadError):
+            raise
         except Exception as e:
             logger.error(f"{self.provider_name} generation error: {e}")
-            raise
+            raise TTSGenerationError(
+                f"Failed to generate speech with {self.provider_name}",
+                provider=self.provider_name,
+                details={"error": str(e), "error_type": type(e).__name__}
+            )
     
-    async def _analyze_text_vibe(self, text: str) -> Optional[str]:
-        """Analyze text to detect appropriate vibe/tone"""
-        # Simple heuristic analysis (in production, would use NLP model)
-        text_lower = text.lower()
-        
-        # Check for question marks - thoughtful or curious
-        if text.count('?') > 1:
-            return "thoughtful"
-        
-        # Check for exclamations - excited or energetic
-        if text.count('!') > 1:
-            return "excited" if len(text) < 50 else "energetic"
-        
-        # Check for formal words
-        formal_words = ["hereby", "whereas", "pursuant", "regarding", "therefore"]
-        if any(word in text_lower for word in formal_words):
-            return "professional"
-        
-        # Check for emotional words
-        if any(word in text_lower for word in ["love", "heart", "dear", "darling"]):
-            return "romantic"
-        
-        if any(word in text_lower for word in ["sorry", "understand", "feel", "hope"]):
-            return "empathetic"
-        
-        # Default to friendly
-        return "friendly"
     
     async def _stream_audio_vibevoice(
         self,
         request: TTSRequest,
         voice: str,
-        vibe: str,
-        vibe_intensity: float,
+        speaker_id: int,
         voice_reference_path: Optional[str] = None
     ) -> AsyncGenerator[bytes, None]:
         """Stream audio from VibeVoice model"""
         if not self.model or not self.processor:
-            raise ValueError("VibeVoice model not initialized")
+            raise TTSModelNotFoundError(
+                "VibeVoice model not initialized",
+                provider=self.provider_name
+            )
         
         # Import StreamingAudioWriter
         from tldw_Server_API.app.core.TTS.streaming_audio_writer import (
@@ -446,8 +476,8 @@ class VibeVoiceAdapter(TTSAdapter):
         )
         
         try:
-            # Prepare input with vibe encoding
-            input_data = self._prepare_vibevoice_input(request, voice, vibe, vibe_intensity)
+            # Prepare input with speaker settings
+            input_data = self._prepare_vibevoice_input(request, voice, speaker_id)
             
             # Process text with context
             if self.enable_context:
@@ -463,10 +493,8 @@ class VibeVoiceAdapter(TTSAdapter):
                     return_tensors="pt"
                 ).to(self.device)
             
-            # Add vibe encoding
-            if self.vibe_encoder:
-                vibe_embedding = self._encode_vibe(vibe, vibe_intensity)
-                inputs["vibe_embedding"] = vibe_embedding
+            # Add speaker ID to inputs
+            inputs["speaker_id"] = torch.tensor([speaker_id], dtype=torch.long).to(self.device)
             
             # Add voice reference if provided
             if voice_reference_path:
@@ -491,9 +519,6 @@ class VibeVoiceAdapter(TTSAdapter):
                     chunk = audio_array[i:i + chunk_size]
                     
                     if len(chunk) > 0:
-                        # Apply vibe modulation (placeholder)
-                        chunk = self._apply_vibe_modulation(chunk, vibe, vibe_intensity)
-                        
                         # Normalize to int16
                         normalized_chunk = normalizer.normalize(chunk, target_dtype=np.int16)
                         
@@ -507,11 +532,17 @@ class VibeVoiceAdapter(TTSAdapter):
             if final_bytes:
                 yield final_bytes
             
-            logger.info(f"{self.provider_name}: Successfully generated audio with vibe={vibe}")
+            logger.info(f"{self.provider_name}: Successfully generated audio with speaker={speaker_id}")
             
+        except TTSModelNotFoundError:
+            raise
         except Exception as e:
             logger.error(f"{self.provider_name} streaming error: {e}")
-            raise
+            raise TTSGenerationError(
+                f"Streaming error in {self.provider_name}",
+                provider=self.provider_name,
+                details={"error": str(e)}
+            )
         finally:
             writer.close()
             # Clean up voice reference file if used
@@ -527,13 +558,12 @@ class VibeVoiceAdapter(TTSAdapter):
         self,
         request: TTSRequest,
         voice: str,
-        vibe: str,
-        vibe_intensity: float,
+        speaker_id: int,
         voice_reference_path: Optional[str] = None
     ) -> bytes:
         """Generate complete audio from VibeVoice"""
         all_audio = b""
-        async for chunk in self._stream_audio_vibevoice(request, voice, vibe, vibe_intensity, voice_reference_path):
+        async for chunk in self._stream_audio_vibevoice(request, voice, speaker_id, voice_reference_path):
             all_audio += chunk
         return all_audio
     
@@ -541,55 +571,23 @@ class VibeVoiceAdapter(TTSAdapter):
         self,
         request: TTSRequest,
         voice: str,
-        vibe: str,
-        vibe_intensity: float
+        speaker_id: int
     ) -> Dict[str, Any]:
-        """Prepare input for VibeVoice with vibe control"""
-        # Validate vibe
-        if vibe not in self.VIBES:
-            logger.warning(f"Unknown vibe '{vibe}', using default")
-            vibe = self.default_vibe
-        
-        # Clamp intensity
-        vibe_intensity = max(0.0, min(2.0, vibe_intensity))
-        
+        """Prepare input for VibeVoice with speaker settings"""
         # Process text with SSML if present
         text = self.preprocess_text(request.text)
         
         return {
             "text": text,
             "voice": voice,
-            "vibe": vibe,
-            "vibe_intensity": vibe_intensity,
+            "speaker_id": speaker_id,
             "speed": request.speed,
             "pitch": request.pitch,
-            "volume": request.volume
+            "volume": request.volume,
+            "background_music": self.enable_background_music,
+            "singing": self.enable_singing
         }
     
-    def _encode_vibe(self, vibe: str, intensity: float):
-        """Encode vibe into embeddings for the model"""
-        # Placeholder - would use actual vibe encoder
-        vibe_idx = list(self.VIBES).index(vibe) if vibe in self.VIBES else 0
-        embedding = torch.zeros(256)  # Placeholder embedding size
-        embedding[vibe_idx] = intensity
-        return embedding.to(self.device)
-    
-    def _apply_vibe_modulation(self, audio: np.ndarray, vibe: str, intensity: float) -> np.ndarray:
-        """Apply vibe-specific audio modulation"""
-        # Placeholder for vibe-specific audio processing
-        # In production, this would apply actual DSP based on vibe
-        
-        if vibe == "excited":
-            # Slightly increase pitch and add energy
-            audio = audio * (1.0 + 0.1 * intensity)
-        elif vibe == "calm":
-            # Smooth the audio
-            audio = audio * (1.0 - 0.1 * intensity)
-        elif vibe == "mysterious":
-            # Add some reverb effect (placeholder)
-            audio = audio * 0.9
-        
-        return audio
     
     async def _prepare_voice_reference(self, voice_reference: bytes) -> Optional[str]:
         """
@@ -657,8 +655,8 @@ class VibeVoiceAdapter(TTSAdapter):
         # Basic preprocessing
         text = super().preprocess_text(text)
         
-        # VibeVoice supports extended SSML with vibe tags
-        # Example: <vibe type="excited" intensity="1.5">This is exciting!</vibe>
+        # VibeVoice supports multi-speaker dialogue markers
+        # Example: [Speaker1] Hello there. [Speaker2] Hi!
         # These would be parsed and handled by the model
         
         return text
@@ -670,12 +668,9 @@ class VibeVoiceAdapter(TTSAdapter):
                 del self.model
             if self.processor:
                 del self.processor
-            if self.vibe_encoder:
-                del self.vibe_encoder
             
             self.model = None
             self.processor = None
-            self.vibe_encoder = None
             
             # Clear GPU cache if using CUDA
             if self.device == "cuda" and torch.cuda.is_available():

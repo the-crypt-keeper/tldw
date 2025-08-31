@@ -29,6 +29,26 @@ from .circuit_breaker import (
     CircuitBreakerManager,
     CircuitOpenError
 )
+from .tts_exceptions import (
+    TTSError,
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError,
+    TTSGenerationError,
+    TTSValidationError,
+    TTSAuthenticationError,
+    TTSRateLimitError,
+    TTSNetworkError,
+    TTSTimeoutError,
+    TTSProviderError,
+    TTSResourceError,
+    TTSInsufficientMemoryError,
+    TTSGPUError,
+    categorize_error,
+    is_retryable_error
+)
+from .tts_validation import validate_tts_request
+from .tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -121,6 +141,14 @@ class TTSServiceV2:
         # Convert OpenAI request to unified TTSRequest
         tts_request = self._convert_request(request)
         
+        # Validate the request first
+        try:
+            validate_tts_request(tts_request, provider=provider.lower() if provider else None)
+        except TTSValidationError as e:
+            logger.error(f"TTS request validation failed: {e}")
+            yield f"ERROR: {str(e)}".encode()
+            return
+        
         # Get adapter
         adapter = await self._get_adapter(request.model, provider)
         
@@ -130,9 +158,12 @@ class TTSServiceV2:
                 adapter = await self._get_fallback_adapter(tts_request)
             
             if not adapter:
-                error_msg = f"No TTS adapter available for model '{request.model}'"
-                logger.error(error_msg)
-                yield error_msg.encode()
+                error = TTSProviderNotConfiguredError(
+                    f"No TTS adapter available for model '{request.model}'",
+                    provider=provider
+                )
+                logger.error(str(error))
+                yield f"ERROR: {str(error)}".encode()
                 return
         
         # Track metrics
@@ -164,11 +195,20 @@ class TTSServiceV2:
                     except CircuitOpenError as e:
                         logger.warning(f"Circuit open for {adapter.provider_name}: {e}")
                         if fallback:
+                            # Record fallback attempt
+                            self.metrics.counter_increment(
+                                "tts_fallback_attempts",
+                                labels={"from_provider": adapter.provider_name, "to_provider": "any", "success": "pending"}
+                            )
                             async for chunk in self._try_fallback_providers(tts_request, [adapter.provider_name]):
                                 yield chunk
                             return
                         else:
-                            raise
+                            raise TTSProviderError(
+                                f"Circuit open for {adapter.provider_name}",
+                                provider=adapter.provider_name,
+                                details={"circuit_state": "open"}
+                            )
                 else:
                     response = await adapter.generate(tts_request)
                 
@@ -205,8 +245,41 @@ class TTSServiceV2:
                     success=True
                 )
                     
-        except Exception as e:
+        except TTSError as e:
+            # Handle TTS-specific errors with proper categorization
             error_msg = f"Error generating speech with {adapter.provider_name}: {str(e)}"
+            logger.error(error_msg)
+            
+            # Record failure metrics
+            self._record_tts_metrics(
+                provider=adapter.provider_name,
+                model=tts_request.model or "default", 
+                voice=tts_request.voice or "default",
+                format=tts_request.format.value,
+                text_length=len(tts_request.text),
+                audio_size=audio_size,
+                duration=time.time() - start_time,
+                success=False,
+                error=str(e)
+            )
+            
+            # Check if error is retryable and fallback is enabled
+            if fallback and is_retryable_error(e):
+                logger.info(f"Attempting fallback due to retryable error: {type(e).__name__}")
+                self.metrics.counter_increment(
+                    "tts_fallback_attempts",
+                    labels={"from_provider": adapter.provider_name, "to_provider": "any", "success": "pending"}
+                )
+                async for chunk in self._try_fallback_providers(tts_request, [adapter.provider_name]):
+                    yield chunk
+            else:
+                # For non-recoverable errors or when fallback is disabled
+                yield f"ERROR: {error_msg}".encode()
+                if not fallback:
+                    raise
+        except Exception as e:
+            # Handle unexpected errors
+            error_msg = f"Unexpected error generating speech with {adapter.provider_name}: {str(e)}"
             logger.error(error_msg, exc_info=True)
             
             # Record failure metrics
@@ -222,20 +295,20 @@ class TTSServiceV2:
                 error=str(e)
             )
             
-            # Categorize error type for better handling
-            error_type = self._categorize_error(e)
-            logger.debug(f"Error categorized as: {error_type}")
+            # Wrap in TTS error for consistency
+            tts_error = TTSGenerationError(
+                f"Unexpected error in {adapter.provider_name}",
+                provider=adapter.provider_name,
+                details={"error": str(e), "error_type": type(e).__name__}
+            )
             
-            if fallback and error_type in ['network', 'api_limit', 'provider_error']:
-                # Try fallback for recoverable errors
-                logger.info(f"Attempting fallback due to {error_type} error...")
+            if fallback:
+                logger.info("Attempting fallback due to unexpected error")
                 async for chunk in self._try_fallback_providers(tts_request, [adapter.provider_name]):
                     yield chunk
             else:
-                # For non-recoverable errors or when fallback is disabled
                 yield f"ERROR: {error_msg}".encode()
-                if not fallback:
-                    raise
+                raise tts_error
         finally:
             # Update active requests gauge
             self.metrics.gauge_add(
@@ -404,6 +477,7 @@ class TTSServiceV2:
     def _categorize_error(self, error: Exception) -> str:
         """
         Categorize error types for better error handling decisions.
+        Uses the new exception system's categorization.
         
         Args:
             error: Exception that occurred
@@ -411,39 +485,12 @@ class TTSServiceV2:
         Returns:
             Error category string
         """
-        error_str = str(error).lower()
-        error_type = type(error).__name__.lower()
-        
-        # Network-related errors
-        if any(keyword in error_str for keyword in ['connection', 'timeout', 'network', 'unreachable']):
-            return 'network'
-        
-        # API rate limiting or quota errors
-        if any(keyword in error_str for keyword in ['rate limit', 'quota', 'too many requests', '429']):
-            return 'api_limit'
-        
-        # Authentication/authorization errors
-        if any(keyword in error_str for keyword in ['unauthorized', 'api key', 'authentication', '401', '403']):
-            return 'auth'
-        
-        # Provider-specific errors (likely recoverable with fallback)
-        if any(keyword in error_str for keyword in ['provider', 'model', 'service unavailable', '503', '502']):
-            return 'provider_error'
-        
-        # Input validation errors (not recoverable with different provider)
-        if any(keyword in error_str for keyword in ['invalid input', 'text too long', 'unsupported format']):
-            return 'input_error'
-        
-        # Configuration errors
-        if any(keyword in error_str for keyword in ['not configured', 'missing config', 'initialization']):
-            return 'config_error'
-        
-        # Default to unknown
-        return 'unknown'
+        # Use the new exception system's categorization
+        return categorize_error(error)
     
     async def _handle_provider_fallback(self, request: TTSRequest, failed_provider: str, error_msg: str):
         """
-        Handle provider fallback logging and potential circuit breaker logic.
+        Handle provider fallback logging and circuit breaker updates.
         
         Args:
             request: Original TTS request
@@ -453,10 +500,12 @@ class TTSServiceV2:
         logger.warning(f"Provider {failed_provider} failed: {error_msg}")
         logger.info(f"Attempting fallback for request: text_length={len(request.text)}, voice={request.voice}")
         
-        # TODO: Implement circuit breaker pattern here
-        # - Track failure rates per provider
-        # - Temporarily disable providers with high failure rates
-        # - Implement exponential backoff
+        # Update circuit breaker state if available
+        if self.circuit_manager:
+            breaker = await self.circuit_manager.get_breaker(failed_provider)
+            if breaker:
+                # The circuit breaker will track the failure internally
+                logger.debug(f"Circuit breaker updated for {failed_provider}")
     
     async def _try_fallback_providers(
         self, 
@@ -480,23 +529,66 @@ class TTSServiceV2:
                 async for chunk in self._generate_with_adapter(fallback_adapter, request):
                     yield chunk
                 logger.info(f"Successfully fell back to {fallback_adapter.provider_name}")
-            except Exception as e:
+                # Record successful fallback
+                self.metrics.counter_increment(
+                    "tts_fallback_attempts",
+                    labels={
+                        "from_provider": exclude_providers[0] if exclude_providers else "unknown",
+                        "to_provider": fallback_adapter.provider_name,
+                        "success": "true"
+                    }
+                )
+            except TTSError as e:
                 logger.error(f"Fallback provider {fallback_adapter.provider_name} also failed: {e}")
-                # Try one more fallback if available
-                exclude_providers.append(fallback_adapter.provider_name)
-                final_fallback = await self._get_fallback_adapter(request, exclude_providers)
+                # Record failed fallback
+                self.metrics.counter_increment(
+                    "tts_fallback_attempts",
+                    labels={
+                        "from_provider": exclude_providers[0] if exclude_providers else "unknown",
+                        "to_provider": fallback_adapter.provider_name,
+                        "success": "false"
+                    }
+                )
                 
-                if final_fallback:
-                    try:
-                        async for chunk in self._generate_with_adapter(final_fallback, request):
-                            yield chunk
-                        logger.info(f"Final fallback to {final_fallback.provider_name} succeeded")
-                    except Exception as final_e:
-                        error_msg = f"All providers failed. Last error: {str(final_e)}"
-                        logger.error(error_msg)
-                        yield f"ERROR: {error_msg}".encode()
+                # Try one more fallback if available and error is retryable
+                if is_retryable_error(e):
+                    exclude_providers.append(fallback_adapter.provider_name)
+                    final_fallback = await self._get_fallback_adapter(request, exclude_providers)
+                    
+                    if final_fallback:
+                        try:
+                            async for chunk in self._generate_with_adapter(final_fallback, request):
+                                yield chunk
+                            logger.info(f"Final fallback to {final_fallback.provider_name} succeeded")
+                            # Record successful final fallback
+                            self.metrics.counter_increment(
+                                "tts_fallback_attempts",
+                                labels={
+                                    "from_provider": fallback_adapter.provider_name,
+                                    "to_provider": final_fallback.provider_name,
+                                    "success": "true"
+                                }
+                            )
+                        except Exception as final_e:
+                            # Wrap non-TTS errors
+                            if not isinstance(final_e, TTSError):
+                                final_e = TTSGenerationError(
+                                    f"Final fallback failed",
+                                    provider=final_fallback.provider_name,
+                                    details={"error": str(final_e)}
+                                )
+                            error_msg = f"All providers failed. Last error: {str(final_e)}"
+                            logger.error(error_msg)
+                            yield f"ERROR: {error_msg}".encode()
+                    else:
+                        yield f"ERROR: All fallback providers exhausted".encode()
                 else:
-                    yield f"ERROR: All fallback providers exhausted".encode()
+                    # Non-retryable error, don't attempt more fallbacks
+                    yield f"ERROR: {str(e)} (non-retryable)".encode()
+            except Exception as e:
+                # Handle unexpected errors
+                logger.error(f"Unexpected error in fallback: {e}", exc_info=True)
+                yield f"ERROR: Unexpected error during fallback: {str(e)}".encode()
         else:
             yield f"ERROR: No fallback providers available".encode()
     

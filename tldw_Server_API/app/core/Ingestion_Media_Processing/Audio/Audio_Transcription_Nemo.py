@@ -21,7 +21,7 @@ import sys
 import logging
 import tempfile
 from pathlib import Path
-from typing import Optional, Union, Tuple, Dict, Any
+from typing import Optional, Union, Tuple, Dict, Any, Callable
 import numpy as np
 import torch
 
@@ -171,76 +171,57 @@ def _load_parakeet_standard(device: str):
 
 
 def _load_parakeet_onnx(device: str):
-    """Load ONNX variant of Parakeet model."""
+    """Load ONNX variant of Parakeet model using proper implementation."""
     try:
-        import onnxruntime as ort
-    except ImportError:
-        logging.error("ONNX Runtime not installed. Install with: pip install onnxruntime")
-        return None
-    
-    logging.info("Loading Parakeet TDT ONNX model...")
-    
-    cache_dir = _get_cache_dir()
-    model_path = cache_dir / "parakeet-onnx"
-    
-    # Download model if not cached
-    if not model_path.exists():
-        try:
-            from huggingface_hub import snapshot_download
-            logging.info("Downloading Parakeet ONNX model from Hugging Face...")
-            snapshot_download(
-                repo_id="istupakov/parakeet-tdt-0.6b-v3-onnx",
-                local_dir=str(model_path),
-                local_dir_use_symlinks=False
-            )
-        except ImportError:
-            logging.error("huggingface_hub not installed. Install with: pip install huggingface_hub")
-            return None
-        except Exception as e:
-            logging.error(f"Failed to download ONNX model: {e}")
-            return None
-    
-    # Create ONNX session
-    providers = ['CUDAExecutionProvider'] if device == 'cuda' else ['CPUExecutionProvider']
-    
-    try:
-        # Look for the main ONNX file
-        onnx_files = list(model_path.glob("*.onnx"))
-        if not onnx_files:
-            logging.error(f"No ONNX files found in {model_path}")
+        # Import the proper ONNX implementation
+        from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_ONNX import (
+            load_parakeet_onnx_model
+        )
+        
+        logging.info("Loading Parakeet TDT ONNX model...")
+        
+        # Load model with proper tokenizer
+        session, tokenizer = load_parakeet_onnx_model(device=device)
+        
+        if session is None or tokenizer is None:
+            logging.error("Failed to load ONNX model or tokenizer")
             return None
         
-        session = ort.InferenceSession(str(onnx_files[0]), providers=providers)
-        
-        # Wrap in a simple class for consistent interface
+        # Wrap in a class for consistent interface
         class ONNXParakeetModel:
-            def __init__(self, session):
+            def __init__(self, session, tokenizer):
                 self.session = session
-                self.input_names = [inp.name for inp in session.get_inputs()]
-                self.output_names = [out.name for out in session.get_outputs()]
+                self.tokenizer = tokenizer
             
-            def transcribe(self, audio_path):
-                # This is a simplified implementation
-                # Real implementation would need proper preprocessing
-                import soundfile as sf
-                audio_data, sample_rate = sf.read(audio_path)
+            def transcribe(self, audio_path, chunk_duration=None, overlap_duration=15.0, chunk_callback=None):
+                # Use the proper ONNX transcription
+                from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_ONNX import (
+                    transcribe_with_parakeet_onnx
+                )
                 
-                # Prepare input (this is model-specific and may need adjustment)
-                inputs = {self.input_names[0]: audio_data.astype(np.float32)}
-                outputs = self.session.run(self.output_names, inputs)
+                result = transcribe_with_parakeet_onnx(
+                    audio_path,
+                    device=device,
+                    chunk_duration=chunk_duration,
+                    overlap_duration=overlap_duration,
+                    chunk_callback=chunk_callback
+                )
                 
-                # Decode outputs (this is model-specific)
-                # For now, return a placeholder
-                return ["[ONNX transcription placeholder - implement decoding]"]
+                # Return as list for compatibility
+                return [result] if result else ["[No transcription produced]"]
         
-        model = ONNXParakeetModel(session)
+        model = ONNXParakeetModel(session, tokenizer)
         cache_key = _get_model_cache_key('parakeet', 'onnx')
         _model_cache[cache_key] = model
-        logging.info(f"Successfully loaded Parakeet ONNX model")
+        logging.info(f"Successfully loaded Parakeet ONNX model with tokenizer")
         return model
         
+    except ImportError as e:
+        logging.error(f"Failed to import ONNX implementation: {e}")
+        logging.error("Ensure Audio_Transcription_Parakeet_ONNX.py is available")
+        return None
     except Exception as e:
-        logging.error(f"Failed to create ONNX session: {e}")
+        logging.error(f"Failed to load ONNX model: {e}")
         return None
 
 
@@ -365,7 +346,10 @@ def transcribe_with_canary(
 def transcribe_with_parakeet(
     audio_data: Union[np.ndarray, str],
     sample_rate: int = 16000,
-    variant: str = 'standard'
+    variant: str = 'standard',
+    chunk_duration: Optional[float] = None,
+    overlap_duration: float = 15.0,
+    chunk_callback: Optional[Callable[[int, int], None]] = None
 ) -> str:
     """
     Transcribe audio using the Parakeet TDT model.
@@ -374,6 +358,9 @@ def transcribe_with_parakeet(
         audio_data: Either a numpy array of audio samples or path to audio file
         sample_rate: Sample rate of the audio
         variant: Model variant to use ('standard', 'onnx', 'mlx')
+        chunk_duration: Duration in seconds for chunking long audio (None = no chunking)
+        overlap_duration: Overlap between chunks in seconds (default 15.0)
+        chunk_callback: Callback function for chunk progress (current, total)
     
     Returns:
         Transcribed text string
@@ -406,11 +393,22 @@ def transcribe_with_parakeet(
             from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX import (
                 transcribe_with_parakeet_mlx as mlx_transcribe
             )
-            result = mlx_transcribe(audio_path, sample_rate=sample_rate)
+            result = mlx_transcribe(
+                audio_path, 
+                sample_rate=sample_rate,
+                chunk_duration=chunk_duration,
+                overlap_duration=overlap_duration,
+                chunk_callback=chunk_callback
+            )
             transcriptions = [result] if result else ["[No transcription produced]"]
         elif variant == 'onnx' and hasattr(model, 'transcribe'):
-            # ONNX model transcription
-            transcriptions = model.transcribe(audio_path)
+            # ONNX model transcription with chunking support
+            transcriptions = model.transcribe(
+                audio_path,
+                chunk_duration=chunk_duration,
+                overlap_duration=overlap_duration,
+                chunk_callback=chunk_callback
+            )
         else:
             # Standard Nemo model transcription
             transcriptions = model.transcribe([audio_path], batch_size=1)
@@ -438,7 +436,10 @@ def transcribe_with_nemo(
     sample_rate: int = 16000,
     model: str = 'parakeet',
     variant: str = 'standard',
-    language: Optional[str] = None
+    language: Optional[str] = None,
+    chunk_duration: Optional[float] = None,
+    overlap_duration: float = 15.0,
+    chunk_callback: Optional[Callable[[int, int], None]] = None
 ) -> str:
     """
     Unified entry point for Nemo model transcription.
@@ -449,14 +450,23 @@ def transcribe_with_nemo(
         model: Which model to use ('parakeet' or 'canary')
         variant: Model variant for Parakeet ('standard', 'onnx', 'mlx')
         language: Target language for Canary (en, es, de, fr)
+        chunk_duration: Duration in seconds for chunking long audio (None = no chunking)
+        overlap_duration: Overlap between chunks in seconds (default 15.0)
+        chunk_callback: Callback function for chunk progress (current, total)
     
     Returns:
         Transcribed text string
     """
     if model.lower() == 'canary':
+        # Note: Canary doesn't support chunking in current implementation
         return transcribe_with_canary(audio_data, sample_rate, language)
     elif model.lower() == 'parakeet':
-        return transcribe_with_parakeet(audio_data, sample_rate, variant)
+        return transcribe_with_parakeet(
+            audio_data, sample_rate, variant,
+            chunk_duration=chunk_duration,
+            overlap_duration=overlap_duration,
+            chunk_callback=chunk_callback
+        )
     else:
         return f"[Error: Unknown Nemo model: {model}]"
 
