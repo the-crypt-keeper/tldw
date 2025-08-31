@@ -24,6 +24,7 @@ from .tts_exceptions import (
     TTSModelNotFoundError
 )
 from .tts_resource_manager import get_resource_manager
+from .tts_config import get_tts_config_manager, TTSConfig
 #
 #######################################################################################################################
 #
@@ -66,7 +67,13 @@ class TTSAdapterRegistry:
         Args:
             config: Configuration dictionary for all adapters
         """
-        self.config = config or {}
+        # Use unified configuration system
+        self.config_manager = get_tts_config_manager()
+        self.tts_config = self.config_manager.get_config()
+        
+        # Legacy config support
+        self.config = config or self.tts_config.dict()
+        
         self._adapters: Dict[TTSProvider, TTSAdapter] = {}
         self._adapter_classes: Dict[TTSProvider, Type[TTSAdapter]] = self.DEFAULT_ADAPTERS.copy()
         self._init_lock = asyncio.Lock()
@@ -142,8 +149,8 @@ class TTSAdapterRegistry:
             # Get provider-specific config
             provider_config = self._get_provider_config(provider)
             
-            # Check if provider is enabled
-            if not provider_config.get(f"{provider.value}_enabled", True):
+            # Check if provider is enabled using unified config
+            if not self.config_manager.is_provider_enabled(provider.value):
                 logger.info(f"Provider {provider.value} is disabled in configuration")
                 return False
             
@@ -195,7 +202,14 @@ class TTSAdapterRegistry:
         Returns:
             Provider-specific configuration dictionary
         """
-        # Start with global config
+        # Use unified configuration system
+        provider_cfg = self.config_manager.get_provider_config(provider.value)
+        
+        if provider_cfg:
+            # Convert to dict for adapter consumption
+            return provider_cfg.dict()
+        
+        # Fallback to legacy config
         provider_config = self.config.copy()
         
         # Add provider-specific overrides
@@ -279,27 +293,28 @@ class TTSAdapterRegistry:
         Returns:
             Ordered list of providers to try
         """
-        # Default priority order
-        default_priority = [
-            TTSProvider.OPENAI,      # Reliable, high quality
-            TTSProvider.KOKORO,      # Local, fast
-            TTSProvider.CHATTERBOX,  # Emotion control
-            TTSProvider.DIA,         # Dialogue specialist
-            TTSProvider.HIGGS        # Advanced but resource-heavy
-        ]
+        # Use unified configuration priority
+        priority_names = self.config_manager.get_provider_priority()
         
-        # Check for custom priority in config
-        if "provider_priority" in self.config:
-            custom_priority = []
-            for provider_name in self.config["provider_priority"]:
-                try:
-                    provider = TTSProvider(provider_name)
-                    custom_priority.append(provider)
-                except ValueError:
-                    logger.warning(f"Unknown provider in priority list: {provider_name}")
-            return custom_priority or default_priority
+        priority = []
+        for provider_name in priority_names:
+            try:
+                provider = TTSProvider(provider_name)
+                priority.append(provider)
+            except ValueError:
+                logger.warning(f"Unknown provider in priority list: {provider_name}")
         
-        return default_priority
+        # Fallback to default if no valid providers
+        if not priority:
+            priority = [
+                TTSProvider.OPENAI,
+                TTSProvider.KOKORO,
+                TTSProvider.CHATTERBOX,
+                TTSProvider.DIA,
+                TTSProvider.HIGGS
+            ]
+        
+        return priority
     
     async def close_all(self):
         """Close all initialized adapters and clean up resources"""

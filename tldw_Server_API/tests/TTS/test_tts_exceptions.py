@@ -8,12 +8,19 @@ from typing import Dict, Any
 # Local Imports
 from tldw_Server_API.app.core.TTS.tts_exceptions import (
     TTSError,
+    TTSConfigurationError,
     TTSProviderNotConfiguredError,
     TTSProviderInitializationError,
     TTSModelNotFoundError,
     TTSModelLoadError,
     TTSGenerationError,
     TTSValidationError,
+    TTSInvalidInputError,
+    TTSUnsupportedFormatError,
+    TTSUnsupportedLanguageError,
+    TTSVoiceNotFoundError,
+    TTSTextTooLongError,
+    TTSInvalidVoiceReferenceError,
     TTSAuthenticationError,
     TTSRateLimitError,
     TTSNetworkError,
@@ -22,12 +29,6 @@ from tldw_Server_API.app.core.TTS.tts_exceptions import (
     TTSResourceError,
     TTSInsufficientMemoryError,
     TTSGPUError,
-    TTSInvalidVoiceError,
-    TTSInvalidFormatError,
-    TTSInvalidLanguageError,
-    TTSTextTooLongError,
-    TTSInvalidParameterError,
-    TTSInvalidVoiceReferenceError,
     categorize_error,
     is_retryable_error,
     get_http_status_for_error,
@@ -81,17 +82,17 @@ class TestTTSExceptionHierarchy:
     
     def test_validation_exception_subtypes(self):
         """Test validation exception subtypes"""
-        text_error = TTSTextTooLongError("Text too long", max_length=1000, actual_length=2000)
+        text_error = TTSTextTooLongError("Text too long", provider="test", details={"max_length": 1000, "actual_length": 2000})
         assert isinstance(text_error, TTSValidationError)
         assert text_error.details["max_length"] == 1000
         assert text_error.details["actual_length"] == 2000
         
-        voice_error = TTSInvalidVoiceError("Invalid voice", requested_voice="test", available_voices=["v1", "v2"])
+        voice_error = TTSVoiceNotFoundError("Voice not found", provider="test", details={"requested_voice": "test", "available_voices": ["v1", "v2"]})
         assert isinstance(voice_error, TTSValidationError)
         assert voice_error.details["requested_voice"] == "test"
         assert voice_error.details["available_voices"] == ["v1", "v2"]
         
-        format_error = TTSInvalidFormatError("Invalid format", requested_format="test", supported_formats=["mp3", "wav"])
+        format_error = TTSUnsupportedFormatError("Unsupported format", provider="test", details={"requested_format": "test", "supported_formats": ["mp3", "wav"]})
         assert isinstance(format_error, TTSValidationError)
         assert format_error.details["requested_format"] == "test"
         assert format_error.details["supported_formats"] == ["mp3", "wav"]
@@ -100,8 +101,8 @@ class TestTTSExceptionHierarchy:
         """Test resource exception subtypes"""
         memory_error = TTSInsufficientMemoryError(
             "Out of memory",
-            required_mb=4096,
-            available_mb=2048
+            provider="test",
+            details={"required_mb": 4096, "available_mb": 2048}
         )
         assert isinstance(memory_error, TTSResourceError)
         assert memory_error.details["required_mb"] == 4096
@@ -109,11 +110,11 @@ class TestTTSExceptionHierarchy:
         
         gpu_error = TTSGPUError(
             "GPU error",
-            cuda_available=False,
-            gpu_memory_mb=0
+            provider="test",
+            details={"cuda_available": False, "gpu_memory_mb": 0}
         )
         assert isinstance(gpu_error, TTSResourceError)
-        assert memory_error.details is not None
+        assert gpu_error.details is not None
 
 
 class TestErrorCategorization:
@@ -131,7 +132,7 @@ class TestErrorCategorization:
         
         # Validation errors
         assert categorize_error(TTSValidationError("test")) == "validation"
-        assert categorize_error(TTSTextTooLongError("test", 100, 200)) == "validation"
+        assert categorize_error(TTSTextTooLongError("test")) == "validation"
         
         # API errors
         assert categorize_error(TTSAuthenticationError("test")) == "authentication"
@@ -143,7 +144,7 @@ class TestErrorCategorization:
         
         # Resource errors
         assert categorize_error(TTSResourceError("test")) == "resource"
-        assert categorize_error(TTSInsufficientMemoryError("test", 100, 50)) == "resource"
+        assert categorize_error(TTSInsufficientMemoryError("test")) == "resource"
         
         # Unknown errors
         assert categorize_error(Exception("test")) == "unknown"
@@ -169,8 +170,8 @@ class TestErrorCategorization:
         """Test HTTP status code mapping"""
         # 400 Bad Request
         assert get_http_status_for_error(TTSValidationError("test")) == 400
-        assert get_http_status_for_error(TTSTextTooLongError("test", 100, 200)) == 400
-        assert get_http_status_for_error(TTSInvalidVoiceError("test", "v1", [])) == 400
+        assert get_http_status_for_error(TTSTextTooLongError("test")) == 400
+        assert get_http_status_for_error(TTSVoiceNotFoundError("test")) == 400
         
         # 401 Unauthorized
         assert get_http_status_for_error(TTSAuthenticationError("test")) == 401
@@ -192,7 +193,7 @@ class TestErrorCategorization:
         # 503 Service Unavailable
         assert get_http_status_for_error(TTSProviderNotConfiguredError("test")) == 503
         assert get_http_status_for_error(TTSResourceError("test")) == 503
-        assert get_http_status_for_error(TTSInsufficientMemoryError("test", 100, 50)) == 503
+        assert get_http_status_for_error(TTSInsufficientMemoryError("test")) == 503
         
         # 504 Gateway Timeout
         assert get_http_status_for_error(TTSTimeoutError("test")) == 504

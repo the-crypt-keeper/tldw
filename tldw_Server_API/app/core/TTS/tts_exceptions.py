@@ -332,6 +332,76 @@ def get_http_status_code(error: TTSError) -> int:
     """
     return ERROR_STATUS_CODES.get(type(error), 500)
 
+
+def get_http_status_for_error(error: Exception) -> int:
+    """
+    Get appropriate HTTP status code for any error (alias for compatibility).
+    
+    Args:
+        error: The error
+        
+    Returns:
+        HTTP status code
+    """
+    if isinstance(error, TTSError):
+        return get_http_status_code(error)
+    return 500
+
+
+def is_retryable_error(error: Exception) -> bool:
+    """
+    Check if an error is retryable.
+    
+    Args:
+        error: The exception to check
+        
+    Returns:
+        True if the error is retryable
+    """
+    # Retryable errors
+    if isinstance(error, (TTSNetworkError, TTSTimeoutError, TTSRateLimitError, 
+                         TTSProviderError, TTSProviderUnavailableError,
+                         TTSResourceError)):
+        return True
+    
+    # Non-retryable errors
+    if isinstance(error, (TTSValidationError, TTSAuthenticationError, 
+                         TTSProviderNotConfiguredError, TTSModelNotFoundError,
+                         TTSConfigurationError)):
+        return False
+    
+    # Unknown errors are not retryable by default
+    return False
+
+
+def resource_error(provider: str, resource_type: str, required: Any = None, 
+                  available: Any = None, **kwargs) -> TTSResourceError:
+    """
+    Create a resource error.
+    
+    Args:
+        provider: Provider name
+        resource_type: Type of resource (memory, gpu, etc)
+        required: Required amount
+        available: Available amount
+        **kwargs: Additional details
+        
+    Returns:
+        TTSResourceError instance
+    """
+    details = {
+        'resource_type': resource_type,
+        'required': required,
+        'available': available,
+        **kwargs
+    }
+    
+    message = f"Insufficient {resource_type} for {provider}"
+    if required and available:
+        message += f" (required: {required}, available: {available})"
+    
+    return TTSResourceError(message, provider=provider, details=details)
+
 #
 # End of tts_exceptions.py
 #######################################################################################################################
