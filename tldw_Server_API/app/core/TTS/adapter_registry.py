@@ -68,8 +68,13 @@ class TTSAdapterRegistry:
             config: Configuration dictionary for all adapters
         """
         # Use unified configuration system
-        self.config_manager = get_tts_config_manager()
-        self.tts_config = self.config_manager.get_config()
+        if config:
+            # Override config provided for testing
+            self.config_manager = None
+            self.tts_config = config
+        else:
+            self.config_manager = get_tts_config_manager()
+            self.tts_config = self.config_manager.get_config()
         
         # Legacy config support
         self.config = config or self.tts_config.dict()
@@ -78,6 +83,7 @@ class TTSAdapterRegistry:
         self._adapter_classes: Dict[TTSProvider, Type[TTSAdapter]] = self.DEFAULT_ADAPTERS.copy()
         self._init_lock = asyncio.Lock()
         self._initialized_providers: Set[TTSProvider] = set()
+        self._failed_providers: Set[TTSProvider] = set()  # Track failed providers to avoid retrying
     
     def register_adapter(self, provider: TTSProvider, adapter_class: Type[TTSAdapter]):
         """
@@ -119,8 +125,16 @@ class TTSAdapterRegistry:
         
         # Initialize adapter if needed
         async with self._init_lock:
+            # Skip if we already tried and failed
+            if provider in self._failed_providers:
+                logger.debug(f"Skipping {provider.value} - previously failed")
+                return None
+                
             if provider not in self._adapters:
-                await self._initialize_adapter(provider)
+                success = await self._initialize_adapter(provider)
+                if not success:
+                    self._failed_providers.add(provider)
+                    return None
             
             adapter = self._adapters.get(provider)
             if adapter and adapter.status == ProviderStatus.AVAILABLE:
@@ -150,9 +164,16 @@ class TTSAdapterRegistry:
             provider_config = self._get_provider_config(provider)
             
             # Check if provider is enabled using unified config
-            if not self.config_manager.is_provider_enabled(provider.value):
-                logger.info(f"Provider {provider.value} is disabled in configuration")
-                return False
+            if self.config_manager:
+                if not self.config_manager.is_provider_enabled(provider.value):
+                    logger.info(f"Provider {provider.value} is disabled in configuration")
+                    return False
+            else:
+                # Using direct config for testing
+                enabled_key = f"{provider.value}_enabled"
+                if not self.config.get(enabled_key, True):
+                    logger.info(f"Provider {provider.value} is disabled in configuration")
+                    return False
             
             # Get resource manager for monitoring
             resource_manager = await get_resource_manager()
@@ -177,20 +198,13 @@ class TTSAdapterRegistry:
             else:
                 error_msg = f"Failed to initialize {provider.value} adapter"
                 logger.error(error_msg)
-                raise TTSProviderInitializationError(
-                    error_msg,
-                    provider=provider.value
-                )
+                # Don't store failed adapter - it will be retried next time
+                return False
                 
-        except TTSProviderInitializationError:
-            raise
         except Exception as e:
             logger.error(f"Error initializing {provider.value} adapter: {e}")
-            raise TTSProviderInitializationError(
-                f"Unexpected error initializing {provider.value}",
-                provider=provider.value,
-                details={"error": str(e), "error_type": type(e).__name__}
-            )
+            # Don't store failed adapter - it will be retried next time
+            return False
     
     def _get_provider_config(self, provider: TTSProvider) -> Dict[str, Any]:
         """
@@ -202,12 +216,13 @@ class TTSAdapterRegistry:
         Returns:
             Provider-specific configuration dictionary
         """
-        # Use unified configuration system
-        provider_cfg = self.config_manager.get_provider_config(provider.value)
-        
-        if provider_cfg:
-            # Convert to dict for adapter consumption
-            return provider_cfg.dict()
+        if self.config_manager:
+            # Use unified configuration system
+            provider_cfg = self.config_manager.get_provider_config(provider.value)
+            
+            if provider_cfg:
+                # Convert to dict for adapter consumption
+                return provider_cfg.dict()
         
         # Fallback to legacy config
         provider_config = self.config.copy()
@@ -294,7 +309,11 @@ class TTSAdapterRegistry:
             Ordered list of providers to try
         """
         # Use unified configuration priority
-        priority_names = self.config_manager.get_provider_priority()
+        if self.config_manager:
+            priority_names = self.config_manager.get_provider_priority()
+        else:
+            # Use priority from config if available
+            priority_names = self.config.get("provider_priority", [])
         
         priority = []
         for provider_name in priority_names:

@@ -244,7 +244,9 @@ class MemoryMonitor:
         self,
         memory_threshold: float = 0.85,  # 85% of total memory
         check_interval: float = 30.0,    # Check every 30 seconds
-        cleanup_threshold: float = 0.90   # Force cleanup at 90%
+        cleanup_threshold: float = 0.90,  # Force cleanup at 90%
+        warning_threshold: Optional[float] = None,  # Alias for memory_threshold (for tests)
+        critical_threshold: Optional[float] = None  # Alias for cleanup_threshold (for tests)
     ):
         """
         Initialize memory monitor.
@@ -254,13 +256,25 @@ class MemoryMonitor:
             check_interval: Monitoring check interval in seconds
             cleanup_threshold: Force cleanup threshold (0.0-1.0)
         """
+        # Handle aliases from tests
+        if warning_threshold is not None:
+            memory_threshold = warning_threshold / 100.0
+        if critical_threshold is not None:
+            cleanup_threshold = critical_threshold / 100.0
+            
         self.memory_threshold = memory_threshold
         self.check_interval = check_interval
         self.cleanup_threshold = cleanup_threshold
         
+        # Store as percentages for compatibility
+        self.warning_threshold = memory_threshold * 100
+        self.critical_threshold = cleanup_threshold * 100
+        
         self._monitoring = False
         self._monitor_task: Optional[asyncio.Task] = None
         self._model_references: Set[weakref.ReferenceType] = set()
+        self._last_check_time = 0
+        self._last_memory_usage = None
         self._cleanup_callbacks: List[Callable] = []
         
         # Get system memory info
@@ -286,12 +300,17 @@ class MemoryMonitor:
     def get_memory_usage(self) -> Dict[str, Any]:
         """Get current memory usage statistics"""
         memory = psutil.virtual_memory()
+        mb = 1024 * 1024
         return {
             "total": memory.total,
             "available": memory.available,
             "used": memory.used,
             "percent": memory.percent,
             "free": memory.free,
+            "total_mb": memory.total // mb,
+            "available_mb": memory.available // mb,
+            "used_mb": memory.used // mb,
+            "free_mb": memory.free // mb,
             "threshold": self.memory_threshold * 100,
             "cleanup_threshold": self.cleanup_threshold * 100
         }
@@ -305,6 +324,10 @@ class MemoryMonitor:
         """Check if memory usage is high"""
         usage = psutil.virtual_memory().percent / 100.0
         return usage > self.memory_threshold
+    
+    def is_memory_warning(self) -> bool:
+        """Check if memory usage is at warning level (alias for is_memory_high)"""
+        return self.is_memory_high()
     
     async def force_cleanup(self):
         """Force memory cleanup"""
