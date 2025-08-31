@@ -208,9 +208,15 @@ class TTSGPUError(TTSResourceError):
 
 
 # Convenience functions for common error patterns
-def validation_error(message: str, provider: Optional[str] = None, **kwargs) -> TTSValidationError:
+def validation_error(field: str, value: Any, constraint: str, **kwargs) -> TTSValidationError:
     """Create a validation error with standard format"""
-    return TTSValidationError(message, provider=provider, **kwargs)
+    details = kwargs.get("details", {})
+    details["field"] = field
+    details["value"] = value
+    details["constraint"] = constraint
+    
+    message = f"Validation failed for field '{field}': {constraint}"
+    return TTSValidationError(message, details=details)
 
 
 def provider_error(message: str, provider: str, error_code: Optional[str] = None, **kwargs) -> TTSProviderError:
@@ -218,14 +224,18 @@ def provider_error(message: str, provider: str, error_code: Optional[str] = None
     return TTSProviderError(message, provider=provider, error_code=error_code, **kwargs)
 
 
-def network_error(message: str, provider: str, **kwargs) -> TTSNetworkError:
+def network_error(provider: str, original_error: Exception, **kwargs) -> TTSNetworkError:
     """Create a network error with standard format"""
-    return TTSNetworkError(message, provider=provider, error_code="NETWORK_ERROR", **kwargs)
+    details = kwargs.get("details", {})
+    details["original_error"] = str(original_error)
+    return TTSNetworkError(str(original_error), provider=provider, error_code="NETWORK_ERROR", details=details)
 
 
-def auth_error(message: str, provider: str, **kwargs) -> TTSAuthenticationError:
+def auth_error(provider: str, message: str, **kwargs) -> TTSAuthenticationError:
     """Create an authentication error with standard format"""
-    return TTSAuthenticationError(message, provider=provider, error_code="AUTH_ERROR", **kwargs)
+    details = kwargs.get("details", {})
+    details["suggestion"] = "Check your API key configuration"
+    return TTSAuthenticationError(message, provider=provider, error_code="AUTH_ERROR", details=details)
 
 
 def rate_limit_error(provider: str, retry_after: Optional[int] = None, **kwargs) -> TTSRateLimitError:
@@ -238,23 +248,21 @@ def rate_limit_error(provider: str, retry_after: Optional[int] = None, **kwargs)
         f"Rate limit exceeded for {provider}",
         provider=provider,
         error_code="RATE_LIMIT",
-        details=details,
-        **kwargs
+        details=details
     )
 
 
-def timeout_error(provider: str, timeout_duration: Optional[float] = None, **kwargs) -> TTSTimeoutError:
+def timeout_error(provider: str, timeout_seconds: Optional[int] = None, **kwargs) -> TTSTimeoutError:
     """Create a timeout error with standard format"""
     details = kwargs.get("details", {})
-    if timeout_duration:
-        details["timeout_duration"] = timeout_duration
+    if timeout_seconds:
+        details["timeout_seconds"] = timeout_seconds
     
     return TTSTimeoutError(
         f"Timeout waiting for {provider} response",
         provider=provider,
         error_code="TIMEOUT",
-        details=details,
-        **kwargs
+        details=details
     )
 
 
@@ -365,17 +373,17 @@ def is_retryable_error(error: Exception) -> bool:
     Returns:
         True if the error is retryable
     """
+    # Non-retryable errors (check these first since some inherit from retryable types)
+    if isinstance(error, (TTSValidationError, TTSAuthenticationError, 
+                         TTSProviderNotConfiguredError, TTSModelNotFoundError,
+                         TTSConfigurationError)):
+        return False
+    
     # Retryable errors
     if isinstance(error, (TTSNetworkError, TTSTimeoutError, TTSRateLimitError, 
                          TTSProviderError, TTSProviderUnavailableError,
                          TTSResourceError)):
         return True
-    
-    # Non-retryable errors
-    if isinstance(error, (TTSValidationError, TTSAuthenticationError, 
-                         TTSProviderNotConfiguredError, TTSModelNotFoundError,
-                         TTSConfigurationError)):
-        return False
     
     # Unknown errors are not retryable by default
     return False

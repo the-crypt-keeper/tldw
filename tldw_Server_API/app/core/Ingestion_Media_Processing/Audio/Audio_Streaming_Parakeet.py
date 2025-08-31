@@ -26,11 +26,11 @@ import tempfile
 from pathlib import Path
 
 # Import transcription functions
-from Audio_Transcription_Nemo import (
+from .Audio_Transcription_Nemo import (
     transcribe_with_parakeet,
     load_parakeet_model
 )
-from Audio_Transcription_Parakeet_MLX import (
+from .Audio_Transcription_Parakeet_MLX import (
     transcribe_with_parakeet_mlx
 )
 

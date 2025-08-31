@@ -298,8 +298,8 @@ class TestStreamingSessionManager:
         assert stats["session_id"] == session_id
         assert stats["provider"] == "higgs"
         assert "duration" in stats
-        assert "bytes_streamed"] in stats
-        assert "chunks_sent"] in stats
+        assert "bytes_streamed" in stats
+        assert "chunks_sent" in stats
         
         # Session should be removed
         assert session_id not in manager._sessions

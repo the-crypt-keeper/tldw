@@ -13,7 +13,7 @@ from httpx import AsyncClient
 # Local Imports
 from tldw_Server_API.app.api.v1.schemas.audio_schemas import OpenAISpeechRequest
 from tldw_Server_API.app.core.TTS.tts_service_v2 import TTSServiceV2
-from tldw_Server_API.app.core.TTS.adapter_registry import AdapterRegistry, TTSProvider
+from tldw_Server_API.app.core.TTS.adapter_registry import TTSAdapterRegistry, TTSProvider
 from tldw_Server_API.app.core.TTS.adapters.base import TTSAdapter, TTSCapabilities
 from tldw_Server_API.app.core.TTS.adapters.openai_adapter import OpenAIAdapter
 from tldw_Server_API.app.core.TTS.adapters.kokoro_adapter import KokoroAdapter

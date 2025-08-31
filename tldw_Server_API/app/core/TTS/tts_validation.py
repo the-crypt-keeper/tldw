@@ -27,6 +27,91 @@ from .adapters.base import AudioFormat, TTSRequest
 #
 #######################################################################################################################
 #
+# Provider Limits
+
+
+class ProviderLimits:
+    """Provider-specific limits and constraints"""
+    
+    LIMITS = {
+        "openai": {
+            "max_text_length": 4096,
+            "valid_voices": {"alloy", "echo", "fable", "onyx", "nova", "shimmer"},
+            "valid_formats": {"mp3", "opus", "aac", "flac", "wav", "pcm"},
+            "min_speed": 0.25,
+            "max_speed": 4.0
+        },
+        "elevenlabs": {
+            "max_text_length": 5000,
+            "valid_formats": {"mp3", "pcm", "ulaw"},
+            "min_stability": 0.0,
+            "max_stability": 1.0,
+            "min_similarity": 0.0,
+            "max_similarity": 1.0
+        },
+        "kokoro": {
+            "max_text_length": 10000,
+            "valid_formats": {"wav", "mp3"},
+            "min_speed": 0.5,
+            "max_speed": 2.0
+        },
+        "higgs": {
+            "max_text_length": 8000,
+            "valid_formats": {"wav", "mp3", "opus"},
+            "min_speed": 0.5,
+            "max_speed": 2.0
+        },
+        "dia": {
+            "max_text_length": 10000,
+            "valid_formats": {"wav", "mp3"},
+            "min_speed": 0.5,
+            "max_speed": 2.0,
+            "max_speakers": 4
+        },
+        "chatterbox": {
+            "max_text_length": 10000,
+            "valid_formats": {"wav", "mp3"},
+            "min_speed": 0.5,
+            "max_speed": 2.0
+        },
+        "vibevoice": {
+            "max_text_length": 10000,
+            "valid_formats": {"wav", "mp3"},
+            "min_speed": 0.5,
+            "max_speed": 2.0,
+            "max_speakers": 4
+        }
+    }
+    
+    @classmethod
+    def get_limits(cls, provider: str) -> Dict[str, Any]:
+        """Get limits for a specific provider"""
+        return cls.LIMITS.get(provider, {})
+    
+    @classmethod
+    def get_max_text_length(cls, provider: str) -> int:
+        """Get maximum text length for provider"""
+        limits = cls.get_limits(provider)
+        return limits.get("max_text_length", 5000)  # Default 5000
+    
+    @classmethod
+    def is_valid_voice(cls, provider: str, voice: str) -> bool:
+        """Check if voice is valid for provider"""
+        limits = cls.get_limits(provider)
+        valid_voices = limits.get("valid_voices")
+        if valid_voices is None:
+            return True  # No restriction
+        return voice in valid_voices
+    
+    @classmethod
+    def is_valid_format(cls, provider: str, format: str) -> bool:
+        """Check if format is valid for provider"""
+        limits = cls.get_limits(provider)
+        valid_formats = limits.get("valid_formats", {"mp3", "wav"})
+        return format.lower() in valid_formats
+
+
+#
 # Input Validation and Sanitization
 
 class TTSInputValidator:
@@ -162,6 +247,26 @@ class TTSInputValidator:
         logger.debug(f"Text sanitized: {len(original_text)} -> {len(text)} chars")
         return text.strip()
     
+    def validate_text_length(self, text: str, provider: Optional[str] = None):
+        """Public method to validate text length"""
+        return self._validate_text(text, provider)
+    
+    def validate_language(self, language: str, provider: Optional[str] = None):
+        """Public method to validate language"""
+        return self._validate_language(language, provider)
+    
+    def validate_format(self, format: AudioFormat, provider: Optional[str] = None):
+        """Public method to validate format"""
+        return self._validate_format(format, provider)
+    
+    def validate_parameters(self, request: TTSRequest):
+        """Public method to validate parameters"""
+        return self._validate_parameters(request)
+    
+    def validate_voice_reference(self, voice_ref_data: bytes):
+        """Public method to validate voice reference"""
+        return self._validate_voice_reference(voice_ref_data)
+    
     def validate_request(self, request: TTSRequest, provider: Optional[str] = None) -> Tuple[bool, Optional[str]]:
         """
         Validate a complete TTS request.
@@ -268,25 +373,25 @@ class TTSInputValidator:
         """Validate TTS parameters"""
         # Speed validation
         if request.speed < 0.1 or request.speed > 3.0:
-            raise validation_error(
+            raise TTSInvalidInputError(
                 f"Speed must be between 0.1 and 3.0, got {request.speed}"
             )
         
         # Pitch validation
         if request.pitch < -20.0 or request.pitch > 20.0:
-            raise validation_error(
+            raise TTSInvalidInputError(
                 f"Pitch must be between -20.0 and 20.0, got {request.pitch}"
             )
         
         # Volume validation
         if request.volume < 0.0 or request.volume > 2.0:
-            raise validation_error(
+            raise TTSInvalidInputError(
                 f"Volume must be between 0.0 and 2.0, got {request.volume}"
             )
         
         # Emotion intensity validation
         if request.emotion_intensity < 0.0 or request.emotion_intensity > 2.0:
-            raise validation_error(
+            raise TTSInvalidInputError(
                 f"Emotion intensity must be between 0.0 and 2.0, got {request.emotion_intensity}"
             )
     
@@ -317,8 +422,11 @@ class TTSInputValidator:
         # Remove most control characters but keep common whitespace
         cleaned = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
         
-        # Replace multiple whitespace with single space
-        cleaned = re.sub(r'\s+', ' ', cleaned)
+        # Replace multiple spaces/tabs with single space but preserve newlines
+        cleaned = re.sub(r'[ \t]+', ' ', cleaned)
+        
+        # Replace multiple newlines with double newline
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
         
         return cleaned
     
@@ -421,7 +529,7 @@ def validate_tts_request(request: TTSRequest, provider: Optional[str] = None, co
     is_valid, error_message = validator.validate_request(request, provider)
     
     if not is_valid:
-        raise validation_error(error_message, provider)
+        raise TTSValidationError(error_message, provider=provider)
 
 
 def validate_voice_reference(voice_ref_data: bytes, config: Optional[Dict[str, Any]] = None) -> None:

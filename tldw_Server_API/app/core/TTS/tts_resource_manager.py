@@ -371,6 +371,65 @@ class MemoryMonitor:
                 await asyncio.sleep(self.check_interval)
 
 
+class StreamingSessionManager:
+    """Manages streaming audio sessions"""
+    
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        self.config = config or {}
+        self.sessions: Dict[str, StreamingSession] = {}
+        self.max_sessions = self.config.get("max_streaming_sessions", 10)
+        self._lock = threading.Lock()
+    
+    def create_session(self, session_id: str, **kwargs) -> StreamingSession:
+        """Create a new streaming session"""
+        with self._lock:
+            if len(self.sessions) >= self.max_sessions:
+                # Clean up old sessions
+                self._cleanup_old_sessions()
+                
+            if len(self.sessions) >= self.max_sessions:
+                raise TTSResourceError("Maximum streaming sessions reached")
+            
+            session = StreamingSession(session_id=session_id, **kwargs)
+            self.sessions[session_id] = session
+            return session
+    
+    def get_session(self, session_id: str) -> Optional[StreamingSession]:
+        """Get an existing session"""
+        return self.sessions.get(session_id)
+    
+    def end_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """End a streaming session and return stats"""
+        with self._lock:
+            session = self.sessions.pop(session_id, None)
+            if session:
+                session.end()
+                return session.get_stats()
+            return None
+    
+    def cleanup_expired_sessions(self):
+        """Clean up expired sessions"""
+        with self._lock:
+            self._cleanup_old_sessions()
+    
+    def _cleanup_old_sessions(self):
+        """Internal method to clean up old sessions"""
+        current_time = time.time()
+        expired = []
+        
+        for sid, session in self.sessions.items():
+            if current_time - session.start_time > 3600:  # 1 hour timeout
+                expired.append(sid)
+        
+        for sid in expired:
+            session = self.sessions.pop(sid)
+            session.end()
+    
+    def get_active_sessions(self) -> int:
+        """Get number of active sessions"""
+        return len(self.sessions)
+
+
 class TTSResourceManager:
     """Central resource manager for TTS operations"""
     
@@ -579,6 +638,10 @@ async def close_resource_manager():
         await _resource_manager.shutdown()
         _resource_manager = None
         logger.info("Global TTS Resource Manager closed")
+
+
+# Alias for compatibility
+reset_resource_manager = close_resource_manager
 
 
 # Context manager for resource management

@@ -67,6 +67,9 @@ def load_external_provider_config(provider_name: str = "default") -> Optional[Ex
     # Try to load from environment variables
     env_prefix = f"EXTERNAL_TRANSCRIPTION_{provider_name.upper()}_"
     
+    # Initialize external_config
+    external_config = {}
+    
     base_url = os.getenv(f"{env_prefix}BASE_URL")
     if not base_url:
         # Try loading from config file

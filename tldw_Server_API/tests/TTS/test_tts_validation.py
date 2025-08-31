@@ -20,9 +20,9 @@ from tldw_Server_API.app.core.TTS.adapters.base import (
 from tldw_Server_API.app.core.TTS.tts_exceptions import (
     TTSValidationError,
     TTSTextTooLongError,
-    TTSInvalidLanguageError,
-    TTSInvalidFormatError,
-    TTSInvalidParameterError,
+    TTSUnsupportedLanguageError,
+    TTSUnsupportedFormatError,
+    TTSInvalidInputError,
     TTSInvalidVoiceReferenceError
 )
 #
@@ -110,7 +110,7 @@ class TestTTSInputValidator:
         validator.validate_language("es", ["en", "es", "fr"])
         
         # Invalid language
-        with pytest.raises(TTSInvalidLanguageError) as exc_info:
+        with pytest.raises(TTSUnsupportedLanguageError) as exc_info:
             validator.validate_language("de", ["en", "es", "fr"])
         
         error = exc_info.value
@@ -127,7 +127,7 @@ class TestTTSInputValidator:
         validator.validate_format(AudioFormat.WAV, {AudioFormat.MP3, AudioFormat.WAV})
         
         # Invalid format
-        with pytest.raises(TTSInvalidFormatError) as exc_info:
+        with pytest.raises(TTSUnsupportedFormatError) as exc_info:
             validator.validate_format(AudioFormat.OPUS, {AudioFormat.MP3, AudioFormat.WAV})
         
         error = exc_info.value
@@ -142,7 +142,7 @@ class TestTTSInputValidator:
         validator.validate_parameters(pitch=0.0, min_val=-20.0, max_val=20.0, param_name="pitch")
         
         # Out of range - too low
-        with pytest.raises(TTSInvalidParameterError) as exc_info:
+        with pytest.raises(TTSInvalidInputError) as exc_info:
             validator.validate_parameters(speed=0.1, min_val=0.25, max_val=4.0, param_name="speed")
         
         error = exc_info.value
@@ -151,7 +151,7 @@ class TestTTSInputValidator:
         assert error.details["min"] == 0.25
         
         # Out of range - too high
-        with pytest.raises(TTSInvalidParameterError) as exc_info:
+        with pytest.raises(TTSInvalidInputError) as exc_info:
             validator.validate_parameters(speed=5.0, min_val=0.25, max_val=4.0, param_name="speed")
         
         error = exc_info.value
@@ -280,7 +280,7 @@ class TestValidateTTSRequest:
             speed=10.0  # Way too fast
         )
         
-        with pytest.raises(TTSInvalidParameterError) as exc_info:
+        with pytest.raises(TTSInvalidInputError) as exc_info:
             validate_tts_request(request_bad_speed)
         
         assert exc_info.value.details["parameter"] == "speed"

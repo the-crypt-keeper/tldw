@@ -89,8 +89,8 @@ class TestParakeetMLX:
         mock_check.return_value = False
         assert check_mlx_available() == False
     
-    @patch('parakeet_mlx.load_model')
-    def test_model_loading(self, mock_load_model):
+    @patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX.parakeet_mlx')
+    def test_model_loading(self, mock_parakeet_mlx):
         """Test Parakeet MLX model loading."""
         from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX import (
             load_parakeet_mlx_model, _model_cache
@@ -102,7 +102,7 @@ class TestParakeetMLX:
         # Mock model
         mock_model = MagicMock()
         mock_model.name = "parakeet-tdt-0.6b"
-        mock_load_model.return_value = mock_model
+        mock_parakeet_mlx.load_model.return_value = mock_model
         
         # Load model
         model = load_parakeet_mlx_model()
@@ -110,12 +110,12 @@ class TestParakeetMLX:
         assert model is not None
         assert model == mock_model
         assert 'mlx_model' in _model_cache
-        mock_load_model.assert_called_once()
+        mock_parakeet_mlx.load_model.assert_called_once()
         
         # Test cache hit (should not call load_model again)
         model2 = load_parakeet_mlx_model()
         assert model2 == mock_model
-        assert mock_load_model.call_count == 1  # Still only called once
+        assert mock_parakeet_mlx.load_model.call_count == 1  # Still only called once
     
     @patch('parakeet_mlx.load_model')
     def test_model_loading_with_custom_path(self, mock_load_model):
