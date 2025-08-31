@@ -14,6 +14,8 @@ https://huggingface.co/learn/mcp-course/unit0/introduction
 https://gofastmcp.com/getting-started/welcome
 https://github.com/BeehiveInnovations/zen-mcp-server
 https://github.com/paulrobello/par-mcp-inspector-tui?tab=readme-ov-file
+https://github.com/MCPJam/inspector
+
 https://github.com/kruskal-labs/toolfront
 
 

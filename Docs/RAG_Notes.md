@@ -32,7 +32,7 @@ https://cloud.google.com/generative-ai-app-builder/docs/check-grounding#claim-le
 https://www.tutorialspoint.com/basic-understanding-of-cure-algorithm
 	https://cloud.google.com/generative-ai-app-builder/docs/check-grounding
 
-
+https://arxiv.org/abs/2508.13107
 https://github.com/SciPhi-AI/R2R/
 https://github.com/Aquiles-ai/Aquiles-RAG
 https://aclanthology.org/2024.acl-long.585/

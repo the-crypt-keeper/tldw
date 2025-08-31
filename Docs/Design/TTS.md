@@ -116,7 +116,7 @@ https://github.com/petermg/Chatterbox-TTS-Extended
 https://github.com/murtaza-nasir/speakr
 https://github.com/rhulha/EchoMate
 https://github.com/rhulha/EchoMate_ServerSide/
-
+https://github.com/zeropointnine/tts-audiobook-tool
 https://github.com/canopyai/Orpheus-TTS
     https://github.com/canopyai/Orpheus-TTS
     https://github.com/isaiahbjork/orpheus-tts-local/
@@ -124,11 +124,16 @@ https://github.com/canopyai/Orpheus-TTS
 webrtc
 https://huggingface.co/spaces/fastrtc/talk-to-claude/blob/main/app.py
 https://github.com/freddyaboulton/fastrtchttps://github.com/rhulha/Speech2Speech
-
+https://github.com/boson-ai/higgs-audio/blob/main/examples/serve_engine/run_hf_example.py
 
 Canary
     https://huggingface.co/nvidia/canary-1b-flash
     https://huggingface.co/nvidia/canary-180m-flash
+
+VibeVoice
+    https://microsoft.github.io/VibeVoice/
+    https://github.com/microsoft/VibeVoice
+    https://huggingface.co/collections/microsoft/vibevoice-68a2ef24a875c44be47b034f
 
 
 ### Services
@@ -152,6 +157,11 @@ https://github.com/amanvirparhar/weebo/tree/main
 ### Other
 https://wave-pulse.io/
 https://arxiv.org/abs/2501.01384
+https://huggingface.co/stepfun-ai/Step-Audio-2-mini
+    https://arxiv.org/abs/2507.16632
+
+
+
 
 ### Link Dump:
 https://huggingface.co/NexaAIDev/Qwen2-Audio-7B-GGUF
