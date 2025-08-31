@@ -82,7 +82,11 @@ See the [Migration Guide](#migration-guide) if upgrading from a previous version
 
 ### Media Processing
 - **Multi-format Support**: Video, audio, PDF, EPUB, DOCX, HTML, Markdown, XML, MediaWiki dumps
-- **Transcription**: faster_whisper integration with model selection
+- **Advanced Transcription**: 
+  - **Multiple Engines**: faster_whisper, NVIDIA Nemo (Canary, Parakeet), Qwen2Audio
+  - **Live Transcription**: Real-time audio streaming with VAD and silence detection
+  - **OpenAI Compatible API**: Drop-in replacement for OpenAI's audio transcription endpoints
+  - **Model Variants**: Support for ONNX and MLX optimized models
 - **Web Scraping**: Advanced pipeline with job queue, rate limiting, and progress tracking
 - **Batch Processing**: Handle multiple files/URLs simultaneously
 - **1000+ Sites**: Compatible with any site supported by yt-dlp
@@ -531,6 +535,13 @@ backup_path = ./Backups/
 # Processing Settings
 whisper_model = medium
 chunk_size = 1000
+
+# Speech-to-Text Settings
+[STT-Settings]
+default_transcriber = faster-whisper  # Options: faster-whisper, parakeet, canary, qwen2audio
+nemo_model_variant = standard         # Options: standard, onnx, mlx (for Parakeet)
+nemo_device = cuda                    # Options: cpu, cuda
+nemo_cache_dir = ./models/nemo        # Where to cache Nemo models
 ```
 
 ### Environment Variables

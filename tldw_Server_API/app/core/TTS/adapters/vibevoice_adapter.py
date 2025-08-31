@@ -468,6 +468,16 @@ class VibeVoiceAdapter(TTSAdapter):
                 vibe_embedding = self._encode_vibe(vibe, vibe_intensity)
                 inputs["vibe_embedding"] = vibe_embedding
             
+            # Add voice reference if provided
+            if voice_reference_path:
+                # Load reference audio for speaker embedding
+                import librosa
+                ref_audio, _ = librosa.load(voice_reference_path, sr=self.sample_rate)
+                # Extract speaker embedding (placeholder - would use actual model)
+                speaker_embedding = torch.tensor(ref_audio[:256]).unsqueeze(0).to(self.device)
+                inputs["speaker_embedding"] = speaker_embedding
+                logger.info(f"Using voice reference for VibeVoice: {voice_reference_path}")
+            
             # Generate with streaming
             with torch.no_grad():
                 # Placeholder for actual generation
@@ -504,17 +514,26 @@ class VibeVoiceAdapter(TTSAdapter):
             raise
         finally:
             writer.close()
+            # Clean up voice reference file if used
+            if voice_reference_path:
+                try:
+                    from pathlib import Path
+                    Path(voice_reference_path).unlink(missing_ok=True)
+                    logger.debug(f"Cleaned up voice reference: {voice_reference_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up voice reference: {e}")
     
     async def _generate_complete_vibevoice(
         self,
         request: TTSRequest,
         voice: str,
         vibe: str,
-        vibe_intensity: float
+        vibe_intensity: float,
+        voice_reference_path: Optional[str] = None
     ) -> bytes:
         """Generate complete audio from VibeVoice"""
         all_audio = b""
-        async for chunk in self._stream_audio_vibevoice(request, voice, vibe, vibe_intensity):
+        async for chunk in self._stream_audio_vibevoice(request, voice, vibe, vibe_intensity, voice_reference_path):
             all_audio += chunk
         return all_audio
     
@@ -571,6 +590,50 @@ class VibeVoiceAdapter(TTSAdapter):
             audio = audio * 0.9
         
         return audio
+    
+    async def _prepare_voice_reference(self, voice_reference: bytes) -> Optional[str]:
+        """
+        Prepare voice reference audio for VibeVoice.
+        VibeVoice supports single-sample voice cloning.
+        
+        Args:
+            voice_reference: Voice reference audio bytes
+            
+        Returns:
+            Path to temporary voice reference file or None if processing fails
+        """
+        try:
+            import tempfile
+            from pathlib import Path
+            from tldw_Server_API.app.core.TTS.audio_utils import process_voice_reference
+            
+            # Process voice reference for VibeVoice requirements
+            processed_audio, error = process_voice_reference(
+                voice_reference,
+                provider='vibevoice',
+                validate=True,
+                convert=True
+            )
+            
+            if error:
+                logger.error(f"Voice reference processing failed: {error}")
+                return None
+            
+            # Save to temporary file
+            with tempfile.NamedTemporaryFile(
+                suffix='.wav',
+                delete=False,
+                prefix='vibevoice_voice_'
+            ) as tmp_file:
+                tmp_file.write(processed_audio)
+                tmp_path = tmp_file.name
+            
+            logger.info(f"Voice reference prepared for VibeVoice: {tmp_path}")
+            return tmp_path
+            
+        except Exception as e:
+            logger.error(f"Failed to prepare voice reference: {e}")
+            return None
     
     def map_voice(self, voice_id: str) -> str:
         """Map generic voice ID to VibeVoice voice"""

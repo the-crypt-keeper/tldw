@@ -252,38 +252,34 @@ def _load_parakeet_mlx():
         return _load_parakeet_standard('cpu')
     
     try:
-        import mlx
-        import mlx.core as mx
-    except ImportError:
-        logging.error("MLX not installed. Install with: pip install mlx")
-        return None
-    
-    logging.info("Loading Parakeet TDT MLX model...")
-    
-    cache_dir = _get_cache_dir()
-    model_path = cache_dir / "parakeet-mlx"
-    
-    # Download model if not cached
-    if not model_path.exists():
-        try:
-            from huggingface_hub import snapshot_download
-            logging.info("Downloading Parakeet MLX model from Hugging Face...")
-            snapshot_download(
-                repo_id="mlx-community/parakeet-tdt-0.6b-v3",
-                local_dir=str(model_path),
-                local_dir_use_symlinks=False
-            )
-        except ImportError:
-            logging.error("huggingface_hub not installed. Install with: pip install huggingface_hub")
-            return None
-        except Exception as e:
-            logging.error(f"Failed to download MLX model: {e}")
-            return None
-    
-    # MLX model loading would go here
-    # This is a placeholder as MLX integration requires specific implementation
-    logging.warning("MLX model loading not fully implemented yet. Falling back to standard variant.")
-    return _load_parakeet_standard('cpu')
+        # Import the specialized MLX implementation
+        from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX import (
+            load_parakeet_mlx_model,
+            check_mlx_available
+        )
+        
+        if not check_mlx_available():
+            logging.warning("MLX not available. Falling back to standard variant.")
+            return _load_parakeet_standard('cpu')
+        
+        logging.info("Loading Parakeet MLX model using specialized implementation...")
+        model = load_parakeet_mlx_model()
+        
+        if model is not None:
+            cache_key = _get_model_cache_key('parakeet', 'mlx')
+            _model_cache[cache_key] = model
+            logging.info("Successfully loaded Parakeet MLX model")
+            return model
+        else:
+            logging.warning("Failed to load MLX model. Falling back to standard variant.")
+            return _load_parakeet_standard('cpu')
+            
+    except ImportError as e:
+        logging.warning(f"MLX implementation not available: {e}. Falling back to standard variant.")
+        return _load_parakeet_standard('cpu')
+    except Exception as e:
+        logging.error(f"Error loading Parakeet MLX model: {e}")
+        return _load_parakeet_standard('cpu')
 
 
 #######################################################################################################################
@@ -405,7 +401,14 @@ def transcribe_with_parakeet(
     
     try:
         # Perform transcription based on variant
-        if variant == 'onnx' and hasattr(model, 'transcribe'):
+        if variant == 'mlx':
+            # Use specialized MLX transcription
+            from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX import (
+                transcribe_with_parakeet_mlx as mlx_transcribe
+            )
+            result = mlx_transcribe(audio_path, sample_rate=sample_rate)
+            transcriptions = [result] if result else ["[No transcription produced]"]
+        elif variant == 'onnx' and hasattr(model, 'transcribe'):
             # ONNX model transcription
             transcriptions = model.transcribe(audio_path)
         else:
