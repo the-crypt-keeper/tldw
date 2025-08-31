@@ -3,6 +3,7 @@
 #
 # Imports
 from typing import Optional, Dict, Any
+from datetime import datetime
 #
 #######################################################################################################################
 #
@@ -32,6 +33,7 @@ class TTSError(Exception):
         self.provider = provider
         self.error_code = error_code
         self.details = details or {}
+        self.timestamp = datetime.utcnow()
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert exception to dictionary for API responses"""
@@ -267,20 +269,24 @@ def categorize_error(error: Exception) -> str:
     Returns:
         Error category string
     """
-    if isinstance(error, (TTSNetworkError, TTSTimeoutError)):
+    if isinstance(error, TTSNetworkError):
         return "network"
-    elif isinstance(error, (TTSRateLimitError, TTSQuotaExceededError)):
+    elif isinstance(error, TTSTimeoutError):
+        return "timeout"
+    elif isinstance(error, TTSRateLimitError):
         return "rate_limit"
     elif isinstance(error, TTSAuthenticationError):
-        return "auth"
+        return "authentication"
     elif isinstance(error, (TTSProviderUnavailableError, TTSProviderError)):
         return "provider_error"
-    elif isinstance(error, (TTSValidationError, TTSInvalidInputError)):
-        return "validation_error"
-    elif isinstance(error, TTSResourceError):
-        return "resource_error"
-    elif isinstance(error, TTSConfigurationError):
-        return "config_error"
+    elif isinstance(error, (TTSValidationError, TTSInvalidInputError, TTSTextTooLongError)):
+        return "validation"
+    elif isinstance(error, (TTSModelNotFoundError, TTSModelLoadError)):
+        return "model"
+    elif isinstance(error, (TTSProviderNotConfiguredError, TTSProviderInitializationError, TTSConfigurationError)):
+        return "configuration"
+    elif isinstance(error, (TTSResourceError, TTSInsufficientMemoryError)):
+        return "resource"
     else:
         return "unknown"
 
@@ -295,15 +301,20 @@ ERROR_STATUS_CODES = {
     TTSTextTooLongError: 400,
     TTSInvalidVoiceReferenceError: 400,
     TTSAuthenticationError: 401,
+    TTSModelNotFoundError: 404,
     TTSRateLimitError: 429,
     TTSQuotaExceededError: 429,
+    TTSProviderError: 502,
     TTSProviderUnavailableError: 503,
-    TTSNetworkError: 503,
+    TTSProviderNotConfiguredError: 503,
+    TTSResourceError: 503,
+    TTSInsufficientMemoryError: 503,
+    TTSInsufficientStorageError: 503,
+    TTSNetworkError: 504,
     TTSTimeoutError: 504,
     TTSConfigurationError: 500,
-    TTSProviderNotConfiguredError: 500,
     TTSProviderInitializationError: 500,
-    TTSModelNotFoundError: 500,
+    TTSModelLoadError: 500,
     TTSGenerationError: 500,
     TTSStreamingError: 500,
     TTSAudioProcessingError: 500,
@@ -312,10 +323,6 @@ ERROR_STATUS_CODES = {
     TTSCircuitOpenError: 503,
     TTSAllProvidersFailedError: 503,
     TTSFallbackExhaustedError: 503,
-    TTSResourceError: 500,
-    TTSInsufficientMemoryError: 507,
-    TTSInsufficientStorageError: 507,
-    TTSModelLoadError: 500,
     TTSGPUError: 500,
 }
 

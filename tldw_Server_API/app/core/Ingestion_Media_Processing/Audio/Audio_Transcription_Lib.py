@@ -797,6 +797,30 @@ def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate
         except Exception as e:
             logging.error(f"Canary transcription failed: {e}")
             return f"Canary transcription error: {str(e)}"
+    
+    elif transcription_provider.lower() == "external" or transcription_provider.lower().startswith("external:"):
+        logging.info("Transcribing using external provider")
+        try:
+            from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_External_Provider import (
+                transcribe_with_external_provider
+            )
+            # Check if a specific provider is specified (e.g., "external:myapi")
+            provider_name = "default"
+            if ":" in transcription_provider:
+                provider_name = transcription_provider.split(":", 1)[1]
+            
+            return transcribe_with_external_provider(
+                audio_data, 
+                sample_rate=sample_rate, 
+                provider_name=provider_name,
+                language=speaker_lang
+            )
+        except ImportError as e:
+            logging.error(f"Failed to import external provider module: {e}")
+            return "External provider module not available. Please check installation."
+        except Exception as e:
+            logging.error(f"External provider transcription failed: {e}")
+            return f"External provider transcription error: {str(e)}"
 
     else:
         logging.info(f"Transcribing using faster-whisper with model: {whisper_model}")
