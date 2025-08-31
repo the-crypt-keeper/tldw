@@ -293,6 +293,7 @@ class DatasetResponse(BaseModel):
     name: str
     description: Optional[str] = None
     sample_count: int
+    samples: Optional[List[DatasetSample]] = Field(None, description="Dataset samples")
     created: int = Field(..., description="Creation timestamp (OpenAI-compatible)")
     created_at: Optional[int] = Field(None, description="Creation timestamp (tldw-compatible)")
     created_by: str

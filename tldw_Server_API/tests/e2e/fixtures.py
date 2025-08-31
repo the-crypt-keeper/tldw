@@ -487,6 +487,21 @@ class APIClient:
         response.raise_for_status()
         return response.json()
     
+    def get_auth_headers(self) -> Dict[str, str]:
+        """Get current authentication headers."""
+        headers = {}
+        if "X-API-KEY" in self.client.headers:
+            headers["X-API-KEY"] = self.client.headers["X-API-KEY"]
+        if "Token" in self.client.headers:
+            headers["Token"] = self.client.headers["Token"]
+        if "Authorization" in self.client.headers:
+            headers["Authorization"] = self.client.headers["Authorization"]
+        return headers
+    
+    def get_api_key(self) -> Optional[str]:
+        """Get the current API key if set."""
+        return self.client.headers.get("X-API-KEY") or self.token
+    
     def close(self):
         """Close the client connection."""
         self.client.close()

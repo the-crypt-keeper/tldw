@@ -13,6 +13,7 @@ import time
 from typing import Dict, Any, List
 from datetime import datetime
 import uuid
+import httpx
 # Note: Removed unittest.mock import - E2E tests should not use mocks
 # E2E tests should simulate real user interactions with actual services
 
@@ -143,8 +144,9 @@ class TestCustomBenchmark:
             }
             
             response = self.client.client.post(
-                "/api/v1/evals",
-                json=eval_data
+                "/api/v1/evaluations",
+                json=eval_data,
+                headers=self.client.get_auth_headers()
             )
             
             if response.status_code in [200, 201]:
@@ -178,7 +180,7 @@ class TestCustomBenchmark:
         }
         
         try:
-            response = self.client.client.post("/api/v1/evals", json=eval_data)
+            response = self.client.client.post("/api/v1/evaluations", json=eval_data)
             response.raise_for_status()
             
             result = response.json()
@@ -221,7 +223,7 @@ class TestCustomBenchmark:
         }
         
         response = self.client.client.post(
-            f"/api/v1/evals/{TestCustomBenchmark.eval_id}/runs",
+            f"/api/v1/evaluations/{TestCustomBenchmark.eval_id}/runs",
             json=run_data
         )
         
@@ -284,7 +286,7 @@ class TestCustomBenchmark:
         }
         
         response = self.client.client.post(
-            f"/api/v1/evals/{TestCustomBenchmark.eval_id}/runs",
+            f"/api/v1/evaluations/{TestCustomBenchmark.eval_id}/runs",
             json=run_data
         )
         
@@ -309,7 +311,7 @@ class TestCustomBenchmark:
                 pytest.skip("Unable to create benchmark for testing")
         
         # Get evaluation runs to check scoring
-        response = self.client.client.get(f"/api/v1/evals/{TestCustomBenchmark.eval_id}/runs")
+        response = self.client.client.get(f"/api/v1/evaluations/{TestCustomBenchmark.eval_id}/runs")
         
         if response.status_code == 200:
             result = response.json()
@@ -342,7 +344,7 @@ class TestCustomBenchmark:
             # Wait for the run to complete
             result = AsyncOperationHandler.wait_for_completion(
                 check_func=lambda: self.client.client.get(
-                    f"/api/v1/evals/{TestCustomBenchmark.eval_id}/runs/{TestCustomBenchmark.run_id}"
+                    f"/api/v1/evaluations/{TestCustomBenchmark.eval_id}/runs/{TestCustomBenchmark.run_id}"
                 ).json(),
                 success_condition=lambda r: r.get("status") == "completed",
                 timeout=60,
@@ -403,7 +405,7 @@ class TestCustomBenchmark:
             }
             
             response = self.client.client.post(
-                f"/api/v1/evals/{TestCustomBenchmark.eval_id}/runs",
+                f"/api/v1/evaluations/{TestCustomBenchmark.eval_id}/runs",
                 json=run_data
             )
             
@@ -444,7 +446,7 @@ class TestCustomBenchmark:
             }
         }
         
-        response = self.client.client.post("/api/v1/evals", json=eval_data)
+        response = self.client.client.post("/api/v1/evaluations", json=eval_data)
         
         if response.status_code == 201:
             result = response.json()
@@ -471,7 +473,7 @@ class TestCustomBenchmark:
         for eval_info in evaluations:
             try:
                 eval_id = eval_info['id'] if isinstance(eval_info, dict) else eval_info
-                response = self.client.client.delete(f"/api/v1/evals/{eval_id}")
+                response = self.client.client.delete(f"/api/v1/evaluations/{eval_id}")
                 if response.status_code in [204, 200, 404]:  # 404 is ok if already deleted
                     cleaned += 1
             except Exception as e:
@@ -502,7 +504,7 @@ class TestBenchmarkEdgeCases:
             "dataset": []  # Empty dataset
         }
         
-        response = self.client.client.post("/api/v1/evals", json=eval_data)
+        response = self.client.client.post("/api/v1/evaluations", json=eval_data)
         # Should either reject or handle gracefully (401 is auth issue)
         assert response.status_code in [400, 401, 422, 201]
         
@@ -529,7 +531,7 @@ class TestBenchmarkEdgeCases:
             ]
         }
         
-        response = self.client.client.post("/api/v1/evals", json=eval_data)
+        response = self.client.client.post("/api/v1/evaluations", json=eval_data)
         # Should handle invalid data gracefully
         print(f"Malformed benchmark response: {response.status_code}")
     
@@ -550,7 +552,7 @@ class TestBenchmarkEdgeCases:
             ]
         }
         
-        response = self.client.client.post("/api/v1/evals", json=eval_data)
+        response = self.client.client.post("/api/v1/evaluations", json=eval_data)
         
         if response.status_code == 201:
             eval_id = response.json()["id"]
@@ -563,7 +565,7 @@ class TestBenchmarkEdgeCases:
             }
             
             run_response = self.client.client.post(
-                f"/api/v1/evals/{eval_id}/runs",
+                f"/api/v1/evaluations/{eval_id}/runs",
                 json=run_data
             )
             
@@ -576,7 +578,7 @@ class TestBenchmarkEdgeCases:
                 print(f"Benchmark run response: {run_response.status_code}")
             
             # Cleanup
-            self.client.client.delete(f"/api/v1/evals/{eval_id}")
+            self.client.client.delete(f"/api/v1/evaluations/{eval_id}")
 
 
 if __name__ == "__main__":

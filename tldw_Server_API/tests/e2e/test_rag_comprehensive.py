@@ -81,7 +81,7 @@ class TestRAGComprehensive:
                         f"{api_client.base_url}/api/v1/media/add",
                         files=files,
                         data=data,
-                        headers={"X-API-KEY": "test-api-key-12345"}
+                        headers=api_client.get_auth_headers()  # Use dynamic auth headers
                     )
                     
                     assert response.status_code in [200, 207], f"Upload failed: {response.text}"
@@ -108,16 +108,17 @@ class TestRAGComprehensive:
         while time.time() - start_time < max_wait:
             # Test FTS search
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/search/simple",
+                f"{api_client.base_url}/api/v1/rag/unified/search",
                 json={
                     "query": "machine learning",
                     "search_mode": "fts",
-                    "limit": 10
-                }
+                    "top_k": 10
+                },
+                headers=api_client.get_auth_headers()
             )
             
             if response.status_code == 200:
-                results = response.json().get("results", [])
+                results = response.json().get("documents", [])
                 # Check if our documents are indexed
                 found_titles = [r.get("title", "") for r in results]
                 if any("Machine Learning" in title for title in found_titles):
@@ -141,12 +142,13 @@ class TestRAGComprehensive:
         
         for mode, query, description in search_tests:
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/search/simple",
+                f"{api_client.base_url}/api/v1/rag/unified/search",
                 json={
                     "query": query,
                     "search_mode": mode,
-                    "limit": 5
-                }
+                    "top_k": 5
+                },
+                headers=api_client.get_auth_headers()
             )
             
             assert response.status_code == 200, f"{description} failed"
@@ -160,7 +162,7 @@ class TestRAGComprehensive:
         
         for alpha in alpha_tests:
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/search/simple",
+                f"{api_client.base_url}/api/v1/rag/unified/search",
                 json={
                     "query": "machine learning neural networks",
                     "search_mode": "hybrid",
@@ -181,7 +183,7 @@ class TestRAGComprehensive:
         
         def perform_search():
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/search/simple",
+                f"{api_client.base_url}/api/v1/rag/unified/search",
                 json={
                     "query": "machine learning",
                     "search_mode": "hybrid",
@@ -218,12 +220,13 @@ class TestRAGComprehensive:
         def search(query_mode):
             query, mode = query_mode
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/search/simple",
+                f"{api_client.base_url}/api/v1/rag/unified/search",
                 json={
                     "query": query,
                     "search_mode": mode,
-                    "limit": 5
-                }
+                    "top_k": 5
+                },
+                headers=api_client.get_auth_headers()
             )
             return response.status_code == 200
         
@@ -240,12 +243,12 @@ class TestRAGComprehensive:
         
         # Test with keyword filter
         response = api_client.client.post(
-            f"{api_client.base_url}/api/v1/rag/search/simple",
+            f"{api_client.base_url}/api/v1/rag/unified/search",
             json={
                 "query": "learning",
                 "search_mode": "hybrid",
                 "keywords": ["neural", "deep"],
-                "limit": 5
+                "top_k": 5
             }
         )
         
@@ -267,7 +270,7 @@ class TestRAGComprehensive:
         
         # Test empty query
         response = api_client.client.post(
-            f"{api_client.base_url}/api/v1/rag/search/simple",
+            f"{api_client.base_url}/api/v1/rag/unified/search",
             json={
                 "query": "",
                 "search_mode": "fts"
@@ -278,7 +281,7 @@ class TestRAGComprehensive:
         # Test very long query
         long_query = "machine learning " * 100
         response = api_client.client.post(
-            f"{api_client.base_url}/api/v1/rag/search/simple",
+            f"{api_client.base_url}/api/v1/rag/unified/search",
             json={
                 "query": long_query,
                 "search_mode": "fts",
@@ -289,7 +292,7 @@ class TestRAGComprehensive:
         
         # Test invalid search mode
         response = api_client.client.post(
-            f"{api_client.base_url}/api/v1/rag/search/simple",
+            f"{api_client.base_url}/api/v1/rag/unified/search",
             json={
                 "query": "test",
                 "search_mode": "invalid_mode"

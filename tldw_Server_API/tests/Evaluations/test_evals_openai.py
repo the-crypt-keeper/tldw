@@ -224,7 +224,7 @@ class TestEvaluationCRUD:
         # Update it
         update_data = {
             "description": "Updated description",
-            "metadata": {"updated": True}
+            "metadata": {"custom": {"updated": True}}
         }
         response = client.patch(
             f"/api/v1/evaluations/{eval_id}",
@@ -234,7 +234,7 @@ class TestEvaluationCRUD:
         assert response.status_code == 200
         data = response.json()
         assert data["description"] == "Updated description"
-        assert data["metadata"]["updated"] is True
+        assert data["metadata"]["custom"]["updated"] is True
     
     def test_delete_evaluation(self, client, auth_headers, sample_evaluation_request):
         """Test deleting an evaluation"""
@@ -292,7 +292,7 @@ class TestDatasetOperations:
     def test_create_dataset(self, client, auth_headers, sample_dataset_request):
         """Test creating a dataset"""
         response = client.post(
-            "/api/v1/datasets",
+            "/api/v1/evaluations/datasets",
             json=sample_dataset_request,
             headers=auth_headers
         )
@@ -306,7 +306,7 @@ class TestDatasetOperations:
         """Test getting a dataset"""
         # Create dataset
         create_response = client.post(
-            "/api/v1/datasets",
+            "/api/v1/evaluations/datasets",
             json=sample_dataset_request,
             headers=auth_headers
         )
@@ -323,7 +323,7 @@ class TestDatasetOperations:
         """Test deleting a dataset"""
         # Create dataset
         create_response = client.post(
-            "/api/v1/datasets",
+            "/api/v1/evaluations/datasets",
             json=sample_dataset_request,
             headers=auth_headers
         )

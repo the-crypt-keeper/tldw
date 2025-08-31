@@ -334,6 +334,25 @@ async def list_evaluations(
         )
 
 
+# ============= Rate Limit Management =============
+
+@router.get("/rate-limits", response_model=RateLimitStatusResponse)
+async def get_rate_limit_status(
+    user_id: str = Depends(verify_api_key)
+):
+    """Get current rate limit status for the authenticated user"""
+    try:
+        summary = await user_rate_limiter.get_usage_summary(user_id)
+        return RateLimitStatusResponse(**summary)
+        
+    except Exception as e:
+        logger.error(f"Failed to get rate limit status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get rate limit status: {sanitize_error_message(e, 'rate limit check')}"
+        )
+
+
 @router.get("/{eval_id}", response_model=EvaluationResponse)
 async def get_evaluation(
     eval_id: str,
@@ -895,24 +914,6 @@ async def test_webhook(
             detail=f"Failed to test webhook: {sanitize_error_message(e, 'webhook testing')}"
         )
 
-
-# ============= Rate Limit Management =============
-
-@router.get("/rate-limits", response_model=RateLimitStatusResponse)
-async def get_rate_limit_status(
-    user_id: str = Depends(verify_api_key)
-):
-    """Get current rate limit status for the authenticated user"""
-    try:
-        summary = await user_rate_limiter.get_usage_summary(user_id)
-        return RateLimitStatusResponse(**summary)
-        
-    except Exception as e:
-        logger.error(f"Failed to get rate limit status: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get rate limit status: {sanitize_error_message(e, 'rate limit check')}"
-        )
 
 
 # ============= Additional Run Endpoints =============
