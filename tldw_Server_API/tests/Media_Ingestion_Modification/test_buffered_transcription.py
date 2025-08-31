@@ -5,6 +5,7 @@ Unit and integration tests for buffered/chunked transcription with merge algorit
 import pytest
 import numpy as np
 import tempfile
+import os
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock, call
 import soundfile as sf

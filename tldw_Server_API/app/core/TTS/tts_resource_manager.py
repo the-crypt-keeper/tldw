@@ -300,6 +300,7 @@ class MemoryMonitor:
     def get_memory_usage(self) -> Dict[str, Any]:
         """Get current memory usage statistics"""
         memory = psutil.virtual_memory()
+        process = psutil.Process()
         mb = 1024 * 1024
         return {
             "total": memory.total,
@@ -311,6 +312,7 @@ class MemoryMonitor:
             "available_mb": memory.available // mb,
             "used_mb": memory.used // mb,
             "free_mb": memory.free // mb,
+            "process_mb": process.memory_info().rss // mb,
             "threshold": self.memory_threshold * 100,
             "cleanup_threshold": self.cleanup_threshold * 100
         }
@@ -403,8 +405,21 @@ class StreamingSessionManager:
         self.max_sessions = self.config.get("max_streaming_sessions", 10)
         self._lock = threading.Lock()
     
-    def create_session(self, session_id: str, **kwargs) -> StreamingSession:
-        """Create a new streaming session"""
+    async def create_session(self, provider: str, session_id: Optional[str] = None, **kwargs) -> str:
+        """Create a new streaming session
+        
+        Args:
+            provider: TTS provider name
+            session_id: Optional session ID, will be generated if not provided
+            **kwargs: Additional session parameters
+            
+        Returns:
+            Session ID
+        """
+        if session_id is None:
+            import uuid
+            session_id = str(uuid.uuid4())
+            
         with self._lock:
             if len(self.sessions) >= self.max_sessions:
                 # Clean up old sessions
@@ -413,13 +428,55 @@ class StreamingSessionManager:
             if len(self.sessions) >= self.max_sessions:
                 raise TTSResourceError("Maximum streaming sessions reached")
             
-            session = StreamingSession(session_id=session_id, **kwargs)
+            session = StreamingSession(session_id=session_id, provider=provider, **kwargs)
             self.sessions[session_id] = session
-            return session
+            return session_id
     
-    def get_session(self, session_id: str) -> Optional[StreamingSession]:
+    async def get_session(self, session_id: str) -> Optional[StreamingSession]:
         """Get an existing session"""
         return self.sessions.get(session_id)
+    
+    async def update_session(self, session_id: str, bytes_sent: int = 0, chunks_sent: int = 0) -> bool:
+        """Update session statistics
+        
+        Args:
+            session_id: Session ID
+            bytes_sent: Additional bytes sent
+            chunks_sent: Additional chunks sent
+            
+        Returns:
+            True if session was updated, False if not found
+        """
+        session = self.sessions.get(session_id)
+        if session:
+            session.bytes_sent += bytes_sent
+            session.chunks_sent += chunks_sent
+            session.last_activity = time.time()
+            return True
+        return False
+    
+    async def close_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Close a streaming session and return stats
+        
+        Args:
+            session_id: Session ID
+            
+        Returns:
+            Session statistics or None if not found
+        """
+        with self._lock:
+            session = self.sessions.pop(session_id, None)
+            if session:
+                duration = time.time() - session.created_at
+                return {
+                    "session_id": session_id,
+                    "provider": session.provider,
+                    "duration": duration,
+                    "bytes_sent": session.bytes_sent,
+                    "chunks_sent": session.chunks_sent,
+                    "error_count": session.error_count
+                }
+            return None
     
     def end_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """End a streaming session and return stats"""
@@ -448,9 +505,9 @@ class StreamingSessionManager:
             session = self.sessions.pop(sid)
             session.end()
     
-    def get_active_sessions(self) -> int:
-        """Get number of active sessions"""
-        return len(self.sessions)
+    async def get_active_sessions(self) -> List[str]:
+        """Get list of active session IDs"""
+        return list(self.sessions.keys())
 
 
 class TTSResourceManager:
@@ -480,12 +537,14 @@ class TTSResourceManager:
         )
         
         # Streaming session management
+        self.session_manager = StreamingSessionManager(self.config)
         self._streaming_sessions: Dict[str, StreamingSession] = {}
         self._session_cleanup_task: Optional[asyncio.Task] = None
         self._session_timeout = self.config.get("streaming_session_timeout", 300)  # 5 minutes
         
         # Model instance tracking
         self._model_instances: Dict[str, weakref.ReferenceType] = {}
+        self._registered_models: Dict[str, weakref.ReferenceType] = {}
         
         # Resource cleanup
         self._cleanup_handlers: Dict[ResourceType, List[Callable]] = {}
@@ -600,6 +659,35 @@ class TTSResourceManager:
             except Exception as e:
                 logger.error(f"Error in session cleanup: {e}")
                 await asyncio.sleep(60)
+    
+    async def unregister_model(self, provider: str):
+        """Unregister a model instance
+        
+        Args:
+            provider: Provider name
+        """
+        if provider in self._registered_models:
+            del self._registered_models[provider]
+            logger.debug(f"Unregistered model for provider: {provider}")
+    
+    async def create_streaming_session(self, provider: str) -> str:
+        """Create a new streaming session
+        
+        Args:
+            provider: Provider name
+            
+        Returns:
+            Session ID
+        """
+        return await self.session_manager.create_session(provider)
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get comprehensive resource statistics
+        
+        Returns:
+            Dictionary with resource statistics
+        """
+        return self.get_resource_stats()
     
     def get_resource_stats(self) -> Dict[str, Any]:
         """Get resource usage statistics"""

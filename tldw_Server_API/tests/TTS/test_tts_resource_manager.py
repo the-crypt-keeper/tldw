@@ -205,14 +205,13 @@ class TestStreamingSession:
         """Test creating a streaming session"""
         session = StreamingSession(
             session_id="test123",
-            provider="openai",
-            start_time=1234567890.0
+            provider="openai"
         )
         
         assert session.session_id == "test123"
         assert session.provider == "openai"
-        assert session.start_time == 1234567890.0
-        assert session.bytes_streamed == 0
+        assert session.created_at > 0
+        assert session.bytes_sent == 0
         assert session.chunks_sent == 0
         assert session.is_active is True
     
@@ -223,16 +222,16 @@ class TestStreamingSession:
             provider="openai"
         )
         
-        session.bytes_streamed += 1024
+        session.bytes_sent += 1024
         session.chunks_sent += 1
         
-        assert session.bytes_streamed == 1024
+        assert session.bytes_sent == 1024
         assert session.chunks_sent == 1
         
-        session.bytes_streamed += 512
+        session.bytes_sent += 512
         session.chunks_sent += 1
         
-        assert session.bytes_streamed == 1536
+        assert session.bytes_sent == 1536
         assert session.chunks_sent == 2
 
 

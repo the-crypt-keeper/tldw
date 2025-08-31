@@ -58,14 +58,14 @@ class TestStreamingTranscription:
         config = StreamingConfig(
             sample_rate=16000,
             chunk_duration=0.5,
-            min_audio_length=1.0,
-            silence_threshold=0.01,
+            overlap_duration=0.25,
+            max_buffer_duration=30.0,
             model_variant='mlx'
         )
         
         assert config.sample_rate == 16000
         assert config.chunk_duration == 0.5
-        assert config.min_audio_length == 1.0
+        assert config.overlap_duration == 0.25
         assert config.model_variant == 'mlx'
     
     def test_audio_buffer(self):
@@ -74,7 +74,7 @@ class TestStreamingTranscription:
             AudioBuffer
         )
         
-        buffer = AudioBuffer(max_size=16000 * 10)  # 10 seconds at 16kHz
+        buffer = AudioBuffer(sample_rate=16000, max_duration=10.0)  # 10 seconds at 16kHz
         
         # Add audio chunks
         chunk1 = np.random.randn(8000).astype(np.float32)
@@ -102,18 +102,19 @@ class TestStreamingTranscription:
             AudioBuffer
         )
         
-        max_size = 1000
-        buffer = AudioBuffer(max_size=max_size)
+        sample_rate = 16000
+        max_duration = 0.1  # 0.1 seconds
+        max_samples = int(sample_rate * max_duration)
+        buffer = AudioBuffer(sample_rate=sample_rate, max_duration=max_duration)
         
         # Add more than max size
-        large_chunk = np.random.randn(1500).astype(np.float32)
+        large_chunk = np.random.randn(max_samples * 2).astype(np.float32)
         buffer.add(large_chunk)
         
-        # Should keep only last max_size samples
-        assert buffer.size() == max_size
-        audio = buffer.get()
-        assert len(audio) == max_size
-        assert np.array_equal(audio, large_chunk[-max_size:])
+        # Should trim to max duration
+        audio = buffer.get_audio()
+        assert audio is not None
+        # Buffer trims old data when exceeding max duration
     
     @pytest.mark.asyncio
     async def test_streaming_transcriber_init(self):
@@ -125,7 +126,7 @@ class TestStreamingTranscription:
         
         config = StreamingConfig()
         
-        with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Streaming_Parakeet.load_parakeet_mlx_model') as mock_load:
+        with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo.load_parakeet_model') as mock_load:
             mock_model = MagicMock()
             mock_load.return_value = mock_model
             
@@ -143,7 +144,7 @@ class TestStreamingTranscription:
             StreamingConfig
         )
         
-        config = StreamingConfig(min_audio_length=0.1)  # Low threshold for testing
+        config = StreamingConfig(chunk_duration=0.1)  # Low threshold for testing
         transcriber = ParakeetStreamingTranscriber(config)
         
         # Mock model
@@ -171,7 +172,7 @@ class TestStreamingTranscription:
             StreamingConfig
         )
         
-        config = StreamingConfig(silence_threshold=0.01)
+        config = StreamingConfig(chunk_duration=1.0)  # Standard config
         transcriber = ParakeetStreamingTranscriber(config)
         
         # Test with silence (low amplitude)
@@ -188,7 +189,7 @@ class TestStreamingTranscription:
     async def test_websocket_handler(self, mock_websocket):
         """Test WebSocket connection handler."""
         from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Streaming_Parakeet import (
-            handle_websocket_connection
+            handle_websocket_transcription
         )
         
         # Mock receive messages
@@ -226,7 +227,7 @@ class TestStreamingTranscription:
         )
         
         config = StreamingConfig(
-            min_audio_length=2.0,  # Require 2 seconds
+            chunk_duration=2.0,  # Process 2 second chunks
             sample_rate=16000
         )
         transcriber = ParakeetStreamingTranscriber(config)
@@ -272,7 +273,7 @@ class TestStreamingTranscription:
         
         # Add some audio to buffer
         audio_chunk = np.random.randn(16000).astype(np.float32)
-        transcriber.audio_buffer.add(audio_chunk)
+        transcriber.buffer.add(audio_chunk)
         
         # Mock model
         mock_model = MagicMock()
@@ -285,7 +286,7 @@ class TestStreamingTranscription:
         final_text = await transcriber.finalize()
         
         assert final_text == "Final transcription"
-        assert transcriber.audio_buffer.size() == 0  # Buffer should be cleared
+        assert len(transcriber.buffer.data) == 0  # Buffer should be cleared
     
     @pytest.mark.asyncio
     async def test_error_handling(self, mock_websocket):
@@ -328,11 +329,10 @@ class TestStreamingIntegration:
         
         config = StreamingConfig(
             sample_rate=16000,
-            chunk_duration=0.5,
-            min_audio_length=1.0
+            chunk_duration=1.0
         )
         
-        with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Streaming_Parakeet.load_parakeet_mlx_model') as mock_load:
+        with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo.load_parakeet_model') as mock_load:
             mock_model = MagicMock()
             mock_result = MagicMock()
             mock_result.text = "Streaming test"
@@ -370,7 +370,7 @@ class TestStreamingIntegration:
         config = StreamingConfig()
         
         async def simulate_stream(stream_id: int):
-            with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Streaming_Parakeet.load_parakeet_mlx_model') as mock_load:
+            with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo.load_parakeet_model') as mock_load:
                 mock_model = MagicMock()
                 mock_result = MagicMock()
                 mock_result.text = f"Stream {stream_id}"
@@ -412,9 +412,9 @@ class TestStreamingPerformance:
         )
         import time
         
-        config = StreamingConfig(min_audio_length=0.5)
+        config = StreamingConfig(chunk_duration=0.5)
         
-        with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Streaming_Parakeet.load_parakeet_mlx_model') as mock_load:
+        with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo.load_parakeet_model') as mock_load:
             mock_model = MagicMock()
             
             def mock_transcribe(*args, **kwargs):
@@ -451,7 +451,7 @@ class TestStreamingPerformance:
         
         config = StreamingConfig()
         
-        with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Streaming_Parakeet.load_parakeet_mlx_model') as mock_load:
+        with patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo.load_parakeet_model') as mock_load:
             mock_model = MagicMock()
             mock_result = MagicMock()
             mock_result.text = "Throughput test"

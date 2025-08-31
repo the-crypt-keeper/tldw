@@ -162,39 +162,41 @@ class TestTTSInputValidator:
     def test_validate_parameters(self, validator):
         """Test parameter validation"""
         # Valid parameters
-        validator.validate_parameters(speed=1.0, min_val=0.25, max_val=4.0, param_name="speed")
-        validator.validate_parameters(pitch=0.0, min_val=-20.0, max_val=20.0, param_name="pitch")
+        request = TTSRequest(text="test", speed=1.0, pitch=0.0, volume=1.0)
+        validator.validate_parameters(request)
         
-        # Out of range - too low
+        # Out of range speed - too low
+        request_bad_speed = TTSRequest(text="test", speed=0.05, pitch=0.0, volume=1.0)
         with pytest.raises(TTSInvalidInputError) as exc_info:
-            validator.validate_parameters(speed=0.1, min_val=0.25, max_val=4.0, param_name="speed")
+            validator.validate_parameters(request_bad_speed)
         
         error = exc_info.value
-        assert error.details["parameter"] == "speed"
-        assert error.details["value"] == 0.1
-        assert error.details["min"] == 0.25
+        assert "Speed must be between 0.1 and 3.0" in str(error)
         
-        # Out of range - too high
+        # Out of range speed - too high
+        request_bad_speed_high = TTSRequest(text="test", speed=5.0, pitch=0.0, volume=1.0)
         with pytest.raises(TTSInvalidInputError) as exc_info:
-            validator.validate_parameters(speed=5.0, min_val=0.25, max_val=4.0, param_name="speed")
+            validator.validate_parameters(request_bad_speed_high)
         
         error = exc_info.value
-        assert error.details["value"] == 5.0
-        assert error.details["max"] == 4.0
+        assert "Speed must be between 0.1 and 3.0" in str(error)
     
     def test_validate_voice_reference(self, validator):
         """Test voice reference validation"""
         # Valid WAV header
         valid_wav = b'RIFF' + b'\x00' * 4 + b'WAVE' + b'fmt ' + b'\x00' * 100
-        assert validator.validate_voice_reference(valid_wav)
+        # Should not raise exception for valid audio
+        validator.validate_voice_reference(valid_wav)
         
         # Valid MP3 header
         valid_mp3 = b'ID3' + b'\x00' * 100
-        assert validator.validate_voice_reference(valid_mp3)
+        # Should not raise exception for valid audio
+        validator.validate_voice_reference(valid_mp3)
         
         # Another MP3 format
         valid_mp3_2 = b'\xff\xfb' + b'\x00' * 100
-        assert validator.validate_voice_reference(valid_mp3_2)
+        # Should not raise exception for valid audio
+        validator.validate_voice_reference(valid_mp3_2)
         
         # Invalid format
         with pytest.raises(TTSInvalidVoiceReferenceError) as exc_info:

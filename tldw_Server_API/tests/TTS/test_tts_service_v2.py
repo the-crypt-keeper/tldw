@@ -324,6 +324,7 @@ class TestCircuitBreaker:
     def test_circuit_recovery(self):
         """Test circuit recovery to half-open state"""
         cb = CircuitBreaker(
+            provider_name="test_provider",
             failure_threshold=2,
             recovery_timeout=0.1  # 100ms for testing
         )
@@ -432,7 +433,6 @@ class TestVoiceCloning:
         
         request = TTSRequest(
             text="Test with voice cloning",
-            provider="higgs",
             voice="clone",
             voice_reference=voice_data
         )
