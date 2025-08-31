@@ -41,6 +41,7 @@ dependencies = [
   # API Server Core
   "aiofiles>=23.0.0",
   "aiohttp",
+  "aioresponses",
   "aiosqlite",
   "apscheduler>=3.10.0",
   "argon2-cffi>=23.0.0",
