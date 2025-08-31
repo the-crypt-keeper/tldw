@@ -510,9 +510,10 @@ async def health_check():
             "test_successful": len(test_result) >= 0
         }
     except Exception as e:
+        logger.error(f"Health check failed: {e}")
         return {
             "status": "unhealthy",
             "pipeline": "unified",
             "version": "1.0.0",
-            "error": str(e)
+            "error": "AN ERROR HAS OCCURRED - RAG HEALTH CHECK FAILED - SEE SERVER LOGS",
         }
