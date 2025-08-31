@@ -385,10 +385,11 @@ Full API documentation is available at `http://localhost:8000/docs` when the ser
 - `POST /api/v1/chat/characters` - Character chat
 
 #### RAG (Retrieval-Augmented Generation)
-- `POST /api/v1/rag/search` - Simple hybrid search across databases
-- `POST /api/v1/rag/search/advanced` - Advanced search with full configuration
-- `POST /api/v1/rag/agent` - Q&A agent with automatic context retrieval
-- `POST /api/v1/rag/agent/advanced` - Research agent with tools and streaming
+- `POST /api/v1/rag/search` - Unified search with all features accessible
+- `POST /api/v1/rag/batch` - Batch processing for multiple queries
+- `GET /api/v1/rag/simple` - Simplified search interface
+- `GET /api/v1/rag/advanced` - Advanced search with common features
+- `GET /api/v1/rag/features` - List available features
 - `GET /api/v1/rag/health` - RAG service health status
 
 #### Content Management
@@ -442,23 +443,31 @@ curl -X GET "http://localhost:8000/api/v1/media/search?query=machine+learning&li
 
 #### RAG Search & Q&A
 ```bash
-# Hybrid search across your content
+# Unified search with all features
 curl -X POST "http://localhost:8000/api/v1/rag/search" \
   -H "Content-Type: application/json" \
   -H "X-API-KEY: your-api-key" \
   -d '{
     "query": "machine learning concepts",
-    "search_type": "hybrid",
-    "databases": ["media_db", "notes"]
+    "sources": ["media_db", "notes"],
+    "search_mode": "hybrid",
+    "enable_citations": true,
+    "citation_style": "apa",
+    "top_k": 10
   }'
 
-# Q&A with automatic context retrieval
-curl -X POST "http://localhost:8000/api/v1/rag/agent" \
+# Simple search interface
+curl -X GET "http://localhost:8000/api/v1/rag/simple?q=machine%20learning&limit=5" \
+  -H "X-API-KEY: your-api-key"
+
+# Batch processing
+curl -X POST "http://localhost:8000/api/v1/rag/batch" \
   -H "Content-Type: application/json" \
   -H "X-API-KEY: your-api-key" \
   -d '{
-    "message": "Explain neural networks based on my notes",
-    "search_databases": ["media_db", "notes"]
+    "queries": ["What is AI?", "Explain ML", "Define neural networks"],
+    "sources": ["media_db"],
+    "max_concurrent": 3
   }'
 ```
 

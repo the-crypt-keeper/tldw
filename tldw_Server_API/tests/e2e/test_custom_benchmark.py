@@ -48,74 +48,94 @@ class TestCustomBenchmark:
         self.benchmark_name = f"custom_test_benchmark_{uuid.uuid4().hex[:8]}"
         self.benchmark_questions = [
             {
-                "id": "q1",
-                "question": "What is the capital of France?",
-                "expected_answer": "Paris",
-                "category": "geography",
-                "difficulty": "easy"
+                "input": "What is the capital of France?",
+                "expected": "Paris",
+                "metadata": {
+                    "id": "q1",
+                    "category": "geography",
+                    "difficulty": "easy"
+                }
             },
             {
-                "id": "q2",
-                "question": "What is 15 * 17?",
-                "expected_answer": "255",
-                "category": "math",
-                "difficulty": "easy"
+                "input": "What is 15 * 17?",
+                "expected": "255",
+                "metadata": {
+                    "id": "q2",
+                    "category": "math",
+                    "difficulty": "easy"
+                }
             },
             {
-                "id": "q3",
-                "question": "Write a Python function to reverse a string",
-                "expected_answer": "def reverse_string(s):\n    return s[::-1]",
-                "category": "programming",
-                "difficulty": "medium"
+                "input": "Write a Python function to reverse a string",
+                "expected": "def reverse_string(s):\n    return s[::-1]",
+                "metadata": {
+                    "id": "q3",
+                    "category": "programming",
+                    "difficulty": "medium"
+                }
             },
             {
-                "id": "q4",
-                "question": "If all roses are flowers and some flowers fade quickly, can we conclude all roses fade quickly?",
-                "expected_answer": "No",
-                "category": "logic",
-                "difficulty": "medium"
+                "input": "If all roses are flowers and some flowers fade quickly, can we conclude all roses fade quickly?",
+                "expected": "No",
+                "metadata": {
+                    "id": "q4",
+                    "category": "logic",
+                    "difficulty": "medium"
+                }
             },
             {
-                "id": "q5",
-                "question": "What year did World War II end?",
-                "expected_answer": "1945",
-                "category": "history",
-                "difficulty": "easy"
+                "input": "What year did World War II end?",
+                "expected": "1945",
+                "metadata": {
+                    "id": "q5",
+                    "category": "history",
+                    "difficulty": "easy"
+                }
             },
             {
-                "id": "q6",
-                "question": "Explain the concept of recursion in one sentence",
-                "expected_answer": "Recursion is a programming technique where a function calls itself",
-                "category": "programming",
-                "difficulty": "medium"
+                "input": "Explain the concept of recursion in one sentence",
+                "expected": "Recursion is a programming technique where a function calls itself",
+                "metadata": {
+                    "id": "q6",
+                    "category": "programming",
+                    "difficulty": "medium"
+                }
             },
             {
-                "id": "q7",
-                "question": "What is the chemical formula for water?",
-                "expected_answer": "H2O",
-                "category": "science",
-                "difficulty": "easy"
+                "input": "What is the chemical formula for water?",
+                "expected": "H2O",
+                "metadata": {
+                    "id": "q7",
+                    "category": "science",
+                    "difficulty": "easy"
+                }
             },
             {
-                "id": "q8",
-                "question": "Calculate: (8 + 2) * 3 - 5",
-                "expected_answer": "25",
-                "category": "math",
-                "difficulty": "easy"
+                "input": "Calculate: (8 + 2) * 3 - 5",
+                "expected": "25",
+                "metadata": {
+                    "id": "q8",
+                    "category": "math",
+                    "difficulty": "easy"
+                }
             },
             {
-                "id": "q9",
-                "question": "What is the largest planet in our solar system?",
-                "expected_answer": "Jupiter",
-                "category": "science",
-                "difficulty": "easy"
+                "input": "What is the largest planet in our solar system?",
+                "expected": "Jupiter",
+                "metadata": {
+                    "id": "q9",
+                    "category": "science",
+                    "difficulty": "easy"
+                }
             },
             {
-                "id": "q10",
-                "question": "Complete the sequence: 2, 4, 8, 16, ?",
-                "expected_answer": "32",
-                "category": "math",
-                "difficulty": "easy"
+                "input": "Complete the sequence: 2, 4, 8, 16, ?",
+                "expected": "32",
+                "metadata": {
+                    "id": "q10",
+                    "category": "math",
+                    "difficulty": "easy"
+                }
             }
         ]
     
@@ -127,19 +147,19 @@ class TestCustomBenchmark:
         try:
             # Simulate user creating a custom benchmark
             eval_data = {
-                "name": f"Test Custom Benchmark {uuid.uuid4().hex[:8]}",
+                "name": f"Test_Custom_Benchmark_{uuid.uuid4().hex[:8]}",  # Fixed name format
                 "description": "Custom benchmark for e2e testing - simulating user-created evaluation",
-                "type": "custom",
-                "questions": self.benchmark_questions[:5],  # Use subset for quick testing
-                "config": {
-                    "model_config": {
-                        "temperature": 0.0,
-                        "max_tokens": 100
-                    },
-                    "scoring": {
-                        "method": "exact_match",
-                        "case_sensitive": False
-                    }
+                "eval_type": "exact_match",  # Fixed field name and type
+                "eval_spec": {
+                    "model": "gpt-3.5-turbo",
+                    "temperature": 0.0,
+                    "metrics": ["accuracy"],
+                    "thresholds": {"accuracy": 0.8}
+                },
+                "dataset": self.benchmark_questions[:5],  # Fixed field name
+                "metadata": {
+                    "testing": True,
+                    "version": "1.0"
                 }
             }
             
@@ -165,10 +185,10 @@ class TestCustomBenchmark:
             "description": "Custom E2E test benchmark with 10 questions",
             "eval_type": "model_graded",
             "eval_spec": {
-                "evaluator_model": "gpt-3.5-turbo",
+                "model": "gpt-3.5-turbo",
                 "metrics": ["correctness", "completeness"],
-                "threshold": 0.7,
-                "scoring_prompt": "Compare the answer to the expected answer and score from 0-1"
+                "thresholds": {"correctness": 0.7, "completeness": 0.7},
+                "custom_prompts": {"scoring": "Compare the answer to the expected answer and score from 0-1"}
             },
             "dataset": self.benchmark_questions,
             "metadata": {
@@ -376,7 +396,7 @@ class TestCustomBenchmark:
         # Verify our test data has proper category distribution
         category_counts = {}
         for question in self.benchmark_questions:
-            cat = question["category"]
+            cat = question["metadata"]["category"]
             category_counts[cat] = category_counts.get(cat, 0) + 1
         
         assert set(category_counts.keys()) == set(expected_categories)

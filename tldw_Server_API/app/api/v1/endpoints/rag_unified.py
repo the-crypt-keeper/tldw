@@ -36,7 +36,7 @@ from tldw_Server_API.app.api.v1.schemas.rag_schemas_unified import (
     UnifiedBatchResponse
 )
 
-router = APIRouter(prefix="/api/v1/rag/unified", tags=["RAG - Unified"])
+router = APIRouter(prefix="/api/v1/rag", tags=["RAG - Unified"])
 
 
 def convert_result_to_response(result: UnifiedSearchResult) -> UnifiedRAGResponse:
@@ -113,7 +113,7 @@ async def unified_search_endpoint(
     is accessible by setting the appropriate parameter.
     """
     try:
-        logger.info(f"Unified RAG search: query='{request.query}', user={current_user.name if current_user else 'anonymous'}")
+        logger.info(f"Unified RAG search: query='{request.query}', user={current_user.username if current_user else 'anonymous'}")
         
         # Set up database paths
         db_paths = {
@@ -188,7 +188,7 @@ async def unified_search_endpoint(
             
             # Feedback
             collect_feedback=request.collect_feedback,
-            feedback_user_id=request.feedback_user_id or (current_user.name if current_user else None),
+            feedback_user_id=request.feedback_user_id or (current_user.username if current_user else None),
             apply_feedback_boost=request.apply_feedback_boost,
             
             # Monitoring
@@ -217,7 +217,7 @@ async def unified_search_endpoint(
             circuit_breaker=request.circuit_breaker,
             
             # User context
-            user_id=current_user.name if current_user else request.user_id,
+            user_id=current_user.username if current_user else request.user_id,
             session_id=request.session_id
         )
         
@@ -238,7 +238,9 @@ async def unified_search_endpoint(
         return response
         
     except Exception as e:
-        logger.error(f"Unified search error: {e}")
+        logger.error(f"Unified search error: {e}", exc_info=True)
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Search failed: {str(e)}"
@@ -270,7 +272,7 @@ async def unified_batch_endpoint(
     Processes multiple queries concurrently with the same parameters.
     """
     try:
-        logger.info(f"Batch RAG search: {len(request.queries)} queries, user={current_user.name if current_user else 'anonymous'}")
+        logger.info(f"Batch RAG search: {len(request.queries)} queries, user={current_user.username if current_user else 'anonymous'}")
         
         start_time = time.time()
         
@@ -284,7 +286,7 @@ async def unified_batch_endpoint(
         # Convert request to kwargs, excluding queries
         kwargs = request.dict(exclude={"queries", "max_concurrent"})
         kwargs.update(db_paths)
-        kwargs["user_id"] = current_user.name if current_user else kwargs.get("user_id")
+        kwargs["user_id"] = current_user.username if current_user else kwargs.get("user_id")
         
         # Process batch
         results = await unified_batch_pipeline(

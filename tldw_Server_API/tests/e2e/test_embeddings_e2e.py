@@ -289,7 +289,7 @@ class TestEmbeddingsE2E:
         
         # Now test RAG search
         search_response = api_client.client.post(
-            f"{api_client.base_url}/api/v1/rag/search/simple",
+            f"{api_client.base_url}/api/v1/rag/simple",
             json={
                 "query": "test document content",
                 "limit": 5

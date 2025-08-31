@@ -284,7 +284,7 @@ class TestRAGV2Integration:
     def test_simple_search_basic(self):
         """Test simple search endpoint with basic query"""
         response = self.client.post(
-            "/api/v1/rag/search/simple",
+            "/api/v1/rag/simple",
             headers=self.auth_headers,
             json={
                 "query": "RAG generation",
@@ -317,7 +317,7 @@ class TestRAGV2Integration:
     def test_simple_search_with_keywords(self):
         """Test simple search with keyword filtering"""
         response = self.client.post(
-            "/api/v1/rag/search/simple",
+            "/api/v1/rag/simple",
             headers=self.auth_headers,
             json={
                 "query": "implementation",
@@ -334,7 +334,7 @@ class TestRAGV2Integration:
     def test_simple_search_semantic(self):
         """Test semantic search"""
         response = self.client.post(
-            "/api/v1/rag/search/simple",
+            "/api/v1/rag/simple",
             headers=self.auth_headers,
             json={
                 "query": "How does artificial intelligence learn from data?",
@@ -353,7 +353,7 @@ class TestRAGV2Integration:
     def test_advanced_search_with_config(self):
         """Test advanced search with custom configuration"""
         response = self.client.post(
-            "/api/v1/rag/search/advanced",
+            "/api/v1/rag/advanced",
             headers=self.auth_headers,
             json={
                 "query": "best practices",
@@ -467,7 +467,7 @@ class TestRAGV2Integration:
     def test_search_empty_query(self):
         """Test search with empty query"""
         response = self.client.post(
-            "/api/v1/rag/search/simple",
+            "/api/v1/rag/simple",
             headers=self.auth_headers,
             json={
                 "query": ""
@@ -479,7 +479,7 @@ class TestRAGV2Integration:
     def test_search_invalid_database(self):
         """Test search with invalid database name"""
         response = self.client.post(
-            "/api/v1/rag/search/simple",
+            "/api/v1/rag/simple",
             headers=self.auth_headers,
             json={
                 "query": "test",
@@ -497,7 +497,7 @@ class TestRAGV2Integration:
             del app.dependency_overrides[get_request_user]
         
         response = self.client.post(
-            "/api/v1/rag/search/simple",
+            "/api/v1/rag/simple",
             json={
                 "query": "test query"
             }
@@ -518,7 +518,7 @@ class TestRAGV2Integration:
             del app.dependency_overrides[get_request_user]
         
         response = self.client.post(
-            "/api/v1/rag/search/simple",
+            "/api/v1/rag/simple",
             headers={"Authorization": "Bearer invalid-token"},
             json={
                 "query": "test query"
@@ -562,7 +562,7 @@ class TestRAGV2Integration:
             
             for query in queries:
                 task = client.post(
-                    "/api/v1/rag/search/simple",
+                    "/api/v1/rag/simple",
                     headers=self.auth_headers,
                     json={
                         "query": query,

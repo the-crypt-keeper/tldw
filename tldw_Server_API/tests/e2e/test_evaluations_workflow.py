@@ -64,25 +64,25 @@ class TestEvaluationWorkflow:
         with self.perf.measure("create_openai_evaluation"):
             # Create evaluation with inline dataset
             eval_data = {
-                "name": f"Test Evaluation {uuid.uuid4().hex[:8]}",
+                "name": f"Test_Evaluation_{uuid.uuid4().hex[:8]}",  # Fixed name format
                 "description": "E2E test evaluation for response quality",
                 "eval_type": "model_graded",
                 "eval_spec": {
-                    "evaluator_model": "gpt-4",
+                    "model": "gpt-4",  # Fixed field name
                     "metrics": ["accuracy", "coherence", "relevance"],
-                    "threshold": 0.8,
-                    "sub_type": "summarization"
+                    "thresholds": {"accuracy": 0.8, "coherence": 0.8, "relevance": 0.8},  # Fixed field name and format
+                    "custom_prompts": {"evaluation": "Evaluate the response for accuracy, coherence, and relevance"}  # Fixed field name
                 },
                 "dataset": [
                     {
                         "input": "What is machine learning?",
                         "expected": "Machine learning is a subset of AI that enables systems to learn from data.",
-                        "context": "AI and ML basics"
+                        "metadata": {"context": "AI and ML basics"}
                     },
                     {
                         "input": "Explain neural networks",
                         "expected": "Neural networks are computing systems inspired by biological neural networks.",
-                        "context": "Deep learning fundamentals"
+                        "metadata": {"context": "Deep learning fundamentals"}
                     }
                 ],
                 "metadata": {

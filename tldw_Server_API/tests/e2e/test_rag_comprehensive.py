@@ -108,7 +108,7 @@ class TestRAGComprehensive:
         while time.time() - start_time < max_wait:
             # Test FTS search
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/unified/search",
+                f"{api_client.base_url}/api/v1/rag/search",
                 json={
                     "query": "machine learning",
                     "search_mode": "fts",
@@ -142,7 +142,7 @@ class TestRAGComprehensive:
         
         for mode, query, description in search_tests:
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/unified/search",
+                f"{api_client.base_url}/api/v1/rag/search",
                 json={
                     "query": query,
                     "search_mode": mode,
@@ -162,7 +162,7 @@ class TestRAGComprehensive:
         
         for alpha in alpha_tests:
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/unified/search",
+                f"{api_client.base_url}/api/v1/rag/search",
                 json={
                     "query": "machine learning neural networks",
                     "search_mode": "hybrid",
@@ -183,7 +183,7 @@ class TestRAGComprehensive:
         
         def perform_search():
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/unified/search",
+                f"{api_client.base_url}/api/v1/rag/search",
                 json={
                     "query": "machine learning",
                     "search_mode": "hybrid",
@@ -220,7 +220,7 @@ class TestRAGComprehensive:
         def search(query_mode):
             query, mode = query_mode
             response = api_client.client.post(
-                f"{api_client.base_url}/api/v1/rag/unified/search",
+                f"{api_client.base_url}/api/v1/rag/search",
                 json={
                     "query": query,
                     "search_mode": mode,
@@ -243,13 +243,14 @@ class TestRAGComprehensive:
         
         # Test with keyword filter
         response = api_client.client.post(
-            f"{api_client.base_url}/api/v1/rag/unified/search",
+            f"{api_client.base_url}/api/v1/rag/search",
             json={
                 "query": "learning",
                 "search_mode": "hybrid",
-                "keywords": ["neural", "deep"],
+                "keyword_filter": ["neural", "deep"],
                 "top_k": 5
-            }
+            },
+            headers=api_client.get_auth_headers()
         )
         
         assert response.status_code == 200
@@ -270,33 +271,36 @@ class TestRAGComprehensive:
         
         # Test empty query
         response = api_client.client.post(
-            f"{api_client.base_url}/api/v1/rag/unified/search",
+            f"{api_client.base_url}/api/v1/rag/search",
             json={
                 "query": "",
                 "search_mode": "fts"
-            }
+            },
+            headers=api_client.get_auth_headers()
         )
         assert response.status_code in [400, 422], "Empty query should be rejected"
         
         # Test very long query
         long_query = "machine learning " * 100
         response = api_client.client.post(
-            f"{api_client.base_url}/api/v1/rag/unified/search",
+            f"{api_client.base_url}/api/v1/rag/search",
             json={
                 "query": long_query,
                 "search_mode": "fts",
-                "limit": 1
-            }
+                "top_k": 1
+            },
+            headers=api_client.get_auth_headers()
         )
         assert response.status_code in [200, 400, 422], "Long query should be handled"
         
         # Test invalid search mode
         response = api_client.client.post(
-            f"{api_client.base_url}/api/v1/rag/unified/search",
+            f"{api_client.base_url}/api/v1/rag/search",
             json={
                 "query": "test",
                 "search_mode": "invalid_mode"
-            }
+            },
+            headers=api_client.get_auth_headers()
         )
         assert response.status_code in [400, 422], "Invalid mode should be rejected"
         
