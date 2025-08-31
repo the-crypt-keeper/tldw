@@ -110,13 +110,12 @@ class TestBufferedTranscription:
             # Adjacent chunks should overlap
             assert chunks[1]['start'] < chunks[0]['end']
     
-    def test_middle_merge_algorithm(self):
+    def test_middle_merge_algorithm(self, config):
         """Test middle merge algorithm."""
         from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Buffered_Transcription import (
             BufferedTranscriber
         )
         
-        config = self.config()
         transcriber = BufferedTranscriber(config)
         
         # Create test chunk results with overlaps
@@ -152,14 +151,13 @@ class TestBufferedTranscription:
         # Check that overlaps are handled (no exact duplicates)
         assert merged.count('this is') <= 2
     
-    def test_lcs_merge_algorithm(self):
+    def test_lcs_merge_algorithm(self, config):
         """Test LCS (Longest Common Subsequence) merge algorithm."""
         from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Buffered_Transcription import (
-            LCSMergeTranscriber
+            LCSMergeTranscriber, MergeAlgorithm
         )
         
-        config = self.config()
-        config.merge_algo = 'lcs'
+        config.merge_algo = MergeAlgorithm.LCS
         transcriber = LCSMergeTranscriber(config)
         
         # Test LCS merging
@@ -172,13 +170,13 @@ class TestBufferedTranscription:
         assert "transcription" in merged
         assert merged.count("this is a test") == 1  # Should not duplicate
     
-    def test_lcs_length_calculation(self):
+    def test_lcs_length_calculation(self, config):
         """Test LCS length calculation."""
         from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Buffered_Transcription import (
-            LCSMergeTranscriber
+            LCSMergeTranscriber, MergeAlgorithm
         )
         
-        config = self.config()
+        config.merge_algo = MergeAlgorithm.LCS
         transcriber = LCSMergeTranscriber(config)
         
         words1 = ["hello", "world", "test"]

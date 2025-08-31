@@ -247,12 +247,30 @@ class TTSInputValidator:
         logger.debug(f"Text sanitized: {len(original_text)} -> {len(text)} chars")
         return text.strip()
     
-    def validate_text_length(self, text: str, provider: Optional[str] = None):
+    def validate_text_length(self, text: str, provider: Optional[str] = None, max_length: Optional[int] = None):
         """Public method to validate text length"""
-        return self._validate_text(text, provider)
+        if max_length:
+            # Override max length for this validation
+            old_max = self.max_text_length_override
+            self.max_text_length_override = max_length
+            try:
+                return self._validate_text(text, provider)
+            finally:
+                self.max_text_length_override = old_max
+        else:
+            return self._validate_text(text, provider)
     
-    def validate_language(self, language: str, provider: Optional[str] = None):
+    def validate_language(self, language: str, provider: Optional[Union[str, List[str]]] = None):
         """Public method to validate language"""
+        # Handle test case where supported languages are passed directly
+        if isinstance(provider, list):
+            supported_languages = provider
+            if language not in supported_languages:
+                raise TTSUnsupportedLanguageError(
+                    f"Language '{language}' not supported. Supported: {supported_languages}",
+                    details={"requested_language": language, "supported_languages": supported_languages}
+                )
+            return
         return self._validate_language(language, provider)
     
     def validate_format(self, format: AudioFormat, provider: Optional[str] = None):

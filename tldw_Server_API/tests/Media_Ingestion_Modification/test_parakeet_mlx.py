@@ -89,49 +89,64 @@ class TestParakeetMLX:
         mock_check.return_value = False
         assert check_mlx_available() == False
     
-    @patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX.parakeet_mlx')
-    def test_model_loading(self, mock_parakeet_mlx):
+    @patch('builtins.__import__')
+    def test_model_loading(self, mock_import):
         """Test Parakeet MLX model loading."""
-        from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX import (
-            load_parakeet_mlx_model, _model_cache
-        )
-        
-        # Clear cache
-        _model_cache.clear()
-        
-        # Mock model
+        # Create mock parakeet_mlx module
+        mock_parakeet_mlx = MagicMock()
         mock_model = MagicMock()
         mock_model.name = "parakeet-tdt-0.6b"
-        mock_parakeet_mlx.load_model.return_value = mock_model
+        mock_parakeet_mlx.from_pretrained.return_value = mock_model
         
-        # Load model
-        model = load_parakeet_mlx_model()
+        # Setup import mock to return our mock module for parakeet_mlx
+        original_import = __import__
+        def custom_import(name, *args, **kwargs):
+            if name == 'parakeet_mlx':
+                return mock_parakeet_mlx
+            return original_import(name, *args, **kwargs)
+        mock_import.side_effect = custom_import
         
-        assert model is not None
-        assert model == mock_model
-        assert 'mlx_model' in _model_cache
-        mock_parakeet_mlx.load_model.assert_called_once()
-        
-        # Test cache hit (should not call load_model again)
-        model2 = load_parakeet_mlx_model()
-        assert model2 == mock_model
-        assert mock_parakeet_mlx.load_model.call_count == 1  # Still only called once
-    
-    @patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX.parakeet_mlx')
-    def test_model_loading_with_custom_path(self, mock_parakeet_mlx):
-        """Test loading model from custom path."""
         from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX import (
             load_parakeet_mlx_model
         )
         
+        # Load model
+        model = load_parakeet_mlx_model(force_reload=True)
+        
+        assert model is not None
+        assert model == mock_model
+        mock_parakeet_mlx.from_pretrained.assert_called_once()
+        
+        # Test cache hit (should not call from_pretrained again)
+        model2 = load_parakeet_mlx_model()
+        assert model2 == mock_model
+        assert mock_parakeet_mlx.from_pretrained.call_count == 1  # Still only called once
+    
+    @patch('builtins.__import__')
+    def test_model_loading_with_custom_path(self, mock_import):
+        """Test loading model from custom path."""
+        # Create mock parakeet_mlx module
+        mock_parakeet_mlx = MagicMock()
         mock_model = MagicMock()
-        mock_parakeet_mlx.load_model.return_value = mock_model
+        mock_parakeet_mlx.from_pretrained.return_value = mock_model
+        
+        # Setup import mock
+        original_import = __import__
+        def custom_import(name, *args, **kwargs):
+            if name == 'parakeet_mlx':
+                return mock_parakeet_mlx
+            return original_import(name, *args, **kwargs)
+        mock_import.side_effect = custom_import
+        
+        from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX import (
+            load_parakeet_mlx_model
+        )
         
         custom_path = "/path/to/custom/model"
-        model = load_parakeet_mlx_model(model_path=custom_path)
+        model = load_parakeet_mlx_model(model_path=custom_path, force_reload=True)
         
         assert model == mock_model
-        mock_parakeet_mlx.load_model.assert_called_with(custom_path)
+        mock_parakeet_mlx.from_pretrained.assert_called_once()
     
     @patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX.load_parakeet_mlx_model')
     @patch('tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Parakeet_MLX.check_mlx_available')

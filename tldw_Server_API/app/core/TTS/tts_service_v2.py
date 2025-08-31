@@ -12,6 +12,7 @@ from loguru import logger
 # Local Imports
 from tldw_Server_API.app.api.v1.schemas.audio_schemas import OpenAISpeechRequest
 from tldw_Server_API.app.core.Metrics import get_metrics_registry
+from tldw_Server_API.app.core.Metrics.metrics_manager import MetricDefinition, MetricType
 from .adapter_registry import (
     get_tts_factory,
     close_tts_factory,
@@ -79,46 +80,64 @@ class TTSServiceV2:
     def _register_tts_metrics(self):
         """Register TTS-specific metrics"""
         # TTS request metrics
-        self.metrics.register_counter(
-            name="tts_requests_total",
-            description="Total number of TTS requests",
-            labels=["provider", "model", "voice", "format", "status"]
+        self.metrics.register_metric(
+            MetricDefinition(
+                name="tts_requests_total",
+                type=MetricType.COUNTER,
+                description="Total number of TTS requests",
+                labels=["provider", "model", "voice", "format", "status"]
+            )
         )
         
-        self.metrics.register_histogram(
-            name="tts_request_duration_seconds",
-            description="TTS request duration in seconds",
-            unit="s",
-            labels=["provider", "model", "voice"],
-            buckets=[0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60]
+        self.metrics.register_metric(
+            MetricDefinition(
+                name="tts_request_duration_seconds",
+                type=MetricType.HISTOGRAM,
+                description="TTS request duration in seconds",
+                unit="s",
+                labels=["provider", "model", "voice"],
+                buckets=[0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60]
+            )
         )
         
-        self.metrics.register_histogram(
-            name="tts_text_length_characters",
-            description="Length of text processed",
-            unit="characters",
-            labels=["provider"],
-            buckets=[10, 50, 100, 250, 500, 1000, 2500, 5000]
+        self.metrics.register_metric(
+            MetricDefinition(
+                name="tts_text_length_characters",
+                type=MetricType.HISTOGRAM,
+                description="Length of text processed",
+                unit="characters",
+                labels=["provider"],
+                buckets=[10, 50, 100, 250, 500, 1000, 2500, 5000]
+            )
         )
         
-        self.metrics.register_histogram(
-            name="tts_audio_size_bytes",
-            description="Size of generated audio",
-            unit="bytes",
-            labels=["provider", "format"],
-            buckets=[1024, 10240, 102400, 1048576, 10485760]  # 1KB, 10KB, 100KB, 1MB, 10MB
+        self.metrics.register_metric(
+            MetricDefinition(
+                name="tts_audio_size_bytes",
+                type=MetricType.HISTOGRAM,
+                description="Size of generated audio",
+                unit="bytes",
+                labels=["provider", "format"],
+                buckets=[1024, 10240, 102400, 1048576, 10485760]  # 1KB, 10KB, 100KB, 1MB, 10MB
+            )
         )
         
-        self.metrics.register_gauge(
-            name="tts_active_requests",
-            description="Number of active TTS requests",
-            labels=["provider"]
+        self.metrics.register_metric(
+            MetricDefinition(
+                name="tts_active_requests",
+                type=MetricType.GAUGE,
+                description="Number of active TTS requests",
+                labels=["provider"]
+            )
         )
         
-        self.metrics.register_counter(
-            name="tts_fallback_attempts",
-            description="Number of fallback attempts",
-            labels=["from_provider", "to_provider", "success"]
+        self.metrics.register_metric(
+            MetricDefinition(
+                name="tts_fallback_attempts",
+                type=MetricType.COUNTER,
+                description="Number of fallback attempts",
+                labels=["from_provider", "to_provider", "success"]
+            )
         )
     
     async def generate_speech(
@@ -172,7 +191,7 @@ class TTSServiceV2:
         chunks_count = 0
         
         # Update active requests gauge
-        self.metrics.gauge_set(
+        self.metrics.set_gauge(
             "tts_active_requests",
             1,
             labels={"provider": adapter.provider_name}
@@ -196,7 +215,7 @@ class TTSServiceV2:
                         logger.warning(f"Circuit open for {adapter.provider_name}: {e}")
                         if fallback:
                             # Record fallback attempt
-                            self.metrics.counter_increment(
+                            self.metrics.increment(
                                 "tts_fallback_attempts",
                                 labels={"from_provider": adapter.provider_name, "to_provider": "any", "success": "pending"}
                             )
@@ -266,7 +285,7 @@ class TTSServiceV2:
             # Check if error is retryable and fallback is enabled
             if fallback and is_retryable_error(e):
                 logger.info(f"Attempting fallback due to retryable error: {type(e).__name__}")
-                self.metrics.counter_increment(
+                self.metrics.increment(
                     "tts_fallback_attempts",
                     labels={"from_provider": adapter.provider_name, "to_provider": "any", "success": "pending"}
                 )
@@ -427,7 +446,7 @@ class TTSServiceV2:
     ):
         """Record TTS request metrics"""
         # Record request counter
-        self.metrics.counter_increment(
+        self.metrics.increment(
             "tts_requests_total",
             labels={
                 "provider": provider,
@@ -439,14 +458,14 @@ class TTSServiceV2:
         )
         
         # Record duration histogram
-        self.metrics.histogram_observe(
+        self.metrics.observe(
             "tts_request_duration_seconds",
             duration,
             labels={"provider": provider, "model": model, "voice": voice}
         )
         
         # Record text length histogram
-        self.metrics.histogram_observe(
+        self.metrics.observe(
             "tts_text_length_characters",
             text_length,
             labels={"provider": provider}
@@ -454,7 +473,7 @@ class TTSServiceV2:
         
         # Record audio size if successful
         if success and audio_size > 0:
-            self.metrics.histogram_observe(
+            self.metrics.observe(
                 "tts_audio_size_bytes",
                 audio_size,
                 labels={"provider": provider, "format": format}
@@ -530,7 +549,7 @@ class TTSServiceV2:
                     yield chunk
                 logger.info(f"Successfully fell back to {fallback_adapter.provider_name}")
                 # Record successful fallback
-                self.metrics.counter_increment(
+                self.metrics.increment(
                     "tts_fallback_attempts",
                     labels={
                         "from_provider": exclude_providers[0] if exclude_providers else "unknown",
@@ -541,7 +560,7 @@ class TTSServiceV2:
             except TTSError as e:
                 logger.error(f"Fallback provider {fallback_adapter.provider_name} also failed: {e}")
                 # Record failed fallback
-                self.metrics.counter_increment(
+                self.metrics.increment(
                     "tts_fallback_attempts",
                     labels={
                         "from_provider": exclude_providers[0] if exclude_providers else "unknown",
@@ -561,7 +580,7 @@ class TTSServiceV2:
                                 yield chunk
                             logger.info(f"Final fallback to {final_fallback.provider_name} succeeded")
                             # Record successful final fallback
-                            self.metrics.counter_increment(
+                            self.metrics.increment(
                                 "tts_fallback_attempts",
                                 labels={
                                     "from_provider": fallback_adapter.provider_name,

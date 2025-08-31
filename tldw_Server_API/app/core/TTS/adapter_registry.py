@@ -244,11 +244,36 @@ class TTSAdapterRegistry:
         capabilities = {}
         
         for provider in TTSProvider:
-            adapter = await self.get_adapter(provider)
-            if adapter:
-                caps = adapter.capabilities
-                if caps:
-                    capabilities[provider] = caps
+            # Skip providers that are disabled or have failed
+            if provider in self._failed_providers:
+                continue
+                
+            # Only try to get adapters that are likely to work quickly
+            # Skip local model providers in testing unless explicitly enabled
+            if provider in [TTSProvider.KOKORO, TTSProvider.HIGGS, TTSProvider.DIA, 
+                           TTSProvider.CHATTERBOX, TTSProvider.VIBEVOICE]:
+                # Check if explicitly enabled in config
+                if self.config_manager:
+                    if not self.config_manager.is_provider_enabled(provider.value):
+                        continue
+                else:
+                    enabled_key = f"{provider.value}_enabled"
+                    if not self.config.get(enabled_key, False):
+                        continue
+            
+            try:
+                # Try to get adapter with a timeout to avoid hanging
+                adapter = await asyncio.wait_for(self.get_adapter(provider), timeout=5.0)
+                if adapter:
+                    caps = adapter.capabilities
+                    if caps:
+                        capabilities[provider] = caps
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout getting capabilities for {provider.value}")
+                self._failed_providers.add(provider)
+            except Exception as e:
+                logger.debug(f"Error getting capabilities for {provider.value}: {e}")
+                self._failed_providers.add(provider)
         
         return capabilities
     

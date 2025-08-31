@@ -14,7 +14,7 @@ from typing import Dict, Any
 # Local Imports
 from tldw_Server_API.app.api.v1.schemas.audio_schemas import OpenAISpeechRequest
 from tldw_Server_API.app.core.TTS.tts_service_v2 import TTSServiceV2
-from tldw_Server_API.app.core.TTS.adapter_registry import TTSAdapterRegistry, TTSProvider
+from tldw_Server_API.app.core.TTS.adapter_registry import TTSAdapterRegistry, TTSProvider, TTSAdapterFactory
 from tldw_Server_API.app.core.TTS.adapters.base import (
     TTSAdapter, 
     TTSCapabilities,
@@ -32,8 +32,8 @@ from tldw_Server_API.app.core.TTS.audio_utils import AudioProcessor, process_voi
 class MockAdapter(TTSAdapter):
     """Mock adapter for testing"""
     
-    def __init__(self, provider_config: Dict[str, Any], client_id: str = "test"):
-        super().__init__(provider_config, client_id)
+    def __init__(self, provider_config: Dict[str, Any]):
+        super().__init__(provider_config)
         self.initialized = False
         self.generate_called = False
         
@@ -90,11 +90,13 @@ class TestTTSServiceV2:
             }
         }
         
-        service = TTSServiceV2(config, client_id="test")
-        # Replace registry with mock
-        service.registry = TTSAdapterRegistry(config)
-        service.registry.adapters[TTSProvider.MOCK] = MockAdapter(config.get("mock", {}))
-        await service.initialize()
+        # Create a mock factory
+        factory = MagicMock(spec=TTSAdapterFactory)
+        factory.create_adapter = AsyncMock(return_value=MockAdapter(config.get("mock", {})))
+        factory.get_adapter = AsyncMock(return_value=MockAdapter(config.get("mock", {})))
+        factory.list_adapters = AsyncMock(return_value=[TTSProvider.MOCK])
+        
+        service = TTSServiceV2(factory)
         return service
     
     @pytest.mark.asyncio
@@ -176,8 +178,6 @@ class TestTTSServiceV2:
             }
         }
         
-        service = TTSServiceV2(config, client_id="test")
-        
         # Create failing adapter
         failing_adapter = MockAdapter({"name": "failing"})
         failing_adapter.generate = AsyncMock(side_effect=Exception("Provider failed"))
@@ -185,11 +185,15 @@ class TestTTSServiceV2:
         # Create working adapter
         working_adapter = MockAdapter({"name": "working"})
         
-        service.registry = TTSAdapterRegistry(config)
-        service.registry.adapters["failing"] = failing_adapter
-        service.registry.adapters["working"] = working_adapter
+        # Create mock factory that returns appropriate adapters
+        factory = MagicMock(spec=TTSAdapterFactory)
+        factory.create_adapter = AsyncMock(side_effect=lambda name, *args: 
+                                          failing_adapter if name == "failing" else working_adapter)
+        factory.get_adapter = AsyncMock(side_effect=lambda name: 
+                                       failing_adapter if name == "failing" else working_adapter)
+        factory.list_adapters = AsyncMock(return_value=["failing", "working"])
         
-        await service.initialize()
+        service = TTSServiceV2(factory)
         
         request = TTSRequest(
             text="Test text",
