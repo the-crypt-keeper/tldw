@@ -44,9 +44,9 @@ def convert_result_to_response(result: UnifiedSearchResult) -> UnifiedRAGRespons
     return UnifiedRAGResponse(
         documents=[
             {
-                "id": doc.id,
-                "content": doc.content,
-                "metadata": doc.metadata,
+                "id": doc.document.id if hasattr(doc, 'document') else doc.id,
+                "content": doc.document.content if hasattr(doc, 'document') else doc.content,
+                "metadata": doc.document.metadata if hasattr(doc, 'document') else doc.metadata,
                 "score": getattr(doc, 'score', 0.0)
             }
             for doc in result.documents
