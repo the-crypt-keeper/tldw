@@ -463,7 +463,7 @@ class TTSServiceAdapter:
             request.model = internal_model_id
         
         # Generate with V2 service
-        async for chunk in self.service_v2.generate_speech(request):
+        async for chunk in self.service_v2.generate_speech(request, fallback=True):
             yield chunk
 
 

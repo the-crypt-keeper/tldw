@@ -12,7 +12,7 @@ import json
 import asyncio
 from pathlib import Path
 
-from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_router
+from tldw_Server_API.app.api.v1.endpoints.rag_unified import router as rag_router
 from tldw_Server_API.app.core.RAG.rag_service.types import Document, DataSource
 
 
