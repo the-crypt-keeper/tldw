@@ -505,14 +505,31 @@ class PartialTranscriptionThread(threading.Thread):
                         audio_np = audio_np.reshape((-1, 2))
                         audio_np = np.mean(audio_np, axis=1)  # simple stereo -> mono
 
-                    # FIXME - Add support for multiple languages/whisper models
-                    partial_text = transcribe_audio(
-                        audio_np,
-                        sample_rate=self.sample_rate,
-                        whisper_model=self.live_model,
-                        speaker_lang="en",
-                        transcription_provider="faster-whisper"
-                    )
+                    # Transcribe using configured provider or default
+                    config = loaded_config_data or load_and_log_configs()
+                    provider = "faster-whisper"  # Default
+                    if config and 'STT-Settings' in config:
+                        provider = config['STT-Settings'].get('default_transcriber', 'faster-whisper')
+                    
+                    if provider == 'parakeet':
+                        from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo import (
+                            transcribe_with_parakeet
+                        )
+                        variant = config['STT-Settings'].get('nemo_model_variant', 'standard') if config else 'standard'
+                        partial_text = transcribe_with_parakeet(audio_np, self.sample_rate, variant)
+                    elif provider == 'canary':
+                        from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo import (
+                            transcribe_with_canary
+                        )
+                        partial_text = transcribe_with_canary(audio_np, self.sample_rate, "en")
+                    else:
+                        partial_text = transcribe_audio(
+                            audio_np,
+                            sample_rate=self.sample_rate,
+                            whisper_model=self.live_model,
+                            speaker_lang="en",
+                            transcription_provider=provider
+                        )
 
                     with self.lock:
                         self.partial_text_state["text"] = partial_text
@@ -749,24 +766,37 @@ def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate
 
     elif transcription_provider.lower() == "parakeet":
         logging.info("Transcribing using Parakeet")
-        # FIXME - implement Parakeet
         try:
-            import nemo.collections.asr as nemo_asr
-        except ImportError:
-            return "Nemo package not found. Please install 'nemo_toolkit[asr]' to use Parakeet."
-
-        asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name="nvidia/parakeet-rnnt-1.1b")
-
-        # Enable local attention
-        asr_model.change_attention_model("rel_pos_local_attn", [128, 128])  # local attn
-
-        # Enable chunking for subsampling module
-        asr_model.change_subsampling_conv_chunking_factor(1)  # 1 = auto select
-
-        # Transcribe a huge audio file
-        transcript = asr_model.transcribe(["<path to a huge audio file>.wav"])
-
-        return transcript
+            from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo import (
+                transcribe_with_parakeet
+            )
+            # Get model variant from config
+            config = loaded_config_data or load_and_log_configs()
+            variant = 'standard'
+            if config and 'STT-Settings' in config:
+                variant = config['STT-Settings'].get('nemo_model_variant', 'standard')
+            
+            return transcribe_with_parakeet(audio_data, sample_rate, variant)
+        except ImportError as e:
+            logging.error(f"Failed to import Nemo transcription module: {e}")
+            return "Nemo transcription module not available. Please check installation."
+        except Exception as e:
+            logging.error(f"Parakeet transcription failed: {e}")
+            return f"Parakeet transcription error: {str(e)}"
+    
+    elif transcription_provider.lower() == "canary":
+        logging.info("Transcribing using Canary")
+        try:
+            from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo import (
+                transcribe_with_canary
+            )
+            return transcribe_with_canary(audio_data, sample_rate, speaker_lang)
+        except ImportError as e:
+            logging.error(f"Failed to import Nemo transcription module: {e}")
+            return "Nemo transcription module not available. Please check installation."
+        except Exception as e:
+            logging.error(f"Canary transcription failed: {e}")
+            return f"Canary transcription error: {str(e)}"
 
     else:
         logging.info(f"Transcribing using faster-whisper with model: {whisper_model}")
@@ -812,7 +842,9 @@ def transcribe_audio(audio_data: np.ndarray, transcription_provider, sample_rate
 
 # FIXME - Sample code for live audio transcription
 class LiveAudioStreamer:
-    def __init__(self, sample_rate=16000, chunk_size=1024, silence_threshold=0.01, silence_duration=1.6):
+    def __init__(self, sample_rate=16000, chunk_size=1024, silence_threshold=0.01, silence_duration=1.6, 
+                 transcription_provider='faster-whisper', whisper_model='distil-large-v3', 
+                 speaker_lang='en', nemo_variant='standard'):
         """
         Manages live audio streaming, silence detection, and transcription.
 
@@ -821,10 +853,11 @@ class LiveAudioStreamer:
         When sufficient silence is detected after speech, the accumulated audio
         buffer is passed to a transcription function.
 
-        FIXME: Transcription model and language support are currently hardcoded
-               in `listen_loop` and need to be made configurable.
-
         Attributes:
+            transcription_provider (str): Provider to use ('faster-whisper', 'parakeet', 'canary', 'qwen2audio')
+            whisper_model (str): Model name for faster-whisper provider
+            speaker_lang (str): Language code for transcription
+            nemo_variant (str): Variant for Parakeet model ('standard', 'onnx', 'mlx')
             sample_rate (int): Audio sample rate in Hz.
             chunk_size (int): Number of frames per buffer for PyAudio stream.
             silence_threshold (float): Amplitude threshold below which audio is
@@ -838,14 +871,14 @@ class LiveAudioStreamer:
             stream (Optional[pyaudio.Stream]): PyAudio stream object.
             listener_thread (Optional[threading.Thread]): Thread for the `listen_loop`.
         """
-        """
-        :param silence_threshold: amplitude threshold below which we consider "silence"
-        :param silence_duration: how many seconds of silence needed to finalize
-        """
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
         self.silence_threshold = silence_threshold
         self.silence_duration = silence_duration
+        self.transcription_provider = transcription_provider
+        self.whisper_model = whisper_model
+        self.speaker_lang = speaker_lang
+        self.nemo_variant = nemo_variant
 
         self.audio_queue = queue.Queue()
         self.is_recording = False
@@ -954,9 +987,28 @@ class LiveAudioStreamer:
                         print("Silence detected. Finalizing the chunk.")
                         final_audio = np.concatenate(audio_buffer, axis=0).flatten()
                         audio_buffer.clear()
-                        # Transcribe the finalized audio
-                        # FIXME - Add support for multiple languages/whisper models
-                        user_text = transcribe_audio(final_audio, sample_rate=self.sample_rate, whisper_model="distil-large-v3", speaker_lang="en", transcription_provider="faster-whisper")
+                        # Transcribe the finalized audio using configured provider
+                        if self.transcription_provider == 'parakeet':
+                            # Use Nemo Parakeet with configured variant
+                            from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo import (
+                                transcribe_with_parakeet
+                            )
+                            user_text = transcribe_with_parakeet(final_audio, self.sample_rate, self.nemo_variant)
+                        elif self.transcription_provider == 'canary':
+                            # Use Nemo Canary
+                            from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo import (
+                                transcribe_with_canary
+                            )
+                            user_text = transcribe_with_canary(final_audio, self.sample_rate, self.speaker_lang)
+                        else:
+                            # Use existing transcribe_audio function
+                            user_text = transcribe_audio(
+                                final_audio, 
+                                sample_rate=self.sample_rate, 
+                                whisper_model=self.whisper_model, 
+                                speaker_lang=self.speaker_lang, 
+                                transcription_provider=self.transcription_provider
+                            )
 
                         # Then do something with user_text (e.g. add to chatbot)
                         self.handle_transcribed_text(user_text)
@@ -1243,7 +1295,7 @@ class WhisperModel(OriginalWhisperModel):
              logging.error(f"An unexpected error occurred during faster_whisper.WhisperModel initialization with '{resolved_identifier}': {e}", exc_info=True)
              raise RuntimeError(f"Unexpected error loading model: {resolved_identifier} - {e}") from e
 
-# Implement FIXME
+# Model unloading functions
 def unload_whisper_model():
     """
     Unloads the global faster-whisper model instance and triggers garbage collection.
@@ -1265,6 +1317,41 @@ def unload_whisper_model():
         del whisper_model_instance
         whisper_model_instance = None
         gc.collect()
+
+
+def unload_all_transcription_models():
+    """
+    Unload all transcription models (Whisper, Qwen, Nemo) to free memory.
+    """
+    # Unload Whisper models
+    unload_whisper_model()
+    
+    # Unload Qwen2Audio models
+    global qwen_processor, qwen_model
+    if qwen_processor is not None:
+        del qwen_processor
+        qwen_processor = None
+    if qwen_model is not None:
+        del qwen_model
+        qwen_model = None
+    
+    # Unload Nemo models
+    try:
+        from tldw_Server_API.app.core.Ingestion_Media_Processing.Audio.Audio_Transcription_Nemo import (
+            unload_nemo_models
+        )
+        unload_nemo_models()
+    except ImportError:
+        pass  # Nemo module not available
+    
+    # Force garbage collection
+    gc.collect()
+    
+    # Clear GPU cache if available
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    logging.info("Unloaded all transcription models from memory")
 
 whisper_model_cache = {}
 

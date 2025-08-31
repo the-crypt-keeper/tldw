@@ -1022,6 +1022,10 @@ def load_and_log_configs():
 
         # STT Settings
         default_stt_provider = config_parser_object.get('STT-Settings', 'default_stt_provider', fallback='faster_whisper')
+        default_transcriber = config_parser_object.get('STT-Settings', 'default_transcriber', fallback='faster-whisper')
+        nemo_model_variant = config_parser_object.get('STT-Settings', 'nemo_model_variant', fallback='standard')
+        nemo_device = config_parser_object.get('STT-Settings', 'nemo_device', fallback='cuda')
+        nemo_cache_dir = config_parser_object.get('STT-Settings', 'nemo_cache_dir', fallback='./models/nemo')
 
         # TTS Settings
         # FIXME
@@ -1503,6 +1507,18 @@ def load_and_log_configs():
             'local_api_timeout': local_api_timeout,
             'STT_Settings': {
                 'default_stt_provider': default_stt_provider,
+                'default_transcriber': default_transcriber,
+                'nemo_model_variant': nemo_model_variant,
+                'nemo_device': nemo_device,
+                'nemo_cache_dir': nemo_cache_dir,
+            },
+            # Also provide with hyphen for backward compatibility
+            'STT-Settings': {
+                'default_stt_provider': default_stt_provider,
+                'default_transcriber': default_transcriber,
+                'nemo_model_variant': nemo_model_variant,
+                'nemo_device': nemo_device,
+                'nemo_cache_dir': nemo_cache_dir,
             },
             'tts_settings': {
                 'default_tts_provider': default_tts_provider,

@@ -102,7 +102,18 @@ class ChatterboxAdapter(TTSAdapter):
                 from chatterbox_tts import ChatterboxModel, ChatterboxProcessor
             except ImportError:
                 logger.error(f"{self.provider_name}: chatterbox-tts library not installed")
-                logger.info("Install with: pip install chatterbox-tts")
+                logger.error(
+                    f"{self.provider_name}: Required libraries not installed. "
+                    f"To use Chatterbox, follow these steps:\n"
+                    f"1. Install Chatterbox (when available):\n"
+                    f"   pip install chatterbox-tts\n"
+                    f"2. Or install from source:\n"
+                    f"   git clone https://github.com/resemble-ai/chatterbox\n"
+                    f"   cd chatterbox && pip install -e .\n"
+                    f"3. Download the model:\n"
+                    f"   huggingface-cli download resemble-ai/chatterbox --local-dir models/chatterbox/\n"
+                    f"4. Ensure CUDA is available for optimal performance (4GB+ VRAM recommended)"
+                )
                 self._status = ProviderStatus.NOT_CONFIGURED
                 return False
             
@@ -184,8 +195,9 @@ class ChatterboxAdapter(TTSAdapter):
         voice = request.voice or "default"
         
         # Handle voice cloning if reference provided
+        voice_reference_path = None
         if request.voice_reference:
-            voice = await self._clone_voice_chatterbox(request.voice_reference)
+            voice_reference_path = await self._prepare_voice_reference(request.voice_reference)
         
         logger.info(
             f"{self.provider_name}: Generating speech with voice={voice}, "
@@ -197,7 +209,7 @@ class ChatterboxAdapter(TTSAdapter):
             if request.stream:
                 # Return streaming response
                 return TTSResponse(
-                    audio_stream=self._stream_audio_chatterbox(request, voice),
+                    audio_stream=self._stream_audio_chatterbox(request, voice, voice_reference_path),
                     format=request.format,
                     sample_rate=self.sample_rate,
                     channels=1,
@@ -211,7 +223,7 @@ class ChatterboxAdapter(TTSAdapter):
                 )
             else:
                 # Generate complete audio
-                audio_data = await self._generate_complete_chatterbox(request, voice)
+                audio_data = await self._generate_complete_chatterbox(request, voice, voice_reference_path)
                 return TTSResponse(
                     audio_data=audio_data,
                     format=request.format,
@@ -233,7 +245,8 @@ class ChatterboxAdapter(TTSAdapter):
     async def _stream_audio_chatterbox(
         self,
         request: TTSRequest,
-        voice: str
+        voice: str,
+        voice_reference_path: Optional[str] = None
     ) -> AsyncGenerator[bytes, None]:
         """Stream audio from Chatterbox model"""
         if not self.model or not self.processor:
@@ -267,15 +280,25 @@ class ChatterboxAdapter(TTSAdapter):
             
             # Generate with streaming
             with torch.no_grad():
+                # Prepare generation kwargs
+                gen_kwargs = {
+                    "max_length": 2000,
+                    "temperature": 0.7,
+                    "do_sample": True,
+                    "speed": request.speed,
+                    "pitch": request.pitch,
+                    "volume": request.volume
+                }
+                
+                # Add voice reference if provided
+                if voice_reference_path:
+                    gen_kwargs["audio_prompt_path"] = voice_reference_path
+                    logger.info(f"Using voice reference: {voice_reference_path}")
+                
                 # Chatterbox supports streaming generation
                 stream_generator = self.model.generate_stream(
                     **inputs,
-                    max_length=2000,
-                    temperature=0.7,
-                    do_sample=True,
-                    speed=request.speed,
-                    pitch=request.pitch,
-                    volume=request.volume
+                    **gen_kwargs
                 )
                 
                 # Process streaming chunks
@@ -308,15 +331,24 @@ class ChatterboxAdapter(TTSAdapter):
             raise
         finally:
             writer.close()
+            # Clean up voice reference file if used
+            if voice_reference_path:
+                try:
+                    from pathlib import Path
+                    Path(voice_reference_path).unlink(missing_ok=True)
+                    logger.debug(f"Cleaned up voice reference: {voice_reference_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up voice reference: {e}")
     
     async def _generate_complete_chatterbox(
         self,
         request: TTSRequest,
-        voice: str
+        voice: str,
+        voice_reference_path: Optional[str] = None
     ) -> bytes:
         """Generate complete audio from Chatterbox"""
         all_audio = b""
-        async for chunk in self._stream_audio_chatterbox(request, voice):
+        async for chunk in self._stream_audio_chatterbox(request, voice, voice_reference_path):
             all_audio += chunk
         return all_audio
     
@@ -367,6 +399,49 @@ class ChatterboxAdapter(TTSAdapter):
         # 3. Create a new voice ID
         
         return "cloned_voice"
+    
+    async def _prepare_voice_reference(self, voice_reference: bytes) -> Optional[str]:
+        """
+        Prepare voice reference audio for Chatterbox.
+        
+        Args:
+            voice_reference: Voice reference audio bytes
+            
+        Returns:
+            Path to temporary voice reference file or None if processing fails
+        """
+        try:
+            import tempfile
+            from pathlib import Path
+            from tldw_Server_API.app.core.TTS.audio_utils import process_voice_reference
+            
+            # Process voice reference for Chatterbox requirements
+            processed_audio, error = process_voice_reference(
+                voice_reference,
+                provider='chatterbox',
+                validate=True,
+                convert=True
+            )
+            
+            if error:
+                logger.error(f"Voice reference processing failed: {error}")
+                return None
+            
+            # Save to temporary file
+            with tempfile.NamedTemporaryFile(
+                suffix='.wav',
+                delete=False,
+                prefix='chatterbox_voice_'
+            ) as tmp_file:
+                tmp_file.write(processed_audio)
+                tmp_path = tmp_file.name
+            
+            logger.info(f"Voice reference prepared: {tmp_path}")
+            return tmp_path
+            
+        except Exception as e:
+            logger.error(f"Failed to prepare voice reference: {e}")
+            return None
     
     def map_voice(self, voice_id: str) -> str:
         """Map generic voice ID to Chatterbox voice"""

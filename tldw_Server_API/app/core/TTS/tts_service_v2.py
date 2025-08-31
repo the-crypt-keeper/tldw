@@ -3,6 +3,7 @@
 #
 # Imports
 import asyncio
+import time
 from typing import AsyncGenerator, Optional, Dict, Any, List
 #
 # Third-party Imports
@@ -10,6 +11,7 @@ from loguru import logger
 #
 # Local Imports
 from tldw_Server_API.app.api.v1.schemas.audio_schemas import OpenAISpeechRequest
+from tldw_Server_API.app.core.Metrics import get_metrics_registry
 from .adapter_registry import (
     get_tts_factory,
     close_tts_factory,
@@ -22,6 +24,11 @@ from .adapters.base import (
     TTSResponse,
     AudioFormat
 )
+from .circuit_breaker import (
+    get_circuit_manager,
+    CircuitBreakerManager,
+    CircuitOpenError
+)
 #
 #######################################################################################################################
 #
@@ -33,15 +40,66 @@ class TTSServiceV2:
     Provides intelligent provider selection and fallback capabilities.
     """
     
-    def __init__(self, factory: TTSAdapterFactory):
+    def __init__(self, factory: TTSAdapterFactory, circuit_manager: Optional[CircuitBreakerManager] = None):
         """
         Initialize the TTS service.
         
         Args:
             factory: TTS adapter factory instance
+            circuit_manager: Optional circuit breaker manager
         """
         self.factory = factory
+        self.circuit_manager = circuit_manager
         self._semaphore = asyncio.Semaphore(4)  # Limit concurrent generations
+        
+        # Initialize metrics
+        self.metrics = get_metrics_registry()
+        self._register_tts_metrics()
+    
+    def _register_tts_metrics(self):
+        """Register TTS-specific metrics"""
+        # TTS request metrics
+        self.metrics.register_counter(
+            name="tts_requests_total",
+            description="Total number of TTS requests",
+            labels=["provider", "model", "voice", "format", "status"]
+        )
+        
+        self.metrics.register_histogram(
+            name="tts_request_duration_seconds",
+            description="TTS request duration in seconds",
+            unit="s",
+            labels=["provider", "model", "voice"],
+            buckets=[0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60]
+        )
+        
+        self.metrics.register_histogram(
+            name="tts_text_length_characters",
+            description="Length of text processed",
+            unit="characters",
+            labels=["provider"],
+            buckets=[10, 50, 100, 250, 500, 1000, 2500, 5000]
+        )
+        
+        self.metrics.register_histogram(
+            name="tts_audio_size_bytes",
+            description="Size of generated audio",
+            unit="bytes",
+            labels=["provider", "format"],
+            buckets=[1024, 10240, 102400, 1048576, 10485760]  # 1KB, 10KB, 100KB, 1MB, 10MB
+        )
+        
+        self.metrics.register_gauge(
+            name="tts_active_requests",
+            description="Number of active TTS requests",
+            labels=["provider"]
+        )
+        
+        self.metrics.register_counter(
+            name="tts_fallback_attempts",
+            description="Number of fallback attempts",
+            labels=["from_provider", "to_provider", "success"]
+        )
     
     async def generate_speech(
         self,
@@ -77,20 +135,53 @@ class TTSServiceV2:
                 yield error_msg.encode()
                 return
         
-        # Generate speech with comprehensive error handling
+        # Track metrics
+        start_time = time.time()
+        audio_size = 0
+        chunks_count = 0
+        
+        # Update active requests gauge
+        self.metrics.gauge_set(
+            "tts_active_requests",
+            1,
+            labels={"provider": adapter.provider_name}
+        )
+        
+        # Generate speech with circuit breaker and comprehensive error handling
         try:
             async with self._semaphore:
                 logger.info(f"Generating speech with {adapter.provider_name}")
                 
-                # Generate response
-                response = await adapter.generate(tts_request)
+                # Get circuit breaker if available
+                circuit_breaker = None
+                if self.circuit_manager:
+                    circuit_breaker = await self.circuit_manager.get_breaker(adapter.provider_name)
+                
+                # Generate response (with or without circuit breaker)
+                if circuit_breaker:
+                    try:
+                        response = await circuit_breaker.call(adapter.generate, tts_request)
+                    except CircuitOpenError as e:
+                        logger.warning(f"Circuit open for {adapter.provider_name}: {e}")
+                        if fallback:
+                            async for chunk in self._try_fallback_providers(tts_request, [adapter.provider_name]):
+                                yield chunk
+                            return
+                        else:
+                            raise
+                else:
+                    response = await adapter.generate(tts_request)
                 
                 # Stream audio
                 if response.audio_stream:
                     async for chunk in response.audio_stream:
+                        chunks_count += 1
+                        audio_size += len(chunk)
                         yield chunk
                 elif response.audio_data:
                     # Non-streaming response
+                    chunks_count = 1
+                    audio_size = len(response.audio_data)
                     yield response.audio_data
                 else:
                     error_msg = f"No audio data returned by {adapter.provider_name}"
@@ -101,10 +192,35 @@ class TTSServiceV2:
                             yield chunk
                     else:
                         yield f"ERROR: {error_msg}".encode()
+                
+                # Record success metrics
+                self._record_tts_metrics(
+                    provider=adapter.provider_name,
+                    model=tts_request.model or "default",
+                    voice=tts_request.voice or "default",
+                    format=tts_request.format.value,
+                    text_length=len(tts_request.text),
+                    audio_size=audio_size,
+                    duration=time.time() - start_time,
+                    success=True
+                )
                     
         except Exception as e:
             error_msg = f"Error generating speech with {adapter.provider_name}: {str(e)}"
             logger.error(error_msg, exc_info=True)
+            
+            # Record failure metrics
+            self._record_tts_metrics(
+                provider=adapter.provider_name,
+                model=tts_request.model or "default", 
+                voice=tts_request.voice or "default",
+                format=tts_request.format.value,
+                text_length=len(tts_request.text),
+                audio_size=audio_size,
+                duration=time.time() - start_time,
+                success=False,
+                error=str(e)
+            )
             
             # Categorize error type for better handling
             error_type = self._categorize_error(e)
@@ -120,6 +236,13 @@ class TTSServiceV2:
                 yield f"ERROR: {error_msg}".encode()
                 if not fallback:
                     raise
+        finally:
+            # Update active requests gauge
+            self.metrics.gauge_add(
+                "tts_active_requests",
+                -1,
+                labels={"provider": adapter.provider_name}
+            )
     
     async def _generate_with_adapter(
         self,
@@ -216,6 +339,67 @@ class TTSServiceV2:
                     return adapter
         
         return None
+    
+    def _record_tts_metrics(
+        self,
+        provider: str,
+        model: str,
+        voice: str,
+        format: str,
+        text_length: int,
+        audio_size: int,
+        duration: float,
+        success: bool,
+        error: Optional[str] = None
+    ):
+        """Record TTS request metrics"""
+        # Record request counter
+        self.metrics.counter_increment(
+            "tts_requests_total",
+            labels={
+                "provider": provider,
+                "model": model,
+                "voice": voice,
+                "format": format,
+                "status": "success" if success else "failure"
+            }
+        )
+        
+        # Record duration histogram
+        self.metrics.histogram_observe(
+            "tts_request_duration_seconds",
+            duration,
+            labels={"provider": provider, "model": model, "voice": voice}
+        )
+        
+        # Record text length histogram
+        self.metrics.histogram_observe(
+            "tts_text_length_characters",
+            text_length,
+            labels={"provider": provider}
+        )
+        
+        # Record audio size if successful
+        if success and audio_size > 0:
+            self.metrics.histogram_observe(
+                "tts_audio_size_bytes",
+                audio_size,
+                labels={"provider": provider, "format": format}
+            )
+        
+        # Log performance metrics
+        if success:
+            chars_per_second = text_length / duration if duration > 0 else 0
+            logger.info(
+                f"TTS metrics: provider={provider}, duration={duration:.2f}s, "
+                f"text_length={text_length}, audio_size={audio_size}, "
+                f"chars/sec={chars_per_second:.1f}"
+            )
+        else:
+            logger.warning(
+                f"TTS failed: provider={provider}, duration={duration:.2f}s, "
+                f"error={error}"
+            )
     
     def _categorize_error(self, error: Exception) -> str:
         """
@@ -368,7 +552,13 @@ class TTSServiceV2:
     
     def get_status(self) -> Dict[str, Any]:
         """Get service status"""
-        return self.factory.get_status()
+        status = self.factory.get_status()
+        
+        # Add circuit breaker status if available
+        if self.circuit_manager:
+            status["circuit_breakers"] = self.circuit_manager.get_all_status()
+        
+        return status
 
 
 # Singleton management
@@ -400,8 +590,11 @@ async def get_tts_service_v2(config: Optional[Dict[str, Any]] = None) -> TTSServ
                 # Get factory
                 factory = await get_tts_factory(config)
                 
+                # Get circuit breaker manager
+                circuit_manager = await get_circuit_manager(config)
+                
                 # Create service
-                _service_instance = TTSServiceV2(factory)
+                _service_instance = TTSServiceV2(factory, circuit_manager)
                 logger.info("Enhanced TTS Service (V2) initialized")
     
     return _service_instance

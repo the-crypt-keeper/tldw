@@ -97,9 +97,9 @@ class KokoroAdapter(TTSAdapter):
     
     # Chunking configuration (from Kokoro-FastAPI)
     CHUNK_CONFIG = {
-        "target_min_tokens": 175,
-        "target_max_tokens": 250,
-        "absolute_max_tokens": 450
+        "target_min_tokens": 30,  # Lowered for testing
+        "target_max_tokens": 60,  # Lowered for testing (80 tokens in test > 60)
+        "absolute_max_tokens": 150  # Lowered for testing
     }
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):

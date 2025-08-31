@@ -16,6 +16,8 @@ from .adapters.kokoro_adapter import KokoroAdapter
 from .adapters.higgs_adapter import HiggsAdapter
 from .adapters.dia_adapter import DiaAdapter
 from .adapters.chatterbox_adapter import ChatterboxAdapter
+from .adapters.elevenlabs_adapter import ElevenLabsAdapter
+from .adapters.vibevoice_adapter import VibeVoiceAdapter
 #
 #######################################################################################################################
 #
@@ -28,8 +30,9 @@ class TTSProvider(Enum):
     HIGGS = "higgs"
     DIA = "dia"
     CHATTERBOX = "chatterbox"
-    # Legacy mappings for backwards compatibility
-    ELEVENLABS = "elevenlabs"  # TODO: Implement ElevenLabs adapter
+    ELEVENLABS = "elevenlabs"
+    VIBEVOICE = "vibevoice"
+    # Additional providers
     ALLTALK = "alltalk"  # TODO: Implement AllTalk adapter
 
 
@@ -45,7 +48,9 @@ class TTSAdapterRegistry:
         TTSProvider.KOKORO: KokoroAdapter,
         TTSProvider.HIGGS: HiggsAdapter,
         TTSProvider.DIA: DiaAdapter,
-        TTSProvider.CHATTERBOX: ChatterboxAdapter
+        TTSProvider.CHATTERBOX: ChatterboxAdapter,
+        TTSProvider.ELEVENLABS: ElevenLabsAdapter,
+        TTSProvider.VIBEVOICE: VibeVoiceAdapter
     }
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -348,13 +353,27 @@ class TTSAdapterFactory:
             "higgs-v2": TTSProvider.HIGGS,
             "higgs-audio-v2": TTSProvider.HIGGS,
             
+            # ElevenLabs models
+            "elevenlabs": TTSProvider.ELEVENLABS,
+            "eleven_monolingual_v1": TTSProvider.ELEVENLABS,
+            "eleven_multilingual_v1": TTSProvider.ELEVENLABS,
+            "eleven_multilingual_v2": TTSProvider.ELEVENLABS,
+            "eleven_turbo_v2": TTSProvider.ELEVENLABS,
+            
             # Dia models
             "dia": TTSProvider.DIA,
             "dia-1.6b": TTSProvider.DIA,
             
             # Chatterbox models
             "chatterbox": TTSProvider.CHATTERBOX,
-            "chatterbox-emotion": TTSProvider.CHATTERBOX
+            "chatterbox-emotion": TTSProvider.CHATTERBOX,
+            
+            # VibeVoice models
+            "vibevoice": TTSProvider.VIBEVOICE,
+            "vibevoice-1.5b": TTSProvider.VIBEVOICE,
+            "vibevoice-7b": TTSProvider.VIBEVOICE,
+            "microsoft/VibeVoice-1.5B": TTSProvider.VIBEVOICE,
+            "WestZhang/VibeVoice-Large-pt": TTSProvider.VIBEVOICE
         }
         
         # Get provider from model name
