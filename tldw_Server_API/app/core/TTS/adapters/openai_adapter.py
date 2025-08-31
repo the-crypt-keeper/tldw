@@ -236,11 +236,15 @@ class OpenAIAdapter(TTSAdapter):
         response.raise_for_status()
         return response.content
     
-    async def close(self):
-        """Clean up resources"""
+    async def _cleanup_resources(self):
+        """Clean up OpenAI adapter resources"""
         if self.client:
-            await self.client.aclose()
-        await super().close()
+            try:
+                await self.client.aclose()
+                self.client = None
+                logger.debug(f"{self.provider_name}: HTTP client closed")
+            except Exception as e:
+                logger.warning(f"{self.provider_name}: Error closing HTTP client: {e}")
     
     def map_voice(self, voice_id: str) -> str:
         """Map generic voice ID to OpenAI voice"""

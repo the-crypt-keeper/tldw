@@ -303,9 +303,18 @@ class TTSAdapter(ABC):
     
     async def close(self):
         """Clean up resources"""
-        self._initialized = False
-        self._status = ProviderStatus.DISABLED
-        logger.info(f"{self.provider_name} adapter closed")
+        try:
+            # Perform adapter-specific cleanup
+            await self._cleanup_resources()
+            self._initialized = False
+            self._status = ProviderStatus.DISABLED
+            logger.info(f"{self.provider_name} adapter closed")
+        except Exception as e:
+            logger.error(f"Error closing {self.provider_name} adapter: {e}")
+    
+    async def _cleanup_resources(self):
+        """Override this method for adapter-specific cleanup"""
+        pass
     
     def map_voice(self, voice_id: str) -> str:
         """
@@ -352,6 +361,8 @@ class TTSAdapter(ABC):
         
         pattern = r'([A-Za-z0-9]+):\s*([^:]+?)(?=(?:[A-Za-z0-9]+:|$))'
         matches = re.findall(pattern, text)
+        # Strip whitespace from dialogue text
+        matches = [(speaker, dialogue.strip()) for speaker, dialogue in matches]
         
         if matches:
             return matches

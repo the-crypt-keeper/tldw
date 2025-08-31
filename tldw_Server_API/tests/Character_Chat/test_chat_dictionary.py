@@ -165,14 +165,14 @@ class TestChatDictionaryService:
             }
         ]
         
-        processed_text, metadata = service.process_text(
+        result = service.process_text(
             text="hello world, hello there",
             token_budget=1000
         )
         
-        assert "hi" in processed_text  # Should have replaced at least one "hello"
-        assert metadata["replacements"] >= 1
-        assert metadata["token_budget_exceeded"] == False
+        assert "hi" in result["processed_text"]  # Should have replaced at least one "hello"
+        assert result["replacements"] >= 1
+        assert result["token_budget_exceeded"] == False
     
     def test_process_text_regex_replacement(self, service, mock_db):
         """Test processing text with regex pattern replacement."""
@@ -184,14 +184,14 @@ class TestChatDictionaryService:
               "max_replacements": 2}]
         ]
         
-        processed_text, metadata = service.process_text(
+        result = service.process_text(
             text="testing tested tester",
             token_budget=1000
         )
         
         # Note: Actual regex processing depends on implementation
-        assert processed_text is not None
-        assert metadata is not None
+        assert result["processed_text"] is not None
+        assert "replacements" in result
     
     def test_process_text_with_probability(self, service, mock_db):
         """Test that probability affects replacements."""
@@ -203,11 +203,11 @@ class TestChatDictionaryService:
               "max_replacements": 1}]
         ]
         
-        processed_text, metadata = service.process_text("hello world", token_budget=1000)
+        result = service.process_text("hello world", token_budget=1000)
         
         # With 0% probability, no replacement should occur
-        assert processed_text == "hello world"
-        assert metadata["replacements"] == 0
+        assert result["processed_text"] == "hello world"
+        assert result["replacements"] == 0
     
     def test_process_text_token_budget(self, service, mock_db):
         """Test that processing stops when token budget is exceeded."""
@@ -232,11 +232,11 @@ class TestChatDictionaryService:
         # Create text with many instances
         long_text = " ".join(["word"] * 50)
         
-        processed_text, metadata = service.process_text(long_text, token_budget=10)
+        result = service.process_text(long_text, token_budget=10)
         
         # Should handle budget
-        assert "token_budget_exceeded" in metadata
-        assert metadata["token_budget_exceeded"] == True
+        assert "token_budget_exceeded" in result
+        assert result["token_budget_exceeded"] == True
     
     def test_delete_dictionary_cascade(self, service, mock_db):
         """Test that deleting a dictionary cascades to entries."""

@@ -77,7 +77,7 @@ class TTSServiceV2:
                 yield error_msg.encode()
                 return
         
-        # Generate speech
+        # Generate speech with comprehensive error handling
         try:
             async with self._semaphore:
                 logger.info(f"Generating speech with {adapter.provider_name}")
@@ -93,30 +93,33 @@ class TTSServiceV2:
                     # Non-streaming response
                     yield response.audio_data
                 else:
-                    logger.error("No audio data in response")
-                    yield b"ERROR: No audio generated"
+                    error_msg = f"No audio data returned by {adapter.provider_name}"
+                    logger.error(error_msg)
+                    if fallback:
+                        await self._handle_provider_fallback(tts_request, adapter.provider_name, error_msg)
+                        async for chunk in self._try_fallback_providers(tts_request, [adapter.provider_name]):
+                            yield chunk
+                    else:
+                        yield f"ERROR: {error_msg}".encode()
                     
         except Exception as e:
-            logger.error(f"Error generating speech with {adapter.provider_name}: {e}")
+            error_msg = f"Error generating speech with {adapter.provider_name}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             
-            if fallback:
-                # Try fallback adapter
-                logger.info("Attempting fallback to another provider...")
-                fallback_adapter = await self._get_fallback_adapter(
-                    tts_request,
-                    exclude=[adapter.provider_name]
-                )
-                
-                if fallback_adapter:
-                    async for chunk in self._generate_with_adapter(
-                        fallback_adapter,
-                        tts_request
-                    ):
-                        yield chunk
-                else:
-                    yield f"ERROR: {str(e)}".encode()
+            # Categorize error type for better handling
+            error_type = self._categorize_error(e)
+            logger.debug(f"Error categorized as: {error_type}")
+            
+            if fallback and error_type in ['network', 'api_limit', 'provider_error']:
+                # Try fallback for recoverable errors
+                logger.info(f"Attempting fallback due to {error_type} error...")
+                async for chunk in self._try_fallback_providers(tts_request, [adapter.provider_name]):
+                    yield chunk
             else:
-                raise
+                # For non-recoverable errors or when fallback is disabled
+                yield f"ERROR: {error_msg}".encode()
+                if not fallback:
+                    raise
     
     async def _generate_with_adapter(
         self,
@@ -214,6 +217,105 @@ class TTSServiceV2:
         
         return None
     
+    def _categorize_error(self, error: Exception) -> str:
+        """
+        Categorize error types for better error handling decisions.
+        
+        Args:
+            error: Exception that occurred
+            
+        Returns:
+            Error category string
+        """
+        error_str = str(error).lower()
+        error_type = type(error).__name__.lower()
+        
+        # Network-related errors
+        if any(keyword in error_str for keyword in ['connection', 'timeout', 'network', 'unreachable']):
+            return 'network'
+        
+        # API rate limiting or quota errors
+        if any(keyword in error_str for keyword in ['rate limit', 'quota', 'too many requests', '429']):
+            return 'api_limit'
+        
+        # Authentication/authorization errors
+        if any(keyword in error_str for keyword in ['unauthorized', 'api key', 'authentication', '401', '403']):
+            return 'auth'
+        
+        # Provider-specific errors (likely recoverable with fallback)
+        if any(keyword in error_str for keyword in ['provider', 'model', 'service unavailable', '503', '502']):
+            return 'provider_error'
+        
+        # Input validation errors (not recoverable with different provider)
+        if any(keyword in error_str for keyword in ['invalid input', 'text too long', 'unsupported format']):
+            return 'input_error'
+        
+        # Configuration errors
+        if any(keyword in error_str for keyword in ['not configured', 'missing config', 'initialization']):
+            return 'config_error'
+        
+        # Default to unknown
+        return 'unknown'
+    
+    async def _handle_provider_fallback(self, request: TTSRequest, failed_provider: str, error_msg: str):
+        """
+        Handle provider fallback logging and potential circuit breaker logic.
+        
+        Args:
+            request: Original TTS request
+            failed_provider: Name of the provider that failed
+            error_msg: Error message from the failed provider
+        """
+        logger.warning(f"Provider {failed_provider} failed: {error_msg}")
+        logger.info(f"Attempting fallback for request: text_length={len(request.text)}, voice={request.voice}")
+        
+        # TODO: Implement circuit breaker pattern here
+        # - Track failure rates per provider
+        # - Temporarily disable providers with high failure rates
+        # - Implement exponential backoff
+    
+    async def _try_fallback_providers(
+        self, 
+        request: TTSRequest, 
+        exclude_providers: List[str]
+    ) -> AsyncGenerator[bytes, None]:
+        """
+        Try fallback providers in priority order.
+        
+        Args:
+            request: TTS request to fulfill
+            exclude_providers: List of provider names to exclude
+            
+        Yields:
+            Audio chunks from successful provider
+        """
+        fallback_adapter = await self._get_fallback_adapter(request, exclude_providers)
+        
+        if fallback_adapter:
+            try:
+                async for chunk in self._generate_with_adapter(fallback_adapter, request):
+                    yield chunk
+                logger.info(f"Successfully fell back to {fallback_adapter.provider_name}")
+            except Exception as e:
+                logger.error(f"Fallback provider {fallback_adapter.provider_name} also failed: {e}")
+                # Try one more fallback if available
+                exclude_providers.append(fallback_adapter.provider_name)
+                final_fallback = await self._get_fallback_adapter(request, exclude_providers)
+                
+                if final_fallback:
+                    try:
+                        async for chunk in self._generate_with_adapter(final_fallback, request):
+                            yield chunk
+                        logger.info(f"Final fallback to {final_fallback.provider_name} succeeded")
+                    except Exception as final_e:
+                        error_msg = f"All providers failed. Last error: {str(final_e)}"
+                        logger.error(error_msg)
+                        yield f"ERROR: {error_msg}".encode()
+                else:
+                    yield f"ERROR: All fallback providers exhausted".encode()
+        else:
+            yield f"ERROR: No fallback providers available".encode()
+    
     async def list_voices(self) -> Dict[str, List[Dict[str, Any]]]:
         """
         List all available voices from all providers.
@@ -291,8 +393,9 @@ async def get_tts_service_v2(config: Optional[Dict[str, Any]] = None) -> TTSServ
             if _service_instance is None:
                 # Load configuration if not provided
                 if config is None:
-                    from tldw_Server_API.app.core.config import load_comprehensive_config
-                    config = load_comprehensive_config()
+                    from tldw_Server_API.app.core.config import load_comprehensive_config_with_tts
+                    config_obj = load_comprehensive_config_with_tts()
+                    config = config_obj.get_tts_config()
                 
                 # Get factory
                 factory = await get_tts_factory(config)

@@ -432,10 +432,11 @@ class KokoroAdapter(TTSAdapter):
         
         for sentence in sentences:
             # Estimate token count (rough approximation: 1 token ≈ 4 chars)
-            estimated_tokens = (len(current_chunk) + len(sentence)) / 4
+            current_plus_sentence = current_chunk + (" " + sentence if current_chunk else sentence)
+            estimated_tokens = len(current_plus_sentence) / 4
             
             if estimated_tokens < self.CHUNK_CONFIG["target_max_tokens"]:
-                current_chunk += " " + sentence if current_chunk else sentence
+                current_chunk = current_plus_sentence
             else:
                 if current_chunk:
                     chunks.append(current_chunk.strip())
@@ -446,12 +447,39 @@ class KokoroAdapter(TTSAdapter):
         
         return chunks
     
-    async def close(self):
-        """Clean up resources"""
-        self.kokoro_instance = None
-        self.model_pt = None
-        self.tokenizer = None
-        await super().close()
+    async def _cleanup_resources(self):
+        """Clean up Kokoro adapter resources"""
+        try:
+            # Clean up ONNX instance
+            if self.kokoro_instance:
+                self.kokoro_instance = None
+                logger.debug(f"{self.provider_name}: ONNX instance cleared")
+            
+            # Clean up PyTorch model and tokenizer
+            if self.model_pt:
+                self.model_pt = None
+                logger.debug(f"{self.provider_name}: PyTorch model cleared")
+            
+            if self.tokenizer:
+                self.tokenizer = None
+                logger.debug(f"{self.provider_name}: Tokenizer cleared")
+            
+            # Clear normalizer
+            if self.audio_normalizer:
+                self.audio_normalizer = None
+            
+            # Clear CUDA cache if using GPU
+            if self.device.startswith("cuda"):
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                        logger.debug(f"{self.provider_name}: CUDA cache cleared")
+                except ImportError:
+                    pass
+                    
+        except Exception as e:
+            logger.warning(f"{self.provider_name}: Error during cleanup: {e}")
 
 #
 # End of kokoro_adapter.py

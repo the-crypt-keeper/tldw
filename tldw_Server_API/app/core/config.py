@@ -6,8 +6,9 @@ import configparser
 import json
 import logging
 import os
+import yaml
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
 
 #
@@ -194,6 +195,103 @@ DIARIZATION_CONFIG = {
     "include_vad_scores": False,  # Include VAD scores in output
 }
 
+
+def load_tts_config() -> Dict[str, Any]:
+    """
+    Load TTS configuration from YAML file and integrate with existing config.
+    
+    Returns:
+        Dictionary containing TTS configuration
+    """
+    current_file_path = Path(__file__).resolve()
+    # Navigate to TTS config file: .../tldw_Server_API/app/core/TTS/tts_providers_config.yaml
+    tts_config_path = current_file_path.parent / 'TTS' / 'tts_providers_config.yaml'
+    
+    logger.info(f"Loading TTS configuration from: {tts_config_path}")
+    
+    if not tts_config_path.exists():
+        logger.warning(f"TTS config file not found at {tts_config_path}, using defaults")
+        return _get_default_tts_config()
+    
+    try:
+        with open(tts_config_path, 'r', encoding='utf-8') as f:
+            tts_config = yaml.safe_load(f)
+        
+        # Validate and process the configuration
+        processed_config = _process_tts_config(tts_config)
+        logger.info("TTS configuration loaded successfully")
+        return processed_config
+        
+    except Exception as e:
+        logger.error(f"Error loading TTS configuration: {e}")
+        logger.info("Falling back to default TTS configuration")
+        return _get_default_tts_config()
+
+def _process_tts_config(tts_config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Process and validate TTS configuration from YAML.
+    
+    Args:
+        tts_config: Raw configuration from YAML file
+        
+    Returns:
+        Processed configuration dictionary
+    """
+    processed = {}
+    
+    # Extract provider priority
+    if 'provider_priority' in tts_config:
+        processed['provider_priority'] = tts_config['provider_priority']
+    
+    # Process provider configurations
+    if 'providers' in tts_config:
+        for provider_name, provider_config in tts_config['providers'].items():
+            processed[f'{provider_name}_config'] = provider_config
+            
+            # Enable/disable flags
+            processed[f'{provider_name}_enabled'] = provider_config.get('enabled', True)
+    
+    # Extract voice mappings
+    if 'voice_mappings' in tts_config:
+        processed['voice_mappings'] = tts_config['voice_mappings']
+    
+    # Extract format preferences
+    if 'format_preferences' in tts_config:
+        processed['format_preferences'] = tts_config['format_preferences']
+    
+    # Extract performance settings
+    if 'performance' in tts_config:
+        processed.update(tts_config['performance'])
+    
+    # Extract fallback settings
+    if 'fallback' in tts_config:
+        processed.update(tts_config['fallback'])
+    
+    # Extract logging settings
+    if 'logging' in tts_config:
+        processed['tts_logging'] = tts_config['logging']
+    
+    return processed
+
+def _get_default_tts_config() -> Dict[str, Any]:
+    """
+    Get default TTS configuration when YAML config is not available.
+    
+    Returns:
+        Default configuration dictionary
+    """
+    return {
+        'provider_priority': ['openai', 'kokoro'],
+        'openai_enabled': True,
+        'kokoro_enabled': True,
+        'higgs_enabled': False,
+        'dia_enabled': False,
+        'chatterbox_enabled': False,
+        'max_concurrent_generations': 4,
+        'fallback_enabled': True,
+        'max_attempts': 3,
+        'retry_delay_ms': 1000
+    }
 
 def load_openai_mappings() -> Dict:
     # Determine path relative to this file.
@@ -419,6 +517,60 @@ def load_comprehensive_config():
 
     logger.info(f"load_comprehensive_config(): Sections found in config: {config_parser.sections()}")
     return config_parser
+
+def load_comprehensive_config_with_tts():
+    """
+    Load comprehensive configuration including TTS settings.
+    
+    Returns:
+        Combined configuration object with TTS settings integrated
+    """
+    # Load main config
+    config_parser = load_comprehensive_config()
+    
+    # Load TTS config
+    tts_config = load_tts_config()
+    
+    # Create combined configuration object
+    class CombinedConfig:
+        def __init__(self, config_parser: configparser.ConfigParser, tts_config: Dict[str, Any]):
+            self.config_parser = config_parser
+            self.tts_config = tts_config
+        
+        def get(self, section: str, key: str, fallback=None):
+            """Get value from main config"""
+            return self.config_parser.get(section, key, fallback=fallback)
+        
+        def has_section(self, section: str) -> bool:
+            """Check if section exists in main config"""
+            return self.config_parser.has_section(section)
+        
+        def has_option(self, section: str, key: str) -> bool:
+            """Check if option exists in main config"""
+            return self.config_parser.has_option(section, key)
+        
+        def items(self, section: str):
+            """Get items from main config section"""
+            return self.config_parser.items(section)
+        
+        def sections(self):
+            """Get sections from main config"""
+            return self.config_parser.sections()
+        
+        def get_tts_config(self) -> Dict[str, Any]:
+            """Get TTS configuration"""
+            # Merge with API keys from main config for convenience
+            merged_tts = self.tts_config.copy()
+            
+            # Add API keys if available
+            if self.config_parser.has_option('API', 'openai_api_key'):
+                merged_tts['openai_api_key'] = self.config_parser.get('API', 'openai_api_key')
+            if self.config_parser.has_option('API', 'elevenlabs_api_key'):
+                merged_tts['elevenlabs_api_key'] = self.config_parser.get('API', 'elevenlabs_api_key')
+            
+            return merged_tts
+    
+    return CombinedConfig(config_parser, tts_config)
 
 def load_and_log_configs():
     logger.debug("load_and_log_configs(): Loading and logging configurations...")

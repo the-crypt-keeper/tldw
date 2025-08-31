@@ -212,18 +212,18 @@ class TestWorldBookService:
              "content": "Magic is powerful", "priority": 50, "enabled": 1, "metadata": '{}'}
         ]
         
-        processed_text, stats = service.process_context(
+        result = service.process_context(
             text="The hero found a magic sword",  # Use "magic" not "magical" for exact match
             world_book_ids=[1],  # Specify which world book to use
             token_budget=1000
         )
         
-        assert processed_text
-        assert "entries_matched" in stats
-        assert stats["entries_matched"] > 0
+        assert result["processed_context"]
+        assert "entries_matched" in result
+        assert result["entries_matched"] > 0
         # Should match both "sword" and "magic"
-        assert "legendary sword" in processed_text.lower()
-        assert "magic is powerful" in processed_text.lower()
+        assert "legendary sword" in result["processed_context"].lower()
+        assert "magic is powerful" in result["processed_context"].lower()
     
     def test_process_context_priority_ordering(self, service, mock_db):
         """Test that entries are processed by priority."""
@@ -248,14 +248,14 @@ class TestWorldBookService:
         # Set entries directly for testing
         service._entry_cache = {1: entries}
         
-        processed_text, stats = service.process_context(
+        result = service.process_context(
             text="This is a test",
             world_book_ids=[1],
             token_budget=1000
         )
         
         # High priority should be processed first
-        assert "High priority" in processed_text
+        assert "High priority" in result["processed_context"]
     
     def test_process_context_token_budget(self, service, mock_db):
         """Test that token budget is respected."""
@@ -270,15 +270,15 @@ class TestWorldBookService:
               "priority": 100, "enabled": 1, "metadata": '{}'}]
         ]
         
-        processed_text, stats = service.process_context(
+        result = service.process_context(
             text="This is a test",
             character_id=None,
             token_budget=10
         )
         
         # Should truncate to fit budget
-        assert stats.get("token_budget_exceeded", False) or stats["tokens_used"] <= 10
-        assert len(processed_text.split()) < 1000
+        assert result.get("token_budget_exceeded", False) or result["tokens_used"] <= 10
+        assert len(result["processed_context"].split()) < 1000
     
     def test_recursive_scanning(self, service, mock_db):
         """Test recursive keyword scanning."""
@@ -297,7 +297,7 @@ class TestWorldBookService:
              "priority": 50, "enabled": 1, "metadata": '{}'}
         ]
         
-        processed_text, stats = service.process_context(
+        result = service.process_context(
             text="Story about a hero",
             world_book_ids=[1],
             token_budget=1000,
@@ -305,7 +305,7 @@ class TestWorldBookService:
         )
         
         # Should match "hero" first, then "sword" from the hero entry
-        assert stats["entries_matched"] >= 1
+        assert result["entries_matched"] >= 1
     
     def test_import_world_book(self, service, mock_db):
         """Test importing a world book from JSON."""

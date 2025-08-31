@@ -45,34 +45,15 @@ router = APIRouter(
 
 
 
-# --- Placeholder for TTSService and Mappings ---
-# We will define these in subsequent steps.
-# This is just to get the endpoint structure.
+# V2 TTS Service handles all provider mapping internally
+# No need for manual model/voice mappings here
 
-_openai_mappings = { # Load this from a JSON file later
-    "models": {
-        "tts-1": "openai_official_tts-1", # Maps to your backend identifier
-        "tts-1-hd": "openai_official_tts-1-hd",
-        "eleven_english_v1": "elevenlabs_english_v1",
-        "kokoro_local": "local_kokoro_default_onnx"
-    },
-    "voices": { # This part is more complex and often backend-specific
-        # OpenAI voices
-        "alloy": "alloy", "echo": "echo", "fable": "fable",
-        "onyx": "onyx", "nova": "nova", "shimmer": "shimmer",
-        # ElevenLabs (IDs or names)
-        "Rachel": "21m00Tcm4TlvDq8ikWAM", # Example ID
-        # Kokoro local voices
-        "bella": "af_bella", # Example mapping
-    }
-}
+# Import the V2 TTS service
+from tldw_Server_API.app.core.TTS.tts_service_v2 import get_tts_service_v2, TTSServiceV2
 
-# Import the real TTS service
-from tldw_Server_API.app.core.TTS.tts_generation import TTSService, get_tts_service as get_real_tts_service
-
-async def get_tts_service() -> TTSService:
-    """Get the TTS service instance."""
-    return await get_real_tts_service()
+async def get_tts_service() -> TTSServiceV2:
+    """Get the V2 TTS service instance."""
+    return await get_tts_service_v2()
 
 # --- End of Placeholder ---
 
@@ -82,7 +63,7 @@ async def get_tts_service() -> TTSService:
 async def create_speech(
     request_data: OpenAISpeechRequest, # FastAPI will parse JSON body into this
     request: Request, # Required for rate limiter and to check for client disconnects
-    tts_service: TTSService = Depends(get_tts_service),
+    tts_service: TTSServiceV2 = Depends(get_tts_service),
     authorization: Optional[str] = Header(None),
 ):
     """
@@ -130,27 +111,10 @@ async def create_speech(
         )
     logger.info(f"Received speech request: model={request_data.model}, voice={request_data.voice}, format={request_data.response_format}")
 
-    # 1. Map OpenAI model name to your internal backend identifier
-    internal_model_id = _openai_mappings["models"].get(request_data.model)
-    if not internal_model_id:
-        logger.warning(f"Unsupported model requested: {request_data.model}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "invalid_model",
-                "message": f"The model `{request_data.model}` does not exist or you do not have access to it.",
-                "type": "invalid_request_error",
-            },
-        )
+    # V2 service handles model mapping internally via the adapter factory
+    # No need for manual mapping here
 
-    # 2. Basic voice validation (can be enhanced per backend later)
-    # For now, we assume the voice name is passed as is to the backend.
-    # More sophisticated mapping might be needed if OpenAI voice names
-    # differ significantly from how your backends expect them.
-    # internal_voice_id = _openai_mappings["voices"].get(request_data.voice, request_data.voice)
-    # request_data.voice = internal_voice_id # Update request_data if you map voices
-
-    # 3. Determine Content-Type
+    # Determine Content-Type
     content_type_map = {
         "mp3": "audio/mpeg",
         "opus": "audio/opus",
@@ -167,10 +131,15 @@ async def create_speech(
             detail=f"Unsupported response_format: {request_data.response_format}. Supported formats are: {', '.join(content_type_map.keys())}",
         )
 
-    # 4. Streaming Logic (simplified from target app)
+    # 4. Streaming Logic (using V2 service)
     async def audio_chunk_generator():
         try:
-            async for audio_chunk_bytes in tts_service.generate_audio_stream(request_data, internal_model_id):
+            # V2 service uses generate_speech with different parameters
+            async for audio_chunk_bytes in tts_service.generate_speech(
+                request_data, 
+                provider=None,  # Let service determine provider from model
+                fallback=True   # Enable fallback to other providers
+            ):
                 if await request.is_disconnected():
                     logger.info("Client disconnected, stopping audio generation.")
                     break
