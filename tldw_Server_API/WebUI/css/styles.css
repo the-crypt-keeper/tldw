@@ -216,17 +216,31 @@ header h1 {
     gap: 2px;
 }
 
+/* Multi-row tab layout */
+.top-tab-row {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.top-tab-row:last-child {
+    border-bottom: none;
+}
+
 .top-tab-button {
     background: transparent;
     color: rgba(255, 255, 255, 0.8);
     border: none;
-    padding: var(--spacing-md) var(--spacing-xl);
+    padding: var(--spacing-sm) var(--spacing-lg);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 500;
     transition: var(--transition-fast);
     position: relative;
     overflow: hidden;
+    min-width: 80px;
 }
 
 .top-tab-button::before {
@@ -1046,6 +1060,19 @@ pre:hover .copy-button {
     .top-tab-buttons {
         overflow-x: auto;
         justify-content: flex-start;
+    }
+    
+    .top-tab-row {
+        overflow-x: auto;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        padding: 2px 0;
+    }
+    
+    .top-tab-button {
+        font-size: 0.85rem;
+        padding: var(--spacing-xs) var(--spacing-md);
+        min-width: 70px;
     }
     
     .toast-container {

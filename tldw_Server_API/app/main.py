@@ -536,7 +536,7 @@ async def favicon():
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to the tldw API; If you're seeing this, the server is running!"}
+    return {"message": "Welcome to the tldw API; If you're seeing this, the server is running!" + "Check out /webui , /docs or /metrics to get started!"}
 
 # Metrics endpoint for Prometheus scraping
 @app.get("/metrics", include_in_schema=False)
