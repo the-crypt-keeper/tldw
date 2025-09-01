@@ -5,37 +5,97 @@
             <span class="endpoint-method post">POST</span>
             <span class="endpoint-path">/api/v1/characters - Create Character</span>
         </h2>
-        <p>Create a new character for roleplay or conversation.</p>
+        <p>Create a new character for roleplay or conversation with ALL available fields.</p>
         
-        <div class="form-group">
-            <label for="charactersCreate_name">Character Name <span class="required">*</span>:</label>
-            <input type="text" id="charactersCreate_name" placeholder="e.g., Assistant, Teacher, Expert">
-        </div>
+        <!-- Basic Character Information -->
+        <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+            <legend>Basic Information</legend>
+            
+            <div class="form-group">
+                <label for="charactersCreate_name">Character Name <span class="required">*</span>:</label>
+                <input type="text" id="charactersCreate_name" placeholder="e.g., Assistant, Teacher, Expert">
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_description">Description:</label>
+                <textarea id="charactersCreate_description" rows="3" placeholder="Brief character description..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_personality">Personality:</label>
+                <textarea id="charactersCreate_personality" rows="3" placeholder="Character personality traits..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_scenario">Scenario:</label>
+                <textarea id="charactersCreate_scenario" rows="3" placeholder="The setting or context where the character exists..."></textarea>
+            </div>
+        </fieldset>
         
-        <div class="form-group">
-            <label for="charactersCreate_description">Description:</label>
-            <textarea id="charactersCreate_description" rows="3" placeholder="Brief character description..."></textarea>
-        </div>
+        <!-- Conversation Settings -->
+        <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+            <legend>Conversation Settings</legend>
+            
+            <div class="form-group">
+                <label for="charactersCreate_system_prompt">System Prompt:</label>
+                <textarea id="charactersCreate_system_prompt" rows="5" placeholder="System instructions for the character...">You are a helpful AI assistant.</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_post_history_instructions">Post-History Instructions:</label>
+                <textarea id="charactersCreate_post_history_instructions" rows="3" placeholder="Instructions that come after conversation history (optional)..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_first_message">First Message:</label>
+                <textarea id="charactersCreate_first_message" rows="3" placeholder="Character's greeting or first message...">Hello! How can I assist you today?</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_message_example">Message Example:</label>
+                <textarea id="charactersCreate_message_example" rows="5" placeholder="Example conversation format (optional)..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_alternate_greetings">Alternate Greetings (JSON array or comma-separated):</label>
+                <textarea id="charactersCreate_alternate_greetings" rows="3" placeholder='["Hello!", "Hi there!", "Greetings!"] or comma-separated list'></textarea>
+            </div>
+        </fieldset>
         
-        <div class="form-group">
-            <label for="charactersCreate_personality">Personality:</label>
-            <textarea id="charactersCreate_personality" rows="3" placeholder="Character personality traits..."></textarea>
-        </div>
-        
-        <div class="form-group">
-            <label for="charactersCreate_system_prompt">System Prompt:</label>
-            <textarea id="charactersCreate_system_prompt" rows="5" placeholder="System instructions for the character...">You are a helpful AI assistant.</textarea>
-        </div>
-        
-        <div class="form-group">
-            <label for="charactersCreate_first_message">First Message:</label>
-            <textarea id="charactersCreate_first_message" rows="3" placeholder="Character's greeting or first message...">Hello! How can I assist you today?</textarea>
-        </div>
-        
-        <div class="form-group">
-            <label for="charactersCreate_tags">Tags (comma-separated):</label>
-            <input type="text" id="charactersCreate_tags" placeholder="e.g., helpful, technical, friendly">
-        </div>
+        <!-- Metadata -->
+        <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+            <legend>Metadata</legend>
+            
+            <div class="form-group">
+                <label for="charactersCreate_creator">Creator:</label>
+                <input type="text" id="charactersCreate_creator" placeholder="Creator name (optional)">
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_creator_notes">Creator Notes:</label>
+                <textarea id="charactersCreate_creator_notes" rows="3" placeholder="Notes from the creator (optional)..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_character_version">Character Version:</label>
+                <input type="text" id="charactersCreate_character_version" placeholder="e.g., 1.0.0">
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_tags">Tags (comma-separated):</label>
+                <input type="text" id="charactersCreate_tags" placeholder="e.g., helpful, technical, friendly">
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_extensions">Extensions (JSON object):</label>
+                <textarea id="charactersCreate_extensions" rows="3" placeholder='{"custom_field": "value", "another_field": 123}'>{}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_image_base64">Character Image (Base64):</label>
+                <textarea id="charactersCreate_image_base64" rows="2" placeholder="Base64 encoded image (optional, without data:image prefix)..."></textarea>
+            </div>
+        </fieldset>
         
         <button class="api-button" onclick="createCharacter()">
             Create Character
@@ -139,17 +199,80 @@ async function createCharacter() {
     try {
         responseEl.textContent = 'Creating character...';
         
-        const tags = document.getElementById('charactersCreate_tags').value;
-        const tagsArray = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
+        // Collect all form values
+        const body = {};
         
-        const body = {
-            name: document.getElementById('charactersCreate_name').value,
-            description: document.getElementById('charactersCreate_description').value,
-            personality: document.getElementById('charactersCreate_personality').value,
-            system_prompt: document.getElementById('charactersCreate_system_prompt').value,
-            first_message: document.getElementById('charactersCreate_first_message').value,
-            tags: tagsArray
-        };
+        // Required field
+        const name = document.getElementById('charactersCreate_name').value;
+        if (!name) {
+            throw new Error('Character name is required');
+        }
+        body.name = name;
+        
+        // Basic Information
+        const description = document.getElementById('charactersCreate_description').value;
+        if (description) body.description = description;
+        
+        const personality = document.getElementById('charactersCreate_personality').value;
+        if (personality) body.personality = personality;
+        
+        const scenario = document.getElementById('charactersCreate_scenario').value;
+        if (scenario) body.scenario = scenario;
+        
+        // Conversation Settings
+        const systemPrompt = document.getElementById('charactersCreate_system_prompt').value;
+        if (systemPrompt) body.system_prompt = systemPrompt;
+        
+        const postHistoryInstructions = document.getElementById('charactersCreate_post_history_instructions').value;
+        if (postHistoryInstructions) body.post_history_instructions = postHistoryInstructions;
+        
+        const firstMessage = document.getElementById('charactersCreate_first_message').value;
+        if (firstMessage) body.first_message = firstMessage;
+        
+        const messageExample = document.getElementById('charactersCreate_message_example').value;
+        if (messageExample) body.message_example = messageExample;
+        
+        // Handle alternate_greetings - can be JSON array or comma-separated
+        const alternateGreetingsValue = document.getElementById('charactersCreate_alternate_greetings').value;
+        if (alternateGreetingsValue) {
+            try {
+                // Try parsing as JSON first
+                body.alternate_greetings = JSON.parse(alternateGreetingsValue);
+            } catch (e) {
+                // If not JSON, treat as comma-separated list
+                body.alternate_greetings = alternateGreetingsValue.split(',').map(g => g.trim()).filter(g => g);
+            }
+        }
+        
+        // Metadata
+        const creator = document.getElementById('charactersCreate_creator').value;
+        if (creator) body.creator = creator;
+        
+        const creatorNotes = document.getElementById('charactersCreate_creator_notes').value;
+        if (creatorNotes) body.creator_notes = creatorNotes;
+        
+        const characterVersion = document.getElementById('charactersCreate_character_version').value;
+        if (characterVersion) body.character_version = characterVersion;
+        
+        // Handle tags - comma-separated
+        const tags = document.getElementById('charactersCreate_tags').value;
+        if (tags) {
+            body.tags = tags.split(',').map(t => t.trim()).filter(t => t);
+        }
+        
+        // Handle extensions - should be JSON object
+        const extensionsValue = document.getElementById('charactersCreate_extensions').value;
+        if (extensionsValue && extensionsValue !== '{}') {
+            try {
+                body.extensions = JSON.parse(extensionsValue);
+            } catch (e) {
+                throw new Error('Extensions must be valid JSON');
+            }
+        }
+        
+        // Handle image_base64
+        const imageBase64 = document.getElementById('charactersCreate_image_base64').value;
+        if (imageBase64) body.image_base64 = imageBase64;
         
         const response = await apiClient.makeRequest('POST', '/api/v1/characters', { body });
         responseEl.textContent = JSON.stringify(response, null, 2);
