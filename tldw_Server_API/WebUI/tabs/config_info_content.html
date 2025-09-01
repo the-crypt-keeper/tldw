@@ -1,0 +1,226 @@
+<!-- Configuration Info Tab -->
+<div id="tabConfigInfo" class="tab-content">
+    <div class="endpoint-section" id="configDocsInfo">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/config/docs-info - Documentation Configuration</span>
+        </h2>
+        <p>Get comprehensive documentation and configuration information about the API.</p>
+        
+        <button class="api-button" onclick="makeRequest('configDocsInfo', 'GET', '/api/v1/config/docs-info', 'none')">
+            Get Documentation Info
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="configDocsInfo_response">---</pre>
+        
+        <div class="info-box" style="margin-top: 20px;">
+            <h4>Configuration Overview</h4>
+            <div id="configOverview" style="margin-top: 10px;">
+                <p>Click "Get Documentation Info" to see configuration details...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="endpoint-section" id="configQuickstart">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/config/quickstart - Quickstart Guide</span>
+        </h2>
+        <p>Get the interactive quickstart HTML guide for the API.</p>
+        
+        <button class="api-button" onclick="getQuickstartGuide()">
+            Get Quickstart Guide
+        </button>
+        
+        <h3>Response:</h3>
+        <div id="configQuickstart_response" style="border: 1px solid #ddd; padding: 10px; margin-top: 10px; min-height: 100px;">
+            <p>Click "Get Quickstart Guide" to load the interactive guide...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// Process and display configuration overview
+function displayConfigOverview(data) {
+    const overviewDiv = document.getElementById('configOverview');
+    if (!data) {
+        overviewDiv.innerHTML = '<p>No configuration data available</p>';
+        return;
+    }
+    
+    let html = '<div style="font-family: monospace; font-size: 14px;">';
+    
+    // API Information
+    if (data.api_info) {
+        html += '<h5>API Information</h5>';
+        html += '<ul style="list-style-type: none; padding-left: 0;">';
+        html += `<li><strong>Title:</strong> ${data.api_info.title || 'N/A'}</li>`;
+        html += `<li><strong>Version:</strong> ${data.api_info.version || 'N/A'}</li>`;
+        html += `<li><strong>Description:</strong> ${data.api_info.description || 'N/A'}</li>`;
+        html += '</ul>';
+    }
+    
+    // Available Endpoints
+    if (data.available_endpoints) {
+        html += '<h5>Available Endpoint Groups</h5>';
+        html += '<ul>';
+        Object.keys(data.available_endpoints).forEach(group => {
+            const endpoints = data.available_endpoints[group];
+            html += `<li><strong>${group}:</strong> ${endpoints.length} endpoints`;
+            
+            // Show first few endpoints as examples
+            if (endpoints.length > 0) {
+                html += '<ul style="margin-top: 5px;">';
+                endpoints.slice(0, 3).forEach(endpoint => {
+                    html += `<li><code>${endpoint}</code></li>`;
+                });
+                if (endpoints.length > 3) {
+                    html += `<li><em>... and ${endpoints.length - 3} more</em></li>`;
+                }
+                html += '</ul>';
+            }
+            html += '</li>';
+        });
+        html += '</ul>';
+    }
+    
+    // Supported Features
+    if (data.supported_features) {
+        html += '<h5>Supported Features</h5>';
+        html += '<ul>';
+        Object.entries(data.supported_features).forEach(([feature, enabled]) => {
+            const status = enabled ? 
+                '<span style="color: green;">✓ Enabled</span>' : 
+                '<span style="color: gray;">✗ Disabled</span>';
+            html += `<li><strong>${feature}:</strong> ${status}</li>`;
+        });
+        html += '</ul>';
+    }
+    
+    // Configuration Status
+    if (data.configuration_status) {
+        html += '<h5>Configuration Status</h5>';
+        html += '<ul>';
+        Object.entries(data.configuration_status).forEach(([key, value]) => {
+            html += `<li><strong>${key}:</strong> ${value}</li>`;
+        });
+        html += '</ul>';
+    }
+    
+    // Documentation Links
+    if (data.documentation_links) {
+        html += '<h5>Documentation Links</h5>';
+        html += '<ul>';
+        Object.entries(data.documentation_links).forEach(([name, url]) => {
+            html += `<li><a href="${url}" target="_blank">${name}</a></li>`;
+        });
+        html += '</ul>';
+    }
+    
+    html += '</div>';
+    overviewDiv.innerHTML = html;
+}
+
+// Get and display quickstart guide
+async function getQuickstartGuide() {
+    const responseDiv = document.getElementById('configQuickstart_response');
+    
+    try {
+        responseDiv.innerHTML = '<p>Loading quickstart guide...</p>';
+        
+        const response = await apiClient.get('/api/v1/config/quickstart');
+        
+        // If response is HTML, display it in an iframe or directly
+        if (typeof response === 'string' && response.includes('<!DOCTYPE html>')) {
+            // Create an iframe to display the HTML
+            const iframe = document.createElement('iframe');
+            iframe.style.width = '100%';
+            iframe.style.height = '600px';
+            iframe.style.border = '1px solid #ddd';
+            iframe.srcdoc = response;
+            
+            responseDiv.innerHTML = '';
+            responseDiv.appendChild(iframe);
+        } else {
+            // If it's JSON or other format, display as text
+            responseDiv.innerHTML = `<pre>${JSON.stringify(response, null, 2)}</pre>`;
+        }
+    } catch (error) {
+        responseDiv.innerHTML = `<div class="error">Error loading quickstart guide: ${error.message}</div>`;
+        console.error('Error loading quickstart guide:', error);
+    }
+}
+
+// Override makeRequest for config info to add custom processing
+const originalMakeRequestConfig = window.makeRequest;
+window.makeRequest = function(sectionId, method, endpoint, bodyType) {
+    // Call the original function
+    const result = originalMakeRequestConfig.call(this, sectionId, method, endpoint, bodyType);
+    
+    // Add custom processing for config docs response
+    if (sectionId === 'configDocsInfo') {
+        setTimeout(() => {
+            const responseElement = document.getElementById('configDocsInfo_response');
+            if (responseElement && responseElement.textContent !== '---') {
+                try {
+                    const data = JSON.parse(responseElement.textContent);
+                    displayConfigOverview(data);
+                } catch (e) {
+                    console.error('Error parsing config response:', e);
+                }
+            }
+        }, 100);
+    }
+    
+    return result;
+};
+
+// Initialize config info tab
+function initializeConfigInfoTab() {
+    console.log('Config Info tab initialized');
+    
+    // Auto-load config info when tab is opened
+    if (document.querySelector('#tabConfigInfo.active')) {
+        makeRequest('configDocsInfo', 'GET', '/api/v1/config/docs-info', 'none');
+    }
+}
+
+// Call initialization when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.querySelector('#tabConfigInfo')) {
+        initializeConfigInfoTab();
+    }
+});
+</script>
+
+<style>
+.info-box {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.info-box h4 {
+    margin-top: 0;
+    color: #333;
+}
+
+.info-box h5 {
+    margin-top: 15px;
+    margin-bottom: 8px;
+    color: #555;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 4px;
+}
+
+.error {
+    color: red;
+    padding: 10px;
+    background-color: #fee;
+    border: 1px solid #fcc;
+    border-radius: 4px;
+}
+</style>

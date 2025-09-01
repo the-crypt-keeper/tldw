@@ -240,18 +240,19 @@ class TTSInputValidator:
         # 1. Normalize Unicode characters
         text = unicodedata.normalize('NFKC', text)
         
-        # 2. Check for dangerous patterns
+        # 2. Check for dangerous patterns and remove them
         for pattern in self.DANGEROUS_REGEX:
             if pattern.search(text):
-                logger.warning(f"Dangerous pattern detected in text: {pattern.pattern[:50]}")
+                logger.warning(f"Dangerous pattern detected and removed: {pattern.pattern[:50]}")
+                # Always remove dangerous patterns for security
+                text = pattern.sub('', text)
+                
+                # In strict mode, also raise an error
                 if self.strict_mode:
                     raise TTSInvalidInputError(
                         "Text contains potentially dangerous content",
                         details={"pattern": pattern.pattern[:50]}
                     )
-                else:
-                    # In non-strict mode, remove the dangerous pattern
-                    text = pattern.sub('', text)
         
         # 3. Remove HTML tags - TTS doesn't need HTML
         # Strip all HTML tags since they shouldn't be spoken

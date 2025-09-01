@@ -7,12 +7,13 @@ import json
 import os
 import tempfile
 import io
+from pathlib import Path as PathLib
 from typing import AsyncGenerator, Optional, Dict, Any
 import numpy as np
 import soundfile as sf
 #
 # Third-party libraries
-from fastapi import APIRouter, Depends, HTTPException, Request, Header, File, Form, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Request, Header, File, Form, UploadFile, WebSocket, WebSocketDisconnect, Path
 from fastapi.responses import StreamingResponse, Response, JSONResponse
 from starlette import status # For status codes
 from slowapi import Limiter
@@ -25,6 +26,7 @@ from tldw_Server_API.app.api.v1.schemas.audio_schemas import (
     OpenAITranscriptionResponse,
     OpenAITranslationRequest
 )
+from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
 from tldw_Server_API.app.core.config import AUTH_BEARER_PREFIX
 from tldw_Server_API.app.core.Auth.auth_utils import (
     extract_bearer_token,
@@ -776,6 +778,243 @@ async def test_streaming():
                 "test_passed": False,
                 "message": str(e)
             }
+        )
+
+#######################################################################################################################
+#
+# Voice Management Endpoints
+#
+
+@router.post("/voices/upload", summary="Upload a custom voice sample")
+@limiter.limit("5/hour")  # Rate limit: 5 uploads per hour
+async def upload_voice(
+    request: Request,
+    file: UploadFile = File(..., description="Voice sample audio file (WAV, MP3, FLAC, OGG)"),
+    name: str = Form(..., description="Name for the voice"),
+    description: Optional[str] = Form(None, description="Description of the voice"),
+    provider: str = Form(default="vibevoice", description="Target TTS provider"),
+    current_user: User = Depends(get_request_user)
+):
+    """
+    Upload a custom voice sample for use with TTS.
+    
+    Supports voice cloning for compatible providers:
+    - VibeVoice: Any duration (1-shot cloning)
+    - Higgs: 3-10 seconds recommended
+    - Chatterbox: 5-20 seconds recommended
+    
+    The voice will be processed and optimized for the specified provider.
+    """
+    from tldw_Server_API.app.core.TTS.voice_manager import (
+        get_voice_manager,
+        VoiceUploadRequest,
+        VoiceProcessingError,
+        VoiceQuotaExceededError
+    )
+    
+    try:
+        # Get voice manager
+        voice_manager = get_voice_manager()
+        
+        # Read file content
+        file_content = await file.read()
+        
+        # Create upload request
+        upload_request = VoiceUploadRequest(
+            name=name,
+            description=description,
+            provider=provider
+        )
+        
+        # Process upload
+        result = await voice_manager.upload_voice(
+            user_id=current_user.id,
+            file_content=file_content,
+            filename=file.filename,
+            request=upload_request
+        )
+        
+        return result.model_dump()
+        
+    except VoiceQuotaExceededError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e)
+        )
+    except VoiceProcessingError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Voice upload error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upload voice sample"
+        )
+
+
+@router.get("/voices", summary="List user's custom voices")
+async def list_voices(
+    request: Request,
+    current_user: User = Depends(get_request_user)
+):
+    """
+    List all custom voice samples uploaded by the user.
+    
+    Returns voice metadata including:
+    - Voice ID for use in TTS requests
+    - Name and description
+    - Duration and format
+    - Compatible providers
+    """
+    from tldw_Server_API.app.core.TTS.voice_manager import get_voice_manager
+    
+    try:
+        voice_manager = get_voice_manager()
+        voices = await voice_manager.list_user_voices(current_user.id)
+        
+        return {
+            "voices": [voice.model_dump() for voice in voices],
+            "count": len(voices)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing voices: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to list voices"
+        )
+
+
+@router.get("/voices/{voice_id}", summary="Get voice details")
+async def get_voice_details(
+    request: Request,
+    voice_id: str = Path(..., description="Voice ID"),
+    current_user: User = Depends(get_request_user)
+):
+    """
+    Get detailed information about a specific voice.
+    """
+    from tldw_Server_API.app.core.TTS.voice_manager import get_voice_manager
+    
+    try:
+        voice_manager = get_voice_manager()
+        voice = await voice_manager.registry.get_voice(current_user.id, voice_id)
+        
+        if not voice:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Voice not found"
+            )
+        
+        return voice.model_dump()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting voice details: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get voice details"
+        )
+
+
+@router.delete("/voices/{voice_id}", summary="Delete a custom voice")
+async def delete_voice(
+    request: Request,
+    voice_id: str = Path(..., description="Voice ID to delete"),
+    current_user: User = Depends(get_request_user)
+):
+    """
+    Delete a custom voice sample.
+    
+    This will remove the voice files and prevent it from being used in future TTS requests.
+    """
+    from tldw_Server_API.app.core.TTS.voice_manager import get_voice_manager
+    
+    try:
+        voice_manager = get_voice_manager()
+        deleted = await voice_manager.delete_voice(current_user.id, voice_id)
+        
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Voice not found"
+            )
+        
+        return {"message": "Voice deleted successfully", "voice_id": voice_id}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting voice: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete voice"
+        )
+
+
+@router.post("/voices/{voice_id}/preview", summary="Generate voice preview")
+@limiter.limit("10/minute")  # Rate limit: 10 previews per minute
+async def preview_voice(
+    request: Request,
+    voice_id: str = Path(..., description="Voice ID to preview"),
+    text: str = Form(default="Hello, this is a preview of your custom voice.", description="Text to speak"),
+    current_user: User = Depends(get_request_user),
+    tts_service: TTSServiceV2 = Depends(get_tts_service)
+):
+    """
+    Generate a short preview of a custom voice.
+    
+    This endpoint generates a short audio sample using the specified voice
+    to help users preview how it sounds before using it in full TTS requests.
+    """
+    from tldw_Server_API.app.core.TTS.voice_manager import get_voice_manager
+    
+    try:
+        # Validate voice exists
+        voice_manager = get_voice_manager()
+        voice = await voice_manager.registry.get_voice(current_user.id, voice_id)
+        
+        if not voice:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Voice not found"
+            )
+        
+        # Limit preview text length
+        if len(text) > 100:
+            text = text[:100]
+        
+        # Create TTS request with custom voice
+        preview_request = OpenAISpeechRequest(
+            model=voice.provider,
+            input=text,
+            voice=f"custom:{voice_id}",
+            response_format="mp3"
+        )
+        
+        # Generate preview
+        response = await tts_service.generate_speech(preview_request)
+        
+        # Stream the audio
+        return StreamingResponse(
+            response.audio_stream,
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": f"inline; filename=preview_{voice_id}.mp3",
+                "X-Voice-Name": voice.name
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Voice preview error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate voice preview"
         )
 
 #

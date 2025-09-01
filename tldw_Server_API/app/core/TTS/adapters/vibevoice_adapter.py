@@ -148,11 +148,79 @@ class VibeVoiceAdapter(TTSAdapter):
         # Setup paths
         self.model_dir = Path(self.config.get("vibevoice_model_dir", "./models/vibevoice"))
         self.cache_dir = Path(self.config.get("vibevoice_cache_dir", "./cache/vibevoice"))
+        
+        # Voice samples folder for 1-shot cloning (like VibeVoice demo)
+        self.voices_dir = Path(self.config.get("vibevoice_voices_dir", "./Voices"))
+        self.custom_voices = {}
     
-    async def initialize(self) -> bool:
+    def _load_custom_voices(self):
+        """Load custom voice samples from Voices folder for 1-shot cloning"""
+        if self.voices_dir.exists():
+            logger.info(f"Loading custom voices from {self.voices_dir}")
+            for voice_file in self.voices_dir.glob("*.wav"):
+                voice_name = voice_file.stem  # Use filename without extension as voice name
+                self.custom_voices[voice_name] = str(voice_file)
+                logger.info(f"Loaded custom voice: {voice_name} from {voice_file}")
+                
+                # Add to voice presets dynamically
+                self.VOICE_PRESETS[voice_name] = VoiceInfo(
+                    id=voice_name,
+                    name=voice_name.replace("_", " ").title(),
+                    gender="neutral",
+                    description=f"Custom voice cloned from {voice_file.name}",
+                    styles=["custom", "cloned"]
+                )
+        else:
+            logger.debug(f"Voices directory {self.voices_dir} not found, using preset voices only")
+    
+    async def _load_user_voices(self, user_id: int):
+        """Load user-specific uploaded voices"""
+        try:
+            from ...voice_manager import get_voice_manager
+            
+            voice_manager = get_voice_manager()
+            user_voices = await voice_manager.list_user_voices(user_id)
+            
+            for voice_info in user_voices:
+                if voice_info.provider == "vibevoice":
+                    # Get full path to voice file
+                    voices_path = voice_manager.get_user_voices_path(user_id)
+                    voice_file_path = voices_path / voice_info.file_path
+                    
+                    if voice_file_path.exists():
+                        # Register with custom: prefix
+                        custom_id = f"custom:{voice_info.voice_id}"
+                        self.custom_voices[custom_id] = str(voice_file_path)
+                        
+                        # Add to voice presets
+                        self.VOICE_PRESETS[custom_id] = VoiceInfo(
+                            id=custom_id,
+                            name=voice_info.name,
+                            gender="neutral",
+                            description=voice_info.description or f"Custom voice: {voice_info.name}",
+                            styles=["custom", "uploaded"]
+                        )
+                        
+                        logger.info(f"Loaded user voice: {voice_info.name} ({custom_id})")
+            
+            logger.info(f"Loaded {len(user_voices)} user voices for VibeVoice")
+            
+        except ImportError:
+            logger.debug("Voice manager not available, skipping user voice loading")
+        except Exception as e:
+            logger.error(f"Error loading user voices: {e}")
+    
+    async def initialize(self, user_id: Optional[int] = None) -> bool:
         """Initialize the VibeVoice TTS model"""
         try:
             logger.info(f"{self.provider_name}: Initializing VibeVoice TTS (variant: {self.variant}, model: {self.model_path})...")
+            
+            # Load custom voices from Voices folder
+            self._load_custom_voices()
+            
+            # Load user-specific voices if user_id provided
+            if user_id:
+                await self._load_user_voices(user_id)
             
             # Get resource manager for memory monitoring
             resource_manager = await get_resource_manager()
@@ -343,7 +411,7 @@ class VibeVoiceAdapter(TTSAdapter):
             },
             max_text_length=self.context_length,  # Use variant-specific context length
             supports_streaming=True,
-            supports_voice_cloning=False,  # VibeVoice doesn't support cloning per Microsoft docs
+            supports_voice_cloning=True,  # Supports cloning via voice reference folder
             supports_emotion_control=False,  # Does not have direct emotion control
             supports_speech_rate=True,
             supports_pitch_control=False,
@@ -354,16 +422,7 @@ class VibeVoiceAdapter(TTSAdapter):
             supports_background_audio=True,  # Spontaneous music generation
             latency_ms=150 if self.device == "cuda" else 800,
             sample_rate=self.sample_rate,
-            default_format=AudioFormat.WAV,
-            additional_features={
-                "max_speakers": 4,
-                "max_generation_minutes": max_generation_minutes,
-                "spontaneous_music": True,
-                "emergent_singing": True,
-                "cross_lingual": True,
-                "model_variant": self.variant,
-                "context_tokens": self.context_length
-            }
+            default_format=AudioFormat.WAV
         )
     
     async def generate(self, request: TTSRequest) -> TTSResponse:
@@ -387,9 +446,23 @@ class VibeVoiceAdapter(TTSAdapter):
         # Ensure speaker_id is within valid range (1-4)
         speaker_id = max(1, min(4, speaker_id))
         
-        # Handle voice cloning if reference provided
+        # Handle voice cloning - check custom voices
         voice_reference_path = None
-        if request.voice_reference:
+        
+        # Check if voice starts with "custom:" prefix (uploaded voice)
+        if voice.startswith("custom:"):
+            if voice in self.custom_voices:
+                voice_reference_path = self.custom_voices[voice]
+                logger.info(f"Using uploaded voice '{voice}' from {voice_reference_path}")
+            else:
+                logger.warning(f"Custom voice '{voice}' not found, using default")
+                voice = "aurora"
+        # Check if voice is a custom voice loaded from Voices folder
+        elif voice in self.custom_voices:
+            voice_reference_path = self.custom_voices[voice]
+            logger.info(f"Using custom voice '{voice}' from {voice_reference_path}")
+        # Otherwise check if voice reference bytes provided
+        elif request.voice_reference:
             voice_reference_path = await self._prepare_voice_reference(request.voice_reference)
             # Use "cloned" as voice identifier when using reference
             voice = "cloned" if voice_reference_path else voice
@@ -545,12 +618,12 @@ class VibeVoiceAdapter(TTSAdapter):
             )
         finally:
             writer.close()
-            # Clean up voice reference file if used
-            if voice_reference_path:
+            # Clean up voice reference file if used (but not custom voices from Voices folder)
+            if voice_reference_path and voice_reference_path not in self.custom_voices.values():
                 try:
                     from pathlib import Path
                     Path(voice_reference_path).unlink(missing_ok=True)
-                    logger.debug(f"Cleaned up voice reference: {voice_reference_path}")
+                    logger.debug(f"Cleaned up temporary voice reference: {voice_reference_path}")
                 except Exception as e:
                     logger.warning(f"Failed to clean up voice reference: {e}")
     
@@ -635,6 +708,19 @@ class VibeVoiceAdapter(TTSAdapter):
     
     def map_voice(self, voice_id: str) -> str:
         """Map generic voice ID to VibeVoice voice"""
+        # Handle custom: prefix
+        if voice_id.startswith("custom:"):
+            if voice_id in self.custom_voices:
+                return voice_id
+            else:
+                logger.warning(f"Custom voice {voice_id} not found")
+                return "aurora"
+        
+        # Check custom voices first
+        if voice_id in self.custom_voices:
+            return voice_id
+            
+        # Then check presets
         if voice_id in self.VOICE_PRESETS:
             return voice_id
         

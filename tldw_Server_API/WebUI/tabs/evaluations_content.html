@@ -3,7 +3,7 @@
     <div class="endpoint-section" id="evalsCreate">
         <h2>
             <span class="endpoint-method post">POST</span>
-            <span class="endpoint-path">/api/v1/evals - Create Evaluation</span>
+            <span class="endpoint-path">/api/v1/evaluations - Create Evaluation</span>
         </h2>
         <p>Create a new evaluation (OpenAI format).</p>
         
@@ -30,7 +30,7 @@
 }</textarea>
         </div>
         
-        <button class="api-button" onclick="makeRequest('evalsCreate', 'POST', '/api/v1/evals', 'json')">
+        <button class="api-button" onclick="makeRequest('evalsCreate', 'POST', '/api/v1/evaluations', 'json')">
             Create Evaluation
         </button>
         
@@ -44,7 +44,7 @@
     <div class="endpoint-section" id="evalsRun">
         <h2>
             <span class="endpoint-method post">POST</span>
-            <span class="endpoint-path">/api/v1/evals/{eval_id}/runs - Start Evaluation Run</span>
+            <span class="endpoint-path">/api/v1/evaluations/{eval_id}/runs - Start Evaluation Run</span>
         </h2>
         <p>Start a new evaluation run.</p>
         
@@ -63,7 +63,7 @@
 }</textarea>
         </div>
         
-        <button class="api-button" onclick="makeRequest('evalsRun', 'POST', '/api/v1/evals/{id}/runs', 'json')">
+        <button class="api-button" onclick="makeRequest('evalsRun', 'POST', '/api/v1/evaluations/{id}/runs', 'json')">
             Start Run
         </button>
         
@@ -80,7 +80,7 @@
     <div class="endpoint-section" id="geval">
         <h2>
             <span class="endpoint-method post">POST</span>
-            <span class="endpoint-path">/api/v1/evals/geval - G-Eval Evaluation</span>
+            <span class="endpoint-path">/api/v1/evaluations/geval - G-Eval Evaluation</span>
         </h2>
         <p>Perform G-Eval evaluation on generated text.</p>
         
@@ -102,7 +102,7 @@
 }</textarea>
         </div>
         
-        <button class="api-button" onclick="makeRequest('geval', 'POST', '/api/v1/evals/geval', 'json')">
+        <button class="api-button" onclick="makeRequest('geval', 'POST', '/api/v1/evaluations/geval', 'json')">
             Run G-Eval
         </button>
         
@@ -119,7 +119,7 @@
     <div class="endpoint-section" id="ragEval">
         <h2>
             <span class="endpoint-method post">POST</span>
-            <span class="endpoint-path">/api/v1/evals/rag - RAG Evaluation</span>
+            <span class="endpoint-path">/api/v1/evaluations/rag - RAG Evaluation</span>
         </h2>
         <p>Evaluate RAG system performance.</p>
         
@@ -138,7 +138,7 @@
 }</textarea>
         </div>
         
-        <button class="api-button" onclick="makeRequest('ragEval', 'POST', '/api/v1/evals/rag', 'json')">
+        <button class="api-button" onclick="makeRequest('ragEval', 'POST', '/api/v1/evaluations/rag', 'json')">
             Run RAG Evaluation
         </button>
         
@@ -155,7 +155,7 @@
     <div class="endpoint-section" id="datasetsCreate">
         <h2>
             <span class="endpoint-method post">POST</span>
-            <span class="endpoint-path">/api/v1/datasets - Create Dataset</span>
+            <span class="endpoint-path">/api/v1/evaluations/datasets - Create Dataset</span>
         </h2>
         <p>Create a new evaluation dataset.</p>
         
@@ -175,7 +175,7 @@
 }</textarea>
         </div>
         
-        <button class="api-button" onclick="makeRequest('datasetsCreate', 'POST', '/api/v1/datasets', 'json')">
+        <button class="api-button" onclick="makeRequest('datasetsCreate', 'POST', '/api/v1/evaluations/datasets', 'json')">
             Create Dataset
         </button>
         
@@ -189,11 +189,11 @@
     <div class="endpoint-section" id="datasetsList">
         <h2>
             <span class="endpoint-method get">GET</span>
-            <span class="endpoint-path">/api/v1/datasets - List Datasets</span>
+            <span class="endpoint-path">/api/v1/evaluations/datasets - List Datasets</span>
         </h2>
         <p>List all evaluation datasets.</p>
         
-        <button class="api-button" onclick="makeRequest('datasetsList', 'GET', '/api/v1/datasets', 'none')">
+        <button class="api-button" onclick="makeRequest('datasetsList', 'GET', '/api/v1/evaluations/datasets', 'none')">
             List Datasets
         </button>
         
@@ -202,6 +202,163 @@
         
         <h3>Response:</h3>
         <pre id="datasetsList_response">---</pre>
+    </div>
+</div>
+
+<!-- Response Quality Evaluation Tab -->
+<div id="tabEvalsResponseQuality" class="tab-content">
+    <div class="endpoint-section" id="responseQualityEval">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/evaluations/response-quality - Response Quality Evaluation</span>
+        </h2>
+        <p>Evaluate the quality of model responses.</p>
+        
+        <div class="form-group">
+            <label for="responseQuality_payload">Response Quality Request (JSON):</label>
+            <textarea id="responseQuality_payload" class="code-input" rows="15">{
+  "prompt": "Explain quantum computing in simple terms",
+  "response": "Quantum computing uses quantum bits or qubits that can be in multiple states simultaneously, unlike classical bits that are either 0 or 1.",
+  "reference_response": "Quantum computing leverages quantum mechanical phenomena like superposition and entanglement to process information in fundamentally different ways than classical computers.",
+  "criteria": {
+    "accuracy": 0.3,
+    "completeness": 0.3,
+    "clarity": 0.2,
+    "relevance": 0.2
+  },
+  "model": "gpt-4o-mini"
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('responseQualityEval', 'POST', '/api/v1/evaluations/response-quality', 'json')">
+            Evaluate Response Quality
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="responseQualityEval_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="responseQualityEval_response">---</pre>
+    </div>
+</div>
+
+<!-- Evaluation Management Tab -->
+<div id="tabEvalsManagement" class="tab-content">
+    <div class="endpoint-section" id="evalsList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/evaluations - List Evaluations</span>
+        </h2>
+        <p>List all evaluations with optional filtering.</p>
+        
+        <div class="form-group">
+            <label for="evalsList_status">Status:</label>
+            <select id="evalsList_status">
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="running">Running</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="evalsList_limit">Limit:</label>
+            <input type="number" id="evalsList_limit" placeholder="10" value="10">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('evalsList', 'GET', '/api/v1/evaluations', 'query')">
+            List Evaluations
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="evalsList_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="evalsGet">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/evaluations/{eval_id} - Get Evaluation</span>
+        </h2>
+        <p>Get details of a specific evaluation.</p>
+        
+        <div class="form-group">
+            <label for="evalsGet_id">Evaluation ID <span class="required">*</span>:</label>
+            <input type="text" id="evalsGet_id" placeholder="eval_123">
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('evalsGet', 'GET', '/api/v1/evaluations/{id}', 'none')">
+            Get Evaluation
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="evalsGet_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="evalsUpdate">
+        <h2>
+            <span class="endpoint-method patch">PATCH</span>
+            <span class="endpoint-path">/api/v1/evaluations/{eval_id} - Update Evaluation</span>
+        </h2>
+        <p>Update an existing evaluation.</p>
+        
+        <div class="form-group">
+            <label for="evalsUpdate_id">Evaluation ID <span class="required">*</span>:</label>
+            <input type="text" id="evalsUpdate_id" placeholder="eval_123">
+        </div>
+        
+        <div class="form-group">
+            <label for="evalsUpdate_payload">Update Data (JSON):</label>
+            <textarea id="evalsUpdate_payload" class="code-input" rows="8">{
+  "description": "Updated description",
+  "config": {
+    "temperature": 0.2,
+    "max_tokens": 1500
+  }
+}</textarea>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('evalsUpdate', 'PATCH', '/api/v1/evaluations/{id}', 'json')">
+            Update Evaluation
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="evalsUpdate_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="evalsDelete">
+        <h2>
+            <span class="endpoint-method delete">DELETE</span>
+            <span class="endpoint-path">/api/v1/evaluations/{eval_id} - Delete Evaluation</span>
+        </h2>
+        <p>Delete an evaluation and all its runs.</p>
+        
+        <div class="form-group">
+            <label for="evalsDelete_id">Evaluation ID <span class="required">*</span>:</label>
+            <input type="text" id="evalsDelete_id" placeholder="eval_123">
+        </div>
+        
+        <button class="api-button btn-danger" onclick="if(confirm('Are you sure you want to delete this evaluation?')) makeRequest('evalsDelete', 'DELETE', '/api/v1/evaluations/{id}', 'none')">
+            Delete Evaluation
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="evalsDelete_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="rateLimits">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/evaluations/rate-limits - Rate Limit Status</span>
+        </h2>
+        <p>Check current rate limit status for evaluations.</p>
+        
+        <button class="api-button" onclick="makeRequest('rateLimits', 'GET', '/api/v1/evaluations/rate-limits', 'none')">
+            Check Rate Limits
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="rateLimits_response">---</pre>
     </div>
 </div>
 
