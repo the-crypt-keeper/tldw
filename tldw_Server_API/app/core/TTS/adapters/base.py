@@ -37,6 +37,7 @@ class AudioFormat(Enum):
     PCM = "pcm"
     OGG = "ogg"
     WEBM = "webm"
+    ULAW = "ulaw"  # μ-law encoding used by telephony systems
 
 class ProviderStatus(Enum):
     """Provider availability status"""
