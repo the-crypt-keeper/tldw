@@ -80,7 +80,7 @@ class TestRealBenchmarkWorkflow:
         
         try:
             response = self.client.client.post(
-                "/api/v1/evals",
+                "/api/v1/evaluations",
                 json=benchmark_data
             )
             
@@ -98,7 +98,7 @@ class TestRealBenchmarkWorkflow:
                 print(f"✅ User successfully created benchmark: {TestRealBenchmarkWorkflow.eval_id}")
                 
                 # Verify user can retrieve their benchmark
-                verify_response = self.client.client.get(f"/api/v1/evals/{TestRealBenchmarkWorkflow.eval_id}")
+                verify_response = self.client.client.get(f"/api/v1/evaluations/{TestRealBenchmarkWorkflow.eval_id}")
                 assert verify_response.status_code == 200, "User should be able to view their benchmark"
                 
             elif response.status_code == 501:
@@ -131,7 +131,7 @@ class TestRealBenchmarkWorkflow:
         
         try:
             response = self.client.client.post(
-                f"/api/v1/evals/{TestRealBenchmarkWorkflow.eval_id}/runs",
+                f"/api/v1/evaluations/{TestRealBenchmarkWorkflow.eval_id}/runs",
                 json=run_config
             )
             
@@ -166,7 +166,7 @@ class TestRealBenchmarkWorkflow:
         # User refreshes page or clicks to check results
         try:
             response = self.client.client.get(
-                f"/api/v1/evals/{TestRealBenchmarkWorkflow.eval_id}/runs/{TestRealBenchmarkWorkflow.run_id}"
+                f"/api/v1/evaluations/{TestRealBenchmarkWorkflow.eval_id}/runs/{TestRealBenchmarkWorkflow.run_id}"
             )
             
             if response.status_code == 200:
@@ -194,7 +194,7 @@ class TestRealBenchmarkWorkflow:
     def test_user_views_all_benchmarks(self):
         """Test a user viewing their list of benchmarks."""
         try:
-            response = self.client.client.get("/api/v1/evals")
+            response = self.client.client.get("/api/v1/evaluations")
             
             if response.status_code == 200:
                 result = response.json()
@@ -223,7 +223,7 @@ class TestRealBenchmarkWorkflow:
         try:
             # User clicks delete button
             response = self.client.client.delete(
-                f"/api/v1/evals/{TestRealBenchmarkWorkflow.eval_id}"
+                f"/api/v1/evaluations/{TestRealBenchmarkWorkflow.eval_id}"
             )
             
             if response.status_code in [200, 204]:
@@ -232,7 +232,7 @@ class TestRealBenchmarkWorkflow:
                 
                 # Verify it's actually gone
                 verify_response = self.client.client.get(
-                    f"/api/v1/evals/{TestRealBenchmarkWorkflow.eval_id}"
+                    f"/api/v1/evaluations/{TestRealBenchmarkWorkflow.eval_id}"
                 )
                 assert verify_response.status_code == 404, "Deleted benchmark should not be accessible"
                 

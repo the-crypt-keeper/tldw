@@ -16,6 +16,15 @@ from .adapters.kokoro_adapter import KokoroAdapter
 from .adapters.higgs_adapter import HiggsAdapter
 from .adapters.dia_adapter import DiaAdapter
 from .adapters.chatterbox_adapter import ChatterboxAdapter
+from .adapters.elevenlabs_adapter import ElevenLabsAdapter
+from .adapters.vibevoice_adapter import VibeVoiceAdapter
+from .tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError
+)
+from .tts_resource_manager import get_resource_manager
+from .tts_config import get_tts_config_manager, TTSConfig
 #
 #######################################################################################################################
 #
@@ -28,9 +37,11 @@ class TTSProvider(Enum):
     HIGGS = "higgs"
     DIA = "dia"
     CHATTERBOX = "chatterbox"
-    # Legacy mappings for backwards compatibility
-    ELEVENLABS = "elevenlabs"  # TODO: Implement ElevenLabs adapter
+    ELEVENLABS = "elevenlabs"
+    VIBEVOICE = "vibevoice"
+    # Additional providers
     ALLTALK = "alltalk"  # TODO: Implement AllTalk adapter
+    MOCK = "mock"  # Mock provider for testing
 
 
 class TTSAdapterRegistry:
@@ -45,7 +56,9 @@ class TTSAdapterRegistry:
         TTSProvider.KOKORO: KokoroAdapter,
         TTSProvider.HIGGS: HiggsAdapter,
         TTSProvider.DIA: DiaAdapter,
-        TTSProvider.CHATTERBOX: ChatterboxAdapter
+        TTSProvider.CHATTERBOX: ChatterboxAdapter,
+        TTSProvider.ELEVENLABS: ElevenLabsAdapter,
+        TTSProvider.VIBEVOICE: VibeVoiceAdapter
     }
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -55,11 +68,23 @@ class TTSAdapterRegistry:
         Args:
             config: Configuration dictionary for all adapters
         """
-        self.config = config or {}
+        # Use unified configuration system
+        if config:
+            # Override config provided for testing
+            self.config_manager = None
+            self.tts_config = config
+        else:
+            self.config_manager = get_tts_config_manager()
+            self.tts_config = self.config_manager.get_config()
+        
+        # Legacy config support
+        self.config = config or self.tts_config.dict()
+        
         self._adapters: Dict[TTSProvider, TTSAdapter] = {}
         self._adapter_classes: Dict[TTSProvider, Type[TTSAdapter]] = self.DEFAULT_ADAPTERS.copy()
         self._init_lock = asyncio.Lock()
         self._initialized_providers: Set[TTSProvider] = set()
+        self._failed_providers: Set[TTSProvider] = set()  # Track failed providers to avoid retrying
     
     def register_adapter(self, provider: TTSProvider, adapter_class: Type[TTSAdapter]):
         """
@@ -81,10 +106,17 @@ class TTSAdapterRegistry:
             
         Returns:
             Initialized adapter instance or None if unavailable
+            
+        Raises:
+            TTSProviderNotConfiguredError: If provider is not registered
         """
         if provider not in self._adapter_classes:
-            logger.error(f"No adapter registered for provider {provider.value}")
-            return None
+            error_msg = f"No adapter registered for provider {provider.value}"
+            logger.error(error_msg)
+            raise TTSProviderNotConfiguredError(
+                error_msg,
+                provider=provider.value
+            )
         
         # Check if adapter already exists
         if provider in self._adapters:
@@ -94,8 +126,16 @@ class TTSAdapterRegistry:
         
         # Initialize adapter if needed
         async with self._init_lock:
+            # Skip if we already tried and failed
+            if provider in self._failed_providers:
+                logger.debug(f"Skipping {provider.value} - previously failed")
+                return None
+                
             if provider not in self._adapters:
-                await self._initialize_adapter(provider)
+                success = await self._initialize_adapter(provider)
+                if not success:
+                    self._failed_providers.add(provider)
+                    return None
             
             adapter = self._adapters.get(provider)
             if adapter and adapter.status == ProviderStatus.AVAILABLE:
@@ -113,6 +153,9 @@ class TTSAdapterRegistry:
             
         Returns:
             True if initialization successful
+            
+        Raises:
+            TTSProviderInitializationError: If initialization fails
         """
         try:
             # Get adapter class
@@ -121,9 +164,24 @@ class TTSAdapterRegistry:
             # Get provider-specific config
             provider_config = self._get_provider_config(provider)
             
-            # Check if provider is enabled
-            if not provider_config.get(f"{provider.value}_enabled", True):
-                logger.info(f"Provider {provider.value} is disabled in configuration")
+            # Check if provider is enabled using unified config
+            if self.config_manager:
+                if not self.config_manager.is_provider_enabled(provider.value):
+                    logger.info(f"Provider {provider.value} is disabled in configuration")
+                    return False
+            else:
+                # Using direct config for testing
+                enabled_key = f"{provider.value}_enabled"
+                if not self.config.get(enabled_key, True):
+                    logger.info(f"Provider {provider.value} is disabled in configuration")
+                    return False
+            
+            # Get resource manager for monitoring
+            resource_manager = await get_resource_manager()
+            
+            # Check memory before initializing new adapter
+            if resource_manager.memory_monitor.is_memory_critical():
+                logger.warning(f"Skipping {provider.value} initialization due to memory constraints")
                 return False
             
             # Create adapter instance
@@ -139,11 +197,14 @@ class TTSAdapterRegistry:
                 logger.info(f"Successfully initialized {provider.value} adapter")
                 return True
             else:
-                logger.error(f"Failed to initialize {provider.value} adapter")
+                error_msg = f"Failed to initialize {provider.value} adapter"
+                logger.error(error_msg)
+                # Don't store failed adapter - it will be retried next time
                 return False
                 
         except Exception as e:
             logger.error(f"Error initializing {provider.value} adapter: {e}")
+            # Don't store failed adapter - it will be retried next time
             return False
     
     def _get_provider_config(self, provider: TTSProvider) -> Dict[str, Any]:
@@ -156,7 +217,15 @@ class TTSAdapterRegistry:
         Returns:
             Provider-specific configuration dictionary
         """
-        # Start with global config
+        if self.config_manager:
+            # Use unified configuration system
+            provider_cfg = self.config_manager.get_provider_config(provider.value)
+            
+            if provider_cfg:
+                # Convert to dict for adapter consumption
+                return provider_cfg.dict()
+        
+        # Fallback to legacy config
         provider_config = self.config.copy()
         
         # Add provider-specific overrides
@@ -176,11 +245,36 @@ class TTSAdapterRegistry:
         capabilities = {}
         
         for provider in TTSProvider:
-            adapter = await self.get_adapter(provider)
-            if adapter:
-                caps = adapter.capabilities
-                if caps:
-                    capabilities[provider] = caps
+            # Skip providers that are disabled or have failed
+            if provider in self._failed_providers:
+                continue
+                
+            # Only try to get adapters that are likely to work quickly
+            # Skip local model providers in testing unless explicitly enabled
+            if provider in [TTSProvider.KOKORO, TTSProvider.HIGGS, TTSProvider.DIA, 
+                           TTSProvider.CHATTERBOX, TTSProvider.VIBEVOICE]:
+                # Check if explicitly enabled in config
+                if self.config_manager:
+                    if not self.config_manager.is_provider_enabled(provider.value):
+                        continue
+                else:
+                    enabled_key = f"{provider.value}_enabled"
+                    if not self.config.get(enabled_key, False):
+                        continue
+            
+            try:
+                # Try to get adapter with a timeout to avoid hanging
+                adapter = await asyncio.wait_for(self.get_adapter(provider), timeout=5.0)
+                if adapter:
+                    caps = adapter.capabilities
+                    if caps:
+                        capabilities[provider] = caps
+            except asyncio.TimeoutError:
+                logger.warning(f"Timeout getting capabilities for {provider.value}")
+                self._failed_providers.add(provider)
+            except Exception as e:
+                logger.debug(f"Error getting capabilities for {provider.value}: {e}")
+                self._failed_providers.add(provider)
         
         return capabilities
     
@@ -240,42 +334,69 @@ class TTSAdapterRegistry:
         Returns:
             Ordered list of providers to try
         """
-        # Default priority order
-        default_priority = [
-            TTSProvider.OPENAI,      # Reliable, high quality
-            TTSProvider.KOKORO,      # Local, fast
-            TTSProvider.CHATTERBOX,  # Emotion control
-            TTSProvider.DIA,         # Dialogue specialist
-            TTSProvider.HIGGS        # Advanced but resource-heavy
-        ]
+        # Use unified configuration priority
+        if self.config_manager:
+            priority_names = self.config_manager.get_provider_priority()
+        else:
+            # Use priority from config if available
+            priority_names = self.config.get("provider_priority", [])
         
-        # Check for custom priority in config
-        if "provider_priority" in self.config:
-            custom_priority = []
-            for provider_name in self.config["provider_priority"]:
-                try:
-                    provider = TTSProvider(provider_name)
-                    custom_priority.append(provider)
-                except ValueError:
-                    logger.warning(f"Unknown provider in priority list: {provider_name}")
-            return custom_priority or default_priority
+        priority = []
+        for provider_name in priority_names:
+            try:
+                provider = TTSProvider(provider_name)
+                priority.append(provider)
+            except ValueError:
+                logger.warning(f"Unknown provider in priority list: {provider_name}")
         
-        return default_priority
+        # Fallback to default if no valid providers
+        if not priority:
+            priority = [
+                TTSProvider.OPENAI,
+                TTSProvider.KOKORO,
+                TTSProvider.CHATTERBOX,
+                TTSProvider.DIA,
+                TTSProvider.HIGGS
+            ]
+        
+        return priority
     
     async def close_all(self):
-        """Close all initialized adapters"""
+        """Close all initialized adapters and clean up resources"""
         logger.info("Closing all TTS adapters...")
+        
+        # Get resource manager for cleanup
+        try:
+            resource_manager = await get_resource_manager()
+        except Exception as e:
+            logger.warning(f"Could not get resource manager for cleanup: {e}")
+            resource_manager = None
         
         tasks = []
         for provider, adapter in self._adapters.items():
             logger.info(f"Closing {provider.value} adapter...")
             tasks.append(adapter.close())
+            
+            # Unregister from resource manager if available
+            if resource_manager:
+                try:
+                    await resource_manager.unregister_model(provider.value)
+                except Exception as e:
+                    logger.warning(f"Error unregistering {provider.value} from resource manager: {e}")
         
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         
         self._adapters.clear()
         self._initialized_providers.clear()
+        
+        # Clean up resource manager connections
+        if resource_manager:
+            try:
+                await resource_manager.cleanup_all()
+            except Exception as e:
+                logger.warning(f"Error during resource manager cleanup: {e}")
+        
         logger.info("All TTS adapters closed")
     
     def get_status_summary(self) -> Dict[str, Any]:
@@ -348,13 +469,27 @@ class TTSAdapterFactory:
             "higgs-v2": TTSProvider.HIGGS,
             "higgs-audio-v2": TTSProvider.HIGGS,
             
+            # ElevenLabs models
+            "elevenlabs": TTSProvider.ELEVENLABS,
+            "eleven_monolingual_v1": TTSProvider.ELEVENLABS,
+            "eleven_multilingual_v1": TTSProvider.ELEVENLABS,
+            "eleven_multilingual_v2": TTSProvider.ELEVENLABS,
+            "eleven_turbo_v2": TTSProvider.ELEVENLABS,
+            
             # Dia models
             "dia": TTSProvider.DIA,
             "dia-1.6b": TTSProvider.DIA,
             
             # Chatterbox models
             "chatterbox": TTSProvider.CHATTERBOX,
-            "chatterbox-emotion": TTSProvider.CHATTERBOX
+            "chatterbox-emotion": TTSProvider.CHATTERBOX,
+            
+            # VibeVoice models
+            "vibevoice": TTSProvider.VIBEVOICE,
+            "vibevoice-1.5b": TTSProvider.VIBEVOICE,
+            "vibevoice-7b": TTSProvider.VIBEVOICE,
+            "microsoft/VibeVoice-1.5B": TTSProvider.VIBEVOICE,
+            "WestZhang/VibeVoice-Large-pt": TTSProvider.VIBEVOICE
         }
         
         # Get provider from model name

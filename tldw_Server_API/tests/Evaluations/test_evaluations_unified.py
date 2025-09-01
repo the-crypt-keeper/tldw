@@ -212,7 +212,7 @@ class TestUnifiedEvaluationCRUD:
         # Update it
         update_data = {
             "description": "Updated description",
-            "metadata": {"project": "updated", "updated": True}
+            "metadata": {"custom": {"project": "updated", "updated": True}}
         }
         response = client.patch(
             f"/api/v1/evaluations/{eval_id}",
@@ -222,7 +222,7 @@ class TestUnifiedEvaluationCRUD:
         assert response.status_code == 200
         data = response.json()
         assert data["description"] == "Updated description"
-        assert data["metadata"]["updated"] is True
+        assert data["metadata"]["custom"]["updated"] is True
     
     def test_delete_evaluation(self, client, auth_headers, sample_evaluation_request):
         """Test deleting an evaluation"""
@@ -263,87 +263,128 @@ class TestUnifiedEvaluationCRUD:
 class TestTldwSpecificEndpoints:
     """Test tldw-specific evaluation endpoints"""
     
-    @patch('tldw_Server_API.app.core.Evaluations.ms_g_eval.run_geval')
-    def test_geval_endpoint(self, mock_geval, client, auth_headers, sample_geval_request):
+    def test_geval_endpoint(self, client, auth_headers, sample_geval_request):
         """Test G-Eval summarization endpoint"""
-        # Mock the G-Eval function
-        mock_geval.return_value = {
-            "metrics": {
-                "fluency": {"score": 0.85, "raw_score": 2.55},
-                "consistency": {"score": 0.90, "raw_score": 4.5}
-            },
-            "average_score": 0.875,
-            "assessment": "High quality summary"
-        }
-        
-        response = client.post(
-            "/api/v1/evaluations/geval",
-            json=sample_geval_request,
-            headers=auth_headers
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "metrics" in data
-        assert "average_score" in data
-        assert "evaluation_time" in data
+        with patch('tldw_Server_API.app.core.Evaluations.unified_evaluation_service.UnifiedEvaluationService.evaluate_geval') as mock_geval:
+            # Mock the G-Eval service method
+            mock_geval.return_value = {
+                "evaluation_id": "eval_123",
+                "results": {
+                    "metrics": {
+                        "fluency": {
+                            "name": "fluency",
+                            "score": 0.85,
+                            "raw_score": 2.55,
+                            "explanation": "Text flows naturally"
+                        },
+                        "consistency": {
+                            "name": "consistency",
+                            "score": 0.90,
+                            "raw_score": 4.5,
+                            "explanation": "Information is consistent"
+                        }
+                    },
+                    "average_score": 0.875,
+                    "assessment": "High quality summary"
+                },
+                "evaluation_time": 1.5
+            }
+            
+            response = client.post(
+                "/api/v1/evaluations/geval",
+                json=sample_geval_request,
+                headers=auth_headers
+            )
+            if response.status_code != 200:
+                print(f"Response status: {response.status_code}")
+                print(f"Response text: {response.text}")
+            assert response.status_code == 200
+            data = response.json()
+            assert "metrics" in data
+            assert "average_score" in data
+            assert "evaluation_time" in data
     
-    @patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.RAGEvaluator.evaluate')
-    async def test_rag_endpoint(self, mock_evaluate, client, auth_headers, sample_rag_request):
+    async def test_rag_endpoint(self, client, auth_headers, sample_rag_request):
         """Test RAG evaluation endpoint"""
-        # Mock the RAG evaluator
-        mock_evaluate.return_value = {
-            "metrics": {
-                "relevance": {"score": 0.9, "explanation": "Highly relevant"},
-                "faithfulness": {"score": 0.85, "explanation": "Well grounded"}
-            },
-            "overall_score": 0.875,
-            "retrieval_quality": 0.9,
-            "generation_quality": 0.85,
-            "suggestions": ["Consider adding more context"]
-        }
-        
-        response = client.post(
-            "/api/v1/evaluations/rag",
-            json=sample_rag_request,
-            headers=auth_headers
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "metrics" in data
-        assert "overall_score" in data
-        assert "retrieval_quality" in data
+        with patch('tldw_Server_API.app.core.Evaluations.unified_evaluation_service.UnifiedEvaluationService.evaluate_rag') as mock_evaluate:
+            # Mock the RAG evaluation service method
+            mock_evaluate.return_value = {
+                "evaluation_id": "rag_123",
+                "results": {
+                    "metrics": {
+                        "relevance": {
+                            "name": "relevance",
+                            "score": 0.9,
+                            "explanation": "Highly relevant"
+                        },
+                        "faithfulness": {
+                            "name": "faithfulness",
+                            "score": 0.85,
+                            "explanation": "Well grounded"
+                        }
+                    },
+                    "overall_score": 0.875,
+                    "retrieval_quality": 0.9,
+                    "generation_quality": 0.85,
+                    "suggestions": ["Consider adding more context"]
+                },
+                "evaluation_time": 2.1
+            }
+            
+            response = client.post(
+                "/api/v1/evaluations/rag",
+                json=sample_rag_request,
+                headers=auth_headers
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert "metrics" in data
+            assert "overall_score" in data
+            assert "retrieval_quality" in data
     
-    @patch('tldw_Server_API.app.core.Evaluations.response_quality_evaluator.ResponseQualityEvaluator.evaluate')
-    async def test_response_quality_endpoint(self, mock_evaluate, client, auth_headers):
+    async def test_response_quality_endpoint(self, client, auth_headers):
         """Test response quality evaluation endpoint"""
-        # Mock the quality evaluator
-        mock_evaluate.return_value = {
-            "metrics": {
-                "relevance": {"score": 0.95},
-                "completeness": {"score": 0.88}
-            },
-            "overall_quality": 0.915,
-            "format_compliance": {"format_ok": True},
-            "issues": [],
-            "improvements": ["Could be more concise"]
-        }
-        
-        request_data = {
-            "prompt": "Explain quantum computing",
-            "response": "Quantum computing uses quantum mechanics principles...",
-            "expected_format": "explanation",
-            "api_name": "openai"
-        }
-        
-        response = client.post(
-            "/api/v1/evaluations/response-quality",
-            json=request_data,
-            headers=auth_headers
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "overall_quality" in data
-        assert "format_compliance" in data
+        with patch('tldw_Server_API.app.core.Evaluations.unified_evaluation_service.UnifiedEvaluationService.evaluate_response_quality') as mock_evaluate:
+            # Mock the response quality evaluation service method
+            mock_evaluate.return_value = {
+                "evaluation_id": "quality_123",
+                "results": {
+                    "metrics": {
+                        "relevance": {
+                            "name": "relevance",
+                            "score": 0.95,
+                            "explanation": "Highly relevant response"
+                        },
+                        "completeness": {
+                            "name": "completeness",
+                            "score": 0.88,
+                            "explanation": "Mostly complete answer"
+                        }
+                    },
+                    "overall_quality": 0.915,
+                    "format_compliance": {"format_ok": True},
+                    "issues": [],
+                    "improvements": ["Could be more concise"]
+                },
+                "evaluation_time": 1.3
+            }
+            
+            request_data = {
+                "prompt": "Explain quantum computing",
+                "response": "Quantum computing uses quantum mechanics principles...",
+                "expected_format": "explanation",
+                "api_name": "openai"
+            }
+            
+            response = client.post(
+                "/api/v1/evaluations/response-quality",
+                json=request_data,
+                headers=auth_headers
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert "overall_quality" in data
+            assert "format_compliance" in data
 
 
 class TestRunManagement:
@@ -488,84 +529,84 @@ class TestDatasetManagement:
 class TestWebhooks:
     """Test webhook functionality"""
     
-    @patch('tldw_Server_API.app.core.Evaluations.webhook_manager.webhook_manager.register_webhook')
-    async def test_register_webhook(self, mock_register, client, auth_headers):
+    def test_register_webhook(self, client, auth_headers):
         """Test webhook registration"""
-        mock_register.return_value = {
-            "webhook_id": 1,
-            "url": "https://example.com/webhook",
-            "events": ["evaluation.completed"],
-            "secret": "test_secret",
-            "created_at": "2024-01-01T00:00:00",
-            "status": "active"
-        }
-        
-        request_data = {
-            "url": "https://example.com/webhook",
-            "events": ["evaluation.completed", "evaluation.failed"],
-            "secret": "test_secret"
-        }
-        
-        response = client.post(
-            "/api/v1/evaluations/webhooks",
-            json=request_data,
-            headers=auth_headers
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["webhook_id"] == 1
-        assert data["url"] == request_data["url"]
-    
-    @patch('tldw_Server_API.app.core.Evaluations.webhook_manager.webhook_manager.get_webhook_status')
-    async def test_list_webhooks(self, mock_status, client, auth_headers):
-        """Test listing webhooks"""
-        mock_status.return_value = [
-            {
+        with patch('tldw_Server_API.app.core.Evaluations.webhook_manager.webhook_manager.register_webhook') as mock_register:
+            mock_register.return_value = {
                 "webhook_id": 1,
                 "url": "https://example.com/webhook",
                 "events": ["evaluation.completed"],
-                "status": "active",
+                "secret": "test_secret_that_is_at_least_32_characters_long",
                 "created_at": "2024-01-01T00:00:00",
-                "failure_count": 0
+                "status": "active"
             }
-        ]
-        
-        response = client.get("/api/v1/evaluations/webhooks", headers=auth_headers)
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 1
-        assert data[0]["webhook_id"] == 1
+            
+            request_data = {
+                "url": "https://example.com/webhook",
+                "events": ["evaluation.completed", "evaluation.failed"],
+                "secret": "test_secret_that_is_at_least_32_characters_long"
+            }
+            
+            response = client.post(
+                "/api/v1/evaluations/webhooks",
+                json=request_data,
+                headers=auth_headers
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["webhook_id"] == 1
+            assert data["url"] == request_data["url"]
     
-    @patch('tldw_Server_API.app.core.Evaluations.webhook_manager.webhook_manager.test_webhook')
-    async def test_test_webhook(self, mock_test, client, auth_headers):
+    def test_list_webhooks(self, client, auth_headers):
+        """Test listing webhooks"""
+        with patch('tldw_Server_API.app.core.Evaluations.webhook_manager.webhook_manager.get_webhook_status') as mock_status:
+            mock_status.return_value = [
+                {
+                    "webhook_id": 1,
+                    "url": "https://example.com/webhook",
+                    "events": ["evaluation.completed"],
+                    "status": "active",
+                    "created_at": "2024-01-01T00:00:00",
+                    "failure_count": 0
+                }
+            ]
+            
+            response = client.get("/api/v1/evaluations/webhooks", headers=auth_headers)
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 1
+            assert data[0]["webhook_id"] == 1
+    
+    def test_test_webhook(self, client, auth_headers):
         """Test webhook testing endpoint"""
-        mock_test.return_value = {
-            "success": True,
-            "status_code": 200,
-            "response_time_ms": 123.45
-        }
-        
-        request_data = {
-            "url": "https://example.com/webhook"
-        }
-        
-        response = client.post(
-            "/api/v1/evaluations/webhooks/test",
-            json=request_data,
-            headers=auth_headers
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["status_code"] == 200
+        with patch('tldw_Server_API.app.core.Evaluations.webhook_manager.webhook_manager.test_webhook') as mock_test:
+            mock_test.return_value = {
+                "success": True,
+                "status_code": 200,
+                "response_time_ms": 123.45
+            }
+            
+            request_data = {
+                "url": "https://example.com/webhook"
+            }
+            
+            response = client.post(
+                "/api/v1/evaluations/webhooks/test",
+                json=request_data,
+                headers=auth_headers
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["status_code"] == 200
 
 
 class TestHealthAndMetrics:
     """Test health check and metrics endpoints"""
     
-    def test_health_check(self, client):
+    def test_health_check(self, client, auth_headers):
         """Test health check endpoint"""
-        response = client.get("/api/v1/evaluations/health")
+        response = client.get("/api/v1/evaluations/health", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert "status" in data
@@ -573,9 +614,9 @@ class TestHealthAndMetrics:
         assert "version" in data
         assert "database" in data
     
-    def test_metrics_endpoint(self, client):
+    def test_metrics_endpoint(self, client, auth_headers):
         """Test metrics endpoint"""
-        response = client.get("/api/v1/evaluations/metrics")
+        response = client.get("/api/v1/evaluations/metrics", headers=auth_headers)
         assert response.status_code == 200
         # Response can be JSON or Prometheus text format
         if response.headers.get("content-type", "").startswith("application/json"):
@@ -589,23 +630,27 @@ class TestHealthAndMetrics:
 class TestRateLimiting:
     """Test rate limiting functionality"""
     
-    @patch('tldw_Server_API.app.core.Evaluations.user_rate_limiter.user_rate_limiter.get_usage_summary')
-    async def test_rate_limit_status(self, mock_summary, client, auth_headers):
+    def test_rate_limit_status(self, client, auth_headers):
         """Test getting rate limit status"""
-        mock_summary.return_value = {
-            "tier": "free",
-            "limits": {"requests_per_minute": 10, "tokens_per_minute": 10000},
-            "usage": {"requests": 5, "tokens": 5000},
-            "remaining": {"requests": 5, "tokens": 5000},
-            "reset_at": "2024-01-01T00:01:00"
-        }
-        
-        response = client.get("/api/v1/evaluations/rate-limits", headers=auth_headers)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["tier"] == "free"
-        assert "limits" in data
-        assert "usage" in data
+        from datetime import datetime, timezone
+        with patch('tldw_Server_API.app.core.Evaluations.user_rate_limiter.user_rate_limiter.get_usage_summary') as mock_summary:
+            mock_summary.return_value = {
+                "tier": "free",
+                "limits": {"requests_per_minute": 10, "tokens_per_minute": 10000},
+                "usage": {"requests": 5, "tokens": 5000},
+                "remaining": {"requests": 5, "tokens": 5000},
+                "reset_at": datetime(2024, 1, 1, 0, 1, 0, tzinfo=timezone.utc)
+            }
+            
+            response = client.get("/api/v1/evaluations/rate-limits", headers=auth_headers)
+            if response.status_code != 200:
+                print(f"Response status: {response.status_code}")
+                print(f"Response text: {response.text}")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["tier"] == "free"
+            assert "limits" in data
+            assert "usage" in data
     
     def test_rate_limit_exceeded(self, client, auth_headers, sample_geval_request):
         """Test rate limit exceeded response"""
@@ -675,7 +720,7 @@ class TestErrorHandling:
         """Test request without authentication"""
         response = client.get("/api/v1/evaluations")
         assert response.status_code == 401
-        assert "error" in response.json()
+        assert "error" in response.json()["detail"]
     
     def test_invalid_evaluation_type(self, client, auth_headers):
         """Test creating evaluation with invalid type"""
@@ -699,7 +744,7 @@ class TestErrorHandling:
         )
         assert response.status_code == 404
         data = response.json()
-        assert "error" in data
+        assert "error" in data["detail"]
 
 
 class TestAuthentication:

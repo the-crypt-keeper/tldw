@@ -12,7 +12,7 @@ import json
 import asyncio
 from pathlib import Path
 
-from tldw_Server_API.app.api.v1.endpoints.rag_api import router as rag_router
+from tldw_Server_API.app.api.v1.endpoints.rag_unified import router as rag_router
 from tldw_Server_API.app.core.RAG.rag_service.types import Document, DataSource
 
 
@@ -116,7 +116,7 @@ class TestRAGContextualSearchIntegration:
             mock_build.return_value = mock_pipeline
             
             response = test_client.post(
-                "/api/v1/rag/search/simple",
+                "/api/v1/rag/simple",
                 json=request_data
             )
             
@@ -157,7 +157,7 @@ class TestRAGContextualSearchIntegration:
             mock_build.return_value = mock_pipeline
             
             response = test_client.post(
-                "/api/v1/rag/search/simple",
+                "/api/v1/rag/simple",
                 json=request_data
             )
             
@@ -209,7 +209,7 @@ class TestRAGContextualSearchIntegration:
             mock_build.return_value = mock_pipeline
             
             response = test_client.post(
-                "/api/v1/rag/search/complex",
+                "/api/v1/rag/complex",
                 json=request_data
             )
             
@@ -250,7 +250,7 @@ class TestRAGContextualSearchIntegration:
             mock_build.return_value = mock_pipeline
             
             response = test_client.post(
-                "/api/v1/rag/search/simple",
+                "/api/v1/rag/simple",
                 json=request_data
             )
             
@@ -290,7 +290,7 @@ class TestRAGContextualSearchIntegration:
             mock_build.return_value = mock_pipeline
             
             response = test_client.post(
-                "/api/v1/rag/search/simple",
+                "/api/v1/rag/simple",
                 json=request_data
             )
             
@@ -332,7 +332,7 @@ class TestRAGContextualSearchIntegration:
             mock_build.return_value = mock_pipeline
             
             response = test_client.post(
-                "/api/v1/rag/search/simple",
+                "/api/v1/rag/simple",
                 json=request_data
             )
             
@@ -388,7 +388,7 @@ class TestRAGContextualSearchIntegration:
             mock_build.return_value = mock_pipeline
             
             response = test_client.post(
-                "/api/v1/rag/search/simple",
+                "/api/v1/rag/simple",
                 json=request_data
             )
             
@@ -415,7 +415,7 @@ class TestRAGContextualSearchIntegration:
             mock_build.return_value = mock_pipeline
             
             response = test_client.post(
-                "/api/v1/rag/search/simple",
+                "/api/v1/rag/simple",
                 json=request_data
             )
             

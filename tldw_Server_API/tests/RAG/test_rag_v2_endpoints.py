@@ -171,7 +171,7 @@ class TestRAGV2Endpoints:
     def test_advanced_search_with_filters(self):
         """Test advanced search without mocking."""
         response = self.client.post(
-            "/api/v1/rag/search/advanced",
+            "/api/v1/rag/advanced",
             headers=self.auth_headers,
             json={
                 "query": "advanced query",

@@ -415,7 +415,7 @@ class ChatbookService:
         tags: List[str] = None,
         categories: List[str] = None,
         async_mode: bool = False
-    ) -> Tuple[bool, str, Optional[str]]:
+    ) -> Tuple[bool, str, Optional[str], Dict[str, int]]:
         """
         Create a chatbook from selected content.
         
@@ -433,7 +433,7 @@ class ChatbookService:
             async_mode: Run as background job
             
         Returns:
-            Tuple of (success, message, job_id or file_path)
+            Tuple of (success, message, job_id or file_path, content_summary)
         """
         if async_mode:
             # Create job and run asynchronously
@@ -455,7 +455,7 @@ class ChatbookService:
                 include_generated_content, tags, categories
             ))
             
-            return True, f"Export job started: {job_id}", job_id
+            return True, f"Export job started: {job_id}", job_id, {}
         else:
             # Run synchronously (wrapped in async)
             return await self._create_chatbook_sync_wrapper(
@@ -1903,7 +1903,7 @@ class ChatbookService:
                     'total_items': row[10] if len(row) > 10 else 0,
                     'processed_items': row[11] if len(row) > 11 else 0,
                     'file_size_bytes': row[12] if len(row) > 12 else None,
-                    'download_url': row[13] if len(row) > 13 else None,
+                    'metadata': row[13] if len(row) > 13 else None,
                     'expires_at': row[14] if len(row) > 14 else None
                 }
             
@@ -1917,6 +1917,17 @@ class ChatbookService:
                     return datetime.fromisoformat(ts)
                 else:  # SQLite format
                     return datetime.strptime(ts, '%Y-%m-%d %H:%M:%S.%f')
+            
+            # Parse metadata if it's a JSON string
+            metadata = {}
+            if 'metadata' in row and row['metadata']:
+                if isinstance(row['metadata'], str):
+                    try:
+                        metadata = json.loads(row['metadata'])
+                    except json.JSONDecodeError:
+                        logger.warning(f"Failed to parse metadata JSON: {row['metadata']}")
+                elif isinstance(row['metadata'], dict):
+                    metadata = row['metadata']
             
             return ExportJob(
                 job_id=row['job_id'],
@@ -1932,9 +1943,9 @@ class ChatbookService:
                 total_items=row['total_items'] or 0,
                 processed_items=row['processed_items'] or 0,
                 file_size_bytes=row['file_size_bytes'],
-                download_url=row['download_url'],
-                expires_at=parse_timestamp(row['expires_at']),
-                metadata={}  # Initialize empty metadata
+                download_url=row.get('download_url'),
+                expires_at=parse_timestamp(row.get('expires_at')),
+                metadata=metadata
             )
         except Exception as e:
             logger.error(f"Error getting export job: {e}")

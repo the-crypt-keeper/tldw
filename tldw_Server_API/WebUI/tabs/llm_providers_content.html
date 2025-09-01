@@ -1,0 +1,250 @@
+<!-- LLM Providers Tab -->
+<div id="tabLLMProviders" class="tab-content">
+    <div class="endpoint-section" id="llmProvidersList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/llm/providers - List LLM Providers</span>
+        </h2>
+        <p>Get a list of all configured LLM providers with their available models.</p>
+        
+        <button class="api-button" onclick="makeRequest('llmProvidersList', 'GET', '/api/v1/llm/providers', 'none')">
+            Get Providers
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="llmProvidersList_response">---</pre>
+        
+        <div class="info-box" style="margin-top: 20px;">
+            <h4>Provider Status Display</h4>
+            <div id="llmProvidersStatus" style="margin-top: 10px;">
+                <p>Click "Get Providers" to see provider status...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="endpoint-section" id="llmProviderDetail">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/llm/providers/{provider_name} - Get Provider Details</span>
+        </h2>
+        <p>Get detailed information about a specific LLM provider.</p>
+        
+        <div class="form-group">
+            <label for="llmProviderDetail_name">Provider Name <span class="required">*</span>:</label>
+            <select id="llmProviderDetail_name">
+                <option value="">Select a provider...</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="cohere">Cohere</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="google">Google</option>
+                <option value="groq">Groq</option>
+                <option value="huggingface">HuggingFace</option>
+                <option value="mistral">Mistral</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="llamacpp">Llama.cpp</option>
+                <option value="koboldcpp">Kobold.cpp</option>
+                <option value="oobabooga">Oobabooga</option>
+                <option value="tabbyapi">TabbyAPI</option>
+                <option value="vllm">vLLM</option>
+                <option value="ollama">Ollama</option>
+                <option value="aphrodite">Aphrodite</option>
+                <option value="custom_openai">Custom OpenAI</option>
+            </select>
+        </div>
+        
+        <button class="api-button" onclick="makeRequest('llmProviderDetail', 'GET', '/api/v1/llm/providers/{name}', 'none')">
+            Get Provider Details
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="llmProviderDetail_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="llmModelsList">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/llm/models - List All Available Models</span>
+        </h2>
+        <p>Get a flat list of all available models across all configured providers.</p>
+        
+        <button class="api-button" onclick="makeRequest('llmModelsList', 'GET', '/api/v1/llm/models', 'none')">
+            Get All Models
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="llmModelsList_response">---</pre>
+        
+        <div class="info-box" style="margin-top: 20px;">
+            <h4>Models by Provider</h4>
+            <div id="llmModelsGrouped" style="margin-top: 10px;">
+                <p>Click "Get All Models" to see models grouped by provider...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Process and display LLM providers status
+function displayProvidersStatus(data) {
+    const statusDiv = document.getElementById('llmProvidersStatus');
+    if (!data || !data.providers) {
+        statusDiv.innerHTML = '<p>No provider data available</p>';
+        return;
+    }
+    
+    let html = '<table class="status-table" style="width: 100%; border-collapse: collapse;">';
+    html += '<thead><tr>';
+    html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Provider</th>';
+    html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Status</th>';
+    html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">Models</th>';
+    html += '<th style="text-align: left; padding: 8px; border-bottom: 2px solid #ddd;">API Key</th>';
+    html += '</tr></thead><tbody>';
+    
+    data.providers.forEach(provider => {
+        const isConfigured = provider.models && provider.models.length > 0;
+        const statusColor = isConfigured ? 'green' : 'gray';
+        const statusText = isConfigured ? 'Configured' : 'Not Configured';
+        const apiKeyStatus = provider.api_key_configured ? '✓ Set' : '✗ Not Set';
+        
+        html += '<tr>';
+        html += `<td style="padding: 8px; border-bottom: 1px solid #eee;"><strong>${provider.name}</strong></td>`;
+        html += `<td style="padding: 8px; border-bottom: 1px solid #eee;"><span style="color: ${statusColor};">● ${statusText}</span></td>`;
+        html += `<td style="padding: 8px; border-bottom: 1px solid #eee;">${provider.models ? provider.models.length : 0} models</td>`;
+        html += `<td style="padding: 8px; border-bottom: 1px solid #eee;">${apiKeyStatus}</td>`;
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    
+    if (data.default_provider) {
+        html += `<p style="margin-top: 10px;"><strong>Default Provider:</strong> ${data.default_provider}</p>`;
+    }
+    
+    if (data.total_configured !== undefined) {
+        html += `<p><strong>Total Configured Providers:</strong> ${data.total_configured}</p>`;
+    }
+    
+    statusDiv.innerHTML = html;
+}
+
+// Process and display models grouped by provider
+function displayModelsGrouped(data) {
+    const modelsDiv = document.getElementById('llmModelsGrouped');
+    if (!data || !data.models) {
+        modelsDiv.innerHTML = '<p>No models data available</p>';
+        return;
+    }
+    
+    // Group models by provider
+    const modelsByProvider = {};
+    data.models.forEach(model => {
+        const parts = model.split('/');
+        const provider = parts.length > 1 ? parts[0] : 'unknown';
+        const modelName = parts.length > 1 ? parts.slice(1).join('/') : model;
+        
+        if (!modelsByProvider[provider]) {
+            modelsByProvider[provider] = [];
+        }
+        modelsByProvider[provider].push(modelName);
+    });
+    
+    let html = '<div style="max-height: 400px; overflow-y: auto;">';
+    
+    Object.keys(modelsByProvider).sort().forEach(provider => {
+        html += `<details style="margin-bottom: 10px;">`;
+        html += `<summary style="cursor: pointer; font-weight: bold; padding: 5px; background-color: #f5f5f5;">`;
+        html += `${provider} (${modelsByProvider[provider].length} models)`;
+        html += `</summary>`;
+        html += '<ul style="margin-top: 5px; padding-left: 20px;">';
+        
+        modelsByProvider[provider].sort().forEach(model => {
+            html += `<li style="margin: 2px 0;"><code>${model}</code></li>`;
+        });
+        
+        html += '</ul></details>';
+    });
+    
+    html += '</div>';
+    html += `<p style="margin-top: 10px;"><strong>Total Models:</strong> ${data.models.length}</p>`;
+    
+    modelsDiv.innerHTML = html;
+}
+
+// Override the default makeRequest for LLM providers to add custom processing
+const originalMakeRequest = window.makeRequest;
+window.makeRequest = function(sectionId, method, endpoint, bodyType) {
+    // Call the original function
+    const result = originalMakeRequest.call(this, sectionId, method, endpoint, bodyType);
+    
+    // Add custom processing for LLM providers responses
+    if (sectionId === 'llmProvidersList') {
+        setTimeout(() => {
+            const responseElement = document.getElementById('llmProvidersList_response');
+            if (responseElement && responseElement.textContent !== '---') {
+                try {
+                    const data = JSON.parse(responseElement.textContent);
+                    displayProvidersStatus(data);
+                } catch (e) {
+                    console.error('Error parsing providers response:', e);
+                }
+            }
+        }, 100);
+    } else if (sectionId === 'llmModelsList') {
+        setTimeout(() => {
+            const responseElement = document.getElementById('llmModelsList_response');
+            if (responseElement && responseElement.textContent !== '---') {
+                try {
+                    const data = JSON.parse(responseElement.textContent);
+                    displayModelsGrouped(data);
+                } catch (e) {
+                    console.error('Error parsing models response:', e);
+                }
+            }
+        }, 100);
+    }
+    
+    return result;
+};
+
+// Initialize LLM providers tab
+function initializeLLMProvidersTab() {
+    console.log('LLM Providers tab initialized');
+    
+    // Auto-load providers list when tab is opened
+    if (document.querySelector('#tabLLMProviders.active')) {
+        makeRequest('llmProvidersList', 'GET', '/api/v1/llm/providers', 'none');
+    }
+}
+
+// Call initialization when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.querySelector('#tabLLMProviders')) {
+        initializeLLMProvidersTab();
+    }
+});
+</script>
+
+<style>
+.info-box {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.info-box h4 {
+    margin-top: 0;
+    color: #333;
+}
+
+.status-table {
+    font-family: monospace;
+    font-size: 14px;
+}
+
+details summary:hover {
+    background-color: #e8e8e8 !important;
+}
+</style>

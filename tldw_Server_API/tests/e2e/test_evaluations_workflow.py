@@ -2,7 +2,7 @@
 End-to-End tests for Evaluation API endpoints.
 
 Tests cover:
-- OpenAI-compatible evaluation endpoints (/api/v1/evals)
+- OpenAI-compatible evaluation endpoints (/api/v1/evaluations)
 - Standard evaluation endpoints (/api/v1/evaluations)
 - G-Eval, RAG evaluation, response quality assessment
 - Batch evaluations and comparison features
@@ -15,6 +15,7 @@ import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
+import httpx
 
 from tldw_Server_API.tests.e2e.fixtures import (
     api_client, authenticated_client, data_tracker,
@@ -63,25 +64,25 @@ class TestEvaluationWorkflow:
         with self.perf.measure("create_openai_evaluation"):
             # Create evaluation with inline dataset
             eval_data = {
-                "name": f"Test Evaluation {uuid.uuid4().hex[:8]}",
+                "name": f"Test_Evaluation_{uuid.uuid4().hex[:8]}",  # Fixed name format
                 "description": "E2E test evaluation for response quality",
                 "eval_type": "model_graded",
                 "eval_spec": {
-                    "evaluator_model": "gpt-4",
+                    "model": "gpt-4",  # Fixed field name
                     "metrics": ["accuracy", "coherence", "relevance"],
-                    "threshold": 0.8,
-                    "sub_type": "summarization"
+                    "thresholds": {"accuracy": 0.8, "coherence": 0.8, "relevance": 0.8},  # Fixed field name and format
+                    "custom_prompts": {"evaluation": "Evaluate the response for accuracy, coherence, and relevance"}  # Fixed field name
                 },
                 "dataset": [
                     {
                         "input": "What is machine learning?",
                         "expected": "Machine learning is a subset of AI that enables systems to learn from data.",
-                        "context": "AI and ML basics"
+                        "metadata": {"context": "AI and ML basics"}
                     },
                     {
                         "input": "Explain neural networks",
                         "expected": "Neural networks are computing systems inspired by biological neural networks.",
-                        "context": "Deep learning fundamentals"
+                        "metadata": {"context": "Deep learning fundamentals"}
                     }
                 ],
                 "metadata": {
@@ -92,7 +93,7 @@ class TestEvaluationWorkflow:
             }
             
             try:
-                response = self.client.client.post("/api/v1/evals", json=eval_data)
+                response = self.client.client.post("/api/v1/evaluations", json=eval_data)
                 response.raise_for_status()
                 
                 result = response.json()
@@ -117,7 +118,7 @@ class TestEvaluationWorkflow:
     def test_list_openai_evaluations(self):
         """Test listing OpenAI-compatible evaluations."""
         with self.perf.measure("list_openai_evaluations"):
-            response = self.client.client.get("/api/v1/evals?limit=10")
+            response = self.client.client.get("/api/v1/evaluations?limit=10")
             
             if response.status_code == 200:
                 result = response.json()
@@ -144,7 +145,7 @@ class TestEvaluationWorkflow:
             pytest.skip("No evaluation ID available")
             
         with self.perf.measure("get_openai_evaluation"):
-            response = self.client.client.get(f"/api/v1/evals/{TestEvaluationWorkflow.eval_id}")
+            response = self.client.client.get(f"/api/v1/evaluations/{TestEvaluationWorkflow.eval_id}")
             
             if response.status_code == 200:
                 result = response.json()
@@ -176,7 +177,7 @@ class TestEvaluationWorkflow:
             }
             
             response = self.client.client.patch(
-                f"/api/v1/evals/{TestEvaluationWorkflow.eval_id}",
+                f"/api/v1/evaluations/{TestEvaluationWorkflow.eval_id}",
                 json=update_data
             )
             
@@ -206,7 +207,7 @@ class TestEvaluationWorkflow:
             }
             
             response = self.client.client.post(
-                f"/api/v1/evals/{TestEvaluationWorkflow.eval_id}/runs",
+                f"/api/v1/evaluations/{TestEvaluationWorkflow.eval_id}/runs",
                 json=run_data
             )
             
@@ -230,7 +231,7 @@ class TestEvaluationWorkflow:
             pytest.skip("No evaluation ID available")
             
         with self.perf.measure("list_evaluation_runs"):
-            response = self.client.client.get(f"/api/v1/evals/{TestEvaluationWorkflow.eval_id}/runs")
+            response = self.client.client.get(f"/api/v1/evaluations/{TestEvaluationWorkflow.eval_id}/runs")
             
             if response.status_code == 200:
                 result = response.json()
@@ -544,7 +545,7 @@ class TestEvaluationWorkflow:
             # Clean up OpenAI-compatible evaluations
             if TestEvaluationWorkflow.eval_id is not None:
                 try:
-                    response = self.client.client.delete(f"/api/v1/evals/{TestEvaluationWorkflow.eval_id}")
+                    response = self.client.client.delete(f"/api/v1/evaluations/{TestEvaluationWorkflow.eval_id}")
                     if response.status_code in [204, 200]:
                         cleaned += 1
                 except Exception as e:
@@ -554,7 +555,7 @@ class TestEvaluationWorkflow:
             if hasattr(self.tracker, 'resources'):
                 for eval_id in self.tracker.resources.get("evaluation", []):
                     try:
-                        response = self.client.client.delete(f"/api/v1/evals/{eval_id['id']}")
+                        response = self.client.client.delete(f"/api/v1/evaluations/{eval_id['id']}")
                         if response.status_code in [204, 200]:
                             cleaned += 1
                     except:
@@ -599,7 +600,7 @@ class TestEvaluationEdgeCases:
                 "dataset": [{"input": "test"}]
             }
             
-            response = self.client.client.post("/api/v1/evals", json=eval_data)
+            response = self.client.client.post("/api/v1/evaluations", json=eval_data)
             # Should get 401 in single-user mode if auth fails, or 422/400 for validation
             assert response.status_code in [401, 422, 400]
             
@@ -621,7 +622,7 @@ class TestEvaluationEdgeCases:
                 # Missing both dataset and dataset_id
             }
             
-            response = self.client.client.post("/api/v1/evals", json=eval_data)
+            response = self.client.client.post("/api/v1/evaluations", json=eval_data)
             # Should get 401 in single-user mode if auth fails, or 422/400 for validation
             assert response.status_code in [401, 422, 400]
             

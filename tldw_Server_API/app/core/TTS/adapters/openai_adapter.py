@@ -19,6 +19,21 @@ from .base import (
     VoiceInfo,
     ProviderStatus
 )
+from ..tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSAuthenticationError,
+    TTSRateLimitError,
+    TTSNetworkError,
+    TTSTimeoutError,
+    TTSProviderError,
+    auth_error,
+    rate_limit_error,
+    network_error,
+    timeout_error
+)
+from ..tts_validation import validate_tts_request
+from ..tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -82,12 +97,17 @@ class OpenAIAdapter(TTSAdapter):
         """Initialize the OpenAI adapter"""
         try:
             if not self.api_key:
-                logger.error(f"{self.provider_name}: Cannot initialize without API key")
+                error_msg = f"{self.provider_name}: Cannot initialize without API key"
+                logger.error(error_msg)
                 self._status = ProviderStatus.NOT_CONFIGURED
-                return False
+                raise TTSProviderNotConfiguredError(error_msg, provider=self.provider_name)
             
-            # Create HTTP client
-            self.client = httpx.AsyncClient(timeout=60.0)
+            # Get HTTP client from resource manager
+            resource_manager = await get_resource_manager()
+            self.client = await resource_manager.get_http_client(
+                provider=self.provider_name.lower(),
+                base_url=self.base_url
+            )
             
             # Test the API key with a minimal request
             headers = {
@@ -100,10 +120,16 @@ class OpenAIAdapter(TTSAdapter):
             self._status = ProviderStatus.AVAILABLE
             return True
             
+        except TTSProviderNotConfiguredError:
+            return False
         except Exception as e:
             logger.error(f"{self.provider_name}: Initialization failed: {e}")
             self._status = ProviderStatus.ERROR
-            return False
+            raise TTSProviderInitializationError(
+                f"Failed to initialize {self.provider_name}",
+                provider=self.provider_name,
+                details={"error": str(e)}
+            )
     
     async def get_capabilities(self) -> TTSCapabilities:
         """Get OpenAI TTS capabilities"""
@@ -138,12 +164,17 @@ class OpenAIAdapter(TTSAdapter):
     async def generate(self, request: TTSRequest) -> TTSResponse:
         """Generate speech using OpenAI TTS API"""
         if not await self.ensure_initialized():
-            raise ValueError(f"{self.provider_name} not initialized")
+            raise TTSProviderNotConfiguredError(
+                f"{self.provider_name} not initialized",
+                provider=self.provider_name
+            )
         
-        # Validate request
-        is_valid, error = await self.validate_request(request)
-        if not is_valid:
-            raise ValueError(error)
+        # Validate request using new validation system
+        try:
+            validate_tts_request(request, provider=self.provider_name.lower())
+        except Exception as e:
+            logger.error(f"{self.provider_name} request validation failed: {e}")
+            raise
         
         # Map voice if needed
         voice = self.map_voice(request.voice or "alloy")
@@ -196,16 +227,43 @@ class OpenAIAdapter(TTSAdapter):
             logger.error(f"{self.provider_name} API error: {e.response.status_code} - {error_msg}")
             
             if e.response.status_code == 401:
-                raise ValueError("Invalid OpenAI API key")
+                raise auth_error("Invalid OpenAI API key", self.provider_name)
             elif e.response.status_code == 429:
-                raise ValueError("OpenAI API rate limit exceeded")
+                # Try to extract retry-after header
+                retry_after = e.response.headers.get('retry-after')
+                raise rate_limit_error(
+                    self.provider_name, 
+                    retry_after=int(retry_after) if retry_after else None
+                )
             elif e.response.status_code == 400:
-                raise ValueError(f"Invalid request to OpenAI: {error_msg}")
+                raise TTSProviderError(
+                    f"Invalid request to OpenAI: {error_msg}",
+                    provider=self.provider_name,
+                    error_code="BAD_REQUEST"
+                )
             else:
-                raise ValueError(f"OpenAI API error: {error_msg}")
+                raise TTSProviderError(
+                    f"OpenAI API error: {error_msg}",
+                    provider=self.provider_name,
+                    error_code=str(e.response.status_code)
+                )
+                
+        except httpx.TimeoutException as e:
+            logger.error(f"{self.provider_name} timeout error: {e}")
+            raise timeout_error(self.provider_name, timeout_duration=60.0)
+            
+        except httpx.NetworkError as e:
+            logger.error(f"{self.provider_name} network error: {e}")
+            raise network_error(f"Network error communicating with {self.provider_name}", self.provider_name)
                 
         except Exception as e:
-            logger.error(f"{self.provider_name} error: {e}")
+            if not isinstance(e, (TTSProviderError, TTSAuthenticationError, TTSRateLimitError, TTSNetworkError, TTSTimeoutError)):
+                logger.error(f"{self.provider_name} unexpected error: {e}")
+                raise TTSProviderError(
+                    f"Unexpected error in {self.provider_name}",
+                    provider=self.provider_name,
+                    details={"error": str(e), "error_type": type(e).__name__}
+                )
             raise
     
     async def _stream_audio(
@@ -236,11 +294,16 @@ class OpenAIAdapter(TTSAdapter):
         response.raise_for_status()
         return response.content
     
-    async def close(self):
-        """Clean up resources"""
-        if self.client:
-            await self.client.aclose()
-        await super().close()
+    async def _cleanup_resources(self):
+        """Clean up OpenAI adapter resources"""
+        # Note: HTTP clients are now managed by the resource manager
+        # No need to manually close them as they use connection pooling
+        try:
+            # Clear reference to client
+            self.client = None
+            logger.debug(f"{self.provider_name}: Resources cleaned up")
+        except Exception as e:
+            logger.warning(f"{self.provider_name}: Error during cleanup: {e}")
     
     def map_voice(self, voice_id: str) -> str:
         """Map generic voice ID to OpenAI voice"""

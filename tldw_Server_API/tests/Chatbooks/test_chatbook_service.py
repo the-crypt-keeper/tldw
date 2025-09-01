@@ -242,12 +242,17 @@ class TestChatbookService:
     
     def test_get_export_job_status(self, service, mock_db):
         """Test retrieving export job status."""
-        # Return tuple matching database schema
+        # Return tuple matching database schema with metadata
+        metadata = json.dumps({
+            "conversation_count": 5,
+            "note_count": 3,
+            "character_count": 2
+        })
         mock_db.execute_query.return_value = [
             ("job123", "test_user", "completed", "Test Export",
              "/tmp/export.chatbook", "2024-01-01T00:00:00",
              "2024-01-01T00:01:00", "2024-01-01T00:05:00",
-             None, 100, 100, 100, 1024, None, None)
+             None, 100, 100, 100, 1024, metadata, None)
         ]
         
         result = service.get_export_job_status("job123")

@@ -41,6 +41,7 @@ dependencies = [
   # API Server Core
   "aiofiles>=23.0.0",
   "aiohttp",
+  "aioresponses",
   "aiosqlite",
   "apscheduler>=3.10.0",
   "argon2-cffi>=23.0.0",
@@ -185,11 +186,6 @@ data-tools = [
   "genanki>=0.13.0",
   "joblib>=1.3.0",
   "python-json-logger>=2.0.0"
-]
-
-# Gradio UI (legacy)
-gradio = [
-  "gradio>=4.0.0"
 ]
 
 # MediaWiki processing
@@ -339,6 +335,7 @@ markers = [
     "local_llm_service: marks tests that require local LLM service",
     "timeout: marks tests with custom timeout settings", 
     "benchmark: marks performance benchmark tests",
+    "performance: marks performance tests",
     "slow: marks tests that take a long time to run",
     "load: marks load testing tests",
     "property: marks property-based testing tests",

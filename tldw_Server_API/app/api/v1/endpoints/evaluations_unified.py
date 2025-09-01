@@ -334,6 +334,298 @@ async def list_evaluations(
         )
 
 
+# ============= Rate Limit Management =============
+
+@router.get("/rate-limits", response_model=RateLimitStatusResponse)
+async def get_rate_limit_status(
+    user_id: str = Depends(verify_api_key)
+):
+    """Get current rate limit status for the authenticated user"""
+    try:
+        summary = await user_rate_limiter.get_usage_summary(user_id)
+        return RateLimitStatusResponse(**summary)
+        
+    except Exception as e:
+        logger.error(f"Failed to get rate limit status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get rate limit status: {sanitize_error_message(e, 'rate limit check')}"
+        )
+
+
+# ============= Dataset Management Endpoints =============
+
+@router.post("/datasets", response_model=DatasetResponse, status_code=status.HTTP_201_CREATED)
+async def create_dataset(
+    dataset_request: CreateDatasetRequest,
+    user_id: str = Depends(verify_api_key)
+):
+    """Create a new dataset"""
+    try:
+        dataset_id = await get_evaluation_service().create_dataset(
+            name=dataset_request.name,
+            description=dataset_request.description,
+            samples=[s.dict() for s in dataset_request.samples],
+            metadata=dataset_request.metadata,
+            created_by=user_id
+        )
+        
+        dataset = await get_evaluation_service().get_dataset(dataset_id)
+        if not dataset:
+            raise ValueError("Failed to retrieve created dataset")
+        
+        return DatasetResponse(**dataset)
+        
+    except Exception as e:
+        logger.error(f"Failed to create dataset: {e}")
+        raise create_error_response(
+            message=f"Failed to create dataset: {sanitize_error_message(e, 'creating dataset')}",
+            error_type="server_error",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@router.get("/datasets", response_model=DatasetListResponse)
+async def list_datasets(
+    limit: int = Query(20, ge=1, le=100),
+    after: Optional[str] = Query(None),
+    user_id: str = Depends(verify_api_key)
+):
+    """List datasets with pagination"""
+    try:
+        datasets, has_more = await get_evaluation_service().list_datasets(
+            limit=limit,
+            after=after
+        )
+        
+        first_id = datasets[0]["id"] if datasets else None
+        last_id = datasets[-1]["id"] if datasets else None
+        
+        return DatasetListResponse(
+            object="list",
+            data=[DatasetResponse(**ds) for ds in datasets],
+            has_more=has_more,
+            first_id=first_id,
+            last_id=last_id
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to list datasets: {e}")
+        raise create_error_response(
+            message=f"Failed to list datasets: {sanitize_error_message(e, 'listing datasets')}",
+            error_type="server_error",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@router.get("/datasets/{dataset_id}", response_model=DatasetResponse)
+async def get_dataset(
+    dataset_id: str,
+    user_id: str = Depends(verify_api_key)
+):
+    """Get dataset by ID"""
+    try:
+        dataset = await get_evaluation_service().get_dataset(dataset_id)
+        if not dataset:
+            raise create_error_response(
+                message=f"Dataset {dataset_id} not found",
+                error_type="not_found_error",
+                param="dataset_id",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        return DatasetResponse(**dataset)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get dataset {dataset_id}: {e}")
+        raise create_error_response(
+            message=f"Failed to get dataset: {sanitize_error_message(e, 'retrieving dataset')}",
+            error_type="server_error",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@router.delete("/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_dataset(
+    dataset_id: str,
+    user_id: str = Depends(verify_api_key)
+):
+    """Delete a dataset"""
+    try:
+        success = await get_evaluation_service().delete_dataset(dataset_id, deleted_by=user_id)
+        if not success:
+            raise create_error_response(
+                message=f"Dataset {dataset_id} not found",
+                error_type="not_found_error",
+                param="dataset_id",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete dataset {dataset_id}: {e}")
+        raise create_error_response(
+            message=f"Failed to delete dataset: {sanitize_error_message(e, 'deleting dataset')}",
+            error_type="server_error",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# ============= Health & Metrics Endpoints =============
+
+@router.get("/health", response_model=HealthCheckResponse)
+async def health_check():
+    """Check evaluation service health"""
+    try:
+        health = await get_evaluation_service().health_check()
+        return HealthCheckResponse(**health)
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return HealthCheckResponse(
+            status="unhealthy",
+            version="1.0.0",
+            uptime=0,
+            database="disconnected"
+        )
+
+
+@router.get("/metrics")
+async def get_metrics(request: Request):
+    """Get Prometheus metrics"""
+    try:
+        metrics_summary = await get_evaluation_service().get_metrics_summary()
+        
+        # Handle failure from service so error message is never exposed
+        if "error" in metrics_summary:
+            logger.error(f"Metrics endpoint service error: {metrics_summary['error']}")
+            # Return a generic error message in both text/plain and JSON responses
+            if "text/plain" in request.headers.get("accept", ""):
+                # Prometheus format error response
+                output = "# HELP evaluation_metrics_failed Metric collection failure\n"
+                output += "# TYPE evaluation_metrics_failed counter\n"
+                output += "evaluation_metrics_failed{} 1\n"
+                return Response(
+                    content=output,
+                    media_type="text/plain; version=0.0.4; charset=utf-8"
+                )
+            # Return JSON error response
+            return {"error": "Metrics are currently unavailable"}
+        
+        # Format as Prometheus text format if requested
+        if "text/plain" in request.headers.get("accept", ""):
+            # Convert to Prometheus format (simplified)
+            output = "# HELP evaluation_requests_total Total evaluation requests\n"
+            output += "# TYPE evaluation_requests_total counter\n"
+            output += f"evaluation_requests_total {{}} {metrics_summary.get('total_requests', 0)}\n"
+            
+            return Response(
+                content=output,
+                media_type="text/plain; version=0.0.4; charset=utf-8"
+            )
+        
+        # Return JSON format
+        return metrics_summary
+        
+    except Exception as e:
+        logger.error(f"Failed to get metrics: {e}")
+        # Do not expose internal error, return generic error
+        return {"error": "Metrics are currently unavailable"}
+
+
+# ============= Webhook Management Endpoints =============
+
+@router.post("/webhooks", response_model=WebhookRegistrationResponse)
+async def register_webhook(
+    request: WebhookRegistrationRequest,
+    user_id: str = Depends(verify_api_key)
+):
+    """Register a webhook for evaluation notifications"""
+    try:
+        # Convert enum values to strings for webhook manager
+        events = [e.value for e in request.events]
+        
+        result = await webhook_manager.register_webhook(
+            user_id=user_id,
+            url=str(request.url),
+            events=events,
+            secret=request.secret
+        )
+        
+        return WebhookRegistrationResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Failed to register webhook: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to register webhook: {sanitize_error_message(e, 'webhook registration')}"
+        )
+
+
+@router.get("/webhooks", response_model=List[WebhookStatusResponse])
+async def list_webhooks(
+    user_id: str = Depends(verify_api_key)
+):
+    """List all registered webhooks for the authenticated user"""
+    try:
+        webhooks = await webhook_manager.get_webhook_status(user_id)
+        return [WebhookStatusResponse(**w) for w in webhooks]
+        
+    except Exception as e:
+        logger.error(f"Failed to list webhooks: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list webhooks: {sanitize_error_message(e, 'listing webhooks')}"
+        )
+
+
+@router.delete("/webhooks")
+async def unregister_webhook(
+    url: str = Query(..., description="Webhook URL to unregister"),
+    user_id: str = Depends(verify_api_key)
+):
+    """Unregister a webhook"""
+    try:
+        success = await webhook_manager.unregister_webhook(user_id, url)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Webhook not found"
+            )
+        
+        return {"message": "Webhook unregistered successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to unregister webhook: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to unregister webhook: {sanitize_error_message(e, 'webhook removal')}"
+        )
+
+
+@router.post("/webhooks/test", response_model=WebhookTestResponse)
+async def test_webhook(
+    request: WebhookTestRequest,
+    user_id: str = Depends(verify_api_key)
+):
+    """Send a test webhook to verify endpoint configuration"""
+    try:
+        result = await webhook_manager.test_webhook(user_id, str(request.url))
+        return WebhookTestResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Failed to test webhook: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to test webhook: {sanitize_error_message(e, 'webhook testing')}"
+        )
+
+
 @router.get("/{eval_id}", response_model=EvaluationResponse)
 async def get_evaluation(
     eval_id: str,
@@ -623,296 +915,11 @@ async def evaluate_response_quality(
         )
 
 
-# ============= Dataset Management Endpoints =============
-
-@router.post("/datasets", response_model=DatasetResponse, status_code=status.HTTP_201_CREATED)
-async def create_dataset(
-    dataset_request: CreateDatasetRequest,
-    user_id: str = Depends(verify_api_key)
-):
-    """Create a new dataset"""
-    try:
-        dataset_id = await get_evaluation_service().create_dataset(
-            name=dataset_request.name,
-            description=dataset_request.description,
-            samples=[s.dict() for s in dataset_request.samples],
-            metadata=dataset_request.metadata,
-            created_by=user_id
-        )
-        
-        dataset = await get_evaluation_service().get_dataset(dataset_id)
-        if not dataset:
-            raise ValueError("Failed to retrieve created dataset")
-        
-        return DatasetResponse(**dataset)
-        
-    except Exception as e:
-        logger.error(f"Failed to create dataset: {e}")
-        raise create_error_response(
-            message=f"Failed to create dataset: {sanitize_error_message(e, 'creating dataset')}",
-            error_type="server_error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 
-@router.get("/datasets", response_model=DatasetListResponse)
-async def list_datasets(
-    limit: int = Query(20, ge=1, le=100),
-    after: Optional[str] = Query(None),
-    user_id: str = Depends(verify_api_key)
-):
-    """List datasets with pagination"""
-    try:
-        datasets, has_more = await get_evaluation_service().list_datasets(
-            limit=limit,
-            after=after
-        )
-        
-        first_id = datasets[0]["id"] if datasets else None
-        last_id = datasets[-1]["id"] if datasets else None
-        
-        return DatasetListResponse(
-            object="list",
-            data=[DatasetResponse(**ds) for ds in datasets],
-            has_more=has_more,
-            first_id=first_id,
-            last_id=last_id
-        )
-        
-    except Exception as e:
-        logger.error(f"Failed to list datasets: {e}")
-        raise create_error_response(
-            message=f"Failed to list datasets: {sanitize_error_message(e, 'listing datasets')}",
-            error_type="server_error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 
-@router.get("/datasets/{dataset_id}", response_model=DatasetResponse)
-async def get_dataset(
-    dataset_id: str,
-    user_id: str = Depends(verify_api_key)
-):
-    """Get dataset by ID"""
-    try:
-        dataset = await get_evaluation_service().get_dataset(dataset_id)
-        if not dataset:
-            raise create_error_response(
-                message=f"Dataset {dataset_id} not found",
-                error_type="not_found_error",
-                param="dataset_id",
-                status_code=status.HTTP_404_NOT_FOUND
-            )
-        
-        return DatasetResponse(**dataset)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get dataset {dataset_id}: {e}")
-        raise create_error_response(
-            message=f"Failed to get dataset: {sanitize_error_message(e, 'retrieving dataset')}",
-            error_type="server_error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
-
-@router.delete("/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_dataset(
-    dataset_id: str,
-    user_id: str = Depends(verify_api_key)
-):
-    """Delete a dataset"""
-    try:
-        success = await get_evaluation_service().delete_dataset(dataset_id, deleted_by=user_id)
-        if not success:
-            raise create_error_response(
-                message=f"Dataset {dataset_id} not found",
-                error_type="not_found_error",
-                param="dataset_id",
-                status_code=status.HTTP_404_NOT_FOUND
-            )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to delete dataset {dataset_id}: {e}")
-        raise create_error_response(
-            message=f"Failed to delete dataset: {sanitize_error_message(e, 'deleting dataset')}",
-            error_type="server_error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-# ============= Health & Metrics Endpoints =============
-
-@router.get("/health", response_model=HealthCheckResponse)
-async def health_check():
-    """Check evaluation service health"""
-    try:
-        health = await get_evaluation_service().health_check()
-        return HealthCheckResponse(**health)
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return HealthCheckResponse(
-            status="unhealthy",
-            version="1.0.0",
-            uptime=0,
-            database="disconnected"
-        )
-
-
-@router.get("/metrics")
-async def get_metrics(request: Request):
-    """Get Prometheus metrics"""
-    try:
-        metrics_summary = await get_evaluation_service().get_metrics_summary()
-        
-        # Handle failure from service so error message is never exposed
-        if "error" in metrics_summary:
-            logger.error(f"Metrics endpoint service error: {metrics_summary['error']}")
-            # Return a generic error message in both text/plain and JSON responses
-            if "text/plain" in request.headers.get("accept", ""):
-                # Prometheus format error response
-                output = "# HELP evaluation_metrics_failed Metric collection failure\n"
-                output += "# TYPE evaluation_metrics_failed counter\n"
-                output += "evaluation_metrics_failed{} 1\n"
-                return Response(
-                    content=output,
-                    media_type="text/plain; version=0.0.4; charset=utf-8"
-                )
-            # Return JSON error response
-            return {"error": "Metrics are currently unavailable"}
-        
-        # Format as Prometheus text format if requested
-        if "text/plain" in request.headers.get("accept", ""):
-            # Convert to Prometheus format (simplified)
-            output = "# HELP evaluation_requests_total Total evaluation requests\n"
-            output += "# TYPE evaluation_requests_total counter\n"
-            output += f"evaluation_requests_total {{}} {metrics_summary.get('total_requests', 0)}\n"
-            
-            return Response(
-                content=output,
-                media_type="text/plain; version=0.0.4; charset=utf-8"
-            )
-        
-        # Return JSON format
-        return metrics_summary
-        
-    except Exception as e:
-        logger.error(f"Failed to get metrics: {e}")
-        # Do not expose internal error, return generic error
-        return {"error": "Metrics are currently unavailable"}
-
-
-# ============= Webhook Management Endpoints =============
-
-@router.post("/webhooks", response_model=WebhookRegistrationResponse)
-async def register_webhook(
-    request: WebhookRegistrationRequest,
-    user_id: str = Depends(verify_api_key)
-):
-    """Register a webhook for evaluation notifications"""
-    try:
-        # Convert enum values to strings for webhook manager
-        events = [e.value for e in request.events]
-        
-        result = await webhook_manager.register_webhook(
-            user_id=user_id,
-            url=str(request.url),
-            events=events,
-            secret=request.secret
-        )
-        
-        return WebhookRegistrationResponse(**result)
-        
-    except Exception as e:
-        logger.error(f"Failed to register webhook: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to register webhook: {sanitize_error_message(e, 'webhook registration')}"
-        )
-
-
-@router.get("/webhooks", response_model=List[WebhookStatusResponse])
-async def list_webhooks(
-    user_id: str = Depends(verify_api_key)
-):
-    """List all registered webhooks for the authenticated user"""
-    try:
-        webhooks = await webhook_manager.get_webhook_status(user_id)
-        return [WebhookStatusResponse(**w) for w in webhooks]
-        
-    except Exception as e:
-        logger.error(f"Failed to list webhooks: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list webhooks: {sanitize_error_message(e, 'listing webhooks')}"
-        )
-
-
-@router.delete("/webhooks")
-async def unregister_webhook(
-    url: str = Query(..., description="Webhook URL to unregister"),
-    user_id: str = Depends(verify_api_key)
-):
-    """Unregister a webhook"""
-    try:
-        success = await webhook_manager.unregister_webhook(user_id, url)
-        
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Webhook not found"
-            )
-        
-        return {"message": "Webhook unregistered successfully"}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to unregister webhook: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to unregister webhook: {sanitize_error_message(e, 'webhook removal')}"
-        )
-
-
-@router.post("/webhooks/test", response_model=WebhookTestResponse)
-async def test_webhook(
-    request: WebhookTestRequest,
-    user_id: str = Depends(verify_api_key)
-):
-    """Send a test webhook to verify endpoint configuration"""
-    try:
-        result = await webhook_manager.test_webhook(user_id, str(request.url))
-        return WebhookTestResponse(**result)
-        
-    except Exception as e:
-        logger.error(f"Failed to test webhook: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to test webhook: {sanitize_error_message(e, 'webhook testing')}"
-        )
-
-
-# ============= Rate Limit Management =============
-
-@router.get("/rate-limits", response_model=RateLimitStatusResponse)
-async def get_rate_limit_status(
-    user_id: str = Depends(verify_api_key)
-):
-    """Get current rate limit status for the authenticated user"""
-    try:
-        summary = await user_rate_limiter.get_usage_summary(user_id)
-        return RateLimitStatusResponse(**summary)
-        
-    except Exception as e:
-        logger.error(f"Failed to get rate limit status: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get rate limit status: {sanitize_error_message(e, 'rate limit check')}"
-        )
 
 
 # ============= Additional Run Endpoints =============

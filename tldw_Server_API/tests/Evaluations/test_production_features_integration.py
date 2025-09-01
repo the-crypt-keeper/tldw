@@ -21,8 +21,10 @@ from aioresponses import aioresponses
 # Import test configuration
 import sys
 import os
+
+from tldw_Server_API.tests.test_config import test_config
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from test_config import test_config
 
 # Set up test environment
 test_config.setup_test_environment()

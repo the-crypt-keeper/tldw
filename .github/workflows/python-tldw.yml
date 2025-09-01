@@ -58,9 +58,9 @@ jobs:
         #run: |
           #ruff check tldw_Server_API/
 
-      #- name: Run MyPy type checker
-        #run: |
-          #mypy tldw_Server_API/ || true  # Allow failures for now
+      - name: Run MyPy type checker
+        run: |
+          mypy tldw_Server_API/ || true  # Allow failures for now
           
       - name: Security check with pip-audit
         run: |
@@ -128,6 +128,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install email-validator
+          pip install pytest-xdist  # Install test parallelization
           pip install -e ".[dev]"
           # Install platform-specific dependencies
           if [ "${{ runner.os }}" = "Windows" ]; then
@@ -137,8 +138,9 @@ jobs:
           
       - name: Run unit tests with coverage
         run: |
-          pytest -v -m "unit" --cov=tldw_Server_API --cov-report=xml --cov-report=html --cov-report=term-missing --junit-xml=test-results-${{ matrix.os }}-${{ matrix.python-version }}.xml --timeout=300 || \
-          pytest -v tldw_Server_API/tests/Character_Chat/ tldw_Server_API/tests/Chat/test_document_generator.py tldw_Server_API/tests/Chatbooks/ --cov=tldw_Server_API --cov-report=xml --junit-xml=test-results-chatbook-${{ matrix.os }}-${{ matrix.python-version }}.xml --timeout=300
+          # Use parallel test execution with pytest-xdist
+          # -n auto uses all available CPU cores, adjust as needed
+          pytest -v -m "unit" -n auto --cov=tldw_Server_API --cov-report=xml --cov-report=html --cov-report=term-missing --junit-xml=test-results-${{ matrix.os }}-${{ matrix.python-version }}.xml --timeout=300
         shell: bash
         continue-on-error: true
         
@@ -158,6 +160,27 @@ jobs:
           file: ./coverage.xml
           flags: unittests
           name: codecov-unit-tests
+          fail_ci_if_error: false  # Don't fail if codecov is down
+          
+      - name: Check coverage threshold
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: |
+          # Extract coverage percentage from the XML report
+          coverage_percent=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.attrib.get('line-rate', '0')) * 100)" 2>/dev/null || echo "0")
+          echo "Current coverage: ${coverage_percent}%"
+          
+          # Set minimum coverage threshold (adjust as needed)
+          MIN_COVERAGE=50
+          
+          if (( $(echo "$coverage_percent < $MIN_COVERAGE" | bc -l 2>/dev/null || echo 1) )); then
+            echo "⚠️ Coverage ${coverage_percent}% is below minimum threshold of ${MIN_COVERAGE}%"
+            # Don't fail the build for now, just warn
+            # exit 1
+          else
+            echo "✅ Coverage ${coverage_percent}% meets minimum threshold of ${MIN_COVERAGE}%"
+          fi
+        shell: bash
+        continue-on-error: true
 
   # Job 3: Integration Tests
   integration-tests:
@@ -203,12 +226,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install email-validator
+          pip install pytest-xdist  # Install test parallelization
           pip install -e ".[dev]"
           
       - name: Run integration tests
         run: |
-          pytest -v -m "integration" --cov=tldw_Server_API --cov-report=xml --junit-xml=test-results-integration.xml --timeout=600 || \
-          pytest -v tldw_Server_API/tests/integration/test_phase1_integration.py tldw_Server_API/tests/integration/test_chatbook_integration.py --cov=tldw_Server_API --cov-report=xml --junit-xml=test-results-chatbook-integration.xml --timeout=600
+          # Use parallel test execution for integration tests too
+          pytest -v -m "integration" -n auto --cov=tldw_Server_API --cov-report=xml --junit-xml=test-results-integration.xml --timeout=600
         shell: bash
         continue-on-error: true
         
@@ -255,6 +279,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install email-validator
+          pip install pytest-xdist  # Install test parallelization
           pip install -e ".[dev]"
           
       - name: Run external API tests
@@ -352,7 +377,122 @@ jobs:
           name: python-package-distributions
           path: dist/
 
-  # Job 7: Test Report Summary
+  # Job 7: Docker Build and Test
+  docker-test:
+    name: Docker Build and Test
+    runs-on: ubuntu-latest
+    needs: [unit-tests, code-quality]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build Docker image
+        run: |
+          # Find available Dockerfile
+          if [ -f "tldw_Server_API/Dockerfiles/Dockerfile" ]; then
+            DOCKERFILE="tldw_Server_API/Dockerfiles/Dockerfile"
+          elif [ -f "Dockerfile" ]; then
+            DOCKERFILE="Dockerfile"
+          else
+            echo "No Dockerfile found, skipping Docker build"
+            exit 0
+          fi
+          
+          echo "Building Docker image using $DOCKERFILE"
+          docker build -f $DOCKERFILE -t tldw-server:test .
+          
+      - name: Test Docker container startup
+        run: |
+          # Start container and check if it runs
+          docker run -d --name tldw-test -p 8000:8000 tldw-server:test || exit 0
+          
+          # Wait for container to be healthy
+          for i in {1..30}; do
+            if docker ps | grep -q tldw-test; then
+              echo "Container is running"
+              
+              # Try to access the API
+              if curl -f http://localhost:8000/docs 2>/dev/null; then
+                echo "✅ Docker container is running and API is accessible"
+                docker stop tldw-test
+                docker rm tldw-test
+                exit 0
+              fi
+            fi
+            echo "Waiting for container to start... (attempt $i/30)"
+            sleep 2
+          done
+          
+          echo "Container failed to start properly"
+          docker logs tldw-test || true
+          docker stop tldw-test || true
+          docker rm tldw-test || true
+        continue-on-error: true
+
+  # Job 8: Performance Benchmarking
+  performance-benchmark:
+    name: Performance Benchmarking
+    runs-on: ubuntu-latest
+    needs: [unit-tests, code-quality]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev' || github.event_name == 'workflow_dispatch'
+    env:
+      PYTHONPATH: ./tldw_Server_API
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-benchmark-v2-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-benchmark-
+            ${{ runner.os }}-pip-
+            
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install email-validator
+          pip install pytest-benchmark
+          pip install -e ".[dev]"
+          
+      - name: Run benchmark tests
+        run: |
+          # Run performance/benchmark tests if they exist
+          pytest -v -m "benchmark or performance" --benchmark-only --benchmark-json=benchmark.json --timeout=1200 || echo "No benchmark tests found"
+        continue-on-error: true
+        
+      - name: Store benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.ref == 'refs/heads/main'
+        with:
+          tool: 'pytest'
+          output-file-path: benchmark.json
+          benchmark-data-dir-path: 'dev/bench'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+          alert-threshold: '120%'  # Alert if performance degrades by >20%
+          comment-on-alert: true
+          alert-comment-cc-users: '@rmusser01'
+        continue-on-error: true
+        
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmark.json
+
+  # Job 9: Test Report Summary
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest

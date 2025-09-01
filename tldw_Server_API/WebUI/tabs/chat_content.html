@@ -2,40 +2,198 @@
 <div id="tabChatCompletions" class="tab-content">
     <div class="endpoint-section">
         <h2>POST /api/v1/chat/completions - Chat Completions</h2>
-        <p>OpenAI-compatible chat completions endpoint for interactive conversations.</p>
+        <p>OpenAI-compatible chat completions endpoint for interactive conversations with full parameter control.</p>
         
-        <div class="form-group">
-            <label for="chatCompletions_model">Model:</label>
-            <select id="chatCompletions_model" class="llm-model-select">
-                <option value="">Loading models...</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="chatCompletions_messages">Messages (JSON array):</label>
-            <textarea id="chatCompletions_messages" style="min-height: 200px;">[
+        <!-- Basic Parameters -->
+        <div class="basic-params">
+            <h3>Basic Parameters</h3>
+            
+            <div class="form-group">
+                <label for="chatCompletions_provider">API Provider:</label>
+                <select id="chatCompletions_provider">
+                    <option value="">Default</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="cohere">Cohere</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="google">Google</option>
+                    <option value="groq">Groq</option>
+                    <option value="huggingface">HuggingFace</option>
+                    <option value="mistral">Mistral</option>
+                    <option value="openrouter">OpenRouter</option>
+                    <option value="llama.cpp">Llama.cpp</option>
+                    <option value="kobold">Kobold</option>
+                    <option value="ollama">Ollama</option>
+                    <option value="ooba">Oobabooga</option>
+                    <option value="tabbyapi">TabbyAPI</option>
+                    <option value="vllm">vLLM</option>
+                    <option value="local-llm">Local LLM</option>
+                    <option value="custom-openai-api">Custom OpenAI API</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="chatCompletions_model">Model:</label>
+                <select id="chatCompletions_model" class="llm-model-select">
+                    <option value="">Loading models...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="chatCompletions_messages">Messages (JSON array):</label>
+                <textarea id="chatCompletions_messages" style="min-height: 200px;">[
     {"role": "system", "content": "You are a helpful assistant."},
     {"role": "user", "content": "Hello! How are you today?"}
 ]</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="chatCompletions_temperature">Temperature:</label>
+                <input type="number" id="chatCompletions_temperature" min="0" max="2" step="0.1" value="0.7">
+            </div>
+            
+            <div class="form-group">
+                <label for="chatCompletions_max_tokens">Max Tokens:</label>
+                <input type="number" id="chatCompletions_max_tokens" value="1000">
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="chatCompletions_stream"> Stream Response
+                </label>
+            </div>
         </div>
         
-        <div class="form-group">
-            <label for="chatCompletions_temperature">Temperature:</label>
-            <input type="number" id="chatCompletions_temperature" min="0" max="2" step="0.1" value="0.7">
-        </div>
+        <!-- Advanced Parameters -->
+        <details class="advanced-params" style="margin-top: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            <summary style="cursor: pointer; font-weight: bold; padding: 5px;">⚙️ Advanced Options</summary>
+            
+            <!-- Sampling Parameters -->
+            <fieldset style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+                <legend>Sampling Parameters</legend>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_frequency_penalty">Frequency Penalty (-2.0 to 2.0):</label>
+                    <input type="number" id="chatCompletions_frequency_penalty" min="-2" max="2" step="0.1" placeholder="0">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_presence_penalty">Presence Penalty (-2.0 to 2.0):</label>
+                    <input type="number" id="chatCompletions_presence_penalty" min="-2" max="2" step="0.1" placeholder="0">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_top_p">Top P (0.0 to 1.0):</label>
+                    <input type="number" id="chatCompletions_top_p" min="0" max="1" step="0.01" placeholder="1">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_top_k">Top K (integer):</label>
+                    <input type="number" id="chatCompletions_top_k" min="1" step="1" placeholder="Not set">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_min_p">Min P (float):</label>
+                    <input type="number" id="chatCompletions_min_p" min="0" max="1" step="0.01" placeholder="Not set">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_seed">Seed (for deterministic sampling):</label>
+                    <input type="number" id="chatCompletions_seed" step="1" placeholder="Random">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_n">Number of Completions (1-128):</label>
+                    <input type="number" id="chatCompletions_n" min="1" max="128" value="1">
+                </div>
+            </fieldset>
+            
+            <!-- Response Control -->
+            <fieldset style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+                <legend>Response Control</legend>
+                
+                <div class="form-group">
+                    <label>Response Format:</label>
+                    <div>
+                        <label><input type="radio" name="chatCompletions_response_format" value="text" checked> Text</label>
+                        <label style="margin-left: 20px;"><input type="radio" name="chatCompletions_response_format" value="json_object"> JSON Object</label>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_stop">Stop Sequences (comma-separated):</label>
+                    <input type="text" id="chatCompletions_stop" placeholder='e.g., "\n\n", "END", "STOP"'>
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_user">User Identifier:</label>
+                    <input type="text" id="chatCompletions_user" placeholder="Optional user ID for monitoring">
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="chatCompletions_logprobs" onchange="toggleLogprobs()"> Return Log Probabilities
+                    </label>
+                </div>
+                
+                <div class="form-group" id="top_logprobs_group" style="display: none;">
+                    <label for="chatCompletions_top_logprobs">Top Log Probabilities (0-20):</label>
+                    <input type="number" id="chatCompletions_top_logprobs" min="0" max="20" value="5">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_logit_bias">Logit Bias (JSON object):</label>
+                    <textarea id="chatCompletions_logit_bias" rows="3" placeholder='e.g., {"50256": -100}'>{}</textarea>
+                </div>
+            </fieldset>
+            
+            <!-- Context & Templates -->
+            <fieldset style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+                <legend>Context & Templates</legend>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_prompt_template">Prompt Template Name:</label>
+                    <input type="text" id="chatCompletions_prompt_template" placeholder="Optional template name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_character_id">Character ID:</label>
+                    <input type="number" id="chatCompletions_character_id" placeholder="Optional character ID">
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_conversation_id">Conversation ID:</label>
+                    <input type="text" id="chatCompletions_conversation_id" placeholder="Optional conversation ID">
+                </div>
+            </fieldset>
+            
+            <!-- Function Calling -->
+            <fieldset style="margin-top: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+                <legend>Function Calling / Tools</legend>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_tools">Tools Definition (JSON array):</label>
+                    <textarea id="chatCompletions_tools" rows="5" placeholder='[{"type": "function", "function": {"name": "get_weather", "description": "Get weather", "parameters": {}}}]'>[]</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="chatCompletions_tool_choice">Tool Choice:</label>
+                    <select id="chatCompletions_tool_choice" onchange="toggleToolChoiceJSON()">
+                        <option value="auto">Auto</option>
+                        <option value="none">None</option>
+                        <option value="required">Required</option>
+                        <option value="specific">Specific Tool (JSON)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="tool_choice_json_group" style="display: none;">
+                    <label for="chatCompletions_tool_choice_json">Specific Tool (JSON):</label>
+                    <textarea id="chatCompletions_tool_choice_json" rows="3" placeholder='{"type": "function", "function": {"name": "function_name"}}'>{}</textarea>
+                </div>
+            </fieldset>
+        </details>
         
-        <div class="form-group">
-            <label for="chatCompletions_max_tokens">Max Tokens:</label>
-            <input type="number" id="chatCompletions_max_tokens" value="1000">
-        </div>
-        
-        <div class="form-group">
-            <label>
-                <input type="checkbox" id="chatCompletions_stream"> Stream Response
-            </label>
-        </div>
-        
-        <button class="api-button" onclick="makeChatCompletionsRequest()">Send Request</button>
+        <button class="api-button" onclick="makeChatCompletionsRequest()" style="margin-top: 20px;">Send Request</button>
         
         <h3>Response:</h3>
         <pre id="chatCompletions_response">---</pre>
@@ -199,30 +357,137 @@
 </div>
 
 <script>
-// Chat Completions functionality
+// Helper functions for UI interactions
+function toggleLogprobs() {
+    const logprobsChecked = document.getElementById('chatCompletions_logprobs').checked;
+    document.getElementById('top_logprobs_group').style.display = logprobsChecked ? 'block' : 'none';
+}
+
+function toggleToolChoiceJSON() {
+    const toolChoice = document.getElementById('chatCompletions_tool_choice').value;
+    document.getElementById('tool_choice_json_group').style.display = toolChoice === 'specific' ? 'block' : 'none';
+}
+
+// Chat Completions functionality - Now collects ALL parameters
 async function makeChatCompletionsRequest() {
-    const model = document.getElementById('chatCompletions_model').value;
-    const messagesText = document.getElementById('chatCompletions_messages').value;
-    const temperature = parseFloat(document.getElementById('chatCompletions_temperature').value);
-    const maxTokens = parseInt(document.getElementById('chatCompletions_max_tokens').value);
-    const stream = document.getElementById('chatCompletions_stream').checked;
     const responseEl = document.getElementById('chatCompletions_response');
     
     try {
-        const messages = JSON.parse(messagesText);
+        // Build the payload with all parameters
+        const payload = {};
         
-        const payload = {
-            model: model,
-            messages: messages,
-            temperature: temperature,
-            max_tokens: maxTokens,
-            stream: stream
-        };
+        // Basic Parameters
+        const provider = document.getElementById('chatCompletions_provider').value;
+        if (provider) payload.api_provider = provider;
         
-        responseEl.textContent = 'Sending request...';
+        const model = document.getElementById('chatCompletions_model').value;
+        if (model) payload.model = model;
         
-        if (stream) {
+        const messagesText = document.getElementById('chatCompletions_messages').value;
+        payload.messages = JSON.parse(messagesText);
+        
+        const temperature = parseFloat(document.getElementById('chatCompletions_temperature').value);
+        if (!isNaN(temperature)) payload.temperature = temperature;
+        
+        const maxTokens = parseInt(document.getElementById('chatCompletions_max_tokens').value);
+        if (!isNaN(maxTokens)) payload.max_tokens = maxTokens;
+        
+        payload.stream = document.getElementById('chatCompletions_stream').checked;
+        
+        // Sampling Parameters
+        const frequencyPenalty = parseFloat(document.getElementById('chatCompletions_frequency_penalty').value);
+        if (!isNaN(frequencyPenalty)) payload.frequency_penalty = frequencyPenalty;
+        
+        const presencePenalty = parseFloat(document.getElementById('chatCompletions_presence_penalty').value);
+        if (!isNaN(presencePenalty)) payload.presence_penalty = presencePenalty;
+        
+        const topP = parseFloat(document.getElementById('chatCompletions_top_p').value);
+        if (!isNaN(topP)) payload.top_p = topP;
+        
+        const topK = parseInt(document.getElementById('chatCompletions_top_k').value);
+        if (!isNaN(topK)) payload.topk = topK;
+        
+        const minP = parseFloat(document.getElementById('chatCompletions_min_p').value);
+        if (!isNaN(minP)) payload.minp = minP;
+        
+        const seed = parseInt(document.getElementById('chatCompletions_seed').value);
+        if (!isNaN(seed)) payload.seed = seed;
+        
+        const n = parseInt(document.getElementById('chatCompletions_n').value);
+        if (!isNaN(n)) payload.n = n;
+        
+        // Response Control
+        const responseFormat = document.querySelector('input[name="chatCompletions_response_format"]:checked').value;
+        if (responseFormat === 'json_object') {
+            payload.response_format = { type: 'json_object' };
+        }
+        
+        const stopSequences = document.getElementById('chatCompletions_stop').value;
+        if (stopSequences) {
+            // Parse comma-separated values
+            payload.stop = stopSequences.split(',').map(s => s.trim()).filter(s => s);
+        }
+        
+        const user = document.getElementById('chatCompletions_user').value;
+        if (user) payload.user = user;
+        
+        const logprobs = document.getElementById('chatCompletions_logprobs').checked;
+        if (logprobs) {
+            payload.logprobs = true;
+            const topLogprobs = parseInt(document.getElementById('chatCompletions_top_logprobs').value);
+            if (!isNaN(topLogprobs)) payload.top_logprobs = topLogprobs;
+        }
+        
+        const logitBiasText = document.getElementById('chatCompletions_logit_bias').value;
+        if (logitBiasText && logitBiasText !== '{}') {
+            try {
+                payload.logit_bias = JSON.parse(logitBiasText);
+            } catch (e) {
+                console.warn('Invalid logit bias JSON:', e);
+            }
+        }
+        
+        // Context & Templates
+        const promptTemplate = document.getElementById('chatCompletions_prompt_template').value;
+        if (promptTemplate) payload.prompt_template_name = promptTemplate;
+        
+        const characterId = parseInt(document.getElementById('chatCompletions_character_id').value);
+        if (!isNaN(characterId)) payload.character_id = characterId;
+        
+        const conversationId = document.getElementById('chatCompletions_conversation_id').value;
+        if (conversationId) payload.conversation_id = conversationId;
+        
+        // Function Calling
+        const toolsText = document.getElementById('chatCompletions_tools').value;
+        if (toolsText && toolsText !== '[]') {
+            try {
+                payload.tools = JSON.parse(toolsText);
+            } catch (e) {
+                console.warn('Invalid tools JSON:', e);
+            }
+        }
+        
+        const toolChoice = document.getElementById('chatCompletions_tool_choice').value;
+        if (toolChoice === 'specific') {
+            const toolChoiceJSON = document.getElementById('chatCompletions_tool_choice_json').value;
+            if (toolChoiceJSON && toolChoiceJSON !== '{}') {
+                try {
+                    payload.tool_choice = JSON.parse(toolChoiceJSON);
+                } catch (e) {
+                    console.warn('Invalid tool choice JSON:', e);
+                }
+            }
+        } else if (toolChoice !== 'auto') {
+            payload.tool_choice = toolChoice;
+        }
+        
+        // Display the request payload for debugging
+        console.log('Request payload:', payload);
+        responseEl.textContent = 'Sending request with parameters:\n' + JSON.stringify(payload, null, 2) + '\n\n';
+        
+        if (payload.stream) {
             // Handle streaming response
+            responseEl.textContent += 'Streaming response:\n';
             const response = await apiClient.post('/api/v1/chat/completions', payload, {
                 streaming: true,
                 onProgress: (chunk) => {
@@ -235,7 +500,7 @@ async function makeChatCompletionsRequest() {
         } else {
             // Handle regular response
             const response = await apiClient.post('/api/v1/chat/completions', payload);
-            responseEl.textContent = JSON.stringify(response, null, 2);
+            responseEl.textContent += '\nResponse:\n' + JSON.stringify(response, null, 2);
         }
     } catch (error) {
         responseEl.textContent = `Error: ${error.message}`;
@@ -514,37 +779,97 @@ document.addEventListener('DOMContentLoaded', () => {
             <span class="endpoint-method post">POST</span>
             <span class="endpoint-path">/api/v1/characters - Create Character</span>
         </h2>
-        <p>Create a new character for roleplay or conversation.</p>
+        <p>Create a new character for roleplay or conversation with ALL available fields.</p>
         
-        <div class="form-group">
-            <label for="charactersCreate_name">Character Name <span class="required">*</span>:</label>
-            <input type="text" id="charactersCreate_name" placeholder="e.g., Assistant, Teacher, Expert">
-        </div>
+        <!-- Basic Character Information -->
+        <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+            <legend>Basic Information</legend>
+            
+            <div class="form-group">
+                <label for="charactersCreate_name">Character Name <span class="required">*</span>:</label>
+                <input type="text" id="charactersCreate_name" placeholder="e.g., Assistant, Teacher, Expert">
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_description">Description:</label>
+                <textarea id="charactersCreate_description" rows="3" placeholder="Brief character description..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_personality">Personality:</label>
+                <textarea id="charactersCreate_personality" rows="3" placeholder="Character personality traits..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_scenario">Scenario:</label>
+                <textarea id="charactersCreate_scenario" rows="3" placeholder="The setting or context where the character exists..."></textarea>
+            </div>
+        </fieldset>
         
-        <div class="form-group">
-            <label for="charactersCreate_description">Description:</label>
-            <textarea id="charactersCreate_description" rows="3" placeholder="Brief character description..."></textarea>
-        </div>
+        <!-- Conversation Settings -->
+        <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+            <legend>Conversation Settings</legend>
+            
+            <div class="form-group">
+                <label for="charactersCreate_system_prompt">System Prompt:</label>
+                <textarea id="charactersCreate_system_prompt" rows="5" placeholder="System instructions for the character...">You are a helpful AI assistant.</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_post_history_instructions">Post-History Instructions:</label>
+                <textarea id="charactersCreate_post_history_instructions" rows="3" placeholder="Instructions that come after conversation history (optional)..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_first_message">First Message:</label>
+                <textarea id="charactersCreate_first_message" rows="3" placeholder="Character's greeting or first message...">Hello! How can I assist you today?</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_message_example">Message Example:</label>
+                <textarea id="charactersCreate_message_example" rows="5" placeholder="Example conversation format (optional)..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_alternate_greetings">Alternate Greetings (JSON array or comma-separated):</label>
+                <textarea id="charactersCreate_alternate_greetings" rows="3" placeholder='["Hello!", "Hi there!", "Greetings!"] or comma-separated list'></textarea>
+            </div>
+        </fieldset>
         
-        <div class="form-group">
-            <label for="charactersCreate_personality">Personality:</label>
-            <textarea id="charactersCreate_personality" rows="3" placeholder="Character personality traits..."></textarea>
-        </div>
-        
-        <div class="form-group">
-            <label for="charactersCreate_system_prompt">System Prompt:</label>
-            <textarea id="charactersCreate_system_prompt" rows="5" placeholder="System instructions for the character...">You are a helpful AI assistant.</textarea>
-        </div>
-        
-        <div class="form-group">
-            <label for="charactersCreate_first_message">First Message:</label>
-            <textarea id="charactersCreate_first_message" rows="3" placeholder="Character's greeting or first message...">Hello! How can I assist you today?</textarea>
-        </div>
-        
-        <div class="form-group">
-            <label for="charactersCreate_tags">Tags (comma-separated):</label>
-            <input type="text" id="charactersCreate_tags" placeholder="e.g., helpful, technical, friendly">
-        </div>
+        <!-- Metadata -->
+        <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 3px;">
+            <legend>Metadata</legend>
+            
+            <div class="form-group">
+                <label for="charactersCreate_creator">Creator:</label>
+                <input type="text" id="charactersCreate_creator" placeholder="Creator name (optional)">
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_creator_notes">Creator Notes:</label>
+                <textarea id="charactersCreate_creator_notes" rows="3" placeholder="Notes from the creator (optional)..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_character_version">Character Version:</label>
+                <input type="text" id="charactersCreate_character_version" placeholder="e.g., 1.0.0">
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_tags">Tags (comma-separated):</label>
+                <input type="text" id="charactersCreate_tags" placeholder="e.g., helpful, technical, friendly">
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_extensions">Extensions (JSON object):</label>
+                <textarea id="charactersCreate_extensions" rows="3" placeholder='{"custom_field": "value", "another_field": 123}'>{}</textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="charactersCreate_image_base64">Character Image (Base64):</label>
+                <textarea id="charactersCreate_image_base64" rows="2" placeholder="Base64 encoded image (optional, without data:image prefix)..."></textarea>
+            </div>
+        </fieldset>
         
         <button class="api-button" onclick="createCharacter()">
             Create Character
@@ -880,17 +1205,80 @@ async function createCharacter() {
     try {
         responseEl.textContent = 'Creating character...';
         
-        const tags = document.getElementById('charactersCreate_tags').value;
-        const tagsArray = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
+        // Collect all form values
+        const body = {};
         
-        const body = {
-            name: document.getElementById('charactersCreate_name').value,
-            description: document.getElementById('charactersCreate_description').value,
-            personality: document.getElementById('charactersCreate_personality').value,
-            system_prompt: document.getElementById('charactersCreate_system_prompt').value,
-            first_message: document.getElementById('charactersCreate_first_message').value,
-            tags: tagsArray
-        };
+        // Required field
+        const name = document.getElementById('charactersCreate_name').value;
+        if (!name) {
+            throw new Error('Character name is required');
+        }
+        body.name = name;
+        
+        // Basic Information
+        const description = document.getElementById('charactersCreate_description').value;
+        if (description) body.description = description;
+        
+        const personality = document.getElementById('charactersCreate_personality').value;
+        if (personality) body.personality = personality;
+        
+        const scenario = document.getElementById('charactersCreate_scenario').value;
+        if (scenario) body.scenario = scenario;
+        
+        // Conversation Settings
+        const systemPrompt = document.getElementById('charactersCreate_system_prompt').value;
+        if (systemPrompt) body.system_prompt = systemPrompt;
+        
+        const postHistoryInstructions = document.getElementById('charactersCreate_post_history_instructions').value;
+        if (postHistoryInstructions) body.post_history_instructions = postHistoryInstructions;
+        
+        const firstMessage = document.getElementById('charactersCreate_first_message').value;
+        if (firstMessage) body.first_message = firstMessage;
+        
+        const messageExample = document.getElementById('charactersCreate_message_example').value;
+        if (messageExample) body.message_example = messageExample;
+        
+        // Handle alternate_greetings - can be JSON array or comma-separated
+        const alternateGreetingsValue = document.getElementById('charactersCreate_alternate_greetings').value;
+        if (alternateGreetingsValue) {
+            try {
+                // Try parsing as JSON first
+                body.alternate_greetings = JSON.parse(alternateGreetingsValue);
+            } catch (e) {
+                // If not JSON, treat as comma-separated list
+                body.alternate_greetings = alternateGreetingsValue.split(',').map(g => g.trim()).filter(g => g);
+            }
+        }
+        
+        // Metadata
+        const creator = document.getElementById('charactersCreate_creator').value;
+        if (creator) body.creator = creator;
+        
+        const creatorNotes = document.getElementById('charactersCreate_creator_notes').value;
+        if (creatorNotes) body.creator_notes = creatorNotes;
+        
+        const characterVersion = document.getElementById('charactersCreate_character_version').value;
+        if (characterVersion) body.character_version = characterVersion;
+        
+        // Handle tags - comma-separated
+        const tags = document.getElementById('charactersCreate_tags').value;
+        if (tags) {
+            body.tags = tags.split(',').map(t => t.trim()).filter(t => t);
+        }
+        
+        // Handle extensions - should be JSON object
+        const extensionsValue = document.getElementById('charactersCreate_extensions').value;
+        if (extensionsValue && extensionsValue !== '{}') {
+            try {
+                body.extensions = JSON.parse(extensionsValue);
+            } catch (e) {
+                throw new Error('Extensions must be valid JSON');
+            }
+        }
+        
+        // Handle image_base64
+        const imageBase64 = document.getElementById('charactersCreate_image_base64').value;
+        if (imageBase64) body.image_base64 = imageBase64;
         
         const response = await apiClient.makeRequest('POST', '/api/v1/characters', { body });
         responseEl.textContent = JSON.stringify(response, null, 2);
