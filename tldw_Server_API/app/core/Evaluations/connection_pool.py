@@ -54,56 +54,63 @@ class PooledConnection:
         self.checkout_time: Optional[float] = None
         self.in_use = False
         self.connection_id = id(connection)
+        self._lock = threading.RLock()  # Thread safety for shared connections
         
         # Configure connection for optimal performance
         self._configure_connection()
     
     def _configure_connection(self):
         """Configure connection with optimal settings."""
-        try:
-            # Enable WAL mode for better concurrency
-            self.connection.execute("PRAGMA journal_mode=WAL")
-            
-            # Set reasonable timeout
-            self.connection.execute("PRAGMA busy_timeout=30000")  # 30 seconds
-            
-            # Optimize for performance
-            self.connection.execute("PRAGMA synchronous=NORMAL")
-            self.connection.execute("PRAGMA temp_store=MEMORY")
-            self.connection.execute("PRAGMA mmap_size=268435456")  # 256MB
-            
-            # Enable foreign keys
-            self.connection.execute("PRAGMA foreign_keys=ON")
-            
-            self.connection.commit()
-            
-        except sqlite3.Error as e:
-            logger.warning(f"Failed to configure connection {self.connection_id}: {e}")
+        with self._lock:
+            try:
+                # Enable WAL mode for better concurrency
+                self.connection.execute("PRAGMA journal_mode=WAL")
+                
+                # Set reasonable timeout
+                self.connection.execute("PRAGMA busy_timeout=30000")  # 30 seconds
+                
+                # Optimize for performance
+                self.connection.execute("PRAGMA synchronous=NORMAL")
+                self.connection.execute("PRAGMA temp_store=MEMORY")
+                self.connection.execute("PRAGMA mmap_size=268435456")  # 256MB
+                
+                # Enable foreign keys
+                self.connection.execute("PRAGMA foreign_keys=ON")
+                
+                self.connection.commit()
+                
+            except sqlite3.Error as e:
+                logger.warning(f"Failed to configure connection {self.connection_id}: {e}")
     
     def execute(self, query: str, parameters: tuple = ()) -> sqlite3.Cursor:
         """Execute query on the connection."""
-        self.last_used = time.time()
-        return self.connection.execute(query, parameters)
+        with self._lock:
+            self.last_used = time.time()
+            return self.connection.execute(query, parameters)
     
     def executemany(self, query: str, parameters: List[tuple]) -> sqlite3.Cursor:
         """Execute query multiple times."""
-        self.last_used = time.time()
-        return self.connection.executemany(query, parameters)
+        with self._lock:
+            self.last_used = time.time()
+            return self.connection.executemany(query, parameters)
     
     def commit(self):
         """Commit transaction."""
-        self.connection.commit()
+        with self._lock:
+            self.connection.commit()
     
     def rollback(self):
         """Rollback transaction."""
-        self.connection.rollback()
+        with self._lock:
+            self.connection.rollback()
     
     def close(self):
         """Close the underlying connection."""
-        try:
-            self.connection.close()
-        except sqlite3.Error as e:
-            logger.warning(f"Error closing connection {self.connection_id}: {e}")
+        with self._lock:
+            try:
+                self.connection.close()
+            except sqlite3.Error as e:
+                logger.warning(f"Error closing connection {self.connection_id}: {e}")
     
     def is_stale(self, max_age_seconds: int = 3600) -> bool:
         """Check if connection is stale."""
@@ -196,12 +203,12 @@ class ConnectionPool:
         """Create a new database connection."""
         try:
             # Create SQLite connection
-            # Note: Removed check_same_thread=False for thread safety
-            # Each connection should only be used by the thread that created it
+            # For thread safety in a connection pool, we need to allow sharing
+            # but ensure proper synchronization at the pool level
             conn = sqlite3.connect(
                 str(self.db_path),
                 timeout=30.0,
-                check_same_thread=True  # Enforce thread safety
+                check_same_thread=False  # Allow sharing between threads
             )
             
             # Row factory for dict-like access

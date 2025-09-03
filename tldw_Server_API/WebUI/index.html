@@ -315,9 +315,13 @@
 
         <!-- Top Level Tabs -->
         <nav class="top-tab-container" role="navigation" aria-label="Main navigation">
-            <div class="top-tab-buttons" role="tablist">
+            <!-- Row 1: Core Features -->
+            <div class="top-tab-buttons top-tab-row" role="tablist">
                 <button class="top-tab-button" data-toptab="general" role="tab" aria-selected="false">
                     General
+                </button>
+                <button class="top-tab-button" data-toptab="auth" role="tab" aria-selected="false">
+                    Auth
                 </button>
                 <button class="top-tab-button" data-toptab="media" role="tab" aria-selected="false">
                     Media
@@ -337,6 +341,10 @@
                 <button class="top-tab-button" data-toptab="notes" role="tab" aria-selected="false">
                     Notes
                 </button>
+            </div>
+            
+            <!-- Row 2: Processing & Analysis -->
+            <div class="top-tab-buttons top-tab-row" role="tablist">
                 <button class="top-tab-button" data-toptab="evaluations" role="tab" aria-selected="false">
                     Evaluations
                 </button>
@@ -349,23 +357,33 @@
                 <button class="top-tab-button" data-toptab="audio" role="tab" aria-selected="false">
                     Audio
                 </button>
+                <button class="top-tab-button" data-toptab="webscraping" role="tab" aria-selected="false">
+                    Web Scraping
+                </button>
+                <button class="top-tab-button" data-toptab="llamacpp" role="tab" aria-selected="false">
+                    Llama.cpp
+                </button>
+                <button class="top-tab-button" data-toptab="mcp" role="tab" aria-selected="false">
+                    MCP
+                </button>
+            </div>
+            
+            <!-- Row 3: Administration & System -->
+            <div class="top-tab-buttons top-tab-row" role="tablist">
                 <button class="top-tab-button" data-toptab="admin" role="tab" aria-selected="false">
                     Admin
+                </button>
+                <button class="top-tab-button" data-toptab="llm" role="tab" aria-selected="false">
+                    LLM
+                </button>
+                <button class="top-tab-button" data-toptab="config" role="tab" aria-selected="false">
+                    Config
                 </button>
                 <button class="top-tab-button" data-toptab="sync" role="tab" aria-selected="false">
                     Sync
                 </button>
                 <button class="top-tab-button" data-toptab="health" role="tab" aria-selected="false">
                     Health
-                </button>
-                <button class="top-tab-button" data-toptab="mcp" role="tab" aria-selected="false">
-                    MCP
-                </button>
-                <button class="top-tab-button" data-toptab="llamacpp" role="tab" aria-selected="false">
-                    Llama.cpp
-                </button>
-                <button class="top-tab-button" data-toptab="webscraping" role="tab" aria-selected="false">
-                    Web Scraping
                 </button>
                 <button class="top-tab-button" data-toptab="maintenance" role="tab" aria-selected="false">
                     Maintenance
@@ -384,6 +402,14 @@
                 </button>
                 <button class="sub-tab-button" data-content-id="tabHistory" role="tab">
                     Request History
+                </button>
+            </div>
+        </div>
+
+        <div id="auth-subtabs" class="sub-tab-row" role="navigation" aria-label="Auth sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabAuth" data-load-group="auth" role="tab">
+                    Authentication
                 </button>
             </div>
         </div>
@@ -472,6 +498,12 @@
                 <button class="sub-tab-button" data-content-id="tabEvalsRAG" data-load-group="evaluations" role="tab">
                     RAG Evaluation
                 </button>
+                <button class="sub-tab-button" data-content-id="tabEvalsResponseQuality" data-load-group="evaluations" role="tab">
+                    Response Quality
+                </button>
+                <button class="sub-tab-button" data-content-id="tabEvalsManagement" data-load-group="evaluations" role="tab">
+                    Management
+                </button>
                 <button class="sub-tab-button" data-content-id="tabEvalsDatasets" data-load-group="evaluations" role="tab">
                     Datasets
                 </button>
@@ -515,6 +547,22 @@
                 </button>
                 <button class="sub-tab-button" data-content-id="tabAdminSystem" data-load-group="admin" role="tab">
                     System Status
+                </button>
+            </div>
+        </div>
+
+        <div id="llm-subtabs" class="sub-tab-row" role="navigation" aria-label="LLM sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabLLMProviders" data-load-group="llm_providers" role="tab">
+                    Providers
+                </button>
+            </div>
+        </div>
+
+        <div id="config-subtabs" class="sub-tab-row" role="navigation" aria-label="Config sub-navigation">
+            <div class="sub-tab-buttons" role="tablist">
+                <button class="sub-tab-button" data-content-id="tabConfigInfo" data-load-group="config_info" role="tab">
+                    Configuration Info
                 </button>
             </div>
         </div>

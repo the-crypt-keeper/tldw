@@ -25,9 +25,21 @@ from typing import Dict, Any
 
 
 class ChatbookVersion(Enum):
-    """Chatbook format versions."""
-    V1 = "1.0"
-    V2 = "2.0"  # Future version with enhanced features
+    """
+    Chatbook format versions.
+    
+    The chatbook format uses semantic versioning (MAJOR.MINOR.PATCH) to track 
+    compatibility and feature sets:
+    
+    - V1 (1.0.0): Initial stable format with basic content types and metadata
+    - V2 (2.0.0): Future version with enhanced features and extended metadata
+    
+    Note: Both "1.0" and "1.0.0" are accepted for V1 compatibility, but "1.0.0"
+    is the canonical format following semantic versioning conventions.
+    """
+    V1 = "1.0.0"  # Primary V1 format using semantic versioning
+    V1_LEGACY = "1.0"  # Legacy format for backward compatibility  
+    V2 = "2.0.0"  # Future version with enhanced features
 
 
 class ContentType(Enum):

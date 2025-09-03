@@ -6,10 +6,13 @@ import asyncio
 import base64
 import json
 import functools
+import sys
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, Callable, Dict, Optional, TypeVar
+#
+# 3rd-Party imports
 from loguru import logger
-
+#
 #######################################################################################################################
 #
 # Type definitions:
@@ -21,7 +24,11 @@ T = TypeVar('T')
 # Constants:
 
 # Process pool for CPU-intensive operations
-CPU_PROCESS_POOL = ProcessPoolExecutor(max_workers=4, max_tasks_per_child=100)
+# max_tasks_per_child is only available in Python 3.11+
+if sys.version_info >= (3, 11):
+    CPU_PROCESS_POOL = ProcessPoolExecutor(max_workers=4, max_tasks_per_child=100)
+else:
+    CPU_PROCESS_POOL = ProcessPoolExecutor(max_workers=4)
 
 # Thread pool for I/O-bound but CPU-heavy operations
 CPU_THREAD_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="cpu_worker")

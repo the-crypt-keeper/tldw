@@ -22,6 +22,7 @@ from datetime import datetime
 
 from tldw_Server_API.app.core.Evaluations.rag_evaluator import RAGEvaluator
 from tldw_Server_API.app.core.Evaluations.evaluation_manager import EvaluationManager
+from tldw_Server_API.app.core.Evaluations.unified_evaluation_service import UnifiedEvaluationService, get_unified_evaluation_service
 from tldw_Server_API.app.core.DB_Management.migrations import migrate_evaluations_database, MigrationManager
 
 
@@ -176,7 +177,7 @@ class TestEvaluationIntegration:
     async def test_embedding_fallback(self):
         """Test that evaluation falls back to LLM when embeddings unavailable."""
         # Create evaluator without embeddings
-        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_rag_embeddings_integration') as mock_create:
+        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_embedding') as mock_create:
             mock_create.side_effect = Exception("No API key")
             
             evaluator = RAGEvaluator()

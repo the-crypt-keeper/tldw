@@ -460,6 +460,58 @@ min_p = 0.05
 # https://artefact2.github.io/llm-sampling/
 
 
+[STT-Settings]
+# Speech-to-Text Settings
+default_transcriber = faster-whisper
+# Options: faster-whisper, qwen2audio, parakeet, canary, external
+nemo_model_variant = mlx
+# Options for Parakeet: standard, onnx, mlx
+nemo_device = cpu
+# Options: cpu, cuda
+nemo_cache_dir = ./models/nemo
+# Directory to cache downloaded Nemo models
+nemo_chunk_duration = 120
+# Duration in seconds for chunking long audio (0 to disable)
+nemo_overlap_duration = 15
+# Overlap between chunks in seconds for context
+
+# MLX optimal settings (for Apple Silicon)
+mlx_chunk_duration = 30.0
+mlx_overlap_duration = 5.0
+
+# Buffered transcription for long audio
+buffered_chunk_duration = 20.0
+buffered_total_buffer = 25.0
+buffered_merge_algo = lcs
+# Options: middle, lcs, tdt, overlap, simple
+
+# External transcription provider settings
+# Allows forwarding requests to external OpenAI-compatible APIs
+# Multiple providers can be configured with different names
+[external_providers]
+# Example provider configuration (uncomment and modify to use):
+# [external_providers.default]
+# base_url = https://api.example.com/v1/audio/transcriptions
+# api_key = your-api-key-here
+# model = whisper-1
+# timeout = 300
+# max_retries = 3
+# verify_ssl = true
+# response_format = json
+# temperature = 0.0
+# language = 
+# prompt = 
+
+# Additional provider example for a local server:
+# [external_providers.local]
+# base_url = http://localhost:8080/v1/audio/transcriptions
+# api_key = 
+# model = local-whisper
+# timeout = 60
+# max_retries = 2
+# verify_ssl = false
+# response_format = json
+
 [TTS-Settings]
 # General TTS Settings
 # Options: 'cpu', 'cuda'

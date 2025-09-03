@@ -3,7 +3,8 @@
 av  # For audio encoding/streaming
 faster_whisper
 kokoro_onnx
-nemo_toolkit
+nemo_toolkit[asr]
+huggingface_hub
 pyannote.audio
 pyannote.core
 pyannote.database
@@ -15,9 +16,11 @@ soundfile
 #
 # API-Server
 aiofiles
+aioresponses
 asyncpg
 aiosqlite
 apscheduler
+bleach
 cachetools
 defusedxml
 email-validator
@@ -83,6 +86,7 @@ torch
 transformers
 #
 # ONNX Conversion
+# mlx  # Optional: for Apple Silicon MLX variant of Parakeet (uncomment if on macOS)
 optimum
 #
 # Re-Ranking

@@ -28,10 +28,15 @@ except ImportError:
 class AdvancedEvaluationMetrics:
     """Advanced metrics collector for evaluation service."""
     
-    def __init__(self, registry: Optional[CollectorRegistry] = None):
+    def __init__(self, registry: Optional[CollectorRegistry] = None, use_separate_registry: bool = False):
         """Initialize advanced metrics collectors."""
         self.enabled = PROMETHEUS_AVAILABLE
-        self.registry = registry or REGISTRY
+        
+        if use_separate_registry:
+            # For testing, use a new registry to avoid conflicts
+            self.registry = CollectorRegistry() if PROMETHEUS_AVAILABLE else None
+        else:
+            self.registry = registry or (REGISTRY if PROMETHEUS_AVAILABLE else None)
         
         if not self.enabled:
             return
@@ -506,31 +511,25 @@ class AdvancedEvaluationMetrics:
 # Global instance - use singleton pattern to avoid duplicate registration
 _advanced_metrics_instance = None
 
-def get_advanced_metrics():
+def get_advanced_metrics(use_separate_registry: bool = False):
     """Get or create the global advanced metrics instance."""
     global _advanced_metrics_instance
-    if _advanced_metrics_instance is None:
+    if _advanced_metrics_instance is None or use_separate_registry:
         try:
-            _advanced_metrics_instance = AdvancedEvaluationMetrics()
+            _advanced_metrics_instance = AdvancedEvaluationMetrics(use_separate_registry=use_separate_registry)
         except ValueError as e:
             # If metrics are already registered (e.g., during reload), create without registry
             if "Duplicated timeseries" in str(e):
-                logger.warning("Metrics already registered, creating instance without new registry")
-                _advanced_metrics_instance = type('DummyMetrics', (), {
-                    'enabled': False,
-                    'track_evaluation_cost': lambda *args, **kwargs: None,
-                    'track_user_activity': lambda *args, **kwargs: None,
-                    'track_error': lambda *args, **kwargs: None,
-                    'record_slo_violation': lambda *args, **kwargs: None,
-                    'track_business_event': lambda *args, **kwargs: None,
-                    'track_webhook_delivery': lambda *args, **kwargs: None,
-                    'get_metrics_summary': lambda: {},
-                    'export_metrics': lambda format='json': {} if format == 'json' else '',
-                    'push_to_gateway': lambda *args, **kwargs: None,
-                })()
+                logger.warning("Metrics already registered, creating instance with separate registry")
+                _advanced_metrics_instance = AdvancedEvaluationMetrics(use_separate_registry=True)
             else:
                 raise
     return _advanced_metrics_instance
+
+def reset_advanced_metrics():
+    """Reset the global advanced metrics instance (for testing)."""
+    global _advanced_metrics_instance
+    _advanced_metrics_instance = None
 
 # Create the global instance
 advanced_metrics = get_advanced_metrics()

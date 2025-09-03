@@ -1,237 +1,451 @@
-Yes, this architecture is designed to support different audio generation backends. Let's clarify how the provider is specified and how to extend it, then outline the next steps.
+# TTS Module - Text-to-Speech Service
 
-**How the Provider/Backend is Specified**
+## Overview
 
-In the OpenAI TTS API and the structure we're building, the "provider" or "backend" is implicitly determined by the **`model` field** in the `OpenAISpeechRequest`.
+The TTS module provides a production-ready, extensible Text-to-Speech service with support for multiple providers, voice cloning, and OpenAI-compatible API endpoints. Built with an adapter pattern architecture, it offers seamless fallback between providers, comprehensive error handling, and enterprise-grade features.
 
-*   **`OpenAISpeechRequest.model`**: This string (e.g., `"tts-1"`, `"eleven_multilingual_v2"`, `"kokoro_local_onnx"`) is the key.
-*   **`openai_tts_mappings.json`**: This file (or a Python dictionary loaded from it) maps these public-facing `model` names to your internal *backend identifiers*.
-    ```json
-    // your_project/configs/openai_tts_mappings.json
-    {
-        "models": {
-            "tts-1": "openai_official_tts-1",  // TTSBackendBase implementation for OpenAI API
-            "eleven_monolingual_v1": "elevenlabs_english_v1", // TTSBackendBase for ElevenLabs
-            "kokoro": "local_kokoro_default_onnx" // TTSBackendBase for your local Kokoro ONNX
-        },
-        "voices": { ... }
+## Features
+
+### Core Capabilities
+- **Multi-Provider Support**: OpenAI, ElevenLabs, and 4 open-source models
+- **Voice Cloning**: Support for voice reference audio with Higgs, Chatterbox, and VibeVoice
+- **Streaming Audio**: Real-time audio streaming for all providers
+- **Format Support**: MP3, WAV, OPUS, FLAC, PCM output formats
+- **OpenAI Compatibility**: Drop-in replacement for OpenAI TTS API
+- **Fault Tolerance**: Circuit breaker pattern with automatic failover
+- **Performance Metrics**: Built-in monitoring and health checks
+- **Transcription/Translation**: OpenAI-compatible speech-to-text endpoints
+
+### Supported Providers
+
+| Provider | Type | Languages | Voice Cloning | Key Features |
+|----------|------|-----------|---------------|--------------|
+| **OpenAI** | Commercial API | 50+ | ❌ | Industry standard, HD quality |
+| **ElevenLabs** | Commercial API | 29 | ✅ (Pro) | Premium quality, emotion control |
+| **Kokoro** | Local ONNX | EN | ❌ | Lightweight, CPU-friendly, offline |
+| **Higgs** | Local PyTorch | 50+ | ✅ (3-10s) | Music generation, multi-lingual |
+| **Chatterbox** | Local PyTorch | EN | ✅ (5-20s) | Emotion exaggeration control |
+| **Dia** | Local PyTorch | EN | ❌ | Multi-speaker dialogue specialist |
+| **VibeVoice** | Local PyTorch | 12 | ✅ (Any) | Long-form (90min), spontaneous music |
+
+## Architecture
+
+### V2 Adapter Pattern
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   API       │────▶│  TTS Service │────▶│  Adapter    │
+│  Endpoint   │     │      V2      │     │  Registry   │
+└─────────────┘     └──────────────┘     └─────────────┘
+                            │                     │
+                    ┌───────▼───────┐    ┌───────▼───────┐
+                    │Circuit Breaker│    │   Provider    │
+                    │   Manager     │    │   Adapters   │
+                    └───────────────┘    └───────────────┘
+                                                 │
+                    ┌────────────────────────────┼────────────────────────────┐
+                    │                            │                            │
+              ┌─────▼─────┐            ┌────────▼────────┐           ┌───────▼───────┐
+              │  OpenAI   │            │   Local Models  │           │  Commercial   │
+              │  Adapter  │            │   (Kokoro,etc)  │           │   (ElevenLabs)│
+              └───────────┘            └─────────────────┘           └───────────────┘
+```
+
+### Key Components
+
+1. **TTSServiceV2** (`tts_service_v2.py`)
+   - Main service orchestrator
+   - Handles provider selection and fallback
+   - Integrates metrics and circuit breaker
+
+2. **Adapter Registry** (`adapter_registry.py`)
+   - Provider registration and management
+   - Capability discovery
+   - Dynamic adapter loading
+
+3. **Base Adapter** (`adapters/base.py`)
+   - Abstract interface for all providers
+   - Standard request/response formats
+   - Capability reporting
+
+4. **Provider Adapters** (`adapters/*.py`)
+   - Provider-specific implementations
+   - Handle authentication and API calls
+   - Audio generation and streaming
+
+5. **Circuit Breaker** (`circuit_breaker.py`)
+   - Fault tolerance and recovery
+   - Automatic provider failover
+   - Configurable thresholds
+
+6. **Audio Utils** (`audio_utils.py`)
+   - Voice reference processing
+   - Format conversion
+   - Audio validation
+
+## Installation
+
+### Prerequisites
+
+```bash
+# System dependencies
+apt-get install ffmpeg espeak-ng  # Ubuntu/Debian
+brew install ffmpeg espeak         # macOS
+
+# Python dependencies
+pip install -r requirements.txt
+```
+
+### Quick Start
+
+1. **Configure API Keys**
+```bash
+# In config.txt
+[API]
+openai_api_key = sk-...
+elevenlabs_api_key = xi-...
+```
+
+2. **Configure TTS Settings**
+```yaml
+# In tts_providers_config.yaml
+provider_priority:
+  - openai      # Primary provider
+  - kokoro      # Fallback to local
+  
+providers:
+  openai:
+    enabled: true
+    model: tts-1-hd
+  
+  kokoro:
+    enabled: true
+    model_path: ./models/kokoro-v0_19.onnx
+```
+
+3. **Start the Server**
+```bash
+python -m uvicorn tldw_Server_API.app.main:app --host 0.0.0.0 --port 8000
+```
+
+## API Usage
+
+### Basic Text-to-Speech
+
+```python
+import requests
+
+response = requests.post(
+    "http://localhost:8000/api/v1/audio/speech",
+    headers={"Authorization": "Bearer your-token"},
+    json={
+        "model": "tts-1",
+        "input": "Hello, world!",
+        "voice": "alloy",
+        "response_format": "mp3"
     }
-    ```
-*   **`TTSBackendManager.get_backend(backend_id)`**: This manager uses the *internal backend identifier* (e.g., `"openai_official_tts-1"`) to instantiate and return the correct `TTSBackendBase` subclass (e.g., `OpenAIAPIBackend`).
+)
 
-So, the client specifies the desired "model," and your server translates that into selecting the appropriate backend code to handle the request.
+with open("output.mp3", "wb") as f:
+    f.write(response.content)
+```
 
-**Will this continue to allow you to support different audio generation backends?**
+### Voice Cloning
 
-**Absolutely.** This is the core strength of the `TTSBackendBase` (abstract class) and `TTSBackendManager` (factory/dispatcher) pattern.
+```python
+import base64
 
-To add a new TTS backend (e.g., for "AllTalk TTS" or a new local model):
+# Prepare voice reference
+with open("voice_sample.wav", "rb") as f:
+    voice_ref = base64.b64encode(f.read()).decode()
 
-1.  **Create a new class** that inherits from `TTSBackendBase`:
-    ```python
-    # your_project/services/tts_backends.py
-    class AllTalkAPIBackend(TTSBackendBase):
-        async def initialize(self):
-            # Initialize AllTalk client or settings
-            logger.info("AllTalkAPIBackend initialized.")
-            self.alltalk_api_url = self.config.get("ALLTALK_API_URL", "http://localhost:7869/api/v1/audio/speech") # Example
+response = requests.post(
+    "http://localhost:8000/api/v1/audio/speech",
+    json={
+        "model": "higgs",  # or chatterbox, vibevoice
+        "input": "This will sound like the reference voice.",
+        "voice": "default",
+        "voice_reference": voice_ref,  # Base64 encoded audio
+        "response_format": "mp3"
+    }
+)
+```
 
-        async def generate_speech_stream(self, request: OpenAISpeechRequest) -> AsyncGenerator[bytes, None]:
-            # Adapt your existing generate_audio_alltalk logic here
-            # Use self.client (httpx.AsyncClient) to make async POST requests
-            # Stream the response bytes
-            payload = {
-                "model": request.model, # AllTalk might ignore this or use its own mapping
-                "input": request.input,
-                "voice": request.voice, # Map if needed
-                "response_format": request.response_format,
-                "speed": request.speed
-            }
-            logger.info(f"AllTalkAPIBackend: Sending request to AllTalk: {payload}")
-            try:
-                async with self.client.stream("POST", self.alltalk_api_url, json=payload) as response:
-                    response.raise_for_status()
-                    async for chunk in response.aiter_bytes():
-                        yield chunk
-            except Exception as e:
-                logger.error(f"AllTalkAPIBackend error: {e}", exc_info=True)
-                raise # Or yield an error message
-    ```
+### Streaming Audio
 
-2.  **Update `openai_tts_mappings.json`** to include a public model name for your new backend:
-    ```json
-    {
-        "models": {
-            // ... existing models ...
-            "alltalk_default": "alltalk_api_backend" // New public name and internal ID
+```python
+import httpx
+
+async with httpx.AsyncClient() as client:
+    response = await client.post(
+        "http://localhost:8000/api/v1/audio/speech",
+        json={
+            "model": "kokoro",
+            "input": "Streaming audio test.",
+            "voice": "af_bella",
+            "stream": True
         },
-        "voices": {
-            // ... existing voices ...
-            // Add voice mappings relevant to AllTalk if needed
-            "at_alloy": "alloy" // Example if AllTalk uses same voice names
+        timeout=30.0
+    )
+    
+    with open("stream.mp3", "wb") as f:
+        async for chunk in response.aiter_bytes():
+            f.write(chunk)
+```
+
+### Transcription (Speech-to-Text)
+
+```python
+# Transcribe audio file
+with open("audio.mp3", "rb") as f:
+    response = requests.post(
+        "http://localhost:8000/api/v1/audio/transcriptions",
+        headers={"Authorization": "Bearer your-token"},
+        files={"file": f},
+        data={
+            "model": "whisper-1",
+            "language": "en",
+            "response_format": "json"
         }
+    )
+    
+print(response.json()["text"])
+```
+
+## Configuration
+
+### Provider Configuration (tts_providers_config.yaml)
+
+```yaml
+# Provider priority (fallback order)
+provider_priority:
+  - openai          # Try first
+  - elevenlabs      # Try second
+  - kokoro          # Local fallback
+
+# Individual provider settings
+providers:
+  openai:
+    enabled: true
+    api_key: ${OPENAI_API_KEY}  # From environment
+    model: tts-1-hd
+    timeout: 30
+    
+  kokoro:
+    enabled: true
+    model_path: ./models/kokoro-v0_19.onnx
+    device: cpu  # or cuda
+    
+  higgs:
+    enabled: true
+    model_path: bosonai/higgs-audio-v2-generation-3B-base
+    device: cuda
+    use_fp16: true
+    
+  chatterbox:
+    enabled: true
+    model_path: resemble-ai/chatterbox
+    enable_watermark: true
+    
+  vibevoice:
+    enabled: true
+    variant: 1.5B  # or 7B
+    device: cuda
+
+# Fallback configuration
+fallback:
+  enabled: true
+  max_attempts: 3
+  retry_delay_ms: 1000
+
+# Circuit breaker settings
+circuit_breaker:
+  failure_threshold: 5
+  recovery_timeout: 60
+  half_open_calls: 3
+
+# Performance settings
+performance:
+  max_concurrent_generations: 4
+  cache_enabled: false
+```
+
+### Voice Cloning Requirements
+
+| Provider | Min Duration | Max Duration | Format | Sample Rate |
+|----------|-------------|--------------|--------|-------------|
+| Higgs | 3s | 10s | WAV/MP3/FLAC | 24kHz |
+| Chatterbox | 5s | 20s | WAV/MP3 | 24kHz+ |
+| VibeVoice | 3s | 30s | WAV/MP3 | 22.05kHz |
+
+## Monitoring
+
+### Health Check
+```bash
+curl http://localhost:8000/api/v1/audio/health
+```
+
+Response:
+```json
+{
+  "status": "healthy",
+  "providers": {
+    "total": 7,
+    "available": 3,
+    "details": {
+      "openai": "available",
+      "kokoro": "available",
+      "higgs": "not_initialized"
     }
-    ```
+  },
+  "circuit_breakers": {
+    "openai": "closed",
+    "kokoro": "closed"
+  }
+}
+```
 
-3.  **Update `TTSBackendManager.get_backend()`** to recognize the new internal backend ID and instantiate your new class:
-    ```python
-    # your_project/services/tts_backends.py
-    class TTSBackendManager:
-        async def get_backend(self, backend_id: str) -> Optional[TTSBackendBase]:
-            # ... existing if/elif ...
-            elif backend_id == "alltalk_api_backend":
-                self._backends[backend_id] = AllTalkAPIBackend(config=specific_config)
-            # ...
-    ```
+### List Providers
+```bash
+curl http://localhost:8000/api/v1/audio/providers
+```
 
-4.  **Configuration:** Add any necessary configuration for the AllTalk backend to your `APP_CONFIG` (e.g., `ALLTALK_API_URL`).
+### Metrics
+The service integrates with the application's metrics system:
+- Request counts per provider
+- Response times (p50, p95, p99)
+- Error rates by category
+- Active request gauges
+- Audio generation sizes
 
-Now, a client can request `{"model": "alltalk_default", ...}` and your server will route it to the `AllTalkAPIBackend`.
+## Troubleshooting
 
-**Extending the API to Support Additional Parameters**
+### Common Issues
 
-The `OpenAISpeechRequest` model defines the parameters compliant with the OpenAI TTS API. If your custom backends require parameters *not* present in the standard OpenAI request, you have a few options:
+| Issue | Solution |
+|-------|----------|
+| "Provider not available" | Check API keys and model files |
+| "Voice reference validation failed" | Ensure audio meets duration/format requirements |
+| "Circuit breaker open" | Provider temporarily disabled due to failures, will auto-recover |
+| "Model not found" | Download required model files (see setup guide) |
+| "Out of memory" | Reduce batch size or use smaller model variant |
 
-1.  **Backend-Specific Defaults/Configuration:**
-    *   For parameters that are fixed for a given backend instance (e.g., a specific sub-model for your local Kokoro, or a fixed quality setting for ElevenLabs), configure these in `APP_CONFIG` and pass them to the backend during its instantiation within `TTSBackendManager`. The backend can then use these fixed settings.
-    *   *Example:* Your `local_kokoro_default_onnx` backend might always use a specific set of post-processing flags.
+### Debug Mode
 
-2.  **Custom Fields in `OpenAISpeechRequest` (with care):**
-    *   You *can* add new optional fields to your `OpenAISpeechRequest` Pydantic model.
-        ```python
-        # your_project/schemas/tts_schemas.py
-        class OpenAISpeechRequest(BaseModel):
-            # ... standard fields ...
-            custom_backend_param: Optional[str] = Field(None, description="A custom parameter for specific backends.")
-            another_custom_int: Optional[int] = Field(None)
-        ```
-    *   **Pros:** Simple to implement.
-    *   **Cons:**
-        *   Deviates from the standard OpenAI API. Clients not aware of these custom fields will ignore them.
-        *   The endpoint signature becomes a mix of standard and custom, which can be confusing.
-        *   Each backend would need to check if `request.custom_backend_param` is relevant to it.
+Enable detailed logging:
+```yaml
+# In tts_providers_config.yaml
+logging:
+  level: DEBUG
+  include_metrics: true
+```
 
-3.  **Using a `model_specific_options: Optional[Dict[str, Any]]` field:**
-    *   Add a generic dictionary to `OpenAISpeechRequest`:
-        ```python
-        # your_project/schemas/tts_schemas.py
-        class OpenAISpeechRequest(BaseModel):
-            # ... standard fields ...
-            model_specific_options: Optional[Dict[str, Any]] = Field(None, description="Backend-specific options.")
-        ```
-    *   Clients can then pass a dictionary: `{"model_specific_options": {"emotion": "happy", "pitch": 1.2}}`
-    *   **Pros:** Keeps the main API clean. Flexible.
-    *   **Cons:** Less type safety for these options. Backends need to parse and validate this dictionary. Good documentation is crucial.
+### Voice Cloning Issues
 
-4.  **Separate Endpoints for Advanced Features:**
-    *   Keep `/v1/audio/speech` strictly OpenAI-compatible.
-    *   Create new endpoints like `/v1/audio/speech/custom_kokoro` or `/v1/audio/speech_advanced` that accept a different Pydantic model with all the specific parameters you need.
-    *   **Pros:** Clear separation of concerns. Standard clients use the standard endpoint. Advanced clients use the advanced one.
-    *   **Cons:** More endpoints to maintain.
+1. **Audio too short/long**: Check provider-specific duration requirements
+2. **Poor quality clone**: Ensure clean audio, single speaker, no background noise
+3. **Format not supported**: Convert to WAV 24kHz mono
+4. **Memory error**: Voice cloning requires more VRAM, try CPU mode
 
-**Recommendation for Additional Parameters:**
+## Development
 
-*   Start with **Option 1 (Backend-Specific Defaults/Configuration)** for settings that don't need to be client-configurable per request.
-*   If client-configurable custom parameters are needed, **Option 3 (`model_specific_options`)** is generally a good balance for extending an OpenAI-compatible endpoint. Your backends would then look into `request.model_specific_options` if it's provided.
-*   If you have vastly different parameter sets for certain backends, **Option 4 (Separate Endpoints)** might be cleaner in the long run.
+### Adding a New Provider
 
-You **do not need a separate field to specify the provider**. The `model` field serves this purpose via the mapping.
+1. Create adapter class in `adapters/`
+```python
+class MyProviderAdapter(TTSAdapter):
+    async def initialize(self) -> bool:
+        # Load models/setup API
+        
+    async def generate(self, request: TTSRequest) -> TTSResponse:
+        # Generate audio
+        
+    async def get_capabilities(self) -> TTSCapabilities:
+        # Return provider capabilities
+```
+
+2. Register in `adapter_registry.py`
+```python
+TTSProvider.MY_PROVIDER = "my_provider"
+DEFAULT_ADAPTERS[TTSProvider.MY_PROVIDER] = MyProviderAdapter
+```
+
+3. Add configuration to YAML
+```yaml
+providers:
+  my_provider:
+    enabled: true
+    # provider-specific settings
+```
+
+### Testing
+
+```bash
+# Run TTS tests
+pytest tests/TTS/ -v
+
+# Test specific provider
+pytest tests/TTS/test_adapters.py::test_openai_adapter -v
+
+# Test with coverage
+pytest tests/TTS/ --cov=tldw_Server_API.app.core.TTS
+```
+
+## Security Considerations
+
+### Voice Cloning Ethics
+- Only clone voices with explicit consent
+- Add watermarking when available (Chatterbox)
+- Implement usage logging for audit trails
+- Consider rate limiting voice cloning requests
+
+### API Security
+- Always use authentication in production
+- Validate and sanitize all inputs
+- Limit file upload sizes
+- Use HTTPS for API endpoints
+- Rotate API keys regularly
+
+## Performance Optimization
+
+### For API Providers
+- Use connection pooling
+- Implement response caching
+- Batch requests when possible
+
+### For Local Models
+- Use GPU acceleration (CUDA)
+- Enable mixed precision (FP16/BF16)
+- Pre-load models at startup
+- Use ONNX runtime for CPU inference
+
+### Voice Cloning
+- Cache processed voice references
+- Limit reference audio duration
+- Use efficient audio formats (WAV)
+- Consider CPU/GPU memory limits
+
+## License
+
+The TTS module follows the main project's dual license:
+- AGPL-3.0 for open source use
+- Commercial license available
+
+Individual model licenses:
+- Kokoro: Apache 2.0
+- Higgs: Custom research license
+- Chatterbox: MIT
+- VibeVoice: Microsoft research license
+
+## Support
+
+For issues or questions:
+1. Check the [troubleshooting guide](#troubleshooting)
+2. Review [API documentation](http://localhost:8000/docs)
+3. Check logs in `logs/tldw_server.log`
+4. Report issues with full error messages
 
 ---
 
-**Next Steps in Implementation (Focusing on `LocalKokoroBackend`)**
-
-Assuming you have the basic router, dummy service, and `OpenAIAPIBackend` somewhat working:
-
-1.  **Refine `LocalKokoroBackend.initialize()`:**
-    *   Ensure your Kokoro ONNX model (`.onnx`) and `voices.json` (if using ONNX) are downloaded or correctly pointed to by your `APP_CONFIG`.
-    *   Ensure your Kokoro PyTorch model (`.pth`) and voice pack files (`.pt`) are correctly located if using PyTorch.
-    *   Verify that `eSpeak NG` is installed and `PHONEMIZER_ESPEAK_LIBRARY` / `PHONEMIZER_ESPEAK_PATH` are set correctly in the environment where your FastAPI app runs (e.g., in your Dockerfile or system environment).
-    *   Successfully instantiate `kokoro_onnx.Kokoro` or load your PyTorch `MODEL` and `tokenizer`.
-
-2.  **Implement Audio Encoding in `LocalKokoroBackend.generate_speech_stream()`:**
-    *   This is the most critical part for local models. The goal is to take the raw audio (NumPy arrays) produced by Kokoro (ONNX or PyTorch) and convert it *in a streaming fashion* to the `request.response_format`.
-    *   **Strong Recommendation:** Integrate the `StreamingAudioWriter` and `AudioService` (or simplified versions) from the "target app" you provided.
-        *   Copy `streaming_audio_writer.py` into your project (e.g., `your_project/services/audio_utils/streaming_audio_writer.py`). You'll need `pyav` (`pip install av`).
-        *   Copy/adapt `audio.py` (for `AudioNormalizer` and a wrapper like `AudioService.convert_audio`) into `your_project/services/audio_utils/audio_service.py`.
-        *   In `LocalKokoroBackend`:
-            ```python
-            # your_project/services/tts_backends.py
-            # At the top of LocalKokoroBackend
-            from your_project.services.audio_utils.streaming_audio_writer import StreamingAudioWriter
-            from your_project.services.audio_utils.audio_service import AudioNormalizer # and potentially a simplified AudioService wrapper
-
-            # Inside _generate_with_kokoro_onnx (or _pytorch)
-            async def _generate_with_kokoro_onnx(self, request: OpenAISpeechRequest) -> AsyncGenerator[bytes, None]:
-                if not self.kokoro_instance: # ... error handling ...
-                    yield b"ERROR..."
-                    return
-
-                # Kokoro ONNX outputs 24kHz, 1 channel float32 typically
-                saw = StreamingAudioWriter(format=request.response_format, sample_rate=24000, channels=1)
-                normalizer = AudioNormalizer() # From target app's audio.py
-
-                try:
-                    lang = 'en-us' # ... determine lang from request.voice ...
-                    async for samples_chunk_np, sr_chunk in self.kokoro_instance.create_stream(
-                        request.input, voice=request.voice, speed=request.speed, lang=lang
-                    ):
-                        if samples_chunk_np is not None and len(samples_chunk_np) > 0:
-                            # Normalize (from target app: converts to int16 and scales)
-                            normalized_chunk_int16 = normalizer.normalize(samples_chunk_np)
-
-                            # The target app's AudioService.trim_audio also happens here if desired.
-                            # For now, let's just encode.
-
-                            encoded_bytes = saw.write_chunk(normalized_chunk_int16)
-                            if encoded_bytes:
-                                yield encoded_bytes
-                        else:
-                            logger.debug("Kokoro ONNX yielded an empty audio chunk.")
-
-                    # Finalize the stream
-                    final_encoded_bytes = saw.write_chunk(finalize=True)
-                    if final_encoded_bytes:
-                        yield final_encoded_bytes
-                except Exception as e:
-                    logger.error(f"Error in Kokoro ONNX streaming/encoding: {e}", exc_info=True)
-                    raise # Or yield an error byte string
-                finally:
-                    saw.close() # Important to release resources from pyav
-            ```
-
-3.  **Text Processing for Kokoro:**
-    *   Kokoro (both PyTorch and the `kokoro_onnx` library using Espeak) generally expects raw text and handles its own phonemization.
-    *   The "target app" has a very advanced `smart_split` in `services/text_processing/text_processor.py` that does normalization, then phonemization, then tokenization *before* sending to its `KokoroV1` backend (which seems to expect pre-phonemized tokens for some internal methods, or text for its `KPipeline`).
-    *   **Decision for your `LocalKokoroBackend`:**
-        *   **Option A (Simpler):** Let your `kokoro_onnx.Kokoro` instance or your PyTorch `generate` function handle the full text-to-phoneme pipeline internally. You just pass `request.input` to it. This is how your `TTS_Providers_Local.py` seems to work.
-        *   **Option B (Advanced, like target app):** If you want finer control or the exact same text preprocessing as the target app, you'd integrate its `smart_split` and related text processing modules. Your `LocalKokoroBackend` would then need to be adapted to consume the output of `smart_split` (which can be phoneme tokens or just text chunks). This is more complex.
-        *   **Recommendation:** Start with **Option A**. If you face issues with how Kokoro handles certain text, then consider adopting parts of the target app's text processing.
-
-4.  **Voice Mapping for `LocalKokoroBackend`:**
-    *   In `openai_tts_mappings.json`, you have `"k_bella": "af_bella"`.
-    *   Your `LocalKokoroBackend`'s `generate_speech_stream` method receives `request.voice` (which would be `"k_bella"`). It needs to map this to the actual voice name/ID that your `kokoro_onnx.Kokoro` or PyTorch `VOICEPACK` expects (e.g., `"af_bella"`).
-        ```python
-        # Inside LocalKokoroBackend.generate_speech_stream (or _generate_with_kokoro_onnx)
-        kokoro_voice_name = _openai_mappings["voices"].get(request.voice, request.voice) # Use the global mapping
-        # Then use kokoro_voice_name with self.kokoro_instance.create_stream(...)
-        ```
-
-5.  **Test `LocalKokoroBackend` Thoroughly:**
-    *   Test with different `response_format` values (MP3, WAV, Opus).
-    *   Test streaming vs. non-streaming (`request.stream`).
-    *   Test different voices mapped in your `openai_tts_mappings.json`.
-
-6.  **Implement Other Backends:**
-    *   Once `LocalKokoroBackend` and `OpenAIAPIBackend` are solid, add `ElevenLabsBackend`, `AllTalkAPIBackend`, etc., following the same pattern.
-    *   For each, focus on how to adapt your existing procedural code from `TTS_Providers.py` into the `async generate_speech_stream` method, ensuring it yields bytes. Use `httpx.AsyncClient` for API calls.
-
-7.  **Lifespan Management:**
-    *   Ensure the `lifespan` function in your main app correctly calls `await get_tts_service(app_config=APP_CONFIG)` on startup to pre-initialize the manager and potentially some default backends.
-    *   Ensure `await close_tts_resources()` is called on shutdown.
-
-8.  **Configuration (`APP_CONFIG`):**
-    *   Make sure all necessary API keys, model paths, and backend-specific settings are loaded correctly into `APP_CONFIG` from environment variables or a config file.
-    *   The `TTSBackendManager` should correctly pass relevant parts of `APP_CONFIG` to each backend instance.
-
-By following these steps, you'll progressively build out a robust, extensible, OpenAI-compatible TTS server. The most challenging part will likely be adapting your existing local model generation (especially Kokoro) to integrate smoothly with the streaming audio encoding. The target app's `StreamingAudioWriter` is a key component to borrow for that.
+*Last Updated: 2025-08-31*
+*Version: 2.0.0*

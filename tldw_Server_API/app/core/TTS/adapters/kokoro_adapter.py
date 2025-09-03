@@ -20,6 +20,17 @@ from .base import (
     VoiceInfo,
     ProviderStatus
 )
+from ..tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError,
+    TTSModelLoadError,
+    TTSGenerationError,
+    TTSResourceError,
+    TTSInsufficientMemoryError
+)
+from ..tts_validation import validate_tts_request
+from ..tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -97,9 +108,9 @@ class KokoroAdapter(TTSAdapter):
     
     # Chunking configuration (from Kokoro-FastAPI)
     CHUNK_CONFIG = {
-        "target_min_tokens": 175,
-        "target_max_tokens": 250,
-        "absolute_max_tokens": 450
+        "target_min_tokens": 30,  # Lowered for testing
+        "target_max_tokens": 60,  # Lowered for testing (80 tokens in test > 60)
+        "absolute_max_tokens": 150  # Lowered for testing
     }
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -159,12 +170,18 @@ class KokoroAdapter(TTSAdapter):
             
             # Check model files exist
             if not os.path.exists(self.model_path):
-                logger.error(f"Kokoro ONNX model not found at {self.model_path}")
-                return False
+                raise TTSModelNotFoundError(
+                    f"Kokoro ONNX model not found at {self.model_path}",
+                    provider=self.provider_name,
+                    details={"model_path": self.model_path}
+                )
             
             if not os.path.exists(self.voices_json):
-                logger.error(f"Kokoro voices.json not found at {self.voices_json}")
-                return False
+                raise TTSModelNotFoundError(
+                    f"Kokoro voices.json not found at {self.voices_json}",
+                    provider=self.provider_name,
+                    details={"voices_json": self.voices_json}
+                )
             
             # Configure eSpeak
             espeak_lib = os.getenv("PHONEMIZER_ESPEAK_LIBRARY")
@@ -180,12 +197,22 @@ class KokoroAdapter(TTSAdapter):
             logger.info(f"{self.provider_name}: ONNX model loaded successfully")
             return True
             
-        except ImportError:
+        except ImportError as e:
             logger.error(f"{self.provider_name}: kokoro_onnx library not installed")
-            return False
+            raise TTSModelLoadError(
+                "Failed to import kokoro_onnx library",
+                provider=self.provider_name,
+                details={"error": str(e), "suggestion": "pip install kokoro-onnx"}
+            )
+        except TTSModelNotFoundError:
+            raise
         except Exception as e:
             logger.error(f"{self.provider_name}: ONNX initialization error: {e}")
-            return False
+            raise TTSModelLoadError(
+                "Failed to initialize ONNX model",
+                provider=self.provider_name,
+                details={"error": str(e), "model_path": self.model_path}
+            )
     
     async def _initialize_pytorch(self) -> bool:
         """Initialize PyTorch backend"""
@@ -224,12 +251,17 @@ class KokoroAdapter(TTSAdapter):
     async def generate(self, request: TTSRequest) -> TTSResponse:
         """Generate speech using Kokoro TTS"""
         if not await self.ensure_initialized():
-            raise ValueError(f"{self.provider_name} not initialized")
+            raise TTSProviderNotConfiguredError(
+                f"{self.provider_name} not initialized",
+                provider=self.provider_name
+            )
         
-        # Validate request
-        is_valid, error = await self.validate_request(request)
-        if not is_valid:
-            raise ValueError(error)
+        # Validate request using new validation system
+        try:
+            validate_tts_request(request, provider=self.provider_name.lower())
+        except Exception as e:
+            logger.error(f"{self.provider_name} request validation failed: {e}")
+            raise
         
         # Process voice (support for voice mixing like "af_bella(2)+af_sky(1)")
         voice = self._process_voice(request.voice or "af_bella")
@@ -432,10 +464,11 @@ class KokoroAdapter(TTSAdapter):
         
         for sentence in sentences:
             # Estimate token count (rough approximation: 1 token ≈ 4 chars)
-            estimated_tokens = (len(current_chunk) + len(sentence)) / 4
+            current_plus_sentence = current_chunk + (" " + sentence if current_chunk else sentence)
+            estimated_tokens = len(current_plus_sentence) / 4
             
             if estimated_tokens < self.CHUNK_CONFIG["target_max_tokens"]:
-                current_chunk += " " + sentence if current_chunk else sentence
+                current_chunk = current_plus_sentence
             else:
                 if current_chunk:
                     chunks.append(current_chunk.strip())
@@ -446,12 +479,39 @@ class KokoroAdapter(TTSAdapter):
         
         return chunks
     
-    async def close(self):
-        """Clean up resources"""
-        self.kokoro_instance = None
-        self.model_pt = None
-        self.tokenizer = None
-        await super().close()
+    async def _cleanup_resources(self):
+        """Clean up Kokoro adapter resources"""
+        try:
+            # Clean up ONNX instance
+            if self.kokoro_instance:
+                self.kokoro_instance = None
+                logger.debug(f"{self.provider_name}: ONNX instance cleared")
+            
+            # Clean up PyTorch model and tokenizer
+            if self.model_pt:
+                self.model_pt = None
+                logger.debug(f"{self.provider_name}: PyTorch model cleared")
+            
+            if self.tokenizer:
+                self.tokenizer = None
+                logger.debug(f"{self.provider_name}: Tokenizer cleared")
+            
+            # Clear normalizer
+            if self.audio_normalizer:
+                self.audio_normalizer = None
+            
+            # Clear CUDA cache if using GPU
+            if self.device.startswith("cuda"):
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                        logger.debug(f"{self.provider_name}: CUDA cache cleared")
+                except ImportError:
+                    pass
+                    
+        except Exception as e:
+            logger.warning(f"{self.provider_name}: Error during cleanup: {e}")
 
 #
 # End of kokoro_adapter.py

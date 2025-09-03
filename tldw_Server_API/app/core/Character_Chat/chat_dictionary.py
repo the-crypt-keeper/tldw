@@ -31,7 +31,7 @@ import random
 import re
 import warnings
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union, Any, Tuple, Set
+from typing import Dict, List, Optional, Union, Any, Set, Tuple
 from pathlib import Path
 
 from loguru import logger
@@ -135,17 +135,10 @@ class ChatDictionaryEntry:
         if self.is_regex:
             try:
                 if not pattern_to_compile:
-                    logger.warning(f"Empty regex pattern from key '{self.raw_key}'. Treating as literal.")
-                    self.is_regex = False
-                    return self.raw_key
+                    raise ValueError(f"Empty regex pattern from key '{self.raw_key}'")
                 return re.compile(pattern_to_compile, self.key_flags)
             except re.error as e:
-                logger.warning(
-                    f"Invalid regex '{pattern_to_compile}' (from key '{self.raw_key}'): {e}. "
-                    f"Treating as literal string."
-                )
-                self.is_regex = False
-                return self.raw_key
+                raise ValueError(f"Invalid regex pattern '{pattern_to_compile}' (from key '{self.raw_key}'): {e}")
         else:
             return key_str
     
@@ -554,8 +547,12 @@ class ChatDictionaryService:
             if not 0 <= probability <= 100:
                 raise InputError("Probability must be between 0 and 100")
             
-            # Compile pattern to check validity
-            entry = ChatDictionaryEntry(key, content, probability, group, timed_effects, max_replacements)
+            # Compile pattern to check validity - this will raise ValueError if invalid regex
+            try:
+                entry = ChatDictionaryEntry(key, content, probability, group, timed_effects, max_replacements)
+            except ValueError as e:
+                # Re-raise ValueError for invalid regex patterns
+                raise
             
             timed_effects_json = json.dumps(timed_effects or {"sticky": 0, "cooldown": 0, "delay": 0})
             
@@ -575,6 +572,9 @@ class ChatDictionaryService:
                 self._invalidate_cache()
                 return entry_id
                 
+        except ValueError:
+            # Re-raise ValueError as is (for invalid regex)
+            raise
         except Exception as e:
             logger.error(f"Error adding dictionary entry: {e}")
             raise CharactersRAGDBError(f"Error adding dictionary entry: {e}")
@@ -758,7 +758,7 @@ class ChatDictionaryService:
         group: Optional[str] = None,
         max_iterations: int = 5,
         token_budget: Optional[int] = None
-    ) -> Tuple[str, Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
         Process text through dictionary replacements.
         
@@ -770,13 +770,18 @@ class ChatDictionaryService:
             token_budget: Optional token limit
             
         Returns:
-            Tuple of (processed text, statistics dictionary)
+            Dictionary with processed_text and statistics
         """
         # Get applicable entries
         entries = self.get_entries(dictionary_id, group, active_only=True)
         
         if not entries:
-            return text, {"replacements": 0, "iterations": 0, "entries_used": []}
+            return {
+                "processed_text": text,
+                "replacements": 0,
+                "iterations": 0,
+                "entries_used": []
+            }
         
         stats = {
             "replacements": 0,
@@ -808,7 +813,10 @@ class ChatDictionaryService:
                                 TokenBudgetExceededWarning
                             )
                             stats["token_budget_exceeded"] = True
-                            return text, stats
+                            return {
+                                "processed_text": text,
+                                **stats
+                            }
             
             stats["iterations"] += 1
             
@@ -816,7 +824,10 @@ class ChatDictionaryService:
             if iteration_replacements == 0:
                 break
         
-        return text, stats
+        return {
+            "processed_text": text,
+            **stats
+        }
     
     def import_from_markdown(self, file_path: Union[str, Path], dictionary_name: str) -> int:
         """

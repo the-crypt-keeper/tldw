@@ -292,7 +292,8 @@ class WebhookSecurityValidator:
             hostname_lower = hostname.lower()
             for pattern in localhost_patterns:
                 if hostname_lower.startswith(pattern):
-                    if self.security_level == WebhookSecurityLevel.STRICT:
+                    # Block private networks at STANDARD and STRICT levels for security
+                    if self.security_level in [WebhookSecurityLevel.STANDARD, WebhookSecurityLevel.STRICT]:
                         errors.append(WebhookValidationError(
                             code="PRIVATE_NETWORK",
                             message=f"Private network addresses are not allowed: {hostname}",
@@ -322,7 +323,8 @@ class WebhookSecurityValidator:
                         # Check if IP is in private networks
                         for network in self.private_networks:
                             if ip_addr in network:
-                                if self.security_level == WebhookSecurityLevel.STRICT:
+                                # Block private networks at STANDARD and STRICT levels for security
+                                if self.security_level in [WebhookSecurityLevel.STANDARD, WebhookSecurityLevel.STRICT]:
                                     errors.append(WebhookValidationError(
                                         code="PRIVATE_IP",
                                         message=f"Hostname resolves to private IP: {ip_str}",
@@ -478,19 +480,131 @@ class WebhookSecurityValidator:
             # Test connectivity with a simple HEAD request
             timeout = aiohttp.ClientTimeout(total=10)
             
-            async with aiohttp.ClientSession(timeout=timeout) as session:
+            # Custom connector to prevent SSRF attacks
+            connector = aiohttp.TCPConnector(
+                ssl=ssl_context,
+                force_close=True,
+                enable_cleanup_closed=True
+            )
+            
+            async with aiohttp.ClientSession(
+                timeout=timeout,
+                connector=connector,
+                trust_env=False  # Disable automatic proxy detection
+            ) as session:
                 start_time = asyncio.get_event_loop().time()
                 
                 try:
+                    # Validate hostname and port before making request
+                    # Resolve the hostname once and use the IP directly to prevent DNS rebinding
+                    safe_ip = None
+                    try:
+                        ip_addr = ipaddress.ip_address(hostname)
+                        # Check if IP is in private networks
+                        for network in self.private_networks:
+                            if ip_addr in network:
+                                result["error"] = f"Private network address not allowed: {hostname}"
+                                return result
+                        safe_ip = str(ip_addr)
+                    except ValueError:
+                        # Not a direct IP, resolve it
+                        try:
+                            import socket
+                            ip_addresses = socket.getaddrinfo(hostname, port, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                            if not ip_addresses:
+                                result["error"] = "Failed to resolve hostname"
+                                return result
+                            
+                            # Check all resolved IPs
+                            safe_ips = []
+                            for addr_info in ip_addresses:
+                                ip_str = addr_info[4][0]
+                                try:
+                                    ip_addr = ipaddress.ip_address(ip_str)
+                                    # Check against private networks
+                                    is_private = False
+                                    for network in self.private_networks:
+                                        if ip_addr in network:
+                                            is_private = True
+                                            break
+                                    
+                                    if is_private:
+                                        result["error"] = f"Hostname resolves to private IP: {ip_str}"
+                                        return result
+                                    
+                                    safe_ips.append(ip_str)
+                                except ValueError:
+                                    continue
+                            
+                            if not safe_ips:
+                                result["error"] = "No valid IPs found for hostname"
+                                return result
+                            
+                            # Use the first safe IP
+                            safe_ip = safe_ips[0]
+                            
+                        except socket.gaierror as e:
+                            result["error"] = f"DNS resolution failed: {str(e)}"
+                            return result
+                    
+                    # Reconstruct URL with the resolved IP to prevent DNS rebinding
+                    from urllib.parse import urlparse, urlunparse
+                    parsed = urlparse(url)
+                    
+                    # Build new URL with IP address instead of hostname
+                    if parsed.port:
+                        netloc = f"[{safe_ip}]:{parsed.port}" if ":" in safe_ip else f"{safe_ip}:{parsed.port}"
+                    else:
+                        netloc = f"[{safe_ip}]" if ":" in safe_ip else safe_ip
+                    
+                    # Create the URL with IP
+                    ip_url = urlunparse((
+                        parsed.scheme,
+                        netloc,
+                        parsed.path,
+                        parsed.params,
+                        parsed.query,
+                        parsed.fragment
+                    ))
+                    
+                    # Set Host header to original hostname for virtual hosting
+                    headers = {'Host': hostname}
+                    
                     async with session.head(
-                        url,
+                        ip_url,  # Use IP-based URL to prevent DNS rebinding
                         ssl=ssl_context,
-                        allow_redirects=True
+                        headers=headers,
+                        allow_redirects=False,  # Disable automatic redirects to prevent SSRF
+                        max_redirects=0,  # Additional protection against redirects
+                        trace_request_ctx={'original_url': url}  # Keep track of original URL
                     ) as response:
                         end_time = asyncio.get_event_loop().time()
                         result["response_time_ms"] = int((end_time - start_time) * 1000)
                         result["reachable"] = True
                         result["status_code"] = response.status
+                        
+                        # Check for redirect attempts
+                        if response.status in [301, 302, 303, 307, 308]:
+                            redirect_location = response.headers.get('Location', '')
+                            if redirect_location:
+                                # Parse and validate redirect location
+                                try:
+                                    redirect_parsed = urlparse(redirect_location)
+                                    if redirect_parsed.hostname:
+                                        # Validate redirect hostname
+                                        try:
+                                            redirect_ip = socket.getaddrinfo(redirect_parsed.hostname, None)[0][4][0]
+                                            redirect_addr = ipaddress.ip_address(redirect_ip)
+                                            for network in self.private_networks:
+                                                if redirect_addr in network:
+                                                    result["error"] = f"Redirect to private network blocked: {redirect_location}"
+                                                    result["reachable"] = False
+                                                    return result
+                                        except (socket.gaierror, ValueError):
+                                            pass
+                                    result["redirect_location"] = redirect_location[:200]  # Truncate for safety
+                                except Exception:
+                                    pass
                         
                         # Check SSL if HTTPS
                         if url.startswith("https://"):
@@ -553,9 +667,9 @@ class WebhookSecurityValidator:
 class WebhookPermissionManager:
     """Manages webhook permissions and ownership."""
     
-    def __init__(self, db_path: str):
-        """Initialize permission manager."""
-        self.db_path = db_path
+    def __init__(self, db_adapter):
+        """Initialize permission manager with database adapter."""
+        self.db_adapter = db_adapter
     
     async def check_webhook_permissions(
         self,
@@ -577,7 +691,7 @@ class WebhookPermissionManager:
             Tuple of (has_permission, error_message)
         """
         try:
-            with __import__('sqlite3').connect(self.db_path) as conn:
+            with self.db_adapter.transaction():
                 if webhook_id:
                     # Check by webhook ID
                     cursor = conn.execute("""
@@ -607,25 +721,26 @@ class WebhookPermissionManager:
                         return False, "Access denied: not webhook owner"
                 
                 elif url:
-                    # Check by URL
-                    cursor = conn.execute("""
-                        SELECT user_id FROM webhook_registrations
-                        WHERE user_id = ? AND url = ? AND active = 1
-                    """, (user_id, url))
-                    
-                    if not cursor.fetchone():
-                        return False, "Webhook not found or access denied"
+                    # Check by URL - only check ownership for non-register actions
+                    if action != "register":
+                        row = self.db_adapter.fetch_one("""
+                            SELECT user_id FROM webhook_registrations
+                            WHERE user_id = ? AND url = ? AND active = 1
+                        """, (user_id, url))
+                        
+                        if not row:
+                            return False, "Webhook not found or access denied"
                 
                 # Check rate limits for registration actions
                 if action == "register":
-                    user_webhook_count = self._get_user_webhook_count(user_id, conn)
+                    user_webhook_count = self._get_user_webhook_count(user_id)
                     max_webhooks = get_config("webhooks.registration_limits.per_user_max", 10)
                     
                     if user_webhook_count >= max_webhooks:
                         return False, f"Maximum webhook limit reached ({max_webhooks})"
                     
                     if url:
-                        url_registration_count = self._get_url_registration_count(url, conn)
+                        url_registration_count = self._get_url_registration_count(url)
                         max_per_url = get_config("webhooks.registration_limits.per_url_max", 1)
                         
                         if url_registration_count >= max_per_url:
@@ -637,21 +752,21 @@ class WebhookPermissionManager:
             logger.error(f"Permission check failed: {e}")
             return False, f"Permission check failed: {str(e)}"
     
-    def _get_user_webhook_count(self, user_id: str, conn) -> int:
+    def _get_user_webhook_count(self, user_id: str) -> int:
         """Get number of active webhooks for user."""
-        cursor = conn.execute("""
+        count = self.db_adapter.fetch_value("""
             SELECT COUNT(*) FROM webhook_registrations
             WHERE user_id = ? AND active = 1
         """, (user_id,))
-        return cursor.fetchone()[0]
+        return count or 0
     
-    def _get_url_registration_count(self, url: str, conn) -> int:
+    def _get_url_registration_count(self, url: str) -> int:
         """Get number of active registrations for URL."""
-        cursor = conn.execute("""
+        count = self.db_adapter.fetch_value("""
             SELECT COUNT(*) FROM webhook_registrations
             WHERE url = ? AND active = 1
         """, (url,))
-        return cursor.fetchone()[0]
+        return count or 0
 
 
 # Global instances

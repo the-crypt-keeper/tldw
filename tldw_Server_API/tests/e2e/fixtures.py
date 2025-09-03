@@ -487,6 +487,21 @@ class APIClient:
         response.raise_for_status()
         return response.json()
     
+    def get_auth_headers(self) -> Dict[str, str]:
+        """Get current authentication headers."""
+        headers = {}
+        if "X-API-KEY" in self.client.headers:
+            headers["X-API-KEY"] = self.client.headers["X-API-KEY"]
+        if "Token" in self.client.headers:
+            headers["Token"] = self.client.headers["Token"]
+        if "Authorization" in self.client.headers:
+            headers["Authorization"] = self.client.headers["Authorization"]
+        return headers
+    
+    def get_api_key(self) -> Optional[str]:
+        """Get the current API key if set."""
+        return self.client.headers.get("X-API-KEY") or self.token
+    
     def close(self):
         """Close the client connection."""
         self.client.close()
@@ -543,17 +558,21 @@ def api_client():
     # Check if single-user mode and set token
     try:
         if health_info.get("auth_mode") == "single_user":
-            # Single-user mode uses the default API key or from environment
-            # Try to get the actual API key from settings
-            try:
-                from tldw_Server_API.app.core.AuthNZ.settings import get_settings
-                settings = get_settings()
-                api_key = settings.SINGLE_USER_API_KEY
-            except:
-                api_key = os.getenv("SINGLE_USER_API_KEY", "test-api-key-12345")
+            # In test mode, get API key from health endpoint
+            if health_info.get("test_api_key"):
+                api_key = health_info.get("test_api_key")
+                print(f"Using test API key from health endpoint: {api_key[:8]}...")
+            else:
+                # Fallback to environment variable or settings
+                try:
+                    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+                    settings = get_settings()
+                    api_key = settings.SINGLE_USER_API_KEY
+                except:
+                    api_key = os.getenv("SINGLE_USER_API_KEY", "test-api-key-12345")
             client.set_auth_token(api_key)
-    except:
-        pass
+    except Exception as e:
+        print(f"Warning: Failed to set API key: {e}")
     yield client
     client.close()
 
@@ -576,18 +595,22 @@ def authenticated_client(api_client, test_user_credentials):
     try:
         health = api_client.health_check()
         if health.get("auth_mode") == "single_user":
-            # Single-user mode uses the default API key or from environment
-            # Try to get the actual API key from settings
-            try:
-                from tldw_Server_API.app.core.AuthNZ.settings import get_settings
-                settings = get_settings()
-                api_key = settings.SINGLE_USER_API_KEY
-            except:
-                api_key = os.getenv("SINGLE_USER_API_KEY", "test-api-key-12345")
+            # In test mode, get API key from health endpoint
+            if health.get("test_api_key"):
+                api_key = health.get("test_api_key")
+                print(f"Authenticated client using test API key: {api_key[:8]}...")
+            else:
+                # Fallback to environment variable or settings
+                try:
+                    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
+                    settings = get_settings()
+                    api_key = settings.SINGLE_USER_API_KEY
+                except:
+                    api_key = os.getenv("SINGLE_USER_API_KEY", "test-api-key-12345")
             api_client.set_auth_token(api_key)
             return api_client
-    except:
-        pass
+    except Exception as e:
+        print(f"Warning in authenticated_client: {e}")
     
     # Multi-user mode - try to register and login
     try:

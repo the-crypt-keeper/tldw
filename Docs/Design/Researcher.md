@@ -137,6 +137,9 @@ https://github.com/tegridydev/abstract-agent
 https://github.com/atineiatte/deep-research-at-home
 https://github.com/zjunlp/OmniThink
 https://searchthearxiv.com/
+https://github.com/PouriaRouzrokh/LatteReview
+https://github.com/dmotz/trystero
+https://github.com/netdur/ragnrock
 https://github.com/neuml/annotateai
 https://github.com/Arindam200/awesome-ai-apps/tree/main/advance_ai_agents/conference_talk_abstract_generator
 https://arxiv.org/pdf/2507.16075

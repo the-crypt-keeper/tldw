@@ -4,6 +4,7 @@
 # Imports
 import secrets
 import hashlib
+import hmac
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from enum import Enum
@@ -191,14 +192,34 @@ class APIKeyManager:
         random_part = secrets.token_urlsafe(self.key_length)
         full_key = f"{self.key_prefix}{random_part}"
         
-        # Hash for storage
-        key_hash = hashlib.sha256(full_key.encode()).hexdigest()
+        # Create HMAC hash for storage (more secure than plain SHA256)
+        # Use a consistent HMAC key derived from settings
+        hmac_key = self.settings.JWT_SECRET_KEY[:32].encode() if len(self.settings.JWT_SECRET_KEY) >= 32 else self.settings.JWT_SECRET_KEY.encode()
+        key_hash = hmac.new(hmac_key, full_key.encode(), hashlib.sha256).hexdigest()
         
         return full_key, key_hash
     
     def hash_api_key(self, api_key: str) -> str:
-        """Hash an API key for comparison"""
-        return hashlib.sha256(api_key.encode()).hexdigest()
+        """
+        Hash an API key for comparison using HMAC-SHA256.
+        
+        This provides better security than plain SHA256 by using a secret key,
+        preventing length extension attacks.
+        
+        Note: We use HMAC-SHA256 instead of Argon2 because:
+        - API keys are already high-entropy (cryptographically random)
+        - This hash is used for fast lookups on every API request
+        - Argon2 would add unnecessary latency (100-1000x slower)
+        
+        Args:
+            api_key: The API key to hash
+            
+        Returns:
+            HMAC-SHA256 hash of the API key
+        """
+        # Use a consistent HMAC key derived from settings
+        hmac_key = self.settings.JWT_SECRET_KEY[:32].encode() if len(self.settings.JWT_SECRET_KEY) >= 32 else self.settings.JWT_SECRET_KEY.encode()
+        return hmac.new(hmac_key, api_key.encode(), hashlib.sha256).hexdigest()
     
     async def create_api_key(
         self,

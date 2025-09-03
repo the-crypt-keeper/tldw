@@ -1,5 +1,20 @@
+# CodeQL configuration for tldw_server
+name: "CodeQL config"
+
+# Paths to include in the analysis
 paths:
- - 'PoC_Version'
+  - 'tldw_Server_API'
+
+# Paths to exclude from the analysis
 paths-ignore:
- - '**/*.*'
- - '**/PoC_Version/**'
+  - 'tldw_Server_API/tests/**'
+  - '**/*.md'
+  - '**/Config_Files/**'
+  - '**/Docs/**'
+  - '**/Helper_Scripts/**'
+  - 'PoC_Version/**'
+
+# Language-specific configuration
+queries:
+  - uses: security-extended
+  - uses: security-and-quality

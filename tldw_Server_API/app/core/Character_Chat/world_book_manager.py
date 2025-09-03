@@ -28,7 +28,7 @@ Features:
 import json
 import re
 import sqlite3
-from typing import List, Dict, Any, Optional, Tuple, Set
+from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
 from pathlib import Path
 
@@ -889,7 +889,7 @@ class WorldBookService:
         scan_depth: int = 3,
         token_budget: int = 500,
         recursive_scanning: bool = False
-    ) -> Tuple[str, Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
         Process text to find and inject relevant world info.
         
@@ -902,7 +902,7 @@ class WorldBookService:
             recursive_scanning: Whether to scan matched entries for more keywords
             
         Returns:
-            Tuple of (injected content, statistics)
+            Dictionary with processed_context and statistics
         """
         # Gather applicable world books
         books_to_use = []
@@ -918,7 +918,12 @@ class WorldBookService:
             books_to_use.extend(char_books)
         
         if not books_to_use:
-            return "", {"entries_matched": 0, "tokens_used": 0, "books_used": 0}
+            return {
+                "processed_context": "",
+                "entries_matched": 0,
+                "tokens_used": 0,
+                "books_used": 0
+            }
         
         # Gather all entries from applicable books
         all_entries = []
@@ -965,14 +970,13 @@ class WorldBookService:
         else:
             injected_content = ""
         
-        stats = {
+        return {
+            "processed_context": injected_content,
             "entries_matched": len(matched_entries),
             "tokens_used": tokens_used,
             "books_used": len(set(e.world_book_id for e in matched_entries)) if matched_entries else 0,
             "entry_ids": [e.entry_id for e in matched_entries]
         }
-        
-        return injected_content, stats
     
     # --- Import/Export ---
     

@@ -294,3 +294,5 @@ errors.log
 /redis_data/
 /Databases/ChromaDB/
 uv.lock
+/models
+/cache

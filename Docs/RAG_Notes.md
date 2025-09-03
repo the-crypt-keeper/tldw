@@ -1,6 +1,12 @@
 # RAG Notes
 
 
+
+Limit context size
+Order preservation of chunks
+            Retrieve the top k chunks based on similarity scores, but preserve the original order of the chunks as they appeared in the document.
+
+
 Unsorted
 	https://levelup.gitconnected.com/testing-18-rag-techniques-to-find-the-best-094d166af27f
 https://www.jeremykun.com/2015/04/06/markov-chain-monte-carlo-without-all-the-bullshit/
@@ -26,7 +32,7 @@ https://cloud.google.com/generative-ai-app-builder/docs/check-grounding#claim-le
 https://www.tutorialspoint.com/basic-understanding-of-cure-algorithm
 	https://cloud.google.com/generative-ai-app-builder/docs/check-grounding
 
-
+https://arxiv.org/abs/2508.13107
 https://github.com/SciPhi-AI/R2R/
 https://github.com/Aquiles-ai/Aquiles-RAG
 https://aclanthology.org/2024.acl-long.585/
@@ -39,6 +45,38 @@ https://www.figma.com/slides/eq8UzeTluT3qLKOpzlLj8y/LlamaIndex-Talk--Document-Ag
 https://ai.plainenglish.io/visual-grounding-rag-with-docling-9696d02054f2
 https://lukew.com/ff/entry.asp?2106?ref=sidebar
 https://github.com/topoteretes/cognee
+https://arxiv.org/abs/2412.02592
+https://github.com/Bessouat40/RAGLight
+https://github.com/Aquiles-ai/Aquiles-RAG
+https://pub.towardsai.net/demystifying-googles-data-gemma-f07a470c2a39?gi=1e0e15c7b54a
+https://github.com/CODE-AXION/rag-best-practices/tree/main?tab=readme-ov-file#prompt
+https://github.com/MinghoKwok/DeepSieve
+https://arxiv.org/abs/2508.13107
+https://archive.is/15vEV#selection-224.0-332.0
+https://github.com/BevinV/Interactive-Rag
+https://www.aryn.ai/
+https://landing.ai/
+https://github.com/OpenBMB/UltraRAG
+https://github.com/bRAGAI/bRAG-langchain
+https://docs.llamaindex.ai/en/stable/examples/memory/Mem0Memory/
+https://github.com/run-llama/llama_parse/blob/main/examples/advanced_rag/dynamic_section_retrieval.ipynb
+https://m3docrag.github.io/
+https://medium.com/knowledge-nexus-ai/introducing-lightrag-a-new-era-in-retrieval-augmented-generation-57c20d6081fa
+https://arxiv.org/abs/2409.10038
+https://arxiv.org/html/2410.22349v1
+https://mltechniques.com/2024/10/08/building-a-ranking-system-to-enhance-prompt-results/
+https://openragmoe.github.io/
+https://github.com/Ariya12138/CORAL
+ttps://arxiv.org/abs/2410.07176
+https://arxiv.org/abs/2410.04343
+https://github.com/Ancientshi/ERM4
+https://github.com/QingFei1/LongRAG
+https://www.reddit.com/r/LangChain/comments/1dzfp48/agent_retrieval_how_we_almost_always_find_the/
+https://www.reddit.com/r/LangChain/comments/1dtr49t/agent_rag_parallel_quotes_how_we_built_rag_on/
+
+
+
+
 https://arxiv.org/abs/2505.23052
 https://help.openai.com/en/articles/10169521-projects-in-chatgpt
 https://github.com/ag2ai/SimpleDoc

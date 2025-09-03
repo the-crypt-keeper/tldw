@@ -20,6 +20,18 @@ from .base import (
     VoiceInfo,
     ProviderStatus
 )
+from ..tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError,
+    TTSModelLoadError,
+    TTSGenerationError,
+    TTSResourceError,
+    TTSInsufficientMemoryError,
+    TTSGPUError
+)
+from ..tts_validation import validate_tts_request
+from ..tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -101,14 +113,29 @@ class HiggsAdapter(TTSAdapter):
         try:
             logger.info(f"{self.provider_name}: Loading Higgs Audio V2 model...")
             
+            # Get resource manager for memory monitoring
+            resource_manager = await get_resource_manager()
+            
+            # Check memory before loading model
+            if resource_manager.memory_monitor.is_memory_critical():
+                raise TTSInsufficientMemoryError(
+                    "Insufficient memory to load Higgs model",
+                    provider=self.provider_name,
+                    details=resource_manager.memory_monitor.get_memory_usage()
+                )
+            
             # Check if boson_multimodal library is available
             try:
                 from boson_multimodal.serve.serve_engine import HiggsAudioServeEngine
-            except ImportError:
+            except ImportError as e:
                 logger.error(f"{self.provider_name}: boson_multimodal library not installed")
                 logger.info("Install Higgs Audio dependencies from: https://github.com/boson-ai/higgs-audio")
                 self._status = ProviderStatus.NOT_CONFIGURED
-                return False
+                raise TTSModelLoadError(
+                    "Failed to import boson_multimodal library",
+                    provider=self.provider_name,
+                    details={"error": str(e), "suggestion": "Install from https://github.com/boson-ai/higgs-audio"}
+                )
             
             # Initialize HiggsAudioServeEngine
             logger.info(f"{self.provider_name}: Initializing HiggsAudioServeEngine...")
@@ -118,6 +145,14 @@ class HiggsAdapter(TTSAdapter):
                 device=self.device
             )
             
+            # Register model with resource manager
+            if self.serve_engine:
+                resource_manager.register_model(
+                    provider=self.provider_name.lower(),
+                    model_instance=self.serve_engine,
+                    cleanup_callback=self._cleanup_resources
+                )
+            
             logger.info(
                 f"{self.provider_name}: Initialized successfully "
                 f"(Device: {self.device})"
@@ -125,10 +160,24 @@ class HiggsAdapter(TTSAdapter):
             self._status = ProviderStatus.AVAILABLE
             return True
             
+        except (TTSInsufficientMemoryError, TTSModelLoadError):
+            raise
+        except RuntimeError as e:
+            if "CUDA" in str(e) or "GPU" in str(e):
+                raise TTSGPUError(
+                    f"GPU error initializing {self.provider_name}",
+                    provider=self.provider_name,
+                    details={"error": str(e), "device": self.device}
+                )
+            raise
         except Exception as e:
             logger.error(f"{self.provider_name}: Initialization failed: {e}")
             self._status = ProviderStatus.ERROR
-            return False
+            raise TTSProviderInitializationError(
+                f"Failed to initialize {self.provider_name}",
+                provider=self.provider_name,
+                details={"error": str(e), "model_path": self.model_path}
+            )
     
     async def get_capabilities(self) -> TTSCapabilities:
         """Get Higgs Audio V2 capabilities"""
@@ -162,19 +211,27 @@ class HiggsAdapter(TTSAdapter):
     async def generate(self, request: TTSRequest) -> TTSResponse:
         """Generate speech using Higgs Audio V2"""
         if not await self.ensure_initialized():
-            raise ValueError(f"{self.provider_name} not initialized")
+            raise TTSProviderNotConfiguredError(
+                f"{self.provider_name} not initialized",
+                provider=self.provider_name
+            )
         
-        # Validate request
-        is_valid, error = await self.validate_request(request)
-        if not is_valid:
-            raise ValueError(error)
+        # Validate request using new validation system
+        try:
+            validate_tts_request(request, provider=self.provider_name.lower())
+        except Exception as e:
+            logger.error(f"{self.provider_name} request validation failed: {e}")
+            raise
         
         # Prepare generation parameters
         voice = request.voice or "conversational"
         
         # Handle voice cloning if reference provided
+        voice_reference_path = None
         if request.voice_reference:
-            voice = await self._clone_voice(request.voice_reference)
+            voice_reference_path = await self._prepare_voice_reference(request.voice_reference)
+            # Use "cloned" as voice identifier when using reference
+            voice = "cloned" if voice_reference_path else voice
         
         logger.info(
             f"{self.provider_name}: Generating speech with voice={voice}, "
@@ -185,7 +242,7 @@ class HiggsAdapter(TTSAdapter):
             if request.stream:
                 # Return streaming response
                 return TTSResponse(
-                    audio_stream=self._stream_audio_higgs(request),
+                    audio_stream=self._stream_audio_higgs(request, voice_reference_path),
                     format=request.format,
                     sample_rate=self.sample_rate,
                     channels=1,
@@ -194,7 +251,7 @@ class HiggsAdapter(TTSAdapter):
                 )
             else:
                 # Generate complete audio
-                audio_data = await self._generate_complete_higgs(request)
+                audio_data = await self._generate_complete_higgs(request, voice_reference_path)
                 return TTSResponse(
                     audio_data=audio_data,
                     format=request.format,
@@ -210,7 +267,8 @@ class HiggsAdapter(TTSAdapter):
     
     async def _stream_audio_higgs(
         self,
-        request: TTSRequest
+        request: TTSRequest,
+        voice_reference_path: Optional[str] = None
     ) -> AsyncGenerator[bytes, None]:
         """Stream audio from Higgs model"""
         if not hasattr(self, 'serve_engine') or not self.serve_engine:
@@ -233,7 +291,7 @@ class HiggsAdapter(TTSAdapter):
         
         try:
             # Prepare ChatML format for Higgs
-            chat_ml_sample = self._prepare_higgs_chat_ml(request)
+            chat_ml_sample = self._prepare_higgs_chat_ml(request, voice_reference_path)
             
             # Generate with HiggsAudioServeEngine
             logger.info(f"{self.provider_name}: Starting generation...")
@@ -276,16 +334,32 @@ class HiggsAdapter(TTSAdapter):
             raise
         finally:
             writer.close()
+            # Clean up voice reference file if used
+            if voice_reference_path:
+                try:
+                    from pathlib import Path
+                    Path(voice_reference_path).unlink(missing_ok=True)
+                    logger.debug(f"Cleaned up voice reference: {voice_reference_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up voice reference: {e}")
     
-    async def _generate_complete_higgs(self, request: TTSRequest) -> bytes:
+    async def _generate_complete_higgs(
+        self,
+        request: TTSRequest,
+        voice_reference_path: Optional[str] = None
+    ) -> bytes:
         """Generate complete audio from Higgs"""
         # Collect all streamed chunks
         all_audio = b""
-        async for chunk in self._stream_audio_higgs(request):
+        async for chunk in self._stream_audio_higgs(request, voice_reference_path):
             all_audio += chunk
         return all_audio
     
-    def _prepare_higgs_chat_ml(self, request: TTSRequest) -> Dict[str, Any]:
+    def _prepare_higgs_chat_ml(
+        self,
+        request: TTSRequest,
+        voice_reference_path: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Prepare ChatML format input for Higgs.
         Higgs uses a specific format for generation.
@@ -325,23 +399,65 @@ class HiggsAdapter(TTSAdapter):
             "content": user_content
         })
         
-        # Return in the format expected by HiggsAudioServeEngine
-        return {
+        # Prepare the result
+        result = {
             "messages": messages,
             "voice": request.voice or "narrator",
             "speed": request.speed,
             "seed": request.seed
         }
+        
+        # Add voice reference if provided
+        if voice_reference_path:
+            result["reference_audio_path"] = voice_reference_path
+            result["voice"] = "cloned"  # Override voice when using reference
+            logger.info(f"Added voice reference to Higgs ChatML: {voice_reference_path}")
+        
+        return result
     
-    async def _clone_voice(self, voice_reference: bytes) -> str:
+    async def _prepare_voice_reference(self, voice_reference: bytes) -> Optional[str]:
         """
-        Clone a voice from audio reference.
-        Higgs needs 3-10 seconds of audio.
+        Prepare voice reference audio for Higgs.
+        Higgs needs 3-10 seconds of audio at 24kHz.
+        
+        Args:
+            voice_reference: Voice reference audio bytes
+            
+        Returns:
+            Path to temporary voice reference file or None if processing fails
         """
-        # This would process the audio reference and create a voice embedding
-        # For now, return a placeholder
-        logger.info(f"{self.provider_name}: Voice cloning from {len(voice_reference)} bytes of audio")
-        return "cloned_voice"
+        try:
+            import tempfile
+            from pathlib import Path
+            from tldw_Server_API.app.core.TTS.audio_utils import process_voice_reference
+            
+            # Process voice reference for Higgs requirements
+            processed_audio, error = process_voice_reference(
+                voice_reference,
+                provider='higgs',
+                validate=True,
+                convert=True
+            )
+            
+            if error:
+                logger.error(f"Voice reference processing failed: {error}")
+                return None
+            
+            # Save to temporary file
+            with tempfile.NamedTemporaryFile(
+                suffix='.wav',
+                delete=False,
+                prefix='higgs_voice_'
+            ) as tmp_file:
+                tmp_file.write(processed_audio)
+                tmp_path = tmp_file.name
+            
+            logger.info(f"Voice reference prepared for Higgs: {tmp_path}")
+            return tmp_path
+            
+        except Exception as e:
+            logger.error(f"Failed to prepare voice reference: {e}")
+            return None
     
     def map_voice(self, voice_id: str) -> str:
         """Map generic voice ID to Higgs voice preset"""

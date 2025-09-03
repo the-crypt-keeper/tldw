@@ -41,9 +41,11 @@ class EvaluationManager:
         else:
             db_path = "Databases/evaluations.db"
         
-        # Sanitize path to prevent directory traversal
+        # Sanitize path to prevent directory traversal and null byte injection
         # Remove any directory traversal attempts
         db_path = db_path.replace("..", "")
+        # Remove null bytes to prevent null byte injection attacks
+        db_path = db_path.replace("\x00", "")
         db_path = os.path.normpath(db_path)
         
         # Make absolute if relative
@@ -154,6 +156,65 @@ class EvaluationManager:
                     conn.execute(index_sql)
                 except sqlite3.OperationalError:
                     pass
+            
+            # Create webhook registrations table (needed for webhook tests)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS webhook_registrations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    secret TEXT NOT NULL,
+                    events TEXT NOT NULL,
+                    active BOOLEAN DEFAULT 1,
+                    retry_count INTEGER DEFAULT 3,
+                    timeout_seconds INTEGER DEFAULT 30,
+                    total_deliveries INTEGER DEFAULT 0,
+                    successful_deliveries INTEGER DEFAULT 0,
+                    failed_deliveries INTEGER DEFAULT 0,
+                    last_delivery_at TIMESTAMP,
+                    last_error TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, url)
+                )
+            """)
+            
+            # Create webhook deliveries table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS webhook_deliveries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    webhook_id INTEGER NOT NULL,
+                    evaluation_id TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    signature TEXT NOT NULL,
+                    status_code INTEGER,
+                    response_body TEXT,
+                    response_time_ms INTEGER,
+                    delivered BOOLEAN DEFAULT 0,
+                    retry_count INTEGER DEFAULT 0,
+                    error_message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    delivered_at TIMESTAMP,
+                    next_retry_at TIMESTAMP,
+                    FOREIGN KEY (webhook_id) REFERENCES webhook_registrations(id),
+                    FOREIGN KEY (evaluation_id) REFERENCES internal_evaluations(evaluation_id)
+                )
+            """)
+            
+            # Create indexes for webhook tables
+            for index_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_webhook_user ON webhook_registrations(user_id)",
+                "CREATE INDEX IF NOT EXISTS idx_webhook_active ON webhook_registrations(active)",
+                "CREATE INDEX IF NOT EXISTS idx_delivery_webhook ON webhook_deliveries(webhook_id)",
+                "CREATE INDEX IF NOT EXISTS idx_delivery_eval ON webhook_deliveries(evaluation_id)",
+                "CREATE INDEX IF NOT EXISTS idx_delivery_status ON webhook_deliveries(delivered)",
+                "CREATE INDEX IF NOT EXISTS idx_delivery_retry ON webhook_deliveries(next_retry_at)"
+            ]:
+                try:
+                    conn.execute(index_sql)
+                except sqlite3.OperationalError:
+                    pass  # Index might already exist
             
             conn.commit()
     

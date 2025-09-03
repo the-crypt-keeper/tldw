@@ -208,8 +208,9 @@ class Chunker:
         # Remove null bytes which could cause issues
         if '\x00' in text:
             logger.warning("Null bytes detected in input, removing them")
+            null_byte_count = text.count('\x00')
             self._security_logger.log_suspicious_content(
-                "null_bytes", f"Found {text.count('\\x00')} null bytes in input", source="sanitize_input"
+                "null_bytes", f"Found {null_byte_count} null bytes in input", source="sanitize_input"
             )
             text = text.replace('\x00', '')
         

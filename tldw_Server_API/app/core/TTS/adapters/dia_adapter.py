@@ -21,6 +21,17 @@ from .base import (
     VoiceInfo,
     ProviderStatus
 )
+from ..tts_exceptions import (
+    TTSProviderNotConfiguredError,
+    TTSProviderInitializationError,
+    TTSModelNotFoundError,
+    TTSModelLoadError,
+    TTSGenerationError,
+    TTSResourceError,
+    TTSGPUError
+)
+from ..tts_validation import validate_tts_request
+from ..tts_resource_manager import get_resource_manager
 #
 #######################################################################################################################
 #
@@ -91,13 +102,21 @@ class DiaAdapter(TTSAdapter):
         try:
             logger.info(f"{self.provider_name}: Loading Dia TTS model (1.6B parameters)...")
             
+            # Get resource manager for memory monitoring
+            resource_manager = await get_resource_manager()
+            
             # Check for required libraries
             try:
                 from transformers import AutoModelForCausalLM, AutoProcessor
-            except ImportError:
+                import torch
+            except ImportError as e:
                 logger.error(f"{self.provider_name}: transformers library not installed")
                 self._status = ProviderStatus.NOT_CONFIGURED
-                return False
+                raise TTSModelLoadError(
+                    "Failed to import required dependencies",
+                    provider=self.provider_name,
+                    details={"error": str(e), "suggestion": "pip install transformers torch"}
+                )
             
             # Load processor
             logger.info(f"{self.provider_name}: Loading processor from {self.model_path}")
@@ -124,6 +143,14 @@ class DiaAdapter(TTSAdapter):
             self.model = self.model.to(self.device)
             self.model.eval()
             
+            # Register model with resource manager
+            if self.model:
+                resource_manager.register_model(
+                    provider=self.provider_name.lower(),
+                    model_instance=self.model,
+                    cleanup_callback=self._cleanup_resources
+                )
+            
             logger.info(
                 f"{self.provider_name}: Initialized successfully "
                 f"(Device: {self.device}, BF16: {self.use_bf16})"
@@ -131,10 +158,24 @@ class DiaAdapter(TTSAdapter):
             self._status = ProviderStatus.AVAILABLE
             return True
             
+        except TTSModelLoadError:
+            raise
+        except RuntimeError as e:
+            if "CUDA" in str(e) or "GPU" in str(e):
+                raise TTSGPUError(
+                    f"GPU error initializing {self.provider_name}",
+                    provider=self.provider_name,
+                    details={"error": str(e), "device": self.device}
+                )
+            raise
         except Exception as e:
             logger.error(f"{self.provider_name}: Initialization failed: {e}")
             self._status = ProviderStatus.ERROR
-            return False
+            raise TTSProviderInitializationError(
+                f"Failed to initialize {self.provider_name}",
+                provider=self.provider_name,
+                details={"error": str(e), "model_path": self.model_path}
+            )
     
     async def get_capabilities(self) -> TTSCapabilities:
         """Get Dia TTS capabilities"""
@@ -168,12 +209,17 @@ class DiaAdapter(TTSAdapter):
     async def generate(self, request: TTSRequest) -> TTSResponse:
         """Generate speech using Dia TTS"""
         if not await self.ensure_initialized():
-            raise ValueError(f"{self.provider_name} not initialized")
+            raise TTSProviderNotConfiguredError(
+                f"{self.provider_name} not initialized",
+                provider=self.provider_name
+            )
         
-        # Validate request
-        is_valid, error = await self.validate_request(request)
-        if not is_valid:
-            raise ValueError(error)
+        # Validate request using new validation system
+        try:
+            validate_tts_request(request, provider=self.provider_name.lower())
+        except Exception as e:
+            logger.error(f"{self.provider_name} request validation failed: {e}")
+            raise
         
         # Process text for dialogue
         dialogue_parts = self._process_dialogue(request.text, request.speakers)

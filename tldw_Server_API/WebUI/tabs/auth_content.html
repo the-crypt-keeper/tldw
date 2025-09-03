@@ -1,0 +1,277 @@
+<!-- Authentication Tab -->
+<div id="tabAuth" class="tab-content">
+    <div class="endpoint-section" id="authLogin">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/login - User Login</span>
+        </h2>
+        <p>Authenticate a user and receive a JWT token.</p>
+        
+        <div class="form-group">
+            <label for="authLogin_username">Username <span class="required">*</span>:</label>
+            <input type="text" id="authLogin_username" placeholder="user@example.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="authLogin_password">Password <span class="required">*</span>:</label>
+            <input type="password" id="authLogin_password" placeholder="********">
+        </div>
+        
+        <div class="form-group">
+            <label for="authLogin_remember">Remember Me:</label>
+            <input type="checkbox" id="authLogin_remember">
+        </div>
+        
+        <button class="api-button" onclick="performLogin()">
+            Login
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="authLogin_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="authLogin_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="authRegister">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/register - User Registration</span>
+        </h2>
+        <p>Register a new user account.</p>
+        
+        <div class="form-group">
+            <label for="authRegister_username">Username <span class="required">*</span>:</label>
+            <input type="text" id="authRegister_username" placeholder="newuser">
+        </div>
+        
+        <div class="form-group">
+            <label for="authRegister_email">Email <span class="required">*</span>:</label>
+            <input type="email" id="authRegister_email" placeholder="user@example.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="authRegister_password">Password <span class="required">*</span>:</label>
+            <input type="password" id="authRegister_password" placeholder="********">
+        </div>
+        
+        <div class="form-group">
+            <label for="authRegister_confirmPassword">Confirm Password <span class="required">*</span>:</label>
+            <input type="password" id="authRegister_confirmPassword" placeholder="********">
+        </div>
+        
+        <div class="form-group">
+            <label for="authRegister_fullName">Full Name:</label>
+            <input type="text" id="authRegister_fullName" placeholder="John Doe">
+        </div>
+        
+        <button class="api-button" onclick="performRegistration()">
+            Register
+        </button>
+        
+        <h3>cURL Command:</h3>
+        <pre id="authRegister_curl">---</pre>
+        
+        <h3>Response:</h3>
+        <pre id="authRegister_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="authLogout">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/logout - User Logout</span>
+        </h2>
+        <p>Logout the current user and invalidate their session.</p>
+        
+        <button class="api-button" onclick="performLogout()">
+            Logout
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="authLogout_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="authRefresh">
+        <h2>
+            <span class="endpoint-method post">POST</span>
+            <span class="endpoint-path">/api/v1/refresh - Refresh Token</span>
+        </h2>
+        <p>Refresh an expired access token using a refresh token.</p>
+        
+        <div class="form-group">
+            <label for="authRefresh_token">Refresh Token <span class="required">*</span>:</label>
+            <textarea id="authRefresh_token" rows="3" placeholder="eyJhbGciOiJIUzI1NiIs..."></textarea>
+        </div>
+        
+        <button class="api-button" onclick="performTokenRefresh()">
+            Refresh Token
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="authRefresh_response">---</pre>
+    </div>
+
+    <div class="endpoint-section" id="authCurrentUser">
+        <h2>
+            <span class="endpoint-method get">GET</span>
+            <span class="endpoint-path">/api/v1/me - Current User Info</span>
+        </h2>
+        <p>Get information about the currently authenticated user.</p>
+        
+        <button class="api-button" onclick="getCurrentUser()">
+            Get Current User
+        </button>
+        
+        <h3>Response:</h3>
+        <pre id="authCurrentUser_response">---</pre>
+    </div>
+</div>
+
+<script>
+// Authentication-specific functions
+async function performLogin() {
+    const username = document.getElementById('authLogin_username').value;
+    const password = document.getElementById('authLogin_password').value;
+    const remember = document.getElementById('authLogin_remember').checked;
+    
+    if (!username || !password) {
+        Toast.error('Username and password are required');
+        return;
+    }
+    
+    try {
+        const response = await apiClient.post('/api/v1/login', {
+            username: username,
+            password: password,
+            remember_me: remember
+        });
+        
+        document.getElementById('authLogin_response').textContent = JSON.stringify(response, null, 2);
+        
+        // Store the token if login successful
+        if (response.access_token) {
+            apiClient.setToken(response.access_token);
+            Toast.success('Login successful!');
+            
+            // Store refresh token if provided
+            if (response.refresh_token) {
+                Utils.saveToStorage('refresh_token', response.refresh_token);
+            }
+        }
+    } catch (error) {
+        document.getElementById('authLogin_response').textContent = 
+            JSON.stringify(error.response || error, null, 2);
+        Toast.error('Login failed: ' + (error.message || 'Unknown error'));
+    }
+}
+
+async function performRegistration() {
+    const username = document.getElementById('authRegister_username').value;
+    const email = document.getElementById('authRegister_email').value;
+    const password = document.getElementById('authRegister_password').value;
+    const confirmPassword = document.getElementById('authRegister_confirmPassword').value;
+    const fullName = document.getElementById('authRegister_fullName').value;
+    
+    if (!username || !email || !password) {
+        Toast.error('Username, email, and password are required');
+        return;
+    }
+    
+    if (password !== confirmPassword) {
+        Toast.error('Passwords do not match');
+        return;
+    }
+    
+    try {
+        const response = await apiClient.post('/api/v1/register', {
+            username: username,
+            email: email,
+            password: password,
+            full_name: fullName
+        });
+        
+        document.getElementById('authRegister_response').textContent = JSON.stringify(response, null, 2);
+        Toast.success('Registration successful! Please login.');
+    } catch (error) {
+        document.getElementById('authRegister_response').textContent = 
+            JSON.stringify(error.response || error, null, 2);
+        Toast.error('Registration failed: ' + (error.message || 'Unknown error'));
+    }
+}
+
+async function performLogout() {
+    try {
+        const response = await apiClient.post('/api/v1/logout', {});
+        document.getElementById('authLogout_response').textContent = JSON.stringify(response, null, 2);
+        
+        // Clear stored tokens
+        apiClient.setToken('');
+        Utils.removeFromStorage('refresh_token');
+        
+        Toast.success('Logged out successfully');
+    } catch (error) {
+        document.getElementById('authLogout_response').textContent = 
+            JSON.stringify(error.response || error, null, 2);
+        Toast.error('Logout failed: ' + (error.message || 'Unknown error'));
+    }
+}
+
+async function performTokenRefresh() {
+    const refreshToken = document.getElementById('authRefresh_token').value;
+    
+    if (!refreshToken) {
+        Toast.error('Refresh token is required');
+        return;
+    }
+    
+    try {
+        const response = await apiClient.post('/api/v1/refresh', {
+            refresh_token: refreshToken
+        });
+        
+        document.getElementById('authRefresh_response').textContent = JSON.stringify(response, null, 2);
+        
+        // Update stored tokens
+        if (response.access_token) {
+            apiClient.setToken(response.access_token);
+            Toast.success('Token refreshed successfully');
+        }
+        if (response.refresh_token) {
+            Utils.saveToStorage('refresh_token', response.refresh_token);
+        }
+    } catch (error) {
+        document.getElementById('authRefresh_response').textContent = 
+            JSON.stringify(error.response || error, null, 2);
+        Toast.error('Token refresh failed: ' + (error.message || 'Unknown error'));
+    }
+}
+
+async function getCurrentUser() {
+    try {
+        const response = await apiClient.get('/api/v1/me');
+        document.getElementById('authCurrentUser_response').textContent = JSON.stringify(response, null, 2);
+    } catch (error) {
+        document.getElementById('authCurrentUser_response').textContent = 
+            JSON.stringify(error.response || error, null, 2);
+        Toast.error('Failed to get user info: ' + (error.message || 'Unknown error'));
+    }
+}
+
+// Initialize auth tab
+function initializeAuthTab() {
+    console.log('Auth tab initialized');
+    
+    // Check if we have a stored refresh token
+    const refreshToken = Utils.getFromStorage('refresh_token');
+    if (refreshToken) {
+        document.getElementById('authRefresh_token').value = refreshToken;
+    }
+}
+
+// Call initialization when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.querySelector('#tabAuth')) {
+        initializeAuthTab();
+    }
+});
+</script>

@@ -23,6 +23,7 @@ w
 
 
 ### Link Dump
+
  Not sure who needs to know this, but I just reduced my vLLM cold start time by over 50% just by loading the pytorch cache as a volume in my docker compose:
 
 volumes:
@@ -30,6 +31,8 @@ volumes:
 
 The next time it starts, it will still compile but sub sequent starts will read the cache and skip the compile. Obviously if you change your config or load a different model, it will need to do another one-time compile. 
 https://docs.vllm.ai/en/latest/examples/offline_inference/save_sharded_state.html
+
+https://lmsys.org/blog/2025-05-05-large-scale-ep/
 
 https://huggingface.co/blog/vlms-2025
 https://docs.vllm.ai/en/latest/features/quantization/auto_awq.html
@@ -40,6 +43,7 @@ https://github.com/intel/neural-compressor/tree/v3.2
 https://southbridge-research.notion.site/Entropixplained-11e5fec70db18022b083d7d7b0e93505
 https://arxiv.org/abs/2506.06105
 https://arxiv.org/abs/2506.12928v1
+https://docs.vllm.ai/en/latest/examples/offline_inference/save_sharded_state.html
 https://github.com/LMCache/LMCache
 https://damek.github.io/random/basic-facts-about-gpus/
 https://bentoml.com/llm/
@@ -69,3 +73,10 @@ https://arxiv.org/pdf/2502.17601
 https://www.reddit.com/r/LocalLLaMA/comments/1k0tkca/massive_5000_tokens_per_second_on_2x3090/
 https://github.com/HazyResearch/minions
 https://github.com/NVIDIA/NeMo-Inspector
+https://arxiv.org/html/2504.17999v2
+
+
+
+
+
+

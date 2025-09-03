@@ -7,7 +7,7 @@ overuse and comply with provider limits.
 
 import time
 import threading
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from collections import defaultdict

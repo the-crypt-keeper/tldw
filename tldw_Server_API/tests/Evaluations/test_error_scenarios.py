@@ -87,12 +87,14 @@ class TestErrorScenarios:
         """Test handling of network timeouts."""
         evaluator = RAGEvaluator()
         
-        async def slow_embed(*args):
-            await asyncio.sleep(10)  # Simulate slow network
-            return np.random.rand(1536)
+        def slow_embed(*args):
+            # Simulate slow network by blocking (create_embedding is synchronous)
+            import time
+            time.sleep(10)
+            return np.random.rand(1536).tolist()
         
-        with patch.object(evaluator, 'embeddings_integration') as mock_integration:
-            mock_integration.embed_query = slow_embed
+        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_embedding') as mock_embed:
+            mock_embed.side_effect = slow_embed
             evaluator.embedding_available = True
             
             # Should timeout or fall back
@@ -108,8 +110,8 @@ class TestErrorScenarios:
         evaluator = RAGEvaluator()
         
         # Simulate memory error in embeddings
-        with patch.object(evaluator, 'embeddings_integration') as mock_integration:
-            mock_integration.embed_query = AsyncMock(side_effect=MemoryError("Out of memory"))
+        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_embedding') as mock_embed:
+            mock_embed.side_effect = MemoryError("Out of memory")
             evaluator.embedding_available = True
             
             # Should fall back to LLM
@@ -165,7 +167,7 @@ class TestErrorScenarios:
     async def test_invalid_api_credentials(self):
         """Test handling of invalid API credentials."""
         # Test with invalid OpenAI key - mock the initialization to fail
-        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_rag_embeddings_integration') as mock_create:
+        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_embedding') as mock_create:
             mock_create.side_effect = Exception("Invalid API key")
             
             evaluator = RAGEvaluator(
@@ -192,7 +194,8 @@ class TestErrorScenarios:
                 mock_path.return_value = db_path
                 
                 # Should fail during initialization with corrupted database  
-                with pytest.raises(sqlite3.DatabaseError):
+                # The manager might raise RuntimeError when migration fails
+                with pytest.raises((sqlite3.DatabaseError, RuntimeError)):
                     manager = EvaluationManager()
         finally:
             if db_path.exists():
@@ -208,12 +211,15 @@ class TestErrorScenarios:
         data["self"] = data  # Circular reference
         
         # Should handle during JSON serialization
-        with pytest.raises(Exception):
+        # JSON serialization will raise ValueError for circular references
+        with pytest.raises((ValueError, TypeError)) as exc_info:
             await manager.store_evaluation(
                 evaluation_type="test",
                 input_data=data,
                 results={}
             )
+        # Verify it's actually a circular reference error
+        assert "circular" in str(exc_info.value).lower() or "recursion" in str(exc_info.value).lower()
     
     @pytest.mark.asyncio
     async def test_unicode_handling(self):
@@ -292,9 +298,9 @@ class TestEdgeCases:
         evaluator = RAGEvaluator()
         
         # Create identical embeddings for perfect similarity
-        with patch.object(evaluator, 'embeddings_integration') as mock_integration:
-            same_embedding = np.array([1.0, 0.0, 0.0])
-            mock_integration.embed_query = AsyncMock(return_value=same_embedding)
+        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_embedding') as mock_embed:
+            same_embedding = [1.0, 0.0, 0.0]  # create_embedding returns a list
+            mock_embed.return_value = same_embedding
             evaluator.embedding_available = True
             
             _, result = await evaluator._evaluate_answer_similarity(
@@ -368,8 +374,8 @@ class TestEdgeCases:
         evaluator = RAGEvaluator()
         
         # Make embeddings work but LLM fail for some metrics
-        with patch.object(evaluator, 'embeddings_integration') as mock_integration:
-            mock_integration.embed_query = AsyncMock(return_value=np.random.rand(1536))
+        with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.create_embedding') as mock_embed:
+            mock_embed.return_value = np.random.rand(1536).tolist()
             evaluator.embedding_available = True
             
             with patch('tldw_Server_API.app.core.Evaluations.rag_evaluator.asyncio.to_thread') as mock_thread:

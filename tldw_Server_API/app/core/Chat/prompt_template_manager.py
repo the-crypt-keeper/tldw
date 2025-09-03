@@ -19,7 +19,16 @@ from loguru import logger
 #
 # Constants:
 #
-PROMPT_TEMPLATES_DIR = Path(__file__).parent / "prompt_templates"
+# Securely define the templates directory with validation
+_BASE_DIR = Path(__file__).parent.resolve()
+PROMPT_TEMPLATES_DIR = (_BASE_DIR / "prompt_templates").resolve()
+
+# Ensure the templates directory exists and is a directory
+if PROMPT_TEMPLATES_DIR.exists() and not PROMPT_TEMPLATES_DIR.is_dir():
+    raise RuntimeError(f"Expected directory but found file at: {PROMPT_TEMPLATES_DIR}")
+
+# Create the directory if it doesn't exist
+PROMPT_TEMPLATES_DIR.mkdir(exist_ok=True)
 #
 #
 # Functions:
@@ -66,8 +75,8 @@ def load_template(template_name: str) -> Optional[PromptTemplate]:
         resolved_path = template_file.resolve()
         expected_dir = PROMPT_TEMPLATES_DIR.resolve()
         
-        # Check if the resolved path is within the templates directory
-        if not str(resolved_path).startswith(str(expected_dir) + os.sep) and resolved_path != expected_dir:
+        # Check if the resolved path is within the templates directory using commonpath
+        if os.path.commonpath([str(resolved_path), str(expected_dir)]) != str(expected_dir):
             logger.warning(f"Path traversal attempt blocked - resolved path outside template directory: {template_name}")
             return None
     except (ValueError, OSError) as e:
@@ -128,10 +137,28 @@ def apply_template_to_string(template_string: Optional[str], data: Dict[str, Any
 
 
 def get_available_templates() -> List[str]:
-    """Returns a list of available template names (without .json extension)."""
+    """Returns a list of available template names (without .json extension).
+    
+    Security: Only returns files that are actually within the templates directory.
+    """
     if not PROMPT_TEMPLATES_DIR.exists():
         return []
-    return [f.stem for f in PROMPT_TEMPLATES_DIR.glob("*.json")]
+    
+    templates = []
+    expected_dir = PROMPT_TEMPLATES_DIR.resolve()
+    
+    for f in PROMPT_TEMPLATES_DIR.glob("*.json"):
+        try:
+            # Verify each file is actually within the templates directory
+            file_path = f.resolve()
+            if os.path.commonpath([str(file_path), str(expected_dir)]) == str(expected_dir):
+                templates.append(f.stem)
+            else:
+                logger.warning(f"Skipping file outside templates directory: {f}")
+        except (ValueError, OSError) as e:
+            logger.warning(f"Error processing template file {f}: {e}")
+    
+    return templates
 
 # Load a default passthrough template on module load for safety
 DEFAULT_RAW_PASSTHROUGH_TEMPLATE = PromptTemplate(
