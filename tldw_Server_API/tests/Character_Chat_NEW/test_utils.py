@@ -117,11 +117,12 @@ class CharacterChatManager:
         self.cleanup()
     
     # Additional methods needed for tests
-    def create_chat_session(self, character_id: int, user_name: str = "User", user_id: str = None) -> Optional[int]:
+    def create_chat_session(self, character_id: int, user_name: str = "User", user_id: str = None, title: str = None) -> Optional[int]:
         """Create a new chat session (alias for start_new_chat)."""
         # Handle both user_name and user_id parameters
         if user_id:
             user_name = user_id
+        # The title parameter is not used in start_new_chat, but we accept it for compatibility
         return self.start_new_chat(character_id, user_name)
     
     def get_chat_session(self, chat_id: int) -> Optional[Dict[str, Any]]:
@@ -190,12 +191,25 @@ class CharacterChatManager:
         # Simple approximation: 1 token ≈ 4 characters
         return len(text) // 4
     
-    def truncate_context(self, context: str, max_tokens: int = 4000) -> str:
+    def truncate_context(self, messages: List[Dict[str, Any]] = None, max_tokens: int = 4000) -> List[Dict[str, Any]]:
         """Truncate context to fit within token limit."""
-        approx_chars = max_tokens * 4
-        if len(context) > approx_chars:
-            return context[:approx_chars]
-        return context
+        if messages is None:
+            return []
+        
+        # Simple implementation: keep messages that fit within token budget
+        total_tokens = 0
+        result = []
+        
+        # Process messages in reverse order (keep most recent)
+        for msg in reversed(messages):
+            msg_tokens = self.count_tokens(msg.get('content', ''))
+            if total_tokens + msg_tokens <= max_tokens:
+                result.insert(0, msg)  # Insert at beginning to maintain order
+                total_tokens += msg_tokens
+            else:
+                break
+        
+        return result
     
     def inject_world_entries(self, context: str, world_entries: List[Dict[str, Any]]) -> str:
         """Inject world book entries into context."""
@@ -235,6 +249,36 @@ class CharacterChatManager:
     def validate_tags(self, tags: List[str]) -> bool:
         """Validate tags."""
         return all(isinstance(tag, str) and 0 < len(tag) <= 50 for tag in tags)
+    
+    def chunk_message(self, message: str, chunk_size: int = 1000) -> List[str]:
+        """Chunk a long message into smaller parts."""
+        if not message:
+            return []
+        
+        words = message.split()
+        chunks = []
+        current_chunk = []
+        current_size = 0
+        
+        for word in words:
+            # Add 1 for the space between words
+            word_size = 1 if current_chunk else 0
+            
+            if current_size + word_size <= chunk_size:
+                current_chunk.append(word)
+                current_size += word_size
+            else:
+                # Start a new chunk
+                if current_chunk:
+                    chunks.append(' '.join(current_chunk))
+                current_chunk = [word]
+                current_size = 1
+        
+        # Add the last chunk
+        if current_chunk:
+            chunks.append(' '.join(current_chunk))
+        
+        return chunks if chunks else [message]
     
     def get_character_statistics(self, character_id: int) -> Dict[str, Any]:
         """Get statistics for a character."""
