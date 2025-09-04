@@ -145,7 +145,7 @@ class TestProviderRouting:
             "/api/v1/chat/completions",
             json={
                 "api_provider": "anthropic",
-                "model": "claude-3-sonnet",
+                "model": "claude-sonnet-4-20250514",
                 "messages": [{"role": "user", "content": "Test"}]
             },
             headers=auth_headers
@@ -228,7 +228,7 @@ class TestDatabaseIntegration:
         
         try:
             # Get the character from populated DB
-            characters = populated_chacha_db.get_all_characters()
+            characters = populated_chacha_db.list_character_cards()
             assert len(characters) > 0
             
             # Get conversations for the first character

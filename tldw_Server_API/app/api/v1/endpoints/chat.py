@@ -692,15 +692,20 @@ async def create_chat_completion(
             # If template produces empty string and we have a character with system prompt, use that instead
             if not final_system_message and character_card_for_context and character_card_for_context.get('system_prompt'):
                 final_system_message = character_card_for_context.get('system_prompt')
-                logger.debug(f"Template produced empty, using character system prompt: {final_system_message[:50]}...")
+                # Use repr() to safely log system prompts that might contain curly braces
+                system_prompt_preview = final_system_message[:50] if final_system_message else ""
+                logger.debug(f"Template produced empty, using character system prompt: {repr(system_prompt_preview)}...")
         elif sys_msg_from_req:
             final_system_message = sys_msg_from_req
         elif character_card_for_context and character_card_for_context.get('system_prompt'):
             # Use character's system prompt if no template and no system message in request
             final_system_message = character_card_for_context.get('system_prompt')
-            logger.debug(f"Using character system prompt: {final_system_message[:50]}...")
+            # Use repr() to safely log system prompts that might contain curly braces
+            system_prompt_preview = final_system_message[:50] if final_system_message else ""
+            logger.debug(f"Using character system prompt: {repr(system_prompt_preview)}...")
         
-        logger.debug(f"Final system message: {final_system_message}")
+        # Use repr() to safely log system message that might contain curly braces
+        logger.debug(f"Final system message: {repr(final_system_message)}")
 
         templated_llm_payload: List[Dict[str, Any]] = []
         # FIXME
