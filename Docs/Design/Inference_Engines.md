@@ -23,7 +23,17 @@ w
 
 
 ### Link Dump
+
+ Not sure who needs to know this, but I just reduced my vLLM cold start time by over 50% just by loading the pytorch cache as a volume in my docker compose:
+
+volumes:
+- ./vllm_cache:/root/.cache/vllm
+
+The next time it starts, it will still compile but sub sequent starts will read the cache and skip the compile. Obviously if you change your config or load a different model, it will need to do another one-time compile. 
+https://docs.vllm.ai/en/latest/examples/offline_inference/save_sharded_state.html
+
 https://lmsys.org/blog/2025-05-05-large-scale-ep/
+
 https://huggingface.co/blog/vlms-2025
 https://docs.vllm.ai/en/latest/features/quantization/auto_awq.html
 https://github.com/intel/auto-round
