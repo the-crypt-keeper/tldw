@@ -8,6 +8,8 @@ https://huggingface.co/spaces/hf-audio/open_asr_leaderboard
 https://github.com/EvolvingLMMs-Lab/Aero-1
 https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2
 https://github.com/cxyfer/GeminiASR
+https://github.com/taresh18/conversify
+https://github.com/kyutai-labs/delayed-streams-modeling/
 https://www.reddit.com/r/LocalLLaMA/comments/1lgv0y9/help_me_build_a_good_tts_llm_stt_stack/
 https://huggingface.co/Banafo/Kroko-ASR
 https://github.com/travisvn/chatterbox-tts-api/  

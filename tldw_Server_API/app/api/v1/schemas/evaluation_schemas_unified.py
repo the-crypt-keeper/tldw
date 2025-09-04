@@ -481,6 +481,7 @@ class EvaluationComparisonResponse(BaseModel):
 
 class EvaluationHistoryRequest(BaseModel):
     """Evaluation history request"""
+    user_id: Optional[str] = None
     evaluation_type: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None

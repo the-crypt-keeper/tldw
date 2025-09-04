@@ -18,6 +18,7 @@ https://github.com/bytedance/MegaTTS3
 https://github.com/petermg/Chatterbox-TTS-Extended/tree/main
 https://github.com/kyutai-labs/hibiki
 https://metis-demo.github.io/#metis-tts
+https://www.reddit.com/r/LocalLLaMA/comments/1n0bhd7/microsoft_vibevoice_tts_opensourced_supports_90/
 https://github.com/Extraltodeus/Quick-slap-tkinter-dia/blob/main/README.md
 https://github.com/RobViren/kokovoicelab
 https://github.com/psdwizzard/chatterbox-Audiobook

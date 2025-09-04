@@ -251,6 +251,26 @@ class MediaDatabase:
         version INTEGER NOT NULL,
         payload TEXT
     );
+    
+    -- Chunking Templates Table --
+    CREATE TABLE IF NOT EXISTS ChunkingTemplates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        template_json TEXT NOT NULL,
+        is_builtin BOOLEAN DEFAULT 0 NOT NULL,
+        tags TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        version INTEGER NOT NULL DEFAULT 1,
+        client_id TEXT NOT NULL,
+        user_id TEXT,
+        deleted BOOLEAN NOT NULL DEFAULT 0,
+        prev_version INTEGER,
+        merge_parent_uuid TEXT
+    );
     """
 
     _INDICES_SQL_V1 = """
@@ -312,6 +332,12 @@ class MediaDatabase:
     CREATE INDEX IF NOT EXISTS idx_sync_log_ts ON sync_log(timestamp);
     CREATE INDEX IF NOT EXISTS idx_sync_log_entity_uuid ON sync_log(entity_uuid);
     CREATE INDEX IF NOT EXISTS idx_sync_log_client_id ON sync_log(client_id);
+    
+    -- Chunking Templates Indices --
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_template_name 
+        ON ChunkingTemplates(name) WHERE deleted = 0;
+    CREATE INDEX IF NOT EXISTS idx_template_is_builtin ON ChunkingTemplates(is_builtin);
+    CREATE INDEX IF NOT EXISTS idx_template_deleted ON ChunkingTemplates(deleted);
     """
 
     _TRIGGERS_SQL_V1 = """

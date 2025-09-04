@@ -785,7 +785,7 @@ class WebhookManager:
         with self.db_adapter.transaction():
             
             if url:
-                cursor.execute("""
+                rows = self.db_adapter.fetch_all("""
                     SELECT id, url, events, active, total_deliveries,
                            successful_deliveries, failed_deliveries,
                            last_delivery_at, last_error, created_at
@@ -793,7 +793,7 @@ class WebhookManager:
                     WHERE user_id = ? AND url = ?
                 """, (user_id, url))
             else:
-                cursor.execute("""
+                rows = self.db_adapter.fetch_all("""
                     SELECT id, url, events, active, total_deliveries,
                            successful_deliveries, failed_deliveries,
                            last_delivery_at, last_error, created_at
@@ -802,22 +802,40 @@ class WebhookManager:
                 """, (user_id,))
             
             webhooks = []
-            for row in cursor.fetchall():
-                webhooks.append({
-                    "id": row[0],
-                    "url": row[1],
-                    "events": json.loads(row[2]),
-                    "active": bool(row[3]),
-                    "statistics": {
-                        "total_deliveries": row[4],
-                        "successful_deliveries": row[5],
-                        "failed_deliveries": row[6],
-                        "success_rate": row[5] / row[4] if row[4] > 0 else 0
-                    },
-                    "last_delivery_at": row[7],
-                    "last_error": row[8],
-                    "created_at": row[9]
-                })
+            for row in rows:
+                # Handle both dict and tuple/list row formats
+                if isinstance(row, dict):
+                    webhooks.append({
+                        "id": row.get("id"),
+                        "url": row.get("url"),
+                        "events": json.loads(row.get("events", "[]")),
+                        "active": bool(row.get("active")),
+                        "statistics": {
+                            "total_deliveries": row.get("total_deliveries", 0),
+                            "successful_deliveries": row.get("successful_deliveries", 0),
+                            "failed_deliveries": row.get("failed_deliveries", 0),
+                            "success_rate": row.get("successful_deliveries", 0) / row.get("total_deliveries", 1) if row.get("total_deliveries", 0) > 0 else 0
+                        },
+                        "last_delivery_at": row.get("last_delivery_at"),
+                        "last_error": row.get("last_error"),
+                        "created_at": row.get("created_at")
+                    })
+                else:
+                    webhooks.append({
+                        "id": row[0],
+                        "url": row[1],
+                        "events": json.loads(row[2]),
+                        "active": bool(row[3]),
+                        "statistics": {
+                            "total_deliveries": row[4],
+                            "successful_deliveries": row[5],
+                            "failed_deliveries": row[6],
+                            "success_rate": row[5] / row[4] if row[4] > 0 else 0
+                        },
+                        "last_delivery_at": row[7],
+                        "last_error": row[8],
+                        "created_at": row[9]
+                    })
             
             return webhooks
     

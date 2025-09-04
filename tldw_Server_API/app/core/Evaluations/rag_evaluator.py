@@ -104,7 +104,8 @@ class RAGEvaluator:
         response: str,
         ground_truth: Optional[str] = None,
         metrics: Optional[List[str]] = None,
-        api_name: str = "openai"
+        api_name: str = "openai",
+        metric_weights: Optional[Dict[str, float]] = None
     ) -> Dict[str, Any]:
         """
         Evaluate RAG system performance.
@@ -121,7 +122,7 @@ class RAGEvaluator:
             Evaluation results with metrics and suggestions
         """
         if metrics is None:
-            metrics = ["relevance", "faithfulness", "answer_similarity"]
+            metrics = ["relevance", "faithfulness", "answer_similarity", "context_relevance"]
         
         results = {
             "metrics": {},
@@ -130,20 +131,31 @@ class RAGEvaluator:
         
         # Evaluate each metric
         tasks = []
-        if "relevance" in metrics:
-            tasks.append(self._evaluate_relevance(query, response, api_name))
+        metric_names = []  # Track which metrics we're actually evaluating
         
-        if "faithfulness" in metrics:
+        if "relevance" in metrics or "answer_relevance" in metrics:
+            tasks.append(self._evaluate_relevance(query, response, api_name))
+            metric_names.append("relevance")
+        
+        if "faithfulness" in metrics or "answer_faithfulness" in metrics:
             tasks.append(self._evaluate_faithfulness(response, contexts, api_name))
+            metric_names.append("faithfulness")
         
         if "answer_similarity" in metrics and ground_truth:
             tasks.append(self._evaluate_answer_similarity(response, ground_truth))
+            metric_names.append("answer_similarity")
+        
+        if "context_relevance" in metrics:
+            tasks.append(self._evaluate_context_relevance(query, contexts, api_name))
+            metric_names.append("context_relevance")
         
         if "context_precision" in metrics:
             tasks.append(self._evaluate_context_precision(query, contexts, api_name))
+            metric_names.append("context_precision")
         
         if "context_recall" in metrics and ground_truth:
             tasks.append(self._evaluate_context_recall(ground_truth, contexts, api_name))
+            metric_names.append("context_recall")
         
         # Run evaluations in parallel with error handling
         try:
@@ -155,12 +167,18 @@ class RAGEvaluator:
             for i, result in enumerate(metric_results):
                 if isinstance(result, Exception):
                     # Log the failure but continue with other metrics
-                    metric_name = metrics[i] if i < len(metrics) else f"metric_{i}"
+                    metric_name = metric_names[i] if i < len(metric_names) else f"metric_{i}"
                     logger.error(f"Metric {metric_name} failed: {result}")
                     failed_metrics.append(metric_name)
                 else:
                     metric_name, metric_result = result
-                    results["metrics"][metric_name] = metric_result
+                    # Handle aliases for test compatibility
+                    if metric_name == "relevance":
+                        results["metrics"]["answer_relevance"] = metric_result
+                    elif metric_name == "faithfulness":
+                        results["metrics"]["answer_faithfulness"] = metric_result
+                    else:
+                        results["metrics"][metric_name] = metric_result
             
             # Add information about failed metrics
             if failed_metrics:
@@ -170,6 +188,10 @@ class RAGEvaluator:
             logger.error(f"Critical failure in evaluation: {e}")
             raise ValueError(f"Evaluation failed: {str(e)}")
             
+        # Calculate overall score if we have metrics
+        if results["metrics"]:
+            results["overall_score"] = self._calculate_overall_score(results["metrics"], metric_weights)
+        
         # Generate suggestions based on scores
         results["suggestions"] = self._generate_suggestions(results["metrics"])
         
@@ -202,7 +224,7 @@ class RAGEvaluator:
                 api_name,  # First param to analyze
                 query,     # input_data
                 prompt,    # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are an evaluation expert. Provide only numeric scores.",  # system_message
                 0.1        # temp
             )
@@ -255,7 +277,7 @@ class RAGEvaluator:
                 api_name,  # First param
                 response,  # input_data
                 prompt,    # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are an evaluation expert. Provide only numeric scores.",  # system_message
                 0.1        # temp
             )
@@ -342,7 +364,7 @@ class RAGEvaluator:
                 "openai",  # api_name - first param
                 response,  # input_data
                 prompt,    # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are an evaluation expert. Provide only numeric scores.",  # system_message
                 0.1        # temp
             )
@@ -384,7 +406,7 @@ class RAGEvaluator:
                     api_name,  # First param
                     context,   # input_data
                     prompt,    # custom_prompt_arg
-                    "",       # api_key
+                    None,      # api_key (None to load from config)
                     "You are an evaluation expert. Provide only numeric scores.",  # system_message
                     0.1        # temp
                 )
@@ -396,11 +418,66 @@ class RAGEvaluator:
         
         # Calculate precision as average relevance
         precision = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.0
+        # Calculate raw score on 1-5 scale
+        raw_score = precision * 4 + 1 if precision > 0 else 1.0
         
         return ("context_precision", {
             "name": "context_precision",
             "score": precision,
+            "raw_score": raw_score,
             "explanation": "Average relevance of retrieved contexts",
+            "metadata": {"individual_scores": relevance_scores}
+        })
+    
+    async def _evaluate_context_relevance(self, query: str, contexts: List[str], api_name: str) -> tuple:
+        """Evaluate relevance of retrieved contexts to the query"""
+        # Check each context for relevance
+        relevance_scores = []
+        
+        for context in contexts:
+            prompt = f"""
+            Rate how relevant this context is to the query on a scale of 1-5.
+            
+            Query: {query}
+            
+            Context: {context}
+            
+            Provide only the numeric score.
+            """
+            
+            try:
+                score_str = await asyncio.to_thread(
+                    analyze,
+                    api_name,  
+                    context,   
+                    prompt,    
+                    None,      
+                    "You are an evaluation expert. Provide only numeric scores.",  
+                    0.1        
+                )
+                
+                # Parse score and handle invalid responses
+                try:
+                    score = float(score_str.strip())
+                    relevance_scores.append(score / 5.0)
+                except (ValueError, AttributeError):
+                    # Invalid response format - treat as 0.0
+                    logger.warning(f"Invalid score format from LLM: {score_str}")
+                    relevance_scores.append(0.0)
+                
+            except Exception as e:
+                logger.debug(f"Context relevance evaluation failed for a context: {e}")
+                relevance_scores.append(0.0)
+        
+        # Calculate average relevance
+        relevance = sum(relevance_scores) / len(relevance_scores) if relevance_scores else 0.0
+        raw_score = relevance * 4 + 1 if relevance > 0 else 1.0
+        
+        return ("context_relevance", {
+            "name": "context_relevance",
+            "score": relevance,
+            "raw_score": raw_score,
+            "explanation": "Average relevance of retrieved contexts to the query",
             "metadata": {"individual_scores": relevance_scores}
         })
     
@@ -432,7 +509,7 @@ class RAGEvaluator:
                 api_name,  # First param
                 combined_context,  # input_data
                 prompt,    # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are an evaluation expert. Provide only numeric scores.",  # system_message
                 0.1        # temp
             )
@@ -476,6 +553,54 @@ class RAGEvaluator:
             suggestions.append("Fine-tune generation to produce more accurate responses")
         
         return suggestions
+    
+    def _normalize_score(self, score: float) -> float:
+        """
+        Normalize score from 1-5 scale to 0-1 scale.
+        
+        Args:
+            score: Score on 1-5 scale
+            
+        Returns:
+            Normalized score on 0-1 scale
+        """
+        # Clamp score to 1-5 range
+        score = max(1, min(5, score))
+        # Normalize to 0-1
+        return (score - 1) / 4
+    
+    def _calculate_overall_score(self, metrics: Dict[str, Dict], weights: Optional[Dict[str, float]] = None) -> float:
+        """
+        Calculate weighted overall score from individual metrics.
+        
+        Args:
+            metrics: Dictionary of metric results with scores
+            weights: Optional weights for each metric (defaults to equal weights)
+            
+        Returns:
+            Weighted average score
+        """
+        if not metrics:
+            return 0.0
+        
+        # Default to equal weights
+        if weights is None:
+            weights = {key: 1.0 for key in metrics.keys()}
+        
+        total_weight = 0
+        weighted_sum = 0
+        
+        for metric_name, metric_data in metrics.items():
+            if "score" in metric_data and metric_name in weights:
+                score = metric_data["score"]
+                weight = weights[metric_name]
+                weighted_sum += score * weight
+                total_weight += weight
+        
+        if total_weight == 0:
+            return 0.0
+        
+        return weighted_sum / total_weight
     
     def close(self):
         """Clean up resources."""

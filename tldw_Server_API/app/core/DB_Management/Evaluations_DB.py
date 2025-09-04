@@ -22,6 +22,7 @@ class EvaluationsDatabase:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._initialize_database()
+        self._apply_migrations()
     
     @contextmanager
     def get_connection(self):
@@ -89,14 +90,81 @@ class EvaluationsDatabase:
                 )
             """)
             
+            # Internal evaluations table (for tldw-specific evaluations)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS internal_evaluations (
+                    evaluation_id TEXT PRIMARY KEY,
+                    evaluation_type TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    input_data TEXT,
+                    results TEXT,
+                    metadata TEXT,
+                    user_id TEXT,
+                    status TEXT DEFAULT 'pending',
+                    completed_at TIMESTAMP,
+                    embedding_provider TEXT,
+                    embedding_model TEXT
+                )
+            """)
+            
+            # Webhook registrations table (match webhook_manager schema)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS webhook_registrations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    secret TEXT NOT NULL,
+                    events TEXT NOT NULL,
+                    active BOOLEAN DEFAULT 1,
+                    retry_count INTEGER DEFAULT 3,
+                    timeout_seconds INTEGER DEFAULT 30,
+                    total_deliveries INTEGER DEFAULT 0,
+                    successful_deliveries INTEGER DEFAULT 0,
+                    failed_deliveries INTEGER DEFAULT 0,
+                    last_delivery_at TIMESTAMP,
+                    last_error TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    webhook_id TEXT
+                )
+            """)
+            
             # Create indexes
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_evals_created ON evaluations(created_at DESC)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_runs_eval ON evaluation_runs(eval_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_runs_status ON evaluation_runs(status)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_datasets_created ON datasets(created_at DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_internal_evals_type ON internal_evaluations(evaluation_type)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_internal_evals_user ON internal_evaluations(user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_webhooks_active ON webhook_registrations(active)")
             
             conn.commit()
             logger.info("Evaluations database initialized")
+    
+    def _apply_migrations(self):
+        """Apply database migrations including the unified schema."""
+        try:
+            from tldw_Server_API.app.core.DB_Management.migrations_v5_unified_evaluations import migrate_to_unified_evaluations
+            
+            # Apply the unified evaluations migration
+            if migrate_to_unified_evaluations(self.db_path):
+                logger.info("Applied unified evaluations migration successfully")
+            else:
+                logger.warning("Unified evaluations migration already applied or failed")
+        except ImportError:
+            logger.warning("Unified evaluations migration module not found, skipping")
+        except Exception as e:
+            logger.error(f"Error applying migrations: {e}")
+    
+    def _use_unified_table(self) -> bool:
+        """Check if the unified table exists and should be used."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='evaluations_unified'
+            """)
+            return cursor.fetchone() is not None
     
     # ============= Evaluation CRUD Operations =============
     
@@ -556,3 +624,113 @@ class EvaluationsDatabase:
             result["samples"] = json.loads(row["samples"]) if row["samples"] else []
         
         return result
+    
+    # ============= Unified Evaluation Operations =============
+    
+    def store_unified_evaluation(
+        self,
+        evaluation_id: str,
+        name: str,
+        evaluation_type: str,
+        input_data: Dict[str, Any],
+        results: Dict[str, Any],
+        status: str = "completed",
+        user_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        embedding_provider: Optional[str] = None,
+        embedding_model: Optional[str] = None
+    ) -> bool:
+        """Store evaluation in the unified table if it exists, otherwise fall back to internal_evaluations."""
+        if self._use_unified_table():
+            # Store in unified table
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO evaluations_unified (
+                            id, evaluation_id, name, evaluation_type, 
+                            input_data, results, status, user_id,
+                            metadata, embedding_provider, embedding_model,
+                            created_at, completed_at, eval_spec
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)
+                    """, (
+                        evaluation_id,  # Use same ID for both id and evaluation_id
+                        evaluation_id,
+                        name or evaluation_type,
+                        evaluation_type,
+                        json.dumps(input_data),
+                        json.dumps(results),
+                        status,
+                        user_id,
+                        json.dumps(metadata) if metadata else None,
+                        embedding_provider,
+                        embedding_model,
+                        json.dumps({})  # Empty eval_spec for backward compatibility
+                    ))
+                    conn.commit()
+                    return True
+                except Exception as e:
+                    logger.error(f"Failed to store in unified table: {e}")
+                    conn.rollback()
+                    return False
+        else:
+            # Store in internal_evaluations table as fallback
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO internal_evaluations (
+                            evaluation_id, evaluation_type, input_data, results,
+                            user_id, metadata, status, embedding_provider, embedding_model,
+                            created_at, completed_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                    """, (
+                        evaluation_id,
+                        evaluation_type,
+                        json.dumps(input_data),
+                        json.dumps(results),
+                        user_id,
+                        json.dumps(metadata) if metadata else None,
+                        status,
+                        embedding_provider,
+                        embedding_model
+                    ))
+                    conn.commit()
+                    return True
+                except Exception as e:
+                    logger.error(f"Failed to store evaluation: {e}")
+                    conn.rollback()
+                    return False
+    
+    def get_unified_evaluation(self, evaluation_id: str) -> Optional[Dict[str, Any]]:
+        """Get evaluation from unified table if it exists, otherwise from legacy tables."""
+        if self._use_unified_table():
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT * FROM evaluations_unified 
+                    WHERE evaluation_id = ? OR id = ?
+                """, (evaluation_id, evaluation_id))
+                
+                result = cursor.fetchone()
+                if result:
+                    return dict(result)
+        
+        # Fall back to checking internal_evaluations table
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM internal_evaluations 
+                WHERE evaluation_id = ?
+            """, (evaluation_id,))
+            result = cursor.fetchone()
+            if result:
+                return dict(result)
+            
+            # Also check the evaluations table
+            cursor.execute("SELECT * FROM evaluations WHERE id = ?", (evaluation_id,))
+            result = cursor.fetchone()
+            if result:
+                return dict(result)
+        
+        return None

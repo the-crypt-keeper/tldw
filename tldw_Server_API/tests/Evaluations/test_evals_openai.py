@@ -651,7 +651,7 @@ class TestConcurrency:
     
     @pytest.mark.asyncio
     async def test_concurrent_runs(self, async_client, auth_headers,
-                                  sample_evaluation_request, sample_run_request):
+                                  sample_evaluation_request, sample_run_request, mock_rate_limiter):
         """Test running multiple evaluations concurrently"""
         with patch('tldw_Server_API.app.core.Evaluations.eval_runner.EvaluationRunner.run_evaluation_async'):
             # Create evaluation
@@ -662,7 +662,7 @@ class TestConcurrency:
             )
             eval_id = eval_response.json()["id"]
             
-            # Start multiple runs concurrently
+            # Start multiple runs concurrently 
             tasks = []
             for i in range(5):
                 req = sample_run_request.copy()
@@ -676,7 +676,7 @@ class TestConcurrency:
             
             responses = await asyncio.gather(*tasks)
             
-            # All should succeed
+            # All should succeed with mocked rate limiter
             for response in responses:
                 assert response.status_code == 202
                 assert response.json()["id"].startswith("run_")

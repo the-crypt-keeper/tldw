@@ -121,7 +121,7 @@ class ResponseQualityEvaluator:
                 api_name,  # First param
                 response,  # input_data
                 evaluation_prompt,  # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are an evaluation expert. Provide only numeric scores.",  # system_message
                 0.1        # temp
             )
@@ -168,7 +168,7 @@ class ResponseQualityEvaluator:
                 api_name,  # First param
                 response,  # input_data
                 evaluation_prompt,  # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are an evaluation expert. Provide only numeric scores.",  # system_message
                 0.1        # temp
             )
@@ -213,7 +213,7 @@ class ResponseQualityEvaluator:
                 api_name,  # First param
                 response,  # input_data
                 evaluation_prompt,  # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are an evaluation expert. Provide only numeric scores.",  # system_message
                 0.1        # temp
             )
@@ -260,7 +260,7 @@ class ResponseQualityEvaluator:
                 api_name,  # First param
                 response,  # input_data
                 evaluation_prompt,  # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are an evaluation expert. Provide only numeric scores.",  # system_message
                 0.1        # temp
             )
@@ -306,7 +306,7 @@ class ResponseQualityEvaluator:
                 api_name,  # First param
                 response,  # input_data
                 evaluation_prompt,  # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are a format compliance checker. Be precise and systematic.",  # system_message
                 0.1        # temp
             )
@@ -361,7 +361,7 @@ class ResponseQualityEvaluator:
                 api_name,  # First param
                 response,  # input_data
                 evaluation_prompt,  # custom_prompt_arg
-                "",       # api_key
+                None,      # api_key (None to load from config)
                 "You are an evaluation expert. Provide only numeric scores.",  # system_message
                 0.1        # temp
             )

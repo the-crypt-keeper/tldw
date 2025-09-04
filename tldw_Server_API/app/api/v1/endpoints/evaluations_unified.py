@@ -8,6 +8,7 @@ This module provides a single, cohesive API for all evaluation functionality.
 import os
 import json
 import asyncio
+import time
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status, Query, Request, Response, Header
@@ -22,6 +23,7 @@ from tldw_Server_API.app.api.v1.schemas.evaluation_schemas_unified import (
     CreateRunRequest, RunResponse, RunResultsResponse,
     CreateDatasetRequest, DatasetResponse,
     EvaluationListResponse, RunListResponse, DatasetListResponse,
+    EvaluationMetric,
     
     # tldw-specific schemas
     GEvalRequest, GEvalResponse,
@@ -39,7 +41,8 @@ from tldw_Server_API.app.api.v1.schemas.evaluation_schemas_unified import (
     RateLimitStatusResponse,
     
     # Common schemas
-    ErrorResponse, ErrorDetail, HealthCheckResponse
+    ErrorResponse, ErrorDetail, HealthCheckResponse,
+    EvaluationMetric
 )
 
 # Import unified service
@@ -343,7 +346,32 @@ async def get_rate_limit_status(
     """Get current rate limit status for the authenticated user"""
     try:
         summary = await user_rate_limiter.get_usage_summary(user_id)
-        return RateLimitStatusResponse(**summary)
+        
+        # Convert the nested structure to flat structure expected by RateLimitStatusResponse
+        from datetime import datetime, timezone, timedelta
+        return RateLimitStatusResponse(
+            tier=summary.get("tier", "free"),
+            limits={
+                "evaluations_per_minute": summary.get("limits", {}).get("per_minute", {}).get("evaluations", 0),
+                "evaluations_per_day": summary.get("limits", {}).get("daily", {}).get("evaluations", 0),
+                "tokens_per_day": summary.get("limits", {}).get("daily", {}).get("tokens", 0),
+                "cost_per_day": int(summary.get("limits", {}).get("daily", {}).get("cost", 0)),
+                "cost_per_month": int(summary.get("limits", {}).get("monthly", {}).get("cost", 0))
+            },
+            usage={
+                "evaluations_today": summary.get("usage", {}).get("today", {}).get("evaluations", 0),
+                "tokens_today": summary.get("usage", {}).get("today", {}).get("tokens", 0),
+                "cost_today": int(summary.get("usage", {}).get("today", {}).get("cost", 0)),
+                "cost_month": int(summary.get("usage", {}).get("month", {}).get("cost", 0))
+            },
+            remaining={
+                "daily_evaluations": summary.get("remaining", {}).get("daily_evaluations", 0),
+                "daily_tokens": summary.get("remaining", {}).get("daily_tokens", 0),
+                "daily_cost": int(summary.get("remaining", {}).get("daily_cost", 0)),
+                "monthly_cost": int(summary.get("remaining", {}).get("monthly_cost", 0))
+            },
+            reset_at=datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        )
         
     except Exception as e:
         logger.error(f"Failed to get rate limit status: {e}")
@@ -544,8 +572,25 @@ async def register_webhook(
 ):
     """Register a webhook for evaluation notifications"""
     try:
-        # Convert enum values to strings for webhook manager
-        events = [e.value for e in request.events]
+        # Import WebhookEvent enum for proper conversion
+        from tldw_Server_API.app.core.Evaluations.webhook_manager import WebhookEvent
+        
+        # Convert string event types to WebhookEvent enums
+        events = []
+        for event_str in request.events:
+            # Handle both enum values and string values
+            if hasattr(event_str, 'value'):
+                # Already an enum
+                event_value = event_str.value
+            else:
+                # String value
+                event_value = event_str
+                
+            # Find matching enum
+            for webhook_event in WebhookEvent:
+                if webhook_event.value == event_value:
+                    events.append(webhook_event)
+                    break
         
         result = await webhook_manager.register_webhook(
             user_id=user_id,
@@ -821,9 +866,19 @@ async def evaluate_geval(
             user_id=user_id
         )
         
-        # Format response
+        # Format response - convert simple metrics to EvaluationMetric objects
+        raw_metrics = result["results"].get("metrics", {})
+        formatted_metrics = {}
+        for metric_name, score in raw_metrics.items():
+            formatted_metrics[metric_name] = EvaluationMetric(
+                name=metric_name,
+                score=score / 5.0 if score > 1 else score,  # Normalize to 0-1 if needed
+                raw_score=score,
+                explanation=result["results"].get("explanations", {}).get(metric_name, "")
+            )
+        
         return GEvalResponse(
-            metrics=result["results"].get("metrics", {}),
+            metrics=formatted_metrics,
             average_score=result["results"].get("average_score", 0.0),
             summary_assessment=result["results"].get("assessment", "Evaluation complete"),
             evaluation_time=result["evaluation_time"],
@@ -859,11 +914,19 @@ async def evaluate_rag(
             user_id=user_id
         )
         
-        # Extract metrics from results
-        metrics = result["results"].get("metrics", {})
+        # Extract and format metrics from results
+        raw_metrics = result["results"].get("metrics", {})
+        formatted_metrics = {}
+        for metric_name, score in raw_metrics.items():
+            formatted_metrics[metric_name] = EvaluationMetric(
+                name=metric_name,
+                score=score if isinstance(score, (int, float)) else 0.0,
+                raw_score=score if isinstance(score, (int, float)) else 0.0,
+                explanation=""
+            )
         
         return RAGEvaluationResponse(
-            metrics=metrics,
+            metrics=formatted_metrics,
             overall_score=result["results"].get("overall_score", 0.0),
             retrieval_quality=result["results"].get("retrieval_quality", 0.0),
             generation_quality=result["results"].get("generation_quality", 0.0),
@@ -899,10 +962,40 @@ async def evaluate_response_quality(
             user_id=user_id
         )
         
+        # Convert metrics to proper EvaluationMetric structure
+        metrics = {}
+        for metric_name, metric_data in result["results"].get("metrics", {}).items():
+            if isinstance(metric_data, dict):
+                metrics[metric_name] = EvaluationMetric(
+                    name=metric_data.get("name", metric_name),
+                    score=metric_data.get("score", 0.0),
+                    raw_score=metric_data.get("raw_score"),
+                    explanation=metric_data.get("explanation"),
+                    metadata=metric_data.get("metadata", {})
+                )
+            else:
+                # Handle flat metric values (for backward compatibility)
+                metrics[metric_name] = EvaluationMetric(
+                    name=metric_name,
+                    score=float(metric_data) if isinstance(metric_data, (int, float)) else 0.0,
+                    explanation=f"{metric_name} score"
+                )
+        
+        # Convert format_compliance to proper structure
+        format_compliance = None
+        if "format_compliance" in result["results"]:
+            fc_value = result["results"]["format_compliance"]
+            if isinstance(fc_value, bool):
+                format_compliance = {"compliant": fc_value}
+            elif isinstance(fc_value, dict):
+                format_compliance = fc_value
+            else:
+                format_compliance = None
+        
         return ResponseQualityResponse(
-            metrics=result["results"].get("metrics", {}),
+            metrics=metrics,
             overall_quality=result["results"].get("overall_quality", 0.0),
-            format_compliance=result["results"].get("format_compliance", {}),
+            format_compliance=format_compliance,
             issues=result["results"].get("issues", []),
             improvements=result["results"].get("improvements", [])
         )
@@ -979,4 +1072,227 @@ async def cancel_run(
             message=f"Failed to cancel run: {sanitize_error_message(e, 'cancelling run')}",
             error_type="server_error",
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# ============= Batch Evaluation Endpoint =============
+
+@router.post("/batch", response_model=BatchEvaluationResponse, dependencies=[Depends(check_evaluation_rate_limit)])
+async def batch_evaluate(
+    request: BatchEvaluationRequest,
+    user_id: str = Depends(verify_api_key)
+):
+    """
+    Run multiple evaluations in batch.
+    
+    Supports running multiple evaluation types with configurable parallelism.
+    """
+    try:
+        start_time = time.time()
+        service = get_evaluation_service()
+        
+        results = []
+        failed_count = 0
+        
+        # Process evaluations based on parallel setting (use parallel_workers > 1 as indicator)
+        if request.parallel_workers > 1:
+            # Run evaluations in parallel
+            tasks = []
+            for eval_request in request.items:
+                eval_type = request.evaluation_type  # Type is at batch level
+                
+                if eval_type == "geval":
+                    task = service.evaluate_geval(
+                        source_text=eval_request.get("source_text", ""),
+                        summary=eval_request.get("summary", ""),
+                        metrics=eval_request.get("metrics", ["coherence"]),
+                        api_name=eval_request.get("api_name", "openai"),
+                        api_key=eval_request.get("api_key", "test_api_key"),
+                        user_id=user_id
+                    )
+                elif eval_type == "rag":
+                    task = service.evaluate_rag(
+                        query=eval_request.get("query", ""),
+                        contexts=eval_request.get("retrieved_contexts", []),
+                        response=eval_request.get("generated_response", ""),
+                        ground_truth=eval_request.get("ground_truth"),
+                        metrics=eval_request.get("metrics", ["relevance", "faithfulness"]),
+                        api_name=eval_request.get("api_name", "openai"),
+                        user_id=user_id
+                    )
+                elif eval_type == "response_quality":
+                    task = service.evaluate_response_quality(
+                        prompt=eval_request.get("prompt", ""),
+                        response=eval_request.get("response", ""),
+                        expected_format=eval_request.get("expected_format"),
+                        custom_criteria=eval_request.get("evaluation_criteria"),
+                        api_name=eval_request.get("api_name", "openai"),
+                        user_id=user_id
+                    )
+                else:
+                    # Unknown type, create failed result
+                    results.append({
+                        "evaluation_id": None,
+                        "status": "failed",
+                        "error": f"Unknown evaluation type: {eval_type}"
+                    })
+                    failed_count += 1
+                    continue
+                
+                if 'task' in locals():
+                    tasks.append(task)
+            
+            # Wait for all tasks
+            if tasks:
+                task_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                for i, result in enumerate(task_results):
+                    if isinstance(result, Exception):
+                        results.append({
+                            "evaluation_id": None,
+                            "status": "failed",
+                            "error": str(result)
+                        })
+                        failed_count += 1
+                    else:
+                        results.append({
+                            "evaluation_id": result.get("evaluation_id"),
+                            "status": "completed",
+                            "results": result.get("results", {})
+                        })
+        else:
+            # Run evaluations sequentially
+            for eval_request in request.items:
+                eval_type = request.evaluation_type  # Type is at batch level
+                
+                try:
+                    if eval_type == "geval":
+                        result = await service.evaluate_geval(
+                            source_text=eval_request.get("source_text", ""),
+                            summary=eval_request.get("summary", ""),
+                            metrics=eval_request.get("metrics", ["coherence"]),
+                            api_name=eval_request.get("api_name", "openai"),
+                            api_key=eval_request.get("api_key", "test_api_key"),
+                            user_id=user_id
+                        )
+                    elif eval_type == "rag":
+                        result = await service.evaluate_rag(
+                            query=eval_request.get("query", ""),
+                            contexts=eval_request.get("retrieved_contexts", []),
+                            response=eval_request.get("generated_response", ""),
+                            ground_truth=eval_request.get("ground_truth"),
+                            metrics=eval_request.get("metrics", ["relevance", "faithfulness"]),
+                            api_name=eval_request.get("api_name", "openai"),
+                            user_id=user_id
+                        )
+                    elif eval_type == "response_quality":
+                        result = await service.evaluate_response_quality(
+                            prompt=eval_request.get("prompt", ""),
+                            response=eval_request.get("response", ""),
+                            expected_format=eval_request.get("expected_format"),
+                            custom_criteria=eval_request.get("evaluation_criteria"),
+                            api_name=eval_request.get("api_name", "openai"),
+                            user_id=user_id
+                        )
+                    else:
+                        results.append({
+                            "evaluation_id": None,
+                            "status": "failed",
+                            "error": f"Unknown evaluation type: {eval_type}"
+                        })
+                        failed_count += 1
+                        continue
+                    
+                    results.append({
+                        "evaluation_id": result.get("evaluation_id"),
+                        "status": "completed",
+                        "results": result.get("results", {})
+                    })
+                    
+                except Exception as e:
+                    results.append({
+                        "evaluation_id": None,
+                        "status": "failed",
+                        "error": str(e)
+                    })
+                    failed_count += 1
+                    
+                    # Check continue_on_error setting (inverse logic)
+                    if not request.continue_on_error:
+                        break
+        
+        processing_time = time.time() - start_time
+        
+        return BatchEvaluationResponse(
+            total_items=len(request.items),
+            successful=len(results) - failed_count,
+            failed=failed_count,
+            results=results,
+            aggregate_metrics={},  # TODO: Calculate aggregate metrics
+            processing_time=processing_time
+        )
+        
+    except Exception as e:
+        logger.error(f"Batch evaluation failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Batch evaluation failed: {sanitize_error_message(e, 'batch evaluation')}"
+        )
+
+
+# ============= Evaluation History Endpoint =============
+
+@router.post("/history", response_model=EvaluationHistoryResponse)
+async def get_evaluation_history(
+    request: EvaluationHistoryRequest,
+    user_id: str = Depends(verify_api_key)
+):
+    """
+    Retrieve evaluation history for a user.
+    
+    Supports filtering by date range, evaluation type, and pagination.
+    """
+    try:
+        service = get_evaluation_service()
+        
+        # Get evaluations from database
+        evaluations = await service.get_evaluation_history(
+            user_id=request.user_id or user_id,
+            evaluation_type=request.evaluation_type,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            limit=request.limit or 100,
+            offset=request.offset or 0
+        )
+        
+        # Get total count for pagination
+        total_count = await service.count_evaluations(
+            user_id=request.user_id or user_id,
+            evaluation_type=request.evaluation_type,
+            start_date=request.start_date,
+            end_date=request.end_date
+        )
+        
+        return EvaluationHistoryResponse(
+            items=evaluations,
+            total_count=total_count,
+            aggregations={
+                "limit": request.limit or 100,
+                "offset": request.offset or 0,
+                "filtered_by": {
+                    "user_id": request.user_id or user_id,
+                    "evaluation_type": request.evaluation_type,
+                    "date_range": {
+                        "start": request.start_date.isoformat() if request.start_date else None,
+                        "end": request.end_date.isoformat() if request.end_date else None
+                    }
+                }
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve evaluation history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve history: {sanitize_error_message(e, 'retrieving history')}"
         )

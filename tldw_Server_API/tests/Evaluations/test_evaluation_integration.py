@@ -295,7 +295,7 @@ class TestAuthentication:
         return settings
     
     @pytest.mark.asyncio
-    async def test_single_user_auth(self, mock_settings):
+    async def test_single_user_auth(self, mock_settings, setup_auth_db):
         """Test single-user authentication without hardcoded keys."""
         from tldw_Server_API.app.api.v1.endpoints.evals_openai import verify_api_key
         from fastapi import HTTPException
@@ -318,7 +318,7 @@ class TestAuthentication:
                 assert exc_info.value.status_code == 401
     
     @pytest.mark.asyncio
-    async def test_multi_user_jwt_auth(self, mock_settings):
+    async def test_multi_user_jwt_auth(self, mock_settings, setup_auth_db):
         """Test multi-user JWT authentication."""
         from tldw_Server_API.app.api.v1.endpoints.evals_openai import verify_api_key
         from fastapi.security import HTTPAuthorizationCredentials
@@ -345,7 +345,7 @@ class TestAuthentication:
 class TestRateLimiting:
     """Test rate limiting configuration."""
     
-    def test_rate_limit_configuration(self):
+    def test_rate_limit_configuration(self, setup_auth_db):
         """Test that rate limits are properly configured from settings."""
         from tldw_Server_API.app.api.v1.endpoints.evals_openai import (
             rate_limit_per_minute, burst_limit
@@ -355,7 +355,7 @@ class TestRateLimiting:
         assert rate_limit_per_minute > 0
         assert burst_limit > 0
     
-    def test_rate_limit_key_function(self):
+    def test_rate_limit_key_function(self, setup_auth_db):
         """Test rate limit key generation."""
         from tldw_Server_API.app.api.v1.endpoints.evals_openai import get_rate_limit_key
         from fastapi import Request

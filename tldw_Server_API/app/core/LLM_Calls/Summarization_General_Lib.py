@@ -599,17 +599,27 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
             temp = 0.7
 
 
+        # Build base payload
         payload = {
             "model": openai_model,
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": openai_prompt}
             ],
-            # FIXME - Set a Max tokens value in config file for each API
-            "max_tokens": 4096,
-            "temperature": temp,
             "stream": streaming
         }
+        
+        # Handle model-specific requirements
+        if openai_model.startswith("gpt-5"):
+            # gpt-5 models use max_completion_tokens and only support temperature=1
+            payload["max_completion_tokens"] = 4096
+            # gpt-5-nano only supports default temperature of 1
+            if temp != 1.0:
+                logging.debug(f"OpenAI: gpt-5 model detected, ignoring temperature {temp} and using default 1.0")
+        else:
+            # Other models use max_tokens and support custom temperature
+            payload["max_tokens"] = 4096
+            payload["temperature"] = temp
 
         # --- Retry Logic --- (Copied from original, seems reasonable)
         session = requests.Session()
@@ -628,12 +638,17 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
 
 
         logging.debug(f"OpenAI: Posting request to {api_url}")
+        # Get timeout value and ensure it's numeric
+        timeout_value = loaded_config_data.get('openai_api', {}).get('api_timeout', 120)
+        if isinstance(timeout_value, str):
+            timeout_value = float(timeout_value)
+        
         response = session.post(
             api_url,
             headers=headers,
             json=payload,
             stream=streaming,
-            timeout=loaded_config_data.get('openai_api', {}).get('api_timeout', 120) # Add timeout
+            timeout=timeout_value  # Use numeric timeout
         )
         response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
 
@@ -676,6 +691,13 @@ def summarize_with_openai(api_key, input_data, custom_prompt_arg, temp=None, sys
 
     except requests.exceptions.RequestException as e:
         logging.error(f"OpenAI: API request failed: {str(e)}", exc_info=True)
+        # Try to get more detailed error from response
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                error_detail = e.response.json()
+                logging.error(f"OpenAI: API error details: {error_detail}")
+            except:
+                pass
         return f"Error: OpenAI API request failed: {str(e)}"
     except Exception as e:
         logging.error(f"OpenAI: Unexpected error: {str(e)}", exc_info=True)

@@ -732,6 +732,147 @@ class UnifiedEvaluationService:
             logger.error(f"Failed to delete dataset {dataset_id}: {e}")
             raise
     
+    async def get_evaluation_history(
+        self,
+        user_id: str,
+        evaluation_type: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        limit: int = 100,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Get evaluation history for a user.
+        
+        Args:
+            user_id: User identifier
+            evaluation_type: Optional filter by evaluation type
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            limit: Maximum number of results
+            offset: Pagination offset
+            
+        Returns:
+            List of evaluation records
+        """
+        try:
+            # Build filter criteria
+            filters = {"user_id": user_id}
+            
+            if evaluation_type:
+                filters["type"] = evaluation_type
+            
+            if start_date:
+                filters["created_after"] = start_date.isoformat()
+            
+            if end_date:
+                filters["created_before"] = end_date.isoformat()
+            
+            # Query database - list_evaluations only accepts limit, after, and eval_type
+            # We need to filter results manually since the DB method doesn't support all filters
+            evaluations, _ = self.db.list_evaluations(
+                limit=limit + offset,  # Get more results to handle offset manually
+                eval_type=evaluation_type
+            )
+            
+            # Manual filtering for user_id and date ranges since DB method doesn't support these
+            filtered_evaluations = []
+            for eval in evaluations:
+                # Filter by user_id if present in the record
+                if user_id and eval.get("user_id") != user_id:
+                    continue
+                    
+                # Filter by date range if specified
+                if start_date or end_date:
+                    created_at_str = eval.get("created_at")
+                    if created_at_str:
+                        try:
+                            created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                            if start_date and created_at < start_date:
+                                continue
+                            if end_date and created_at > end_date:
+                                continue
+                        except:
+                            pass
+                
+                filtered_evaluations.append(eval)
+            
+            # Apply offset and limit manually
+            evaluations = filtered_evaluations[offset:offset + limit]
+            
+            return evaluations
+            
+        except Exception as e:
+            logger.error(f"Failed to get evaluation history: {e}")
+            raise
+    
+    async def count_evaluations(
+        self,
+        user_id: str,
+        evaluation_type: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> int:
+        """
+        Count evaluations matching criteria.
+        
+        Args:
+            user_id: User identifier
+            evaluation_type: Optional filter by evaluation type
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            
+        Returns:
+            Total count of matching evaluations
+        """
+        try:
+            # Build filter criteria
+            filters = {"user_id": user_id}
+            
+            if evaluation_type:
+                filters["type"] = evaluation_type
+            
+            if start_date:
+                filters["created_after"] = start_date.isoformat()
+            
+            if end_date:
+                filters["created_before"] = end_date.isoformat()
+            
+            # Get count from database - since DB doesn't have count_evaluations, count manually
+            # Get all evaluations and count them with filters
+            evaluations, _ = self.db.list_evaluations(
+                limit=10000,  # Large limit to get all
+                eval_type=evaluation_type
+            )
+            
+            # Manual filtering and counting
+            count = 0
+            for eval in evaluations:
+                # Filter by user_id if present in the record
+                if user_id and eval.get("user_id") != user_id:
+                    continue
+                    
+                # Filter by date range if specified
+                if start_date or end_date:
+                    created_at_str = eval.get("created_at")
+                    if created_at_str:
+                        try:
+                            created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+                            if start_date and created_at < start_date:
+                                continue
+                            if end_date and created_at > end_date:
+                                continue
+                        except:
+                            pass
+                
+                count += 1
+            
+            return count
+            
+        except Exception as e:
+            logger.error(f"Failed to count evaluations: {e}")
+            raise
+    
     # ============= Helper Methods =============
     
     async def _store_evaluation_result(
@@ -741,18 +882,39 @@ class UnifiedEvaluationService:
         results: Any,
         metadata: Dict
     ) -> str:
-        """Store evaluation result in database"""
+        """Store evaluation result in database using unified approach"""
         try:
-            # Create a simple evaluation record
+            # Generate evaluation ID
+            eval_id = f"eval_{evaluation_type}_{int(time.time() * 1000)}"
+            
+            # Store using unified method if available
+            if hasattr(self.db, 'store_unified_evaluation'):
+                success = self.db.store_unified_evaluation(
+                    evaluation_id=eval_id,
+                    name=f"{evaluation_type}_{int(time.time())}",
+                    evaluation_type=evaluation_type,
+                    input_data=input_data,
+                    results=results if isinstance(results, dict) else {"result": results},
+                    status="completed",
+                    user_id=metadata.get("user_id", "system"),
+                    metadata=metadata,
+                    embedding_provider=metadata.get("embedding_provider"),
+                    embedding_model=metadata.get("embedding_model")
+                )
+                if success:
+                    logger.info(f"Stored evaluation {eval_id} in unified table")
+                    return eval_id
+            
+            # Fallback to standard approach
             eval_id = self.db.create_evaluation(
                 name=f"{evaluation_type}_{int(time.time())}",
                 eval_type=evaluation_type,
-                eval_spec={"type": evaluation_type},
+                eval_spec={"type": evaluation_type, "input": input_data},
                 created_by=metadata.get("user_id", "system"),
                 metadata=metadata
             )
             
-            # Create and complete a run
+            # Create and complete a run with results
             run_id = self.db.create_run(
                 eval_id=eval_id,
                 target_model=metadata.get("api_name", "unknown"),
@@ -761,7 +923,7 @@ class UnifiedEvaluationService:
             
             # Update run with results
             self.db.update_run_status(run_id, "completed")
-            self.db.update_run(run_id, {"results": results})
+            self.db.update_run_progress(run_id, {"results": results})
             
             return eval_id
             

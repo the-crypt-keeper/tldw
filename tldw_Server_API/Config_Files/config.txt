@@ -264,7 +264,8 @@ cohere_api_retry = 3
 cohere_api_retry_delay = 1
 #
 #
-deepseek_api_key = <deepseek_api_key>
+deepseek_api_key = ***REMOVED***
+#<deepseek_api_key>
 # Options: 'deepseek-chat' or 'deepseek-reasoner'
 deepseek_model = deepseek-chat
 deepseek_streaming = True
@@ -316,8 +317,9 @@ mistral__api_timeout = 90
 mistral_api_retry = 3
 mistral_api_retry_delay = 1
 #
-openai_api_key = <openai_api_key>
-openai_model = gpt-4o
+#<openai_api_key>
+openai_api_key = ***REMOVED***
+openai_model = gpt-5-nano-2025-08-07
 openai_streaming = False
 openai_temperature = 0.7
 openai_top_p = 0.95

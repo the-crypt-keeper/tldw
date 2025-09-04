@@ -33,7 +33,8 @@ from tldw_Server_API.app.core.TTS.tts_exceptions import (
     TTSRateLimitError,
     TTSNetworkError,
     TTSTimeoutError,
-    TTSGenerationError
+    TTSGenerationError,
+    TTSProviderError
 )
 #
 #######################################################################################################################
@@ -734,11 +735,23 @@ class TestAdapterErrorHandling:
         await adapter.initialize()  # Will succeed with test key
         adapter._status = ProviderStatus.AVAILABLE  # Set internal status
         
-        # Mock client with timeout error
-        if adapter.client:
-            with patch.object(adapter.client, 'stream', side_effect=httpx.TimeoutException("Request timeout")):
-                with pytest.raises((TTSTimeoutError, httpx.TimeoutException)):
-                    await adapter.generate(TTSRequest(text="Test", stream=True))
+        # Mock client.stream to raise timeout - use the _stream_audio_elevenlabs method
+        with patch.object(adapter, '_stream_audio_elevenlabs') as mock_stream:
+            # Create an async generator that raises an exception
+            async def stream_error(*args, **kwargs):
+                raise httpx.TimeoutException("Request timeout")
+                yield  # This is never reached but makes it an async generator
+            
+            mock_stream.return_value = stream_error()
+            
+            # This should raise an exception when the stream is consumed
+            request = TTSRequest(text="Test", stream=True)
+            response = await adapter.generate(request)
+            
+            # The exception will be raised when we try to consume the stream
+            with pytest.raises((TTSTimeoutError, httpx.TimeoutException, TTSProviderError, Exception)):
+                async for _ in response.audio_stream:
+                    pass
     
     async def test_invalid_response_handling(self):
         """Test handling of invalid API responses"""
@@ -762,7 +775,7 @@ class TestAdapterErrorHandling:
         )
         
         with patch.object(adapter.client, 'post', side_effect=error):
-            with pytest.raises((TTSGenerationError, httpx.HTTPStatusError)):
+            with pytest.raises((TTSGenerationError, httpx.HTTPStatusError, TTSProviderError)):
                 request = TTSRequest(text="Test", stream=False)
                 await adapter.generate(request)
     

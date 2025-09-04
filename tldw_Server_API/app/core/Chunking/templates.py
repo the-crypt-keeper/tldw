@@ -303,9 +303,11 @@ class TemplateProcessor:
         for chunk in chunks:
             if not current_chunk:
                 current_chunk = chunk
-            elif len(current_chunk) + len(chunk) < min_size:
+            elif len(current_chunk) < min_size:
+                # Keep merging if current chunk is still too small
                 current_chunk = current_chunk + separator + chunk
             else:
+                # Current chunk is large enough, save it and start new one
                 merged_chunks.append(current_chunk)
                 current_chunk = chunk
         

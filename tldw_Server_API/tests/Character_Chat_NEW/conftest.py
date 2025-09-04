@@ -1,0 +1,682 @@
+"""
+Character Chat Module Test Configuration and Fixtures
+
+Provides fixtures for testing character chat functionality including
+character cards, chat sessions, world books, dictionaries, and rate limiting.
+"""
+
+import os
+import tempfile
+from pathlib import Path
+from typing import Dict, Any, List, Generator, Optional
+from unittest.mock import MagicMock, AsyncMock, Mock, patch
+from datetime import datetime, timedelta
+import uuid
+import json
+import sqlite3
+
+import pytest
+from fastapi.testclient import TestClient
+
+# Import actual character chat components for integration tests
+from tldw_Server_API.app.core.Character_Chat.Character_Chat_Lib import CharacterChatManager
+from tldw_Server_API.app.core.Character_Chat.chat_dictionary import ChatDictionaryService
+from tldw_Server_API.app.core.Character_Chat.world_book_manager import WorldBookService
+from tldw_Server_API.app.core.Character_Chat.character_rate_limiter import CharacterRateLimiter
+from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
+
+# =====================================================================
+# Test Markers
+# =====================================================================
+
+def pytest_configure(config):
+    """Register custom markers for test categorization."""
+    config.addinivalue_line("markers", "unit: Unit tests with minimal mocking")
+    config.addinivalue_line("markers", "integration: Integration tests with real components")
+    config.addinivalue_line("markers", "property: Property-based tests")
+    config.addinivalue_line("markers", "slow: Tests that take > 1 second")
+    config.addinivalue_line("markers", "rate_limit: Rate limiting tests")
+    config.addinivalue_line("markers", "world_book: World book functionality tests")
+
+# =====================================================================
+# Environment Configuration
+# =====================================================================
+
+@pytest.fixture(scope="session")
+def test_env_vars():
+    """Set up test environment variables."""
+    original_env = os.environ.copy()
+    
+    # Set test mode
+    os.environ["TEST_MODE"] = "true"
+    os.environ["CHARACTER_DB_PATH"] = ":memory:"
+    os.environ["MAX_CHAT_HISTORY"] = "100"
+    os.environ["RATE_LIMIT_PER_MINUTE"] = "30"
+    
+    yield
+    
+    # Restore original environment
+    os.environ.clear()
+    os.environ.update(original_env)
+
+# =====================================================================
+# Database Fixtures
+# =====================================================================
+
+@pytest.fixture
+def test_db_path() -> Generator[Path, None, None]:
+    """Create a temporary database file that gets cleaned up."""
+    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp_file:
+        db_path = Path(tmp_file.name)
+    
+    yield db_path
+    
+    # Cleanup
+    try:
+        if db_path.exists():
+            db_path.unlink()
+    except Exception as e:
+        print(f"Warning: Could not delete test database: {e}")
+
+@pytest.fixture
+def character_db(test_db_path) -> Generator[CharactersRAGDB, None, None]:
+    """Create a real CharactersRAGDB instance for testing."""
+    db = CharactersRAGDB(
+        db_path=str(test_db_path),
+        client_id="test_client"
+    )
+    
+    # Initialize the database schema
+    db.initialize_db()
+    
+    yield db
+    
+    # Cleanup
+    try:
+        db.close()
+    except:
+        pass
+
+@pytest.fixture
+def populated_character_db(character_db) -> CharactersRAGDB:
+    """Create a CharactersRAGDB with test data."""
+    db = character_db
+    
+    # Create test character cards
+    char1_id = db.create_character_card(
+        name="Test Character 1",
+        description="A helpful test character",
+        personality="Friendly and knowledgeable",
+        first_message="Hello! I'm Test Character 1.",
+        creator="test_user"
+    )
+    
+    char2_id = db.create_character_card(
+        name="Fantasy Wizard",
+        description="A wise wizard from a fantasy world",
+        personality="Mysterious and ancient",
+        first_message="Greetings, traveler. What brings you to my tower?",
+        creator="test_user"
+    )
+    
+    char3_id = db.create_character_card(
+        name="Science Assistant",
+        description="An AI assistant specialized in science",
+        personality="Analytical and precise",
+        first_message="Hello! Ready to explore the world of science?",
+        creator="science_user"
+    )
+    
+    # Create test chats
+    chat1_id = db.create_chat(
+        character_id=char1_id,
+        user_id="test_user",
+        title="First Chat"
+    )
+    
+    chat2_id = db.create_chat(
+        character_id=char2_id,
+        user_id="test_user",
+        title="Wizard Chat"
+    )
+    
+    # Add messages to chats
+    db.add_message(chat1_id, "user", "Hello!")
+    db.add_message(chat1_id, "assistant", "Hello! How can I help you today?")
+    
+    return db
+
+@pytest.fixture
+def chat_manager(test_db_path) -> Generator[CharacterChatManager, None, None]:
+    """Create a CharacterChatManager instance for testing."""
+    manager = CharacterChatManager(db_path=str(test_db_path))
+    
+    yield manager
+    
+    # Cleanup
+    try:
+        manager.close()
+    except:
+        pass
+
+@pytest.fixture
+def chat_dictionary_service(test_db_path) -> Generator[ChatDictionaryService, None, None]:
+    """Create a ChatDictionaryService instance for testing."""
+    service = ChatDictionaryService(db_path=str(test_db_path))
+    
+    yield service
+    
+    # Cleanup
+    try:
+        service.close()
+    except:
+        pass
+
+@pytest.fixture
+def world_book_service(test_db_path) -> Generator[WorldBookService, None, None]:
+    """Create a WorldBookService instance for testing."""
+    service = WorldBookService(db_path=str(test_db_path))
+    
+    yield service
+    
+    # Cleanup
+    try:
+        service.close()
+    except:
+        pass
+
+@pytest.fixture
+def mock_character_db():
+    """Create a mock CharactersRAGDB for unit tests."""
+    db = MagicMock(spec=CharactersRAGDB)
+    
+    # Mock character methods
+    db.create_character_card = Mock(return_value=1)
+    db.get_character_card = Mock(return_value={
+        'id': 1,
+        'name': 'Test Character',
+        'description': 'Test description',
+        'personality': 'Test personality',
+        'first_message': 'Hello!',
+        'created_at': datetime.utcnow().isoformat()
+    })
+    db.list_character_cards = Mock(return_value=[])
+    db.update_character_card = Mock(return_value={'success': True})
+    db.delete_character_card = Mock(return_value={'success': True})
+    
+    # Mock chat methods
+    db.create_chat = Mock(return_value=1)
+    db.get_chat = Mock(return_value={
+        'id': 1,
+        'character_id': 1,
+        'user_id': 'test_user',
+        'title': 'Test Chat',
+        'created_at': datetime.utcnow().isoformat()
+    })
+    db.list_chats = Mock(return_value=[])
+    db.add_message = Mock(return_value=1)
+    db.get_messages = Mock(return_value=[])
+    
+    return db
+
+@pytest.fixture
+def mock_chat_manager(mock_character_db):
+    """Create a CharacterChatManager with mocked database for unit tests."""
+    with patch('tldw_Server_API.app.core.Character_Chat.Character_Chat_Lib.CharactersRAGDB', return_value=mock_character_db):
+        manager = CharacterChatManager(db_path=":memory:")
+        manager.db = mock_character_db
+        yield manager
+
+# =====================================================================
+# Character Card Fixtures
+# =====================================================================
+
+@pytest.fixture
+def sample_character_card():
+    """Sample character card data."""
+    return {
+        'name': 'Test Character',
+        'description': 'A helpful AI assistant for testing',
+        'personality': 'Friendly, helpful, and knowledgeable',
+        'first_message': 'Hello! How can I assist you today?',
+        'creator': 'test_user',
+        'tags': ['test', 'assistant', 'AI'],
+        'scenario': 'You are chatting with a helpful AI assistant.',
+        'example_messages': [
+            {'role': 'user', 'content': 'What can you do?'},
+            {'role': 'assistant', 'content': 'I can help with various tasks!'}
+        ]
+    }
+
+@pytest.fixture
+def sample_character_cards():
+    """Multiple sample character cards."""
+    return [
+        {
+            'name': 'Science Teacher',
+            'description': 'Expert in various sciences',
+            'personality': 'Patient and thorough',
+            'first_message': 'Welcome to science class!',
+            'creator': 'educator',
+            'tags': ['education', 'science']
+        },
+        {
+            'name': 'Fantasy Guide',
+            'description': 'Your guide through fantasy worlds',
+            'personality': 'Adventurous and wise',
+            'first_message': 'Greetings, adventurer!',
+            'creator': 'game_master',
+            'tags': ['fantasy', 'roleplay']
+        },
+        {
+            'name': 'Code Helper',
+            'description': 'Programming assistant',
+            'personality': 'Logical and precise',
+            'first_message': 'Ready to debug some code?',
+            'creator': 'dev_user',
+            'tags': ['programming', 'technical']
+        }
+    ]
+
+@pytest.fixture
+def character_card_v3_format():
+    """Character card in V3 format for import/export."""
+    return {
+        'spec': 'chara_card_v3',
+        'spec_version': '3.0',
+        'data': {
+            'name': 'Imported Character',
+            'description': 'Character from V3 format',
+            'personality': 'Standard V3 personality',
+            'first_mes': 'Greetings from V3!',
+            'mes_example': '<START>\n{{user}}: Hi\n{{char}}: Hello!\n',
+            'scenario': 'V3 scenario',
+            'creator_notes': 'Created for testing',
+            'system_prompt': 'You are {{char}}',
+            'post_history_instructions': 'Remember context',
+            'alternate_greetings': ['Alt greeting 1', 'Alt greeting 2'],
+            'tags': ['imported', 'v3']
+        }
+    }
+
+# =====================================================================
+# Chat Session Fixtures
+# =====================================================================
+
+@pytest.fixture
+def sample_chat_session():
+    """Sample chat session data."""
+    return {
+        'character_id': 1,
+        'user_id': 'test_user',
+        'title': 'Test Chat Session',
+        'messages': [
+            {'role': 'system', 'content': 'You are Test Character.'},
+            {'role': 'assistant', 'content': 'Hello! How can I help?'},
+            {'role': 'user', 'content': 'Tell me about yourself.'},
+            {'role': 'assistant', 'content': 'I am a helpful AI assistant.'}
+        ]
+    }
+
+@pytest.fixture
+def long_chat_history():
+    """Long chat history for testing context management."""
+    messages = []
+    for i in range(50):
+        messages.extend([
+            {'role': 'user', 'content': f'Question {i}?'},
+            {'role': 'assistant', 'content': f'Answer {i}.'}
+        ])
+    return messages
+
+# =====================================================================
+# World Book Fixtures
+# =====================================================================
+
+@pytest.fixture
+def sample_world_book():
+    """Sample world book data."""
+    return {
+        'name': 'Fantasy World',
+        'description': 'A comprehensive fantasy world setting',
+        'entries': [
+            {
+                'keywords': ['dragon', 'dragons'],
+                'content': 'Dragons are ancient magical creatures.',
+                'priority': 100,
+                'enabled': True
+            },
+            {
+                'keywords': ['magic', 'spell'],
+                'content': 'Magic flows through the world.',
+                'priority': 90,
+                'enabled': True
+            },
+            {
+                'keywords': ['kingdom'],
+                'content': 'The kingdom spans three continents.',
+                'priority': 80,
+                'enabled': True
+            }
+        ]
+    }
+
+@pytest.fixture
+def complex_world_book():
+    """Complex world book with recursive entries."""
+    return {
+        'name': 'Complex World',
+        'description': 'World with recursive scanning',
+        'entries': [
+            {
+                'keywords': ['hero'],
+                'content': 'The hero wields a legendary sword.',
+                'priority': 100,
+                'enabled': True,
+                'recursive_scanning': True
+            },
+            {
+                'keywords': ['sword'],
+                'content': 'The sword was forged by ancient smiths.',
+                'priority': 95,
+                'enabled': True
+            },
+            {
+                'keywords': ['smiths', 'ancient'],
+                'content': 'Ancient smiths lived in mountain forges.',
+                'priority': 90,
+                'enabled': True
+            }
+        ]
+    }
+
+# =====================================================================
+# Chat Dictionary Fixtures
+# =====================================================================
+
+@pytest.fixture
+def sample_dictionary():
+    """Sample chat dictionary data."""
+    return {
+        'name': 'Test Dictionary',
+        'description': 'Dictionary for text replacements',
+        'entries': [
+            {
+                'pattern': 'AI',
+                'replacement': 'Artificial Intelligence',
+                'type': 'literal',
+                'enabled': True
+            },
+            {
+                'pattern': r'\b(\d+)\s*F\b',
+                'replacement': r'\1 Fahrenheit',
+                'type': 'regex',
+                'enabled': True
+            },
+            {
+                'pattern': 'lol',
+                'replacement': 'laugh out loud',
+                'type': 'literal',
+                'probability': 0.5,
+                'enabled': True
+            }
+        ]
+    }
+
+@pytest.fixture
+def markdown_dictionary():
+    """Dictionary in markdown format for import/export."""
+    return """# Test Dictionary
+
+## Entry: AI
+- **Type**: literal
+- **Replacement**: Artificial Intelligence
+- **Enabled**: true
+
+## Entry: Temperature
+- **Type**: regex
+- **Pattern**: \\b(\\d+)\\s*F\\b
+- **Replacement**: \\1 Fahrenheit
+- **Enabled**: true
+
+## Entry: Slang
+- **Type**: literal
+- **Pattern**: lol
+- **Replacement**: laugh out loud
+- **Probability**: 0.5
+- **Enabled**: true
+"""
+
+# =====================================================================
+# Rate Limiting Fixtures
+# =====================================================================
+
+@pytest.fixture
+def rate_limiter():
+    """Create a rate limiter for testing."""
+    return CharacterRateLimiter(
+        max_requests_per_minute=30,
+        max_tokens_per_minute=10000,
+        burst_size=5
+    )
+
+@pytest.fixture
+def rate_limit_config():
+    """Rate limiter configuration."""
+    return {
+        'max_requests_per_minute': 30,
+        'max_tokens_per_minute': 10000,
+        'burst_size': 5,
+        'window_size': 60  # seconds
+    }
+
+# =====================================================================
+# Message Processing Fixtures
+# =====================================================================
+
+@pytest.fixture
+def sample_messages():
+    """Sample messages for testing."""
+    return [
+        {'role': 'user', 'content': 'Hello!'},
+        {'role': 'assistant', 'content': 'Hi there!'},
+        {'role': 'user', 'content': 'How are you?'},
+        {'role': 'assistant', 'content': 'I am doing well, thank you!'}
+    ]
+
+@pytest.fixture
+def context_injection_data():
+    """Data for testing context injection."""
+    return {
+        'world_book_entries': [
+            'Dragons are ancient magical creatures.',
+            'The kingdom spans three continents.'
+        ],
+        'dictionary_replacements': {
+            'AI': 'Artificial Intelligence',
+            'lol': 'laugh out loud'
+        },
+        'character_context': 'You are a helpful assistant.',
+        'scenario': 'Modern day conversation.'
+    }
+
+# =====================================================================
+# Search and Filter Fixtures
+# =====================================================================
+
+@pytest.fixture
+def search_queries():
+    """Various search query patterns."""
+    return {
+        'simple': 'test',
+        'tags': 'tag:fantasy',
+        'creator': 'creator:test_user',
+        'combined': 'wizard tag:fantasy',
+        'complex': '(science OR tech) AND creator:dev_user'
+    }
+
+@pytest.fixture
+def filter_criteria():
+    """Filter criteria for characters."""
+    return {
+        'by_tags': {'tags': ['fantasy', 'roleplay']},
+        'by_creator': {'creator': 'test_user'},
+        'by_date': {
+            'created_after': '2024-01-01',
+            'created_before': '2024-12-31'
+        },
+        'combined': {
+            'tags': ['test'],
+            'creator': 'test_user',
+            'active': True
+        }
+    }
+
+# =====================================================================
+# Import/Export Fixtures
+# =====================================================================
+
+@pytest.fixture
+def export_data():
+    """Sample export data structure."""
+    return {
+        'version': '1.0',
+        'exported_at': datetime.utcnow().isoformat(),
+        'characters': [
+            {
+                'name': 'Exported Character 1',
+                'description': 'First exported character',
+                'personality': 'Friendly',
+                'first_message': 'Hello!',
+                'tags': ['export', 'test']
+            },
+            {
+                'name': 'Exported Character 2',
+                'description': 'Second exported character',
+                'personality': 'Mysterious',
+                'first_message': 'Greetings...',
+                'tags': ['export', 'fantasy']
+            }
+        ],
+        'world_books': [
+            {
+                'name': 'Exported World',
+                'entries': [
+                    {'keywords': ['test'], 'content': 'Test entry'}
+                ]
+            }
+        ]
+    }
+
+@pytest.fixture
+def import_file(export_data, tmp_path):
+    """Create a temporary import file."""
+    file_path = tmp_path / "character_import.json"
+    file_path.write_text(json.dumps(export_data))
+    return file_path
+
+# =====================================================================
+# Token Counting Fixtures
+# =====================================================================
+
+@pytest.fixture
+def mock_tokenizer():
+    """Mock tokenizer for testing."""
+    tokenizer = MagicMock()
+    tokenizer.encode = Mock(side_effect=lambda text: list(text.split()))
+    tokenizer.decode = Mock(side_effect=lambda tokens: ' '.join(tokens))
+    tokenizer.count_tokens = Mock(side_effect=lambda text: len(text.split()))
+    return tokenizer
+
+# =====================================================================
+# Performance Testing Fixtures
+# =====================================================================
+
+@pytest.fixture
+def large_character_collection():
+    """Generate a large collection of characters for performance testing."""
+    characters = []
+    for i in range(100):
+        characters.append({
+            'name': f'Character {i}',
+            'description': f'Description for character {i}',
+            'personality': f'Personality {i % 10}',
+            'first_message': f'Hello from character {i}!',
+            'creator': f'user_{i % 5}',
+            'tags': [f'tag_{i % 3}', f'group_{i % 5}']
+        })
+    return characters
+
+@pytest.fixture
+def performance_metrics():
+    """Track performance metrics during tests."""
+    return {
+        'create_times': [],
+        'read_times': [],
+        'search_times': [],
+        'message_times': [],
+        'context_times': []
+    }
+
+# =====================================================================
+# API Client Fixtures
+# =====================================================================
+
+@pytest.fixture
+def test_client(test_env_vars):
+    """Create a test client for the FastAPI app."""
+    from tldw_Server_API.app.main import app
+    return TestClient(app)
+
+@pytest.fixture
+def auth_headers():
+    """Authentication headers for API requests."""
+    return {
+        "Authorization": "Bearer test-api-key",
+        "Content-Type": "application/json"
+    }
+
+# =====================================================================
+# Cleanup Fixtures
+# =====================================================================
+
+@pytest.fixture(autouse=True)
+def cleanup_after_test():
+    """Cleanup after each test."""
+    yield
+    # Cleanup any temporary files or resources
+    import gc
+    gc.collect()
+
+# =====================================================================
+# Helper Functions
+# =====================================================================
+
+def create_test_character(db, **kwargs):
+    """Helper to create a test character card."""
+    character_data = {
+        'name': 'Test Character',
+        'description': 'Test description',
+        'personality': 'Test personality',
+        'first_message': 'Hello!',
+        'creator': 'test_user'
+    }
+    character_data.update(kwargs)
+    return db.create_character_card(**character_data)
+
+def create_test_chat(db, character_id, user_id='test_user', **kwargs):
+    """Helper to create a test chat session."""
+    return db.create_chat(
+        character_id=character_id,
+        user_id=user_id,
+        title=kwargs.get('title', 'Test Chat')
+    )
+
+def create_test_world_book(service, **kwargs):
+    """Helper to create a test world book."""
+    world_book_data = {
+        'name': 'Test World Book',
+        'description': 'Test world book'
+    }
+    world_book_data.update(kwargs)
+    return service.create_world_book(**world_book_data)
