@@ -7,6 +7,25 @@ of unit, integration, and property tests. Focuses on the OpenAI-compatible
 """
 
 import os
+# Set test environment variables before any imports
+os.environ["TEST_MODE"] = "true"
+os.environ["DEFAULT_LLM_PROVIDER"] = "openai"
+os.environ["API_BEARER"] = "default-secret-key-for-single-user"
+os.environ["SINGLE_USER_API_KEY"] = "default-secret-key-for-single-user"
+
+# Load config to get API keys
+from tldw_Server_API.app.core.config import load_and_log_configs
+_test_config = load_and_log_configs()
+if _test_config and 'openai_api' in _test_config:
+    _openai_key = _test_config['openai_api'].get('api_key')
+    if _openai_key:
+        os.environ["OPENAI_API_KEY"] = _openai_key
+
+# Add dummy API keys for other providers used in tests
+os.environ["ANTHROPIC_API_KEY"] = "test-anthropic-key-for-testing"
+os.environ["GROQ_API_KEY"] = "test-groq-key-for-testing"
+os.environ["MISTRAL_API_KEY"] = "test-mistral-key-for-testing"
+
 import tempfile
 from pathlib import Path
 from typing import Dict, Any, List, Generator, Optional
@@ -46,18 +65,8 @@ def pytest_configure(config):
 
 @pytest.fixture
 def test_env_vars():
-    """Set up test environment variables."""
-    original_env = os.environ.copy()
-    
-    # Set test mode to bypass rate limiting
-    os.environ["TEST_MODE"] = "true"
-    os.environ["DEFAULT_LLM_PROVIDER"] = "openai"
-    
+    """Placeholder for test environment variables - already set at module level."""
     yield
-    
-    # Restore original environment
-    os.environ.clear()
-    os.environ.update(original_env)
 
 # =====================================================================
 # Database Fixtures
@@ -75,32 +84,43 @@ def chacha_db(temp_db_path) -> CharactersRAGDB:
     """Create a real CharactersRAGDB instance for testing."""
     db = CharactersRAGDB(
         db_path=str(temp_db_path),
-        user_id="test_user"
+        client_id="test_user"
     )
-    db.initialize_db()
+    # Database is initialized in __init__, no need to call initialize_db
     return db
 
 @pytest.fixture
 def populated_chacha_db(chacha_db) -> CharactersRAGDB:
     """Create a CharactersRAGDB with test data."""
+    # First, add a character card
+    character_data = {
+        'name': 'Assistant',
+        'description': 'A helpful assistant',
+        'personality': 'Helpful and friendly',
+        'system_prompt': 'You are a helpful assistant.',
+        'client_id': 'test_user'
+    }
+    character_id = chacha_db.add_character_card(character_data)
+    
     # Add test conversations
-    conversation_id = chacha_db.create_conversation(
-        title="Test Conversation",
-        character_name="Assistant"
-    )
+    conversation_data = {
+        'title': "Test Conversation",
+        'character_id': character_id
+    }
+    conversation_id = chacha_db.add_conversation(conversation_data)
     
     # Add test messages
-    chacha_db.save_message(
-        conversation_id=conversation_id,
-        role="user",
-        content="Hello, how are you?"
-    )
+    chacha_db.add_message({
+        'conversation_id': conversation_id,
+        'sender': "user",
+        'content': "Hello, how are you?"
+    })
     
-    chacha_db.save_message(
-        conversation_id=conversation_id,
-        role="assistant",
-        content="I'm doing well, thank you! How can I help you today?"
-    )
+    chacha_db.add_message({
+        'conversation_id': conversation_id,
+        'sender': "assistant",
+        'content': "I'm doing well, thank you! How can I help you today?"
+    })
     
     return chacha_db
 
@@ -114,14 +134,15 @@ def mock_chacha_db():
     mock_db = MagicMock(spec=CharactersRAGDB)
     
     # Setup default return values
-    mock_db.create_conversation.return_value = 1
-    mock_db.save_message.return_value = 1
+    mock_db.add_conversation.return_value = "test-conversation-id"
+    mock_db.add_message.return_value = "test-message-id"
     mock_db.get_conversation.return_value = {
-        "id": 1,
+        "id": "test-conversation-id",
         "title": "Test Conversation",
-        "character_name": "Assistant"
+        "character_id": 1
     }
     mock_db.get_messages.return_value = []
+    mock_db.add_character_card.return_value = 1
     
     return mock_db
 
@@ -257,14 +278,18 @@ def test_client(test_env_vars):
 async def async_client(test_env_vars):
     """Create an async test client for streaming tests."""
     from tldw_Server_API.app.main import app
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    # Use httpx.AsyncClient with transport instead of app parameter
+    from httpx import ASGITransport
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
 
 @pytest.fixture
 def auth_headers():
     """Authentication headers for API requests."""
     return {
-        "Authorization": "Bearer test-api-key",
+        "Token": "Bearer default-secret-key-for-single-user",
+        "X-API-KEY": "default-secret-key-for-single-user",
         "Content-Type": "application/json"
     }
 

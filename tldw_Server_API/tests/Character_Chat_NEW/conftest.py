@@ -19,7 +19,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 # Import actual character chat components for integration tests
-from tldw_Server_API.app.core.Character_Chat.Character_Chat_Lib import CharacterChatManager
+# NOTE: CharacterChatManager doesn't exist - using individual services instead
+# from tldw_Server_API.app.core.Character_Chat.Character_Chat_Lib import CharacterChatManager
 from tldw_Server_API.app.core.Character_Chat.chat_dictionary import ChatDictionaryService
 from tldw_Server_API.app.core.Character_Chat.world_book_manager import WorldBookService
 from tldw_Server_API.app.core.Character_Chat.character_rate_limiter import CharacterRateLimiter
@@ -146,18 +147,19 @@ def populated_character_db(character_db) -> CharactersRAGDB:
     
     return db
 
-@pytest.fixture
-def chat_manager(test_db_path) -> Generator[CharacterChatManager, None, None]:
-    """Create a CharacterChatManager instance for testing."""
-    manager = CharacterChatManager(db_path=str(test_db_path))
-    
-    yield manager
-    
-    # Cleanup
-    try:
-        manager.close()
-    except:
-        pass
+# NOTE: CharacterChatManager doesn't exist - this fixture is disabled
+# @pytest.fixture
+# def chat_manager(test_db_path) -> Generator[CharacterChatManager, None, None]:
+#     """Create a CharacterChatManager instance for testing."""
+#     manager = CharacterChatManager(db_path=str(test_db_path))
+#     
+#     yield manager
+#     
+#     # Cleanup
+#     try:
+#         manager.close()
+#     except:
+#         pass
 
 @pytest.fixture
 def chat_dictionary_service(test_db_path) -> Generator[ChatDictionaryService, None, None]:
@@ -219,13 +221,14 @@ def mock_character_db():
     
     return db
 
-@pytest.fixture
-def mock_chat_manager(mock_character_db):
-    """Create a CharacterChatManager with mocked database for unit tests."""
-    with patch('tldw_Server_API.app.core.Character_Chat.Character_Chat_Lib.CharactersRAGDB', return_value=mock_character_db):
-        manager = CharacterChatManager(db_path=":memory:")
-        manager.db = mock_character_db
-        yield manager
+# NOTE: CharacterChatManager doesn't exist - this fixture is disabled
+# @pytest.fixture
+# def mock_chat_manager(mock_character_db):
+#     """Create a CharacterChatManager with mocked database for unit tests."""
+#     with patch('tldw_Server_API.app.core.Character_Chat.Character_Chat_Lib.CharactersRAGDB', return_value=mock_character_db):
+#         manager = CharacterChatManager(db_path=":memory:")
+#         manager.db = mock_character_db
+#         yield manager
 
 # =====================================================================
 # Character Card Fixtures

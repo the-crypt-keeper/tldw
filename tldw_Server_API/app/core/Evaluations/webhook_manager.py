@@ -308,6 +308,8 @@ class WebhookManager:
                 "events": [e.value for e in events],
                 "secret": secret if not existing else "***hidden***",
                 "active": True,
+                "created_at": datetime.now(timezone.utc),
+                "status": "active",
                 "action": action.lower()
             }
             
@@ -806,10 +808,11 @@ class WebhookManager:
                 # Handle both dict and tuple/list row formats
                 if isinstance(row, dict):
                     webhooks.append({
-                        "id": row.get("id"),
+                        "webhook_id": row.get("id"),
                         "url": row.get("url"),
                         "events": json.loads(row.get("events", "[]")),
                         "active": bool(row.get("active")),
+                        "status": "active" if row.get("active") else "inactive",
                         "statistics": {
                             "total_deliveries": row.get("total_deliveries", 0),
                             "successful_deliveries": row.get("successful_deliveries", 0),
@@ -822,10 +825,11 @@ class WebhookManager:
                     })
                 else:
                     webhooks.append({
-                        "id": row[0],
+                        "webhook_id": row[0],
                         "url": row[1],
                         "events": json.loads(row[2]),
                         "active": bool(row[3]),
+                        "status": "active" if row[3] else "inactive",
                         "statistics": {
                             "total_deliveries": row[4],
                             "successful_deliveries": row[5],

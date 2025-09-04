@@ -651,35 +651,42 @@ class TestConcurrency:
     
     @pytest.mark.asyncio
     async def test_concurrent_runs(self, async_client, auth_headers,
-                                  sample_evaluation_request, sample_run_request, mock_rate_limiter):
+                                  sample_evaluation_request, sample_run_request):
         """Test running multiple evaluations concurrently"""
-        with patch('tldw_Server_API.app.core.Evaluations.eval_runner.EvaluationRunner.run_evaluation_async'):
-            # Create evaluation
-            eval_response = await async_client.post(
-                "/api/v1/evaluations",
-                json=sample_evaluation_request,
-                headers=auth_headers
-            )
-            eval_id = eval_response.json()["id"]
+        from unittest.mock import patch, Mock
+        
+        # Mock the rate limiter decorators
+        with patch('tldw_Server_API.app.api.v1.endpoints.evals_openai.limiter.limit') as mock_limit:
+            # Make the decorator a no-op
+            mock_limit.return_value = lambda f: f
             
-            # Start multiple runs concurrently 
-            tasks = []
-            for i in range(5):
-                req = sample_run_request.copy()
-                req["config"]["temperature"] = i * 0.2
-                task = async_client.post(
-                    f"/api/v1/evaluations/{eval_id}/runs",
-                    json=req,
+            with patch('tldw_Server_API.app.core.Evaluations.eval_runner.EvaluationRunner.run_evaluation_async'):
+                # Create evaluation
+                eval_response = await async_client.post(
+                    "/api/v1/evaluations",
+                    json=sample_evaluation_request,
                     headers=auth_headers
                 )
-                tasks.append(task)
-            
-            responses = await asyncio.gather(*tasks)
-            
-            # All should succeed with mocked rate limiter
-            for response in responses:
-                assert response.status_code == 202
-                assert response.json()["id"].startswith("run_")
+                eval_id = eval_response.json()["id"]
+                
+                # Start multiple runs concurrently 
+                tasks = []
+                for i in range(5):
+                    req = sample_run_request.copy()
+                    req["config"]["temperature"] = i * 0.2
+                    task = async_client.post(
+                        f"/api/v1/evaluations/{eval_id}/runs",
+                        json=req,
+                        headers=auth_headers
+                    )
+                    tasks.append(task)
+                
+                responses = await asyncio.gather(*tasks)
+                
+                # All should succeed with mocked rate limiter
+                for response in responses:
+                    assert response.status_code == 202
+                    assert response.json()["id"].startswith("run_")
 
 
 # Run tests

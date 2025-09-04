@@ -140,7 +140,8 @@ class TestEvaluationIntegration:
                 
                 # Should have partial results
                 assert "metrics" in results
-                assert "faithfulness" in results["metrics"]
+                # faithfulness is stored as answer_faithfulness
+                assert "answer_faithfulness" in results["metrics"]
                 assert "failed_metrics" in results
                 assert "relevance" in results["failed_metrics"]
                 assert results.get("partial_results") is True

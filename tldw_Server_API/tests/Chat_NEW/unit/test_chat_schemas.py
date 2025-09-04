@@ -281,7 +281,7 @@ class TestToolsAndFunctions:
             }
         )
         assert tool.type == "function"
-        assert tool.function["name"] == "search"
+        assert tool.function.name == "search"
     
     @pytest.mark.unit
     def test_request_with_tools(self):

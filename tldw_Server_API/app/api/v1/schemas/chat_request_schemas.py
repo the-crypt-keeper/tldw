@@ -221,7 +221,7 @@ class ChatCompletionRequest(BaseModel):
     logit_bias: Optional[Dict[str, float]] = Field(None, description="Logit bias parameter (provider support varies).")
     logprobs: Optional[bool] = Field(False, description="Whether to return log probabilities (provider support varies).")
     top_logprobs: Optional[int] = Field(None, ge=0, le=20, description="Number of top log probabilities to return (provider support varies). `logprobs` must be true.")
-    max_tokens: Optional[int] = Field(None, description="Maximum number of tokens to generate (provider support varies).")
+    max_tokens: Optional[int] = Field(None, ge=1, description="Maximum number of tokens to generate (provider support varies).")
     n: Optional[int] = Field(1, ge=1, le=128, description="Number of completions to generate (provider support varies).")
     presence_penalty: Optional[float] = Field(None, ge=-2.0, le=2.0, description="Presence penalty parameter (provider support varies).")
     response_format: Optional[ResponseFormat] = Field(None, description="Response format specification (e.g., JSON mode, provider support varies).")

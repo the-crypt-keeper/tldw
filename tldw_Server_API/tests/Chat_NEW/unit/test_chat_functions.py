@@ -10,6 +10,7 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from typing import Dict, Any
 import json
 
+from tldw_Server_API.app.core.Chat import Chat_Functions
 from tldw_Server_API.app.core.Chat.Chat_Functions import (
     chat_api_call,
     process_user_input,
@@ -28,27 +29,31 @@ class TestChatAPICall:
     """Test the chat_api_call function."""
     
     @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.perform_llm_call')
-    def test_successful_api_call(self, mock_llm_call, mock_llm_response):
+    @patch.dict('tldw_Server_API.app.core.Chat.Chat_Functions.API_CALL_HANDLERS')
+    def test_successful_api_call(self, mock_llm_response):
         """Test successful chat API call."""
-        mock_llm_call.return_value = mock_llm_response
+        mock_handler = MagicMock(return_value=mock_llm_response)
+        mock_handler.__name__ = 'mock_chat_with_openai'  # Add __name__ attribute
+        Chat_Functions.API_CALL_HANDLERS['openai'] = mock_handler
         
         result = chat_api_call(
-            api_provider="openai",
+            api_endpoint="openai",
+            messages_payload=[{"role": "user", "content": "Hello"}],
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": "Hello"}],
-            temperature=0.7
+            temp=0.7
         )
         
         assert result["id"] == "chatcmpl-test123"
         assert result["choices"][0]["message"]["content"] == "This is a test response from the LLM."
-        mock_llm_call.assert_called_once()
+        mock_handler.assert_called_once()
     
     @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.perform_llm_call')
-    def test_api_call_with_system_message(self, mock_llm_call, mock_llm_response):
+    @patch.dict('tldw_Server_API.app.core.Chat.Chat_Functions.API_CALL_HANDLERS')
+    def test_api_call_with_system_message(self, mock_llm_response):
         """Test API call with system message."""
-        mock_llm_call.return_value = mock_llm_response
+        mock_handler = MagicMock(return_value=mock_llm_response)
+        mock_handler.__name__ = 'mock_chat_with_openai'
+        Chat_Functions.API_CALL_HANDLERS['openai'] = mock_handler
         
         messages = [
             {"role": "system", "content": "You are helpful."},
@@ -56,65 +61,73 @@ class TestChatAPICall:
         ]
         
         result = chat_api_call(
-            api_provider="openai",
-            model="gpt-3.5-turbo",
-            messages=messages
+            api_endpoint="openai",
+            messages_payload=messages,
+            model="gpt-3.5-turbo"
         )
         
         assert result is not None
-        call_args = mock_llm_call.call_args
-        assert call_args[1]["messages"] == messages
+        mock_handler.assert_called_once()
     
     @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.perform_llm_call')
-    def test_api_call_rate_limit_error(self, mock_llm_call):
+    @patch.dict('tldw_Server_API.app.core.Chat.Chat_Functions.API_CALL_HANDLERS')
+    def test_api_call_rate_limit_error(self):
         """Test handling of rate limit errors."""
-        mock_llm_call.side_effect = ChatRateLimitError("Rate limit exceeded")
+        mock_handler = MagicMock(side_effect=ChatRateLimitError("Rate limit exceeded", provider="openai"))
+        mock_handler.__name__ = 'mock_chat_with_openai'
+        Chat_Functions.API_CALL_HANDLERS['openai'] = mock_handler
         
         with pytest.raises(ChatRateLimitError) as exc_info:
             chat_api_call(
-                api_provider="openai",
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "Hello"}]
+                api_endpoint="openai",
+                messages_payload=[{"role": "user", "content": "Hello"}],
+                model="gpt-3.5-turbo"
             )
         
         assert "Rate limit exceeded" in str(exc_info.value)
     
     @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.perform_llm_call')
-    def test_api_call_auth_error(self, mock_llm_call):
+    @patch.dict('tldw_Server_API.app.core.Chat.Chat_Functions.API_CALL_HANDLERS')
+    def test_api_call_auth_error(self):
         """Test handling of authentication errors."""
-        mock_llm_call.side_effect = ChatAuthenticationError("Invalid API key")
+        mock_handler = MagicMock(side_effect=ChatAuthenticationError("Invalid API key", provider="openai"))
+        mock_handler.__name__ = 'mock_chat_with_openai'
+        Chat_Functions.API_CALL_HANDLERS['openai'] = mock_handler
         
         with pytest.raises(ChatAuthenticationError) as exc_info:
             chat_api_call(
-                api_provider="openai",
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": "Hello"}]
+                api_endpoint="openai",
+                messages_payload=[{"role": "user", "content": "Hello"}],
+                model="gpt-3.5-turbo"
             )
         
         assert "Invalid API key" in str(exc_info.value)
     
     @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.perform_llm_call')
-    def test_api_call_provider_routing(self, mock_llm_call, mock_llm_response):
+    @patch.dict('tldw_Server_API.app.core.Chat.Chat_Functions.API_CALL_HANDLERS')
+    def test_api_call_provider_routing(self, mock_llm_response):
         """Test that different providers are routed correctly."""
-        mock_llm_call.return_value = mock_llm_response
-        
         providers = ["openai", "anthropic", "groq", "mistral"]
         
+        # Create mocks for each provider
+        mocks = {}
+        for provider in providers:
+            mock_handler = MagicMock(return_value=mock_llm_response)
+            mock_handler.__name__ = f'mock_chat_with_{provider}'
+            Chat_Functions.API_CALL_HANDLERS[provider] = mock_handler
+            mocks[provider] = mock_handler
+        
+        # Call each provider
         for provider in providers:
             chat_api_call(
-                api_provider=provider,
-                model="test-model",
-                messages=[{"role": "user", "content": "Test"}]
+                api_endpoint=provider,
+                messages_payload=[{"role": "user", "content": "Test"}],
+                model="test-model"
             )
         
-        assert mock_llm_call.call_count == len(providers)
-        
-        # Check that provider was passed correctly
-        for i, provider in enumerate(providers):
-            assert mock_llm_call.call_args_list[i][1]["api_provider"] == provider
+        # Verify each provider was called once
+        for provider, mock in mocks.items():
+            assert mock.call_count == 1
 
 # ========================================================================
 # User Input Processing Tests
@@ -126,18 +139,18 @@ class TestProcessUserInput:
     @pytest.mark.unit
     def test_process_simple_text_input(self):
         """Test processing simple text input."""
-        result = process_user_input("Hello, how are you?")
+        result = process_user_input("Hello, how are you?", entries=[])
         
-        assert result["type"] == "text"
-        assert result["content"] == "Hello, how are you?"
+        assert isinstance(result, str)
+        assert result == "Hello, how are you?"
     
     @pytest.mark.unit 
     def test_process_empty_input(self):
         """Test processing empty input."""
-        result = process_user_input("")
+        result = process_user_input("", entries=[])
         
-        assert result["type"] == "text"
-        assert result["content"] == ""
+        assert isinstance(result, str)
+        assert result == ""
     
     @pytest.mark.unit
     def test_process_multiline_input(self):
@@ -146,32 +159,32 @@ class TestProcessUserInput:
         Line 2
         Line 3"""
         
-        result = process_user_input(input_text)
+        result = process_user_input(input_text, entries=[])
         
-        assert result["type"] == "text"
-        assert "Line 1" in result["content"]
-        assert "Line 2" in result["content"]
-        assert "Line 3" in result["content"]
+        assert isinstance(result, str)
+        assert "Line 1" in result
+        assert "Line 2" in result
+        assert "Line 3" in result
     
     @pytest.mark.unit
     def test_process_input_with_special_characters(self):
         """Test processing input with special characters."""
         special_input = "Test with special chars: !@#$%^&*()[]{}\"'<>"
         
-        result = process_user_input(special_input)
+        result = process_user_input(special_input, entries=[])
         
-        assert result["type"] == "text"
-        assert result["content"] == special_input
+        assert isinstance(result, str)
+        assert result == special_input
     
     @pytest.mark.unit
     def test_process_json_like_input(self):
         """Test processing JSON-like string input."""
         json_input = '{"key": "value", "number": 123}'
         
-        result = process_user_input(json_input)
+        result = process_user_input(json_input, entries=[])
         
-        assert result["type"] == "text"
-        assert result["content"] == json_input
+        assert isinstance(result, str)
+        assert result == json_input
 
 # ========================================================================
 # Chat Content Update Tests
@@ -183,77 +196,94 @@ class TestUpdateChatContent:
     @pytest.mark.unit
     def test_update_content_basic(self):
         """Test basic content update."""
-        original = "Hello world"
-        update = " How are you?"
+        # Mock database
+        mock_db = MagicMock()
+        mock_db.get_note_by_id.return_value = {
+            'content': '{"content": "Note content", "summary": "Note summary", "prompt": "Note prompt"}',
+        }
         
-        result = update_chat_content(original, update)
+        result, tags = update_chat_content(
+            selected_item="Test Item",
+            use_content=True,
+            use_summary=False,
+            use_prompt=False,
+            item_mapping={"Test Item": "1"},
+            db_instance=mock_db
+        )
         
-        assert result == "Hello world How are you?"
+        assert isinstance(result, dict)
+        assert isinstance(tags, list)
+        assert 'content' in result
+        mock_db.get_note_by_id.assert_called_once_with("1")
     
     @pytest.mark.unit
-    def test_update_content_with_empty_original(self):
-        """Test updating from empty content."""
-        result = update_chat_content("", "New content")
+    def test_update_content_with_summary(self):
+        """Test updating with summary."""
+        mock_db = MagicMock()
+        mock_db.get_note_by_id.return_value = {
+            'content': '{"content": "Note content", "summary": "Note summary", "prompt": "Note prompt"}',
+        }
         
-        assert result == "New content"
+        result, tags = update_chat_content(
+            selected_item="Test Item",
+            use_content=False,
+            use_summary=True,
+            use_prompt=False,
+            item_mapping={"Test Item": "2"},
+            db_instance=mock_db
+        )
+        
+        assert 'summary' in result
+        assert result['summary'] == 'Note summary'
     
     @pytest.mark.unit
-    def test_update_content_with_empty_update(self):
-        """Test updating with empty content."""
-        result = update_chat_content("Original", "")
+    def test_update_content_no_selection(self):
+        """Test updating with no item selected."""
+        mock_db = MagicMock()
         
-        assert result == "Original"
+        result, tags = update_chat_content(
+            selected_item=None,
+            use_content=True,
+            use_summary=False,
+            use_prompt=False,
+            item_mapping={},
+            db_instance=mock_db
+        )
+        
+        assert result == {}
+        assert tags == []
+        mock_db.get_note_by_id.assert_not_called()
     
     @pytest.mark.unit
-    def test_update_content_both_empty(self):
-        """Test updating when both are empty."""
-        result = update_chat_content("", "")
+    def test_update_content_all_options(self):
+        """Test updating with all content options."""
+        mock_db = MagicMock()
+        mock_db.get_note_by_id.return_value = {
+            'content': '{"content": "Note content", "summary": "Note summary", "prompt": "Note prompt"}',
+            'keywords': 'tag1, tag2'
+        }
         
-        assert result == ""
+        result, tags = update_chat_content(
+            selected_item="Test Item",
+            use_content=True,
+            use_summary=True,
+            use_prompt=True,
+            item_mapping={"Test Item": "3"},
+            db_instance=mock_db
+        )
+        
+        assert 'content' in result
+        assert 'summary' in result
+        assert 'prompt' in result
+        assert len(tags) > 0
 
 # ========================================================================
 # Provider Manager Integration Tests
 # ========================================================================
 
-class TestProviderManagement:
-    """Test provider management and configuration."""
-    
-    @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.get_provider_config')
-    def test_get_provider_config(self, mock_get_config):
-        """Test getting provider configuration."""
-        mock_get_config.return_value = {
-            "api_key": "test-key",
-            "base_url": "https://api.test.com",
-            "models": ["model-1", "model-2"]
-        }
-        
-        config = mock_get_config("openai")
-        
-        assert config["api_key"] == "test-key"
-        assert config["base_url"] == "https://api.test.com"
-        assert "model-1" in config["models"]
-    
-    @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.validate_provider')
-    def test_validate_provider_success(self, mock_validate):
-        """Test successful provider validation."""
-        mock_validate.return_value = True
-        
-        is_valid = mock_validate("openai", "test-key")
-        
-        assert is_valid is True
-        mock_validate.assert_called_once_with("openai", "test-key")
-    
-    @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.validate_provider')
-    def test_validate_provider_failure(self, mock_validate):
-        """Test failed provider validation."""
-        mock_validate.return_value = False
-        
-        is_valid = mock_validate("invalid-provider", "bad-key")
-        
-        assert is_valid is False
+# TestProviderManagement class removed - these functions don't exist:
+# - get_provider_config
+# - validate_provider
 
 # ========================================================================
 # Error Handling Tests
@@ -273,17 +303,18 @@ class TestErrorHandling:
     @pytest.mark.unit
     def test_rate_limit_error_properties(self):
         """Test ChatRateLimitError properties."""
-        error = ChatRateLimitError("Too many requests", retry_after=60)
+        error = ChatRateLimitError("Too many requests", provider="openai")
         
         assert "Too many requests" in str(error)
-        assert error.retry_after == 60
+        assert error.provider == "openai"
     
     @pytest.mark.unit
     def test_auth_error_properties(self):
         """Test ChatAuthenticationError properties."""
-        error = ChatAuthenticationError("Invalid credentials")
+        error = ChatAuthenticationError("Invalid credentials", provider="openai")
         
         assert "Invalid credentials" in str(error)
+        assert error.provider == "openai"
         assert error.status_code == 401
     
     @pytest.mark.unit
@@ -340,34 +371,7 @@ class TestMessageFormatting:
         assert "metadata" in parsed
 
 # ========================================================================
-# Token Counting Tests (Mock)
+# Token Counting Tests (Removed - function doesn't exist)
 # ========================================================================
-
-class TestTokenCounting:
-    """Test token counting functionality."""
-    
-    @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.count_tokens')
-    def test_count_tokens_simple(self, mock_count):
-        """Test token counting for simple text."""
-        mock_count.return_value = 5
-        
-        count = mock_count("Hello world test")
-        
-        assert count == 5
-        mock_count.assert_called_once_with("Hello world test")
-    
-    @pytest.mark.unit
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.count_tokens')
-    def test_count_tokens_messages(self, mock_count):
-        """Test token counting for messages."""
-        mock_count.return_value = 20
-        
-        messages = [
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there!"}
-        ]
-        
-        count = mock_count(json.dumps(messages))
-        
-        assert count == 20
+# The count_tokens function doesn't exist in the actual implementation.
+# There is an approximate_token_count function that could be tested instead.

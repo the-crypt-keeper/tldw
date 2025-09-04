@@ -40,8 +40,16 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
         r'\(\?R\)',  # Recursive patterns
         r'\(\?\(DEFINE\)',  # DEFINE patterns
         r'{\d{4,}}',  # Large repetition ranges
-        r'[*+]{2,}',  # Nested quantifiers
+        r'[*+]{2,}',  # Consecutive quantifiers
         r'\([^)]*[*+].*[*+].*\)',  # Multiple quantifiers in group
+        # Additional patterns to catch nested quantifiers (ReDoS prevention)
+        r'\([^)]*[+*]\)[+*?]',  # Group with quantifier followed by quantifier: (a+)+, (a*)*
+        r'\([^)]*[+*]\){',  # Group with quantifier followed by range: (a+){n,m}
+        r'\(\w+\+\)\+',  # Explicit (x+)+ pattern
+        r'\(\w+\*\)\*',  # Explicit (x*)* pattern
+        r'\(\w+\?\)\?',  # Explicit (x?)? pattern
+        r'\([^)]*\|[^)]*[+*]\)[+*]',  # Alternative with quantifier: (a|b+)+
+        r'\(\([^)]+\)[+*]\)[+*]',  # Nested groups with quantifiers: ((a)+)+
     ]
     
     def __init__(self, language: str = 'en'):

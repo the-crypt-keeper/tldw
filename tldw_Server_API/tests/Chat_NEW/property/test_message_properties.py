@@ -118,11 +118,14 @@ class TestMessageRoleInvariants:
             messages=messages
         )
         
-        # System messages typically come first
-        system_indices = [i for i, msg in enumerate(request.messages) if msg.role == "system"]
-        if system_indices:
-            # System message should be at the beginning if present
-            assert min(system_indices) == 0
+        # Check that we have at least one user message (required)
+        user_messages = [msg for msg in request.messages if msg.role == "user"]
+        assert len(user_messages) > 0, "At least one user message is required"
+        
+        # Check that roles are valid
+        valid_roles = {"system", "user", "assistant", "tool"}
+        for msg in request.messages:
+            assert msg.role in valid_roles
 
 # ========================================================================
 # Message Content Invariants

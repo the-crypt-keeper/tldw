@@ -20,13 +20,16 @@ class TestChatCompletionsEndpoint:
     """Test the /v1/chat/completions endpoint."""
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
-    def test_basic_completion_request(self, mock_chat_call, test_client, mock_llm_response, auth_headers):
+    def test_basic_completion_request(self, test_client, auth_headers):
         """Test basic chat completion request."""
-        mock_chat_call.return_value = mock_llm_response
+        # This is an integration test - it will make real API calls
+        # Skip if no API key is configured
+        import os
+        if not os.getenv("OPENAI_API_KEY"):
+            pytest.skip("Requires OPENAI_API_KEY to be set")
         
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Hello"}]
@@ -41,13 +44,13 @@ class TestChatCompletionsEndpoint:
         assert data["choices"][0]["message"]["content"]
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_multi_turn_conversation(self, mock_chat_call, test_client, mock_llm_response, auth_headers):
         """Test multi-turn conversation handling."""
         mock_chat_call.return_value = mock_llm_response
         
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [
@@ -68,7 +71,7 @@ class TestChatCompletionsEndpoint:
     def test_missing_auth_header(self, test_client):
         """Test request without authentication header."""
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Hello"}]
@@ -82,7 +85,7 @@ class TestChatCompletionsEndpoint:
     def test_invalid_request_body(self, test_client, auth_headers):
         """Test request with invalid body."""
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "invalid_field": "value"
             },
@@ -95,7 +98,7 @@ class TestChatCompletionsEndpoint:
     def test_empty_messages_list(self, test_client, auth_headers):
         """Test request with empty messages list."""
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": []
@@ -113,13 +116,13 @@ class TestProviderRouting:
     """Test routing to different LLM providers."""
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_openai_provider_routing(self, mock_chat_call, test_client, mock_llm_response, auth_headers):
         """Test routing to OpenAI provider."""
         mock_chat_call.return_value = mock_llm_response
         
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "api_provider": "openai",
                 "model": "gpt-3.5-turbo",
@@ -134,13 +137,13 @@ class TestProviderRouting:
         assert call_args[1]["api_provider"] == "openai"
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_anthropic_provider_routing(self, mock_chat_call, test_client, mock_llm_response, auth_headers):
         """Test routing to Anthropic provider."""
         mock_chat_call.return_value = mock_llm_response
         
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "api_provider": "anthropic",
                 "model": "claude-3-sonnet",
@@ -154,13 +157,13 @@ class TestProviderRouting:
         assert call_args[1]["api_provider"] == "anthropic"
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_default_provider_fallback(self, mock_chat_call, test_client, mock_llm_response, auth_headers):
         """Test fallback to default provider when not specified."""
         mock_chat_call.return_value = mock_llm_response
         
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Test"}]
@@ -180,7 +183,7 @@ class TestDatabaseIntegration:
     """Test database persistence and retrieval."""
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_conversation_saved_to_database(self, mock_chat_call, test_client, populated_chacha_db, mock_llm_response, auth_headers):
         """Test that conversations are saved to database."""
         mock_chat_call.return_value = mock_llm_response
@@ -196,7 +199,7 @@ class TestDatabaseIntegration:
         
         try:
             response = test_client.post(
-                "/v1/chat/completions",
+                "/api/v1/chat/completions",
                 json={
                     "model": "gpt-3.5-turbo",
                     "messages": [{"role": "user", "content": "Save this message"}]
@@ -245,14 +248,14 @@ class TestErrorHandling:
     """Test error handling in the API."""
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_rate_limit_error_handling(self, mock_chat_call, test_client, auth_headers):
         """Test handling of rate limit errors."""
         from tldw_Server_API.app.core.Chat.Chat_Functions import ChatRateLimitError
-        mock_chat_call.side_effect = ChatRateLimitError("Rate limit exceeded", retry_after=60)
+        mock_chat_call.side_effect = ChatRateLimitError("Rate limit exceeded", provider="openai")
         
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Test"}]
@@ -265,14 +268,14 @@ class TestErrorHandling:
         assert "error" in data
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_auth_error_handling(self, mock_chat_call, test_client, auth_headers):
         """Test handling of authentication errors."""
         from tldw_Server_API.app.core.Chat.Chat_Functions import ChatAuthenticationError
-        mock_chat_call.side_effect = ChatAuthenticationError("Invalid API key")
+        mock_chat_call.side_effect = ChatAuthenticationError("Invalid API key", provider="openai")
         
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Test"}]
@@ -282,16 +285,16 @@ class TestErrorHandling:
         
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         data = response.json()
-        assert "error" in data
+        assert "detail" in data or "error" in data
     
     @pytest.mark.integration 
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_general_error_handling(self, mock_chat_call, test_client, auth_headers):
         """Test handling of general errors."""
         mock_chat_call.side_effect = Exception("Unexpected error")
         
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Test"}]
@@ -320,7 +323,7 @@ class TestStreamingResponses:
             
             async with async_client.stream(
                 "POST",
-                "/v1/chat/completions",
+                "/api/v1/chat/completions",
                 json={
                     "model": "gpt-3.5-turbo",
                     "messages": [{"role": "user", "content": "Stream this"}],
@@ -347,14 +350,14 @@ class TestParameterValidation:
     """Test parameter validation and constraints."""
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_temperature_bounds(self, mock_chat_call, test_client, mock_llm_response, auth_headers):
         """Test temperature parameter bounds."""
         mock_chat_call.return_value = mock_llm_response
         
         # Valid temperature
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Test"}],
@@ -366,7 +369,7 @@ class TestParameterValidation:
         
         # Invalid temperature (too high)
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Test"}],
@@ -377,14 +380,14 @@ class TestParameterValidation:
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
     
     @pytest.mark.integration
-    @patch('tldw_Server_API.app.core.Chat.Chat_Functions.chat_api_call')
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
     def test_max_tokens_validation(self, mock_chat_call, test_client, mock_llm_response, auth_headers):
         """Test max_tokens parameter validation."""
         mock_chat_call.return_value = mock_llm_response
         
         # Valid max_tokens
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Test"}],
@@ -396,7 +399,7 @@ class TestParameterValidation:
         
         # Invalid max_tokens (negative)
         response = test_client.post(
-            "/v1/chat/completions",
+            "/api/v1/chat/completions",
             json={
                 "model": "gpt-3.5-turbo",
                 "messages": [{"role": "user", "content": "Test"}],

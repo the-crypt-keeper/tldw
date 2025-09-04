@@ -200,33 +200,39 @@ class TestRAGEvaluationEndpoint:
             assert "answer_similarity" in result["metrics"]
     
     @pytest.mark.asyncio
-    async def test_rag_concurrent_evaluations(self, async_api_client, auth_headers, mock_rate_limiter):
+    async def test_rag_concurrent_evaluations(self, async_api_client, auth_headers):
         """Test multiple concurrent RAG evaluations."""
-        # Create multiple evaluation requests
-        requests = [SampleDataGenerator.generate_rag_evaluation_data() for _ in range(5)]
+        from unittest.mock import patch, AsyncMock
         
-        # Send concurrent requests with small delays to avoid rate limiting
-        tasks = []
-        for i, req_data in enumerate(requests):
-            # Add a small delay between requests to avoid rate limiting
-            if i > 0:
-                await asyncio.sleep(0.1)
-            task = async_api_client.post(
-                "/api/v1/evaluations/rag",
-                json=req_data,
-                headers=auth_headers
-            )
-            tasks.append(task)
-        
-        responses = await asyncio.gather(*tasks)
-        
-        # All should succeed with mocked rate limiter
-        for response in responses:
-            assert response.status_code == 200
-            # evaluation_id is nested in metadata
-            result = response.json()
-            assert "metadata" in result
-            assert "evaluation_id" in result["metadata"]
+        # Mock the rate limiter dependency to always allow requests
+        with patch('tldw_Server_API.app.api.v1.endpoints.evals.check_evaluation_rate_limit', new_callable=AsyncMock) as mock_check:
+            mock_check.return_value = None  # No rate limiting
+            
+            # Create multiple evaluation requests
+            requests = [SampleDataGenerator.generate_rag_evaluation_data() for _ in range(5)]
+            
+            # Send concurrent requests with small delays to avoid rate limiting
+            tasks = []
+            for i, req_data in enumerate(requests):
+                # Add a small delay between requests to avoid rate limiting
+                if i > 0:
+                    await asyncio.sleep(0.1)
+                task = async_api_client.post(
+                    "/api/v1/evaluations/rag",
+                    json=req_data,
+                    headers=auth_headers
+                )
+                tasks.append(task)
+            
+            responses = await asyncio.gather(*tasks)
+            
+            # All should succeed with mocked rate limiter
+            for response in responses:
+                assert response.status_code == 200
+                # evaluation_id is nested in metadata
+                result = response.json()
+                assert "metadata" in result
+                assert "evaluation_id" in result["metadata"]
 
 
 @pytest.mark.integration
@@ -435,47 +441,51 @@ class TestWebhookEndpoints:
         
         # Fix webhook table schema - drop and recreate with correct schema
         # This is needed because the table may have an old incompatible schema
-        project_root = Path(__file__).parent.parent.parent.parent.parent
-        db_path = project_root / "Databases" / "evaluations.db"
-        if db_path.exists():
-            with sqlite3.connect(db_path) as conn:
-                try:
-                    # Drop the existing tables to fix schema issues
-                    conn.execute("DROP TABLE IF EXISTS webhook_deliveries")
-                    conn.execute("DROP TABLE IF EXISTS webhook_registrations")
-                    print("DEBUG: Dropped webhook tables to fix schema")
-                    
-                    # Recreate with the correct schema that webhook_manager expects
-                    conn.execute("""
-                        CREATE TABLE IF NOT EXISTS webhook_registrations (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            user_id TEXT NOT NULL,
-                            url TEXT NOT NULL,
-                            secret TEXT NOT NULL,
-                            events TEXT NOT NULL,
-                            active BOOLEAN DEFAULT 1,
-                            retry_count INTEGER DEFAULT 3,
-                            timeout_seconds INTEGER DEFAULT 30,
-                            total_deliveries INTEGER DEFAULT 0,
-                            successful_deliveries INTEGER DEFAULT 0,
-                            failed_deliveries INTEGER DEFAULT 0,
-                            last_delivery_at TIMESTAMP,
-                            last_error TEXT,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            UNIQUE(user_id, url)
-                        )
-                    """)
-                    print("DEBUG: Recreated webhook_registrations table with correct schema")
-                    conn.commit()
-                    
-                    # Verify the table is empty
-                    cursor = conn.execute("SELECT COUNT(*) FROM webhook_registrations")
-                    count = cursor.fetchone()[0]
-                    print(f"DEBUG: Table now has {count} webhooks (should be 0)")
-                    
-                except sqlite3.OperationalError as e:
-                    print(f"DEBUG: Error fixing webhook table: {e}")
+        # Note: The db_adapter actually uses tldw_Server_API/Databases, not the root Databases
+        db_path_1 = Path(__file__).parent.parent.parent.parent / "Databases" / "evaluations.db"
+        db_path_2 = Path(__file__).parent.parent.parent.parent.parent / "Databases" / "evaluations.db"
+        
+        # Clean both possible database locations
+        for db_path in [db_path_1, db_path_2]:
+            if db_path.exists():
+                with sqlite3.connect(db_path) as conn:
+                    try:
+                        # Drop the existing tables to fix schema issues
+                        conn.execute("DROP TABLE IF EXISTS webhook_deliveries")
+                        conn.execute("DROP TABLE IF EXISTS webhook_registrations")
+                        print(f"DEBUG: Dropped webhook tables in {db_path}")
+                        
+                        # Recreate with the correct schema that webhook_manager expects
+                        conn.execute("""
+                            CREATE TABLE IF NOT EXISTS webhook_registrations (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                user_id TEXT NOT NULL,
+                                url TEXT NOT NULL,
+                                secret TEXT NOT NULL,
+                                events TEXT NOT NULL,
+                                active BOOLEAN DEFAULT 1,
+                                retry_count INTEGER DEFAULT 3,
+                                timeout_seconds INTEGER DEFAULT 30,
+                                total_deliveries INTEGER DEFAULT 0,
+                                successful_deliveries INTEGER DEFAULT 0,
+                                failed_deliveries INTEGER DEFAULT 0,
+                                last_delivery_at TIMESTAMP,
+                                last_error TEXT,
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                UNIQUE(user_id, url)
+                            )
+                        """)
+                        print(f"DEBUG: Recreated webhook_registrations table in {db_path}")
+                        conn.commit()
+                        
+                        # Verify the table is empty
+                        cursor = conn.execute("SELECT COUNT(*) FROM webhook_registrations")
+                        count = cursor.fetchone()[0]
+                        print(f"DEBUG: {db_path} now has {count} webhooks (should be 0)")
+                        
+                    except sqlite3.OperationalError as e:
+                        print(f"DEBUG: Error fixing webhook table in {db_path}: {e}")
         
         # Use unique URL to avoid conflicts
         unique_id = str(uuid.uuid4())[:8]
