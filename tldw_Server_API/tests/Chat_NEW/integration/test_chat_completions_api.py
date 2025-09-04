@@ -20,13 +20,10 @@ class TestChatCompletionsEndpoint:
     """Test the /v1/chat/completions endpoint."""
     
     @pytest.mark.integration
-    def test_basic_completion_request(self, test_client, auth_headers):
+    @patch('tldw_Server_API.app.api.v1.endpoints.chat.perform_chat_api_call')
+    def test_basic_completion_request(self, mock_chat_call, test_client, mock_llm_response, auth_headers):
         """Test basic chat completion request."""
-        # This is an integration test - it will make real API calls
-        # Skip if no API key is configured
-        import os
-        if not os.getenv("OPENAI_API_KEY"):
-            pytest.skip("Requires OPENAI_API_KEY to be set")
+        mock_chat_call.return_value = mock_llm_response
         
         response = test_client.post(
             "/api/v1/chat/completions",
