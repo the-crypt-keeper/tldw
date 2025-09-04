@@ -339,9 +339,26 @@ def chat_with_openai(
         "stream": final_streaming,
     }
     # Add optional parameters if they have a value
-    if final_temp is not None: payload["temperature"] = final_temp
-    if final_top_p is not None: payload["top_p"] = final_top_p # OpenAI uses top_p
-    if final_max_tokens is not None: payload["max_tokens"] = final_max_tokens
+    # gpt-5-mini has special requirements
+    if final_model and 'gpt-5' in final_model:
+        # gpt-5-mini only supports temperature of 1 (default), and doesn't support top_p
+        if final_temp is not None and final_temp != 1.0:
+            logging.debug(f"OpenAI: gpt-5-mini only supports temperature of 1.0, ignoring temperature={final_temp}")
+        # Don't include temperature for gpt-5 models unless it's 1.0
+        if final_temp == 1.0:
+            payload["temperature"] = final_temp
+        # gpt-5-mini doesn't support top_p
+        if final_top_p is not None:
+            logging.debug(f"OpenAI: gpt-5-mini does not support top_p, ignoring top_p={final_top_p}")
+    else:
+        if final_temp is not None: payload["temperature"] = final_temp
+        if final_top_p is not None: payload["top_p"] = final_top_p # OpenAI uses top_p
+    # gpt-5-mini uses max_completion_tokens instead of max_tokens
+    if final_max_tokens is not None:
+        if final_model and 'gpt-5' in final_model:
+            payload["max_completion_tokens"] = final_max_tokens
+        else:
+            payload["max_tokens"] = final_max_tokens
     if frequency_penalty is not None: payload["frequency_penalty"] = frequency_penalty
     if logit_bias is not None: payload["logit_bias"] = logit_bias
     if logprobs is not None: payload["logprobs"] = logprobs
@@ -432,7 +449,8 @@ def chat_with_openai(
         error_content_text = "No response text"
         error_content_json = None
         if e.response is not None:
-            logging.error(f"OpenAI Full Error Response (status {e.response.status_code}): {e.response.text}")
+            # Use repr() to safely log JSON responses that might contain curly braces
+            logging.error(f"OpenAI Full Error Response (status {e.response.status_code}): {repr(e.response.text)}")
         else:
             logging.error(f"OpenAI HTTPError with no response object: {e}")
         raise
@@ -935,7 +953,7 @@ def chat_with_cohere(
     except requests.exceptions.HTTPError as e:
         status_code = getattr(e.response, 'status_code', 500)
         error_text = getattr(e.response, 'text', str(e))
-        logging.error(f"Cohere API call HTTPError to {COHERE_CHAT_URL} status {status_code}. Details: {error_text[:500]}", exc_info=False)
+        logging.error(f"Cohere API call HTTPError to {COHERE_CHAT_URL} status {status_code}. Details: {repr(error_text[:500])}", exc_info=False)
         if status_code == 401:
             raise ChatAuthenticationError(provider="cohere", message=f"Authentication failed. Detail: {error_text[:200]}")
         elif status_code == 429:
@@ -1581,7 +1599,7 @@ def chat_with_huggingface(
     except requests.exceptions.HTTPError as e:
         status_code = getattr(e.response, 'status_code', 500)
         error_text = getattr(e.response, 'text', str(e))
-        logging.error(f"HuggingFace API call failed to {api_url} with status {status_code}. Details: {error_text[:500]}", exc_info=False)
+        logging.error(f"HuggingFace API call failed to {api_url} with status {status_code}. Details: {repr(error_text[:500])}", exc_info=False)
         if status_code == 401:
             raise ChatAuthenticationError(provider="huggingface", message=f"Authentication failed. Detail: {error_text[:200]}")
         elif status_code == 404: # Specifically handle 404 for URL/model issues

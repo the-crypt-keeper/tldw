@@ -27,6 +27,10 @@ from tldw_Server_API.app.api.v1.endpoints.chat import router as chat_router
 #
 # Character Endpoint
 from tldw_Server_API.app.api.v1.endpoints.characters_endpoint import router as character_router
+# Character Chat Sessions Endpoint
+from tldw_Server_API.app.api.v1.endpoints.character_chat_sessions import router as character_chat_sessions_router
+# Character Messages Endpoint
+from tldw_Server_API.app.api.v1.endpoints.character_messages import router as character_messages_router
 #
 # Metrics Endpoint
 from tldw_Server_API.app.api.v1.endpoints.metrics import router as metrics_router
@@ -581,8 +585,14 @@ app.include_router(audio_router, prefix=f"{API_V1_PREFIX}/audio", tags=["audio"]
 app.include_router(chat_router, prefix=f"{API_V1_PREFIX}/chat", tags=["chat"])
 
 
-# Router for chat endpoints/chat temp-file handling
+# Router for character endpoints
 app.include_router(character_router, prefix=f"{API_V1_PREFIX}/characters", tags=["character, persona"])
+
+# Router for character chat sessions
+app.include_router(character_chat_sessions_router, prefix=f"{API_V1_PREFIX}/chats", tags=["character chat sessions"])
+
+# Router for character messages (Note: uses multiple prefixes for different endpoints)
+app.include_router(character_messages_router, prefix=f"{API_V1_PREFIX}", tags=["character messages"])
 
 
 # Router for metrics endpoints

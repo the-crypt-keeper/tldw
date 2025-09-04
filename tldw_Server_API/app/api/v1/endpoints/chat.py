@@ -84,7 +84,7 @@ from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import (
 )
 from tldw_Server_API.app.api.v1.API_Deps.DB_Deps import get_media_db_for_user
 from tldw_Server_API.app.api.v1.schemas.chat_request_schemas import (
-    API_KEYS,
+    get_api_keys,
     ChatCompletionRequest,
     DEFAULT_LLM_PROVIDER,
 )
@@ -562,7 +562,9 @@ async def create_chat_completion(
 
     try:
         target_api_provider = provider # Already determined
-        provider_api_key = API_KEYS.get(target_api_provider) # API_KEYS should be up-to-date
+        # Get API keys dynamically to support runtime changes (e.g., in tests)
+        api_keys = get_api_keys()
+        provider_api_key = api_keys.get(target_api_provider)
 
         # Simplified list, actual check might be in Chat_Functions or per-provider
         # FIXME - This should be a more dynamic check based on the provider's requirements.
@@ -581,7 +583,12 @@ async def create_chat_completion(
             current_loop
         )
         if character_card_for_context:
-            logger.debug(f"Loaded character: {character_card_for_context.get('name')} with system_prompt: {character_card_for_context.get('system_prompt', 'None')[:50]}...")
+            system_prompt_preview = character_card_for_context.get('system_prompt')
+            if system_prompt_preview:
+                system_prompt_preview = system_prompt_preview[:50] + "..." if len(system_prompt_preview) > 50 else system_prompt_preview
+            else:
+                system_prompt_preview = "None"
+            logger.debug(f"Loaded character: {character_card_for_context.get('name')} with system_prompt: {system_prompt_preview}")
         
         # Track character access
         if character_card_for_context:
@@ -1064,7 +1071,8 @@ async def create_chat_completion(
                             ChatConfigurationError: 503, ChatProviderError: getattr(e_chat, 'status_code', 502),
                             ChatAPIError: getattr(e_chat, 'status_code', 500) }
         err_status = status_code_map.get(type(e_chat), 500)
-        logger.error(f"Chat Library Error: {type(e_chat).__name__} - '{e_chat.message}' (Provider: {e_chat.provider}, UpstreamStatus: {getattr(e_chat, 'status_code', 'N/A')})", exc_info=True)
+        # Use repr() for the message to avoid issues with JSON containing curly braces
+        logger.error(f"Chat Library Error: {type(e_chat).__name__} - {repr(e_chat.message)} (Provider: {e_chat.provider}, UpstreamStatus: {getattr(e_chat, 'status_code', 'N/A')})", exc_info=True)
         # Standardize error messages - never expose internal details for 5xx errors
         if err_status < 500:
             # Client errors can have more detail
@@ -1094,12 +1102,18 @@ async def create_chat_completion(
         raise HTTPException(status_code=err_status, detail=client_detail)
 
     except Exception as e_final:
+        # Log the full traceback for debugging
+        import traceback
+        logger.error(f"Unexpected error in chat completion: {type(e_final).__name__}: {str(e_final)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        
         # Create a structured error for unexpected exceptions
         unexpected_error = ChatModuleException(
             code=ChatErrorCode.INT_UNEXPECTED_ERROR,
-            message=f"Unexpected error in chat completion endpoint",
+            message=f"Unexpected error in chat completion endpoint: {str(e_final)}",
             details={
                 "error_type": type(e_final).__name__,
+                "error_str": str(e_final),
                 "request_id": request_id if 'request_id' in locals() else None,
                 "conversation_id": final_conversation_id if 'final_conversation_id' in locals() else None
             },

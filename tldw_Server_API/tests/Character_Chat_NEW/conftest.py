@@ -82,6 +82,8 @@ def test_db_path() -> Generator[Path, None, None]:
 @pytest.fixture
 def character_db(test_db_path) -> Generator[CharactersRAGDB, None, None]:
     """Create a real CharactersRAGDB instance for testing."""
+    # Use a temporary file database instead of in-memory to avoid threading issues
+    # In-memory databases are not shared between connections in different threads
     db = CharactersRAGDB(
         db_path=str(test_db_path),
         client_id="test_client"
@@ -93,7 +95,7 @@ def character_db(test_db_path) -> Generator[CharactersRAGDB, None, None]:
     
     # Cleanup
     try:
-        db.close()
+        db.close_all_connections()
     except:
         pass
 
@@ -102,47 +104,86 @@ def populated_character_db(character_db) -> CharactersRAGDB:
     """Create a CharactersRAGDB with test data."""
     db = character_db
     
-    # Create test character cards
-    char1_id = db.create_character_card(
-        name="Test Character 1",
-        description="A helpful test character",
-        personality="Friendly and knowledgeable",
-        first_message="Hello! I'm Test Character 1.",
-        creator="test_user"
-    )
+    # Create test character cards using the actual database method
+    char1_id = db.add_character_card({
+        "name": "Test Character 1",
+        "description": "A helpful test character",
+        "personality": "Friendly and knowledgeable",
+        "first_message": "Hello! I'm Test Character 1.",
+        "creator": "test_user"
+    })
     
-    char2_id = db.create_character_card(
-        name="Fantasy Wizard",
-        description="A wise wizard from a fantasy world",
-        personality="Mysterious and ancient",
-        first_message="Greetings, traveler. What brings you to my tower?",
-        creator="test_user"
-    )
+    char2_id = db.add_character_card({
+        "name": "Fantasy Wizard",
+        "description": "A wise wizard from a fantasy world",
+        "personality": "Mysterious and ancient",
+        "first_message": "Greetings, traveler. What brings you to my tower?",
+        "creator": "test_user"
+    })
     
-    char3_id = db.create_character_card(
-        name="Science Assistant",
-        description="An AI assistant specialized in science",
-        personality="Analytical and precise",
-        first_message="Hello! Ready to explore the world of science?",
-        creator="science_user"
-    )
+    char3_id = db.add_character_card({
+        "name": "Science Assistant",
+        "description": "An AI assistant specialized in science",
+        "personality": "Analytical and precise",
+        "first_message": "Hello! Ready to explore the world of science?",
+        "creator": "science_user"
+    })
     
-    # Create test chats
-    chat1_id = db.create_chat(
-        character_id=char1_id,
-        user_id="test_user",
-        title="First Chat"
-    )
+    # Create test chats using the actual database method
+    import uuid
+    chat1_id = str(uuid.uuid4())
+    chat2_id = str(uuid.uuid4())
     
-    chat2_id = db.create_chat(
-        character_id=char2_id,
-        user_id="test_user",
-        title="Wizard Chat"
-    )
+    db.add_conversation({
+        'id': chat1_id,
+        'character_id': char1_id,
+        'title': "First Chat",
+        'root_id': chat1_id,
+        'parent_id': None,
+        'active': 1,
+        'deleted': 0,
+        'client_id': 'test_client',
+        'version': 1
+    })
     
-    # Add messages to chats
-    db.add_message(chat1_id, "user", "Hello!")
-    db.add_message(chat1_id, "assistant", "Hello! How can I help you today?")
+    db.add_conversation({
+        'id': chat2_id,
+        'character_id': char2_id,
+        'title': "Wizard Chat",
+        'root_id': chat2_id,
+        'parent_id': None,
+        'active': 1,
+        'deleted': 0,
+        'client_id': 'test_client',
+        'version': 1
+    })
+    
+    # Add messages to chats using the actual database method
+    import uuid
+    msg1_id = str(uuid.uuid4())
+    msg2_id = str(uuid.uuid4())
+    
+    db.add_message({
+        'id': msg1_id,
+        'conversation_id': chat1_id,
+        'sender': 'user',
+        'content': 'Hello!',
+        'parent_message_id': None,
+        'deleted': 0,
+        'client_id': 'test_client',
+        'version': 1
+    })
+    
+    db.add_message({
+        'id': msg2_id,
+        'conversation_id': chat1_id,
+        'sender': 'assistant',
+        'content': 'Hello! How can I help you today?',
+        'parent_message_id': msg1_id,
+        'deleted': 0,
+        'client_id': 'test_client',
+        'version': 1
+    })
     
     return db
 
@@ -652,34 +693,42 @@ def test_client(test_env_vars, character_db):
     from tldw_Server_API.app.main import app
     from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
     from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
+    from tldw_Server_API.app.api.v1.API_Deps.auth_deps import get_current_user
+    from tldw_Server_API.app.core.AuthNZ.settings import get_settings
     from tldw_Server_API.app.core.config import settings as global_settings
     
-    # Save original settings
-    original_auth_mode = global_settings.get('AUTH_MODE')
-    original_api_key = global_settings.get('SINGLE_USER_API_KEY')
-    
-    # Configure for single-user mode testing
-    global_settings['AUTH_MODE'] = 'single_user'
-    global_settings['SINGLE_USER_API_KEY'] = 'test-api-key'
+    # Create test user
+    test_user = User(
+        id=1,
+        username="test_user",
+        email="test@example.com",
+        is_admin=True,
+        is_active=True
+    )
     
     # Override database dependency
     def override_get_chacha_db_for_user():
         """Override to return test database."""
         return character_db
     
-    # Override user authentication for testing
-    def override_get_request_user():
+    # Override user authentication for testing - bypass all auth
+    async def override_get_request_user():
         """Override to return a test user."""
-        return User(
-            id=1,
-            username="test_user",
-            email="test@example.com",
-            is_admin=True,
-            is_active=True
-        )
+        return test_user
     
+    async def override_get_current_user():
+        """Override get_current_user to bypass authentication."""
+        return test_user
+    
+    # Set up dependency overrides
     app.dependency_overrides[get_chacha_db_for_user] = override_get_chacha_db_for_user
     app.dependency_overrides[get_request_user] = override_get_request_user
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    
+    # Also try to override the settings to ensure consistent API key
+    settings_instance = get_settings()
+    original_api_key = settings_instance.SINGLE_USER_API_KEY
+    settings_instance.SINGLE_USER_API_KEY = 'test-api-key'
     
     with TestClient(app) as client:
         yield client
@@ -687,16 +736,8 @@ def test_client(test_env_vars, character_db):
     # Cleanup
     app.dependency_overrides.clear()
     
-    # Restore original settings
-    if original_auth_mode is None:
-        global_settings.pop('AUTH_MODE', None)
-    else:
-        global_settings['AUTH_MODE'] = original_auth_mode
-    
-    if original_api_key is None:
-        global_settings.pop('SINGLE_USER_API_KEY', None)
-    else:
-        global_settings['SINGLE_USER_API_KEY'] = original_api_key
+    # Restore API key
+    settings_instance.SINGLE_USER_API_KEY = original_api_key
 
 @pytest.fixture
 def auth_headers():
@@ -732,15 +773,26 @@ def create_test_character(db, **kwargs):
         'creator': 'test_user'
     }
     character_data.update(kwargs)
-    return db.create_character_card(**character_data)
+    return db.add_character_card(character_data)
 
 def create_test_chat(db, character_id, user_id='test_user', **kwargs):
     """Helper to create a test chat session."""
-    return db.create_chat(
-        character_id=character_id,
-        user_id=user_id,
-        title=kwargs.get('title', 'Test Chat')
-    )
+    import uuid
+    chat_id = str(uuid.uuid4())
+    
+    db.add_conversation({
+        'id': chat_id,
+        'character_id': character_id,
+        'title': kwargs.get('title', 'Test Chat'),
+        'root_id': chat_id,
+        'parent_id': None,
+        'active': 1,
+        'deleted': 0,
+        'client_id': 'test_client',
+        'version': 1
+    })
+    
+    return chat_id
 
 def create_test_world_book(service, **kwargs):
     """Helper to create a test world book."""

@@ -65,17 +65,33 @@ class CharacterChatManager:
     
     def start_new_chat(self, character_id: int, user_name: str = "User") -> Optional[int]:
         """Start a new chat session with a character."""
-        return char_lib.start_new_chat_session(
-            self.db, character_id, user_name, system_prompt=None
+        result = char_lib.start_new_chat_session(
+            self.db, character_id, user_name
         )
+        # start_new_chat_session returns a tuple, extract the chat ID
+        if result and result[0]:
+            return result[0]  # Return the chat_id from the tuple
+        return None
     
     def add_message(self, chat_id: int, role: str, content: str) -> bool:
         """Add a message to an existing chat."""
-        return self.db.add_message(chat_id, role, content)
+        import uuid
+        msg_data = {
+            'id': str(uuid.uuid4()),
+            'conversation_id': chat_id,
+            'sender': role,
+            'content': content,
+            'parent_message_id': None,
+            'deleted': 0,
+            'client_id': 'test_client',
+            'version': 1
+        }
+        result = self.db.add_message(msg_data)
+        return result is not None
     
     def get_chat_messages(self, chat_id: int) -> List[Dict[str, Any]]:
         """Get all messages from a chat."""
-        messages = self.db.get_messages(chat_id)
+        messages = self.db.get_messages_for_conversation(chat_id)
         return messages if messages else []
     
     def list_chats_for_character(self, character_id: int, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:

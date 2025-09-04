@@ -28,11 +28,17 @@ class TestChatCompletionsEndpoint:
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": [{"role": "user", "content": "Hello"}]
             },
             headers=auth_headers
         )
+        
+        # Debug output if test fails
+        if response.status_code != status.HTTP_200_OK:
+            print(f"\nResponse status: {response.status_code}")
+            print(f"Response body: {response.json()}")
+            print(f"OPENAI_API_KEY env: {os.getenv('OPENAI_API_KEY', 'NOT SET')[:10]}..." if os.getenv('OPENAI_API_KEY') else "OPENAI_API_KEY: NOT SET")
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -48,7 +54,7 @@ class TestChatCompletionsEndpoint:
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": [
                     {"role": "system", "content": "You are helpful."},
                     {"role": "user", "content": "What is 2+2?"},
@@ -69,7 +75,7 @@ class TestChatCompletionsEndpoint:
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": [{"role": "user", "content": "Hello"}]
             }
         )
@@ -96,7 +102,7 @@ class TestChatCompletionsEndpoint:
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": []
             },
             headers=auth_headers
@@ -120,7 +126,7 @@ class TestProviderRouting:
             "/api/v1/chat/completions",
             json={
                 "api_provider": "openai",
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": [{"role": "user", "content": "Test"}]
             },
             headers=auth_headers
@@ -157,7 +163,7 @@ class TestProviderRouting:
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": [{"role": "user", "content": "Test"}]
             },
             headers=auth_headers
@@ -193,7 +199,7 @@ class TestDatabaseIntegration:
             response = test_client.post(
                 "/api/v1/chat/completions",
                 json={
-                    "model": "gpt-3.5-turbo",
+                    "model": "gpt-5-mini",
                     "messages": [{"role": "user", "content": "Save this message"}]
                 },
                 headers=auth_headers
@@ -268,7 +274,7 @@ class TestErrorHandling:
             response = test_client.post(
                 "/api/v1/chat/completions",
                 json={
-                    "model": "gpt-3.5-turbo",
+                    "model": "gpt-5-mini",
                     "messages": [{"role": "user", "content": "Test"}]
                 },
                 headers=invalid_headers
@@ -291,7 +297,16 @@ class TestErrorHandling:
         """Test handling of general errors."""
         mock_chat_call.side_effect = Exception("Unexpected error")
         
-        pass  # Cannot reliably trigger general errors
+        response = test_client.post(
+            "/api/v1/chat/completions",
+            json={
+                "model": "gpt-5-mini",
+                "messages": [{"role": "user", "content": "Test"}]
+            },
+            headers=auth_headers
+        )
+        
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         data = response.json()
         assert "error" in data or "detail" in data
 
@@ -312,7 +327,7 @@ class TestStreamingResponses:
                 "POST",
                 "/api/v1/chat/completions",
                 json={
-                    "model": "gpt-3.5-turbo",
+                    "model": "gpt-5-mini",
                     "messages": [{"role": "user", "content": "Stream this"}],
                     "stream": True
                 },
@@ -345,7 +360,7 @@ class TestParameterValidation:
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": [{"role": "user", "content": "Test"}],
                 "temperature": 1.5
             },
@@ -357,7 +372,7 @@ class TestParameterValidation:
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": [{"role": "user", "content": "Test"}],
                 "temperature": 2.5
             },
@@ -374,7 +389,7 @@ class TestParameterValidation:
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": [{"role": "user", "content": "Test"}],
                 "max_tokens": 100
             },
@@ -386,7 +401,7 @@ class TestParameterValidation:
         response = test_client.post(
             "/api/v1/chat/completions",
             json={
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-5-mini",
                 "messages": [{"role": "user", "content": "Test"}],
                 "max_tokens": -1
             },

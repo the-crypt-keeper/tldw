@@ -25,7 +25,12 @@ class CharacterRateLimiter:
         max_operations: int = 100,
         window_seconds: int = 3600,
         max_characters: int = 1000,  # Max total characters per user
-        max_import_size_mb: int = 10  # Max import file size
+        max_import_size_mb: int = 10,  # Max import file size
+        # Chat-specific limits
+        max_chats_per_user: int = 100,  # Max concurrent chats per user
+        max_messages_per_chat: int = 1000,  # Max messages per chat session
+        max_chat_completions_per_minute: int = 20,  # Rate limit for chat completions
+        max_message_sends_per_minute: int = 60  # Rate limit for sending messages
     ):
         """
         Initialize the rate limiter.
@@ -36,12 +41,22 @@ class CharacterRateLimiter:
             window_seconds: Time window in seconds
             max_characters: Maximum total characters per user
             max_import_size_mb: Maximum import file size in MB
+            max_chats_per_user: Maximum concurrent chats per user
+            max_messages_per_chat: Maximum messages per chat session
+            max_chat_completions_per_minute: Rate limit for chat completions
+            max_message_sends_per_minute: Rate limit for message sending
         """
         self.redis = redis_client
         self.max_operations = max_operations
         self.window_seconds = window_seconds
         self.max_characters = max_characters
         self.max_import_size_mb = max_import_size_mb
+        
+        # Chat-specific limits
+        self.max_chats_per_user = max_chats_per_user
+        self.max_messages_per_chat = max_messages_per_chat
+        self.max_chat_completions_per_minute = max_chat_completions_per_minute
+        self.max_message_sends_per_minute = max_message_sends_per_minute
         
         # In-memory fallback storage
         self.memory_store: Dict[int, List[float]] = defaultdict(list) if not redis_client else {}
@@ -50,6 +65,7 @@ class CharacterRateLimiter:
             f"CharacterRateLimiter initialized: "
             f"max_ops={max_operations}/{window_seconds}s, "
             f"max_chars={max_characters}, "
+            f"max_chats={max_chats_per_user}, "
             f"redis={'enabled' if redis_client else 'disabled (using memory)'}"
         )
     
@@ -222,6 +238,182 @@ class CharacterRateLimiter:
             "window_seconds": self.window_seconds,
             "reset_time": now + self.window_seconds
         }
+    
+    # ========== Chat-specific rate limiting methods ==========
+    
+    async def check_chat_limit(self, user_id: int, current_chat_count: int) -> bool:
+        """
+        Check if user has exceeded maximum chat limit.
+        
+        Args:
+            user_id: User ID to check
+            current_chat_count: Current number of active chats
+            
+        Returns:
+            True if under limit
+            
+        Raises:
+            HTTPException: If chat limit exceeded
+        """
+        if current_chat_count >= self.max_chats_per_user:
+            logger.warning(
+                f"Chat limit exceeded for user {user_id}: "
+                f"{current_chat_count}/{self.max_chats_per_user} chats"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Chat limit exceeded. Maximum {self.max_chats_per_user} concurrent chats allowed."
+            )
+        return True
+    
+    async def check_message_limit(self, chat_id: str, current_message_count: int) -> bool:
+        """
+        Check if chat has exceeded maximum message limit.
+        
+        Args:
+            chat_id: Chat session ID
+            current_message_count: Current number of messages in chat
+            
+        Returns:
+            True if under limit
+            
+        Raises:
+            HTTPException: If message limit exceeded
+        """
+        if current_message_count >= self.max_messages_per_chat:
+            logger.warning(
+                f"Message limit exceeded for chat {chat_id}: "
+                f"{current_message_count}/{self.max_messages_per_chat} messages"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Message limit exceeded. Maximum {self.max_messages_per_chat} messages per chat."
+            )
+        return True
+    
+    async def check_chat_completion_rate(self, user_id: int) -> Tuple[bool, int]:
+        """
+        Check rate limit for chat completion requests.
+        
+        Args:
+            user_id: User ID to check
+            
+        Returns:
+            Tuple of (allowed, remaining_requests)
+            
+        Raises:
+            HTTPException: If rate limit exceeded
+        """
+        return await self._check_specific_rate(
+            user_id, 
+            "chat_completion",
+            self.max_chat_completions_per_minute,
+            60  # 1 minute window
+        )
+    
+    async def check_message_send_rate(self, user_id: int) -> Tuple[bool, int]:
+        """
+        Check rate limit for message sending.
+        
+        Args:
+            user_id: User ID to check
+            
+        Returns:
+            Tuple of (allowed, remaining_messages)
+            
+        Raises:
+            HTTPException: If rate limit exceeded
+        """
+        return await self._check_specific_rate(
+            user_id,
+            "message_send",
+            self.max_message_sends_per_minute,
+            60  # 1 minute window
+        )
+    
+    async def _check_specific_rate(
+        self, 
+        user_id: int, 
+        operation_type: str, 
+        max_count: int, 
+        window: int
+    ) -> Tuple[bool, int]:
+        """
+        Generic rate limit checker for specific operation types.
+        
+        Args:
+            user_id: User ID to check
+            operation_type: Type of operation (e.g., "chat_completion", "message_send")
+            max_count: Maximum operations allowed
+            window: Time window in seconds
+            
+        Returns:
+            Tuple of (allowed, remaining_operations)
+            
+        Raises:
+            HTTPException: If rate limit exceeded
+        """
+        key = f"rate_limit:{operation_type}:{user_id}"
+        
+        if self.redis:
+            try:
+                pipe = self.redis.pipeline()
+                now = time.time()
+                window_start = now - window
+                
+                # Remove old entries and count current
+                pipe.zremrangebyscore(key, 0, window_start)
+                pipe.zcard(key)
+                pipe.zadd(key, {str(now): now})
+                pipe.expire(key, window)
+                
+                results = pipe.execute()
+                current_count = results[1]
+                
+                if current_count >= max_count:
+                    logger.warning(
+                        f"Rate limit exceeded for {operation_type} by user {user_id}: "
+                        f"{current_count}/{max_count} operations"
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=f"Rate limit exceeded. Max {max_count} {operation_type} operations per {window} seconds."
+                    )
+                
+                remaining = max_count - current_count
+                return True, remaining
+                
+            except redis.RedisError as e:
+                logger.error(f"Redis error in rate limiter: {e}. Falling back to memory.")
+        
+        # In-memory fallback - use operation-specific store
+        if not hasattr(self, 'operation_stores'):
+            self.operation_stores = defaultdict(lambda: defaultdict(list))
+        
+        now = time.time()
+        window_start = now - window
+        
+        # Clean old entries
+        self.operation_stores[operation_type][user_id] = [
+            t for t in self.operation_stores[operation_type][user_id]
+            if t > window_start
+        ]
+        
+        current_count = len(self.operation_stores[operation_type][user_id])
+        
+        if current_count >= max_count:
+            logger.warning(
+                f"Rate limit exceeded for {operation_type} by user {user_id} (memory): "
+                f"{current_count}/{max_count} operations"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded. Max {max_count} {operation_type} operations per {window} seconds."
+            )
+        
+        self.operation_stores[operation_type][user_id].append(now)
+        remaining = max_count - current_count - 1
+        return True, remaining
 
 
 # Global instance (initialized in dependencies)
@@ -256,7 +448,12 @@ def get_character_rate_limiter() -> CharacterRateLimiter:
             max_operations=settings.get("CHARACTER_RATE_LIMIT_OPS", 100),
             window_seconds=settings.get("CHARACTER_RATE_LIMIT_WINDOW", 3600),
             max_characters=settings.get("MAX_CHARACTERS_PER_USER", 1000),
-            max_import_size_mb=settings.get("MAX_CHARACTER_IMPORT_SIZE_MB", 10)
+            max_import_size_mb=settings.get("MAX_CHARACTER_IMPORT_SIZE_MB", 10),
+            # Chat-specific limits
+            max_chats_per_user=settings.get("MAX_CHATS_PER_USER", 100),
+            max_messages_per_chat=settings.get("MAX_MESSAGES_PER_CHAT", 1000),
+            max_chat_completions_per_minute=settings.get("MAX_CHAT_COMPLETIONS_PER_MINUTE", 20),
+            max_message_sends_per_minute=settings.get("MAX_MESSAGE_SENDS_PER_MINUTE", 60)
         )
     
     return _rate_limiter

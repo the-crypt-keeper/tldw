@@ -203,37 +203,7 @@ class WebUI {
 
         const html = await response.text();
         const mainContentArea = document.getElementById('main-content-area');
-        
-        // Create a temporary container to parse the HTML
-        const tempContainer = document.createElement('div');
-        tempContainer.innerHTML = html;
-        
-        // Extract and execute script tags
-        const scripts = tempContainer.querySelectorAll('script');
-        const scriptContents = [];
-        
-        scripts.forEach(script => {
-            scriptContents.push(script.innerHTML);
-            // Remove script from HTML to avoid duplication
-            script.remove();
-        });
-        
-        // Insert the HTML without scripts
-        mainContentArea.insertAdjacentHTML('beforeend', tempContainer.innerHTML);
-        
-        // Execute the scripts in global scope
-        scriptContents.forEach(scriptContent => {
-            if (scriptContent.trim()) {
-                try {
-                    // Use Function constructor to execute in global scope
-                    const globalEval = new Function(scriptContent);
-                    globalEval();
-                    console.log('Executed script from', groupName);
-                } catch (error) {
-                    console.error('Error executing script from', groupName, error);
-                }
-            }
-        });
+        mainContentArea.insertAdjacentHTML('beforeend', html);
 
         // Re-initialize form handlers for newly loaded content
         this.initFormHandlers();

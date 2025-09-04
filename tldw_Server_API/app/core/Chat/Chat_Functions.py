@@ -605,9 +605,9 @@ def chat_api_call(
         error_text = getattr(e.response, 'text', str(e))
         log_message_base = f"{endpoint_lower} API call failed with status {status_code}"
 
-        # Log safely first
+        # Log safely first - use repr() to avoid issues with JSON containing curly braces
         try:
-            logging.error("%s. Details: %s", log_message_base, error_text[:500], exc_info=False)
+            logging.error(f"{log_message_base}. Details: {repr(error_text[:500])}", exc_info=False)
         except Exception as log_e:
             logging.error(f"Error during logging HTTPError details: {log_e}")
 
