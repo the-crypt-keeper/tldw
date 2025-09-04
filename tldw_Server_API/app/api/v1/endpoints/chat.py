@@ -925,7 +925,11 @@ async def create_chat_completion(
             
             content_to_save: Optional[str] = None
             if isinstance(llm_response, dict): # OpenAI-like
-                content_to_save = llm_response.get("choices", [{}])[0].get("message", {}).get("content")
+                choices = llm_response.get("choices")
+                if choices and isinstance(choices, list) and len(choices) > 0:
+                    content_to_save = choices[0].get("message", {}).get("content")
+                else:
+                    logger.warning("LLM response does not contain valid choices array")
                 
                 # Track token usage if available
                 usage = llm_response.get("usage")
@@ -940,6 +944,9 @@ async def create_chat_completion(
                     )
             elif isinstance(llm_response, str):
                 content_to_save = llm_response
+            elif llm_response is None:
+                logger.error("LLM response is None - this indicates a serious issue with the LLM call")
+                raise ChatAPIError(provider=provider, message="LLM call returned None response", status_code=500)
 
             if content_to_save:
                 asst_name = character_card_for_context.get("name", "Assistant") if character_card_for_context else "Assistant"
@@ -1093,7 +1100,7 @@ async def create_chat_completion(
             message=f"Unexpected error in chat completion endpoint",
             details={
                 "error_type": type(e_final).__name__,
-                "request_id": request_id,
+                "request_id": request_id if 'request_id' in locals() else None,
                 "conversation_id": final_conversation_id if 'final_conversation_id' in locals() else None
             },
             cause=e_final,
@@ -1104,7 +1111,7 @@ async def create_chat_completion(
         # Send alert for critical errors
         if hasattr(e_final, '__module__') and 'sqlite' not in e_final.__module__:
             # Don't alert for database errors, they're handled separately
-            logger.critical(f"ALERT: Critical error in chat module - Request ID: {request_id}")
+            logger.critical(f"ALERT: Critical error in chat module - Request ID: {request_id if 'request_id' in locals() else 'Not set'}")
         
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

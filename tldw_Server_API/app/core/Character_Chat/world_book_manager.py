@@ -1284,6 +1284,18 @@ class WorldBookService:
         except Exception as e:
             logger.error(f"Error cloning world book: {e}")
             raise CharactersRAGDBError(f"Error cloning world book: {e}")
+    
+    def close(self):
+        """
+        Close the service and clean up resources.
+        
+        This method is provided for compatibility with test fixtures
+        that expect a close method. Since the database connection is
+        managed by CharactersRAGDB, this is a no-op.
+        """
+        # Database connections are managed by CharactersRAGDB
+        # Nothing to close here
+        pass
 
 
 # Export main classes

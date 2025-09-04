@@ -5,7 +5,7 @@ Tests invariants and properties that should always hold true.
 """
 
 import pytest
-from hypothesis import given, strategies as st, assume, settings
+from hypothesis import given, strategies as st, assume, settings, HealthCheck
 from hypothesis.stateful import RuleBasedStateMachine, rule, precondition, invariant, Bundle
 import json
 import re
@@ -250,6 +250,7 @@ class TestWorldBookProperties:
         content=st.text(min_size=1, max_size=500),
         priority=priority_strategy
     )
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_entry_keyword_matching(self, keywords, content, priority, world_book_service):
         """Entries should activate when keywords match."""
         service = world_book_service
@@ -283,6 +284,7 @@ class TestWorldBookProperties:
             max_size=10
         )
     )
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_priority_ordering_invariant(self, entries, world_book_service):
         """Activated entries should be ordered by priority."""
         service = world_book_service
@@ -312,6 +314,7 @@ class TestWorldBookProperties:
     @given(
         keyword=st.text(min_size=1, max_size=30).filter(lambda x: x.strip())
     )
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_keyword_case_insensitive(self, keyword, world_book_service):
         """Keywords should match case-insensitively."""
         service = world_book_service
@@ -347,6 +350,7 @@ class TestDictionaryProperties:
         pattern=st.text(min_size=1, max_size=50).filter(lambda x: x.strip()),
         replacement=st.text(min_size=0, max_size=100)
     )
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_literal_replacement_complete(self, pattern, replacement, chat_dictionary_service):
         """Literal replacements should replace all occurrences."""
         service = chat_dictionary_service
@@ -379,6 +383,7 @@ class TestDictionaryProperties:
             unique_by=lambda x: x[0]
         )
     )
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_multiple_replacements_no_conflicts(self, entries, chat_dictionary_service):
         """Multiple replacements should not interfere with each other."""
         service = chat_dictionary_service
@@ -404,6 +409,7 @@ class TestDictionaryProperties:
     
     @pytest.mark.property
     @given(probability=st.floats(min_value=0.0, max_value=1.0))
+    @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_probability_bounds(self, probability, chat_dictionary_service):
         """Probability replacements should respect bounds."""
         service = chat_dictionary_service

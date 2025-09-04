@@ -256,6 +256,181 @@ const Utils = {
     },
 
     /**
+     * Validate character/conversation IDs
+     */
+    validateId(id, type = 'any') {
+        if (!id) return false;
+        
+        // Check for basic ID format (alphanumeric with underscores/hyphens)
+        const idPattern = /^[a-zA-Z0-9_-]+$/;
+        if (!idPattern.test(id)) return false;
+        
+        // Type-specific validation
+        switch(type) {
+            case 'character':
+                return /^(char_)?[a-zA-Z0-9_-]+$/.test(id);
+            case 'conversation':
+                return /^(conv_)?[a-zA-Z0-9_-]+$/.test(id);
+            case 'numeric':
+                return /^\d+$/.test(id);
+            default:
+                return true;
+        }
+    },
+    
+    /**
+     * Validate and parse JSON safely
+     */
+    parseJSONSafely(jsonStr, defaultValue = null) {
+        try {
+            // Check for basic JSON structure
+            if (typeof jsonStr !== 'string') {
+                return defaultValue;
+            }
+            
+            // Trim whitespace
+            jsonStr = jsonStr.trim();
+            
+            // Check for empty strings
+            if (!jsonStr || jsonStr === '{}' || jsonStr === '[]') {
+                return defaultValue || (jsonStr === '[]' ? [] : {});
+            }
+            
+            // Parse and validate
+            const parsed = JSON.parse(jsonStr);
+            
+            // Additional security checks
+            const jsonString = JSON.stringify(parsed);
+            if (jsonString.length > 1000000) { // 1MB limit
+                console.warn('JSON too large, rejecting');
+                return defaultValue;
+            }
+            
+            return parsed;
+        } catch (e) {
+            console.error('Failed to parse JSON:', e.message);
+            return defaultValue;
+        }
+    },
+    
+    /**
+     * Validate file upload
+     */
+    validateFileUpload(file, options = {}) {
+        const {
+            maxSize = 10 * 1024 * 1024, // 10MB default
+            allowedTypes = [],
+            allowedExtensions = []
+        } = options;
+        
+        if (!file) return { valid: false, error: 'No file provided' };
+        
+        // Check file size
+        if (file.size > maxSize) {
+            return { valid: false, error: `File too large. Maximum size: ${this.formatBytes(maxSize)}` };
+        }
+        
+        // Check file type
+        if (allowedTypes.length > 0 && !allowedTypes.includes(file.type)) {
+            return { valid: false, error: `Invalid file type. Allowed: ${allowedTypes.join(', ')}` };
+        }
+        
+        // Check file extension
+        if (allowedExtensions.length > 0) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!allowedExtensions.includes(ext)) {
+                return { valid: false, error: `Invalid file extension. Allowed: ${allowedExtensions.join(', ')}` };
+            }
+        }
+        
+        return { valid: true };
+    },
+
+    /**
+     * Retry a function with exponential backoff
+     */
+    async retryWithBackoff(fn, options = {}) {
+        const {
+            maxRetries = 3,
+            initialDelay = 1000,
+            maxDelay = 10000,
+            backoffFactor = 2,
+            shouldRetry = (error) => true
+        } = options;
+        
+        let lastError;
+        
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                return await fn();
+            } catch (error) {
+                lastError = error;
+                
+                // Check if we should retry
+                if (attempt === maxRetries || !shouldRetry(error)) {
+                    throw error;
+                }
+                
+                // Calculate delay with exponential backoff
+                const delay = Math.min(
+                    initialDelay * Math.pow(backoffFactor, attempt),
+                    maxDelay
+                );
+                
+                console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+        
+        throw lastError;
+    },
+    
+    /**
+     * Error handler with user-friendly messages
+     */
+    handleError(error, context = '') {
+        console.error(`Error in ${context}:`, error);
+        
+        // Determine error type and provide user-friendly message
+        let userMessage = 'An unexpected error occurred';
+        let technicalDetails = error.message || 'Unknown error';
+        let recoveryAction = null;
+        
+        if (error.name === 'AbortError') {
+            userMessage = 'Request timed out';
+            recoveryAction = 'Try again with a shorter request or check your connection';
+        } else if (error.message?.includes('Failed to fetch')) {
+            userMessage = 'Connection failed';
+            recoveryAction = 'Check your internet connection and API server status';
+        } else if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+            userMessage = 'Authentication failed';
+            recoveryAction = 'Check your API key or login credentials';
+        } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+            userMessage = 'Access denied';
+            recoveryAction = 'You don\'t have permission for this action';
+        } else if (error.message?.includes('404')) {
+            userMessage = 'Resource not found';
+            recoveryAction = 'The requested item may have been deleted or moved';
+        } else if (error.message?.includes('429')) {
+            userMessage = 'Rate limit exceeded';
+            recoveryAction = 'Please wait a moment before trying again';
+        } else if (error.message?.includes('500') || error.message?.includes('Internal Server')) {
+            userMessage = 'Server error';
+            recoveryAction = 'The server encountered an error. Try again later';
+        } else if (error.message?.includes('JSON')) {
+            userMessage = 'Invalid data format';
+            recoveryAction = 'Check your input data and try again';
+        }
+        
+        return {
+            userMessage,
+            technicalDetails,
+            recoveryAction,
+            originalError: error
+        };
+    },
+    
+    /**
      * Format timestamp to readable date
      */
     formatDate(timestamp, includeTime = true) {

@@ -87,8 +87,7 @@ def character_db(test_db_path) -> Generator[CharactersRAGDB, None, None]:
         client_id="test_client"
     )
     
-    # Initialize the database schema
-    db.initialize_db()
+    # Schema is initialized automatically in constructor
     
     yield db
     
@@ -204,6 +203,14 @@ def mock_character_db():
     # Mock character methods
     db.add_character_card = Mock(return_value=1)  # This is what Character_Chat_Lib calls
     db.create_character_card = Mock(return_value=1)  # Keep for direct tests
+    db.get_character_card = Mock(return_value={  # Some tests expect this generic method
+        'id': 1,
+        'name': 'Test Character',
+        'description': 'Test description',
+        'personality': 'Test personality',
+        'first_message': 'Hello!',
+        'created_at': datetime.utcnow().isoformat()
+    })
     db.get_character_card_by_id = Mock(return_value={
         'id': 1,
         'name': 'Test Character',
@@ -640,16 +647,62 @@ def performance_metrics():
 # =====================================================================
 
 @pytest.fixture
-def test_client(test_env_vars):
-    """Create a test client for the FastAPI app."""
+def test_client(test_env_vars, character_db):
+    """Create a test client for the FastAPI app with proper dependency overrides."""
     from tldw_Server_API.app.main import app
-    return TestClient(app)
+    from tldw_Server_API.app.api.v1.API_Deps.ChaCha_Notes_DB_Deps import get_chacha_db_for_user
+    from tldw_Server_API.app.core.AuthNZ.User_DB_Handling import get_request_user, User
+    from tldw_Server_API.app.core.config import settings as global_settings
+    
+    # Save original settings
+    original_auth_mode = global_settings.get('AUTH_MODE')
+    original_api_key = global_settings.get('SINGLE_USER_API_KEY')
+    
+    # Configure for single-user mode testing
+    global_settings['AUTH_MODE'] = 'single_user'
+    global_settings['SINGLE_USER_API_KEY'] = 'test-api-key'
+    
+    # Override database dependency
+    def override_get_chacha_db_for_user():
+        """Override to return test database."""
+        return character_db
+    
+    # Override user authentication for testing
+    def override_get_request_user():
+        """Override to return a test user."""
+        return User(
+            id=1,
+            username="test_user",
+            email="test@example.com",
+            is_admin=True,
+            is_active=True
+        )
+    
+    app.dependency_overrides[get_chacha_db_for_user] = override_get_chacha_db_for_user
+    app.dependency_overrides[get_request_user] = override_get_request_user
+    
+    with TestClient(app) as client:
+        yield client
+    
+    # Cleanup
+    app.dependency_overrides.clear()
+    
+    # Restore original settings
+    if original_auth_mode is None:
+        global_settings.pop('AUTH_MODE', None)
+    else:
+        global_settings['AUTH_MODE'] = original_auth_mode
+    
+    if original_api_key is None:
+        global_settings.pop('SINGLE_USER_API_KEY', None)
+    else:
+        global_settings['SINGLE_USER_API_KEY'] = original_api_key
 
 @pytest.fixture
 def auth_headers():
     """Authentication headers for API requests."""
     return {
-        "Authorization": "Bearer test-api-key",
+        "X-API-KEY": "test-api-key",
         "Content-Type": "application/json"
     }
 

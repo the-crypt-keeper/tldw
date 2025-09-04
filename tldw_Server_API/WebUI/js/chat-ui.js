@@ -12,7 +12,37 @@ class ChatUI {
             tool: ''
         };
         this.presets = [];
+        this.eventListeners = new Map(); // Track event listeners for cleanup
+        this.dragDropHandlers = new Map(); // Track drag-drop handlers
+        this.autoSaveTimer = null; // For debouncing
         this.loadPresets();
+    }
+    
+    // Cleanup method to prevent memory leaks
+    cleanup() {
+        // Clear all event listeners
+        this.eventListeners.forEach((listener, element) => {
+            if (element && listener) {
+                element.removeEventListener(listener.event, listener.handler);
+            }
+        });
+        this.eventListeners.clear();
+        
+        // Clear drag-drop handlers
+        this.dragDropHandlers.forEach((handlers, element) => {
+            if (element && handlers) {
+                element.removeEventListener('dragover', handlers.dragover);
+                element.removeEventListener('dragleave', handlers.dragleave);
+                element.removeEventListener('drop', handlers.drop);
+            }
+        });
+        this.dragDropHandlers.clear();
+        
+        // Clear auto-save timer
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
+            this.autoSaveTimer = null;
+        }
     }
 
     loadPresets() {
@@ -155,6 +185,18 @@ class ChatUI {
     removeMessage(prefix, id) {
         const messageDiv = document.getElementById(`${prefix}_message_entry_${id}`);
         if (messageDiv) {
+            // Clean up any associated drag-drop handlers
+            const imageWrapper = messageDiv.querySelector(`#${prefix}_message_image_${id}`)?.parentElement;
+            if (imageWrapper) {
+                const handlers = this.dragDropHandlers.get(imageWrapper);
+                if (handlers) {
+                    imageWrapper.removeEventListener('dragover', handlers.dragover);
+                    imageWrapper.removeEventListener('dragleave', handlers.dragleave);
+                    imageWrapper.removeEventListener('drop', handlers.drop);
+                    this.dragDropHandlers.delete(imageWrapper);
+                }
+            }
+            
             messageDiv.remove();
             this.autoSaveMessages(prefix);
             Toast.success('Message removed');
@@ -238,19 +280,27 @@ class ChatUI {
     }
 
     initImageDragDrop(prefix, id) {
-        const wrapper = document.querySelector(`#${prefix}_message_image_${id}`).parentElement;
+        const wrapper = document.querySelector(`#${prefix}_message_image_${id}`)?.parentElement;
         if (!wrapper) return;
+        
+        // Clean up existing handlers if any
+        const existingHandlers = this.dragDropHandlers.get(wrapper);
+        if (existingHandlers) {
+            wrapper.removeEventListener('dragover', existingHandlers.dragover);
+            wrapper.removeEventListener('dragleave', existingHandlers.dragleave);
+            wrapper.removeEventListener('drop', existingHandlers.drop);
+        }
 
-        wrapper.addEventListener('dragover', (e) => {
+        const dragoverHandler = (e) => {
             e.preventDefault();
             wrapper.classList.add('drag-over');
-        });
+        };
 
-        wrapper.addEventListener('dragleave', () => {
+        const dragleaveHandler = () => {
             wrapper.classList.remove('drag-over');
-        });
+        };
 
-        wrapper.addEventListener('drop', (e) => {
+        const dropHandler = (e) => {
             e.preventDefault();
             wrapper.classList.remove('drag-over');
             
@@ -259,6 +309,18 @@ class ChatUI {
                 fileInput.files = e.dataTransfer.files;
                 this.handleImageUpload(prefix, id);
             }
+        };
+        
+        // Add new handlers
+        wrapper.addEventListener('dragover', dragoverHandler);
+        wrapper.addEventListener('dragleave', dragleaveHandler);
+        wrapper.addEventListener('drop', dropHandler);
+        
+        // Store handlers for cleanup
+        this.dragDropHandlers.set(wrapper, {
+            dragover: dragoverHandler,
+            dragleave: dragleaveHandler,
+            drop: dropHandler
         });
     }
 
@@ -397,12 +459,21 @@ class ChatUI {
     }
 
     autoSaveMessages(prefix) {
-        try {
-            const payload = this.buildPayload(prefix);
-            Utils.saveToStorage(`${prefix}_autosave`, payload);
-        } catch (e) {
-            // Silent fail for auto-save
+        // Clear existing timer
+        if (this.autoSaveTimer) {
+            clearTimeout(this.autoSaveTimer);
         }
+        
+        // Debounce auto-save by 500ms
+        this.autoSaveTimer = setTimeout(() => {
+            try {
+                const payload = this.buildPayload(prefix);
+                Utils.saveToStorage(`${prefix}_autosave`, payload);
+            } catch (e) {
+                // Silent fail for auto-save
+                console.debug('Auto-save failed:', e.message);
+            }
+        }, 500);
     }
 
     loadAutoSavedMessages(prefix) {

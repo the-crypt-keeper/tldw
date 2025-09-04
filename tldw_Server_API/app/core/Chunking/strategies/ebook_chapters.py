@@ -287,6 +287,8 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
             # Get custom pattern or use language-specific default
             custom_pattern = options.get('custom_chapter_pattern')
             if custom_pattern:
+                # Validate custom pattern for security
+                self._validate_regex_pattern(custom_pattern)
                 chapter_pattern = custom_pattern
             else:
                 chapter_pattern = self.CHAPTER_PATTERNS.get(
@@ -295,6 +297,7 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
                 )
             
             # Find all chapter markers
+            # Note: Pattern safety is ensured by _validate_regex_pattern above
             chapter_markers = list(re.finditer(chapter_pattern, text, re.MULTILINE))
             
             chunks = []

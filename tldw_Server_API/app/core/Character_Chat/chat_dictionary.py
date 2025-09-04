@@ -1192,6 +1192,18 @@ class ChatDictionaryService:
         except Exception as e:
             logger.error(f"Error cloning dictionary: {e}")
             raise CharactersRAGDBError(f"Error cloning dictionary: {e}")
+    
+    def close(self):
+        """
+        Close the service and clean up resources.
+        
+        This method is provided for compatibility with test fixtures
+        that expect a close method. Since the database connection is
+        managed by CharactersRAGDB, this is a no-op.
+        """
+        # Database connections are managed by CharactersRAGDB
+        # Nothing to close here
+        pass
 
 
 # Import handling to prevent breaking changes

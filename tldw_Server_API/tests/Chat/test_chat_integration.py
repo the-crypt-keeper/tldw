@@ -137,14 +137,14 @@ def test_chat_completion_integration(client, auth_token, test_chacha_db, setup_d
     
     settings = get_settings()
     
-    # Note: We're using "local-llm" as a test provider
-    # This avoids needing real external API keys for testing
+    # Note: We're using "openai" as a test provider with the mock server
+    # The configure_for_mock_server fixture sets up a mock OpenAI server
     request_data = ChatCompletionRequest(
         model="test-model",
         messages=[
             ChatCompletionUserMessageParam(role="user", content="Hello, how are you?")
         ],
-        api_provider="local-llm"  # Use local-llm provider for testing
+        api_provider="openai"  # Use openai provider with mock server
     )
     
     # Build headers
@@ -173,12 +173,12 @@ def test_chat_completion_integration(client, auth_token, test_chacha_db, setup_d
         if response.status_code == 500:
             print("500 error - checking server logs")
     
-    # For integration test, we expect either:
-    # - 200 OK if local-llm is properly configured
-    # - 503 Service Unavailable if local-llm server isn't running
+    # For integration test with mock server, we expect:
+    # - 200 OK if mock server is running and working properly
+    # - 503 Service Unavailable if mock server isn't running
     # - 500 Internal Server Error if there's a configuration issue
     
-    # Since we're not running a real local LLM server, we expect 503 or 500
+    # With the mock server fixture, we expect a 200 OK response
     assert response.status_code in [status.HTTP_200_OK, status.HTTP_503_SERVICE_UNAVAILABLE, status.HTTP_500_INTERNAL_SERVER_ERROR], \
         f"Expected 200, 503, or 500 but got {response.status_code}: {response.text}"
     

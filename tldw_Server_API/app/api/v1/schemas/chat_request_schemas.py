@@ -5,13 +5,13 @@
 import os
 from typing import Optional, Dict, Any, Literal, Union, List
 
-import toml
 from dotenv import load_dotenv
 #
 # 3rd-party imports
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 #
 # Local Imports
+from tldw_Server_API.app.core.config import load_comprehensive_config
 #
 #######################################################################################################################
 #
@@ -25,20 +25,29 @@ model_config = ConfigDict(extra="allow", from_attributes=True)
 
 # Config Loading
 load_dotenv()
-try:
-    _config = toml.load("config.toml")
-except FileNotFoundError:
-    _config = {}
+_config = load_comprehensive_config() or {}
 
 def _get_setting(env_var, section, key, default=""):
     env_value = os.getenv(env_var)
     if env_value is not None:
         return env_value
+    
+    # Handle different config structures
+    # First check if section exists directly
     config_section = _config.get(section)
     if config_section:
         config_value = config_section.get(key)
         if config_value is not None:
             return config_value
+    
+    # Also check external_providers for API keys
+    if section == "api_keys":
+        external_providers = _config.get("external_providers", {})
+        if key in external_providers:
+            provider_config = external_providers[key]
+            if isinstance(provider_config, dict):
+                return provider_config.get("api_key", default)
+    
     return default
 ALL_SUPPORTED_PROVIDER_NAMES_LIST: List[str] = [
     "anthropic",

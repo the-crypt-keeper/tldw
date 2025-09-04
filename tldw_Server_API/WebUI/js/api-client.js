@@ -11,7 +11,59 @@ class APIClient {
         this.configLoaded = false;
         this.authMode = 'unknown'; // 'single-user', 'multi-user', or 'unknown'
         this.websockets = new Map(); // Store active WebSocket connections
+        this.activeRequests = new Map(); // Track active fetch requests
         this.init();
+    }
+    
+    // Cleanup method to close all connections
+    cleanup() {
+        // Close all WebSocket connections
+        this.websockets.forEach((ws, key) => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+        });
+        this.websockets.clear();
+        
+        // Abort all active requests
+        this.activeRequests.forEach((controller, key) => {
+            if (controller) {
+                controller.abort();
+            }
+        });
+        this.activeRequests.clear();
+    }
+    
+    // Create or get WebSocket connection
+    getWebSocket(url, options = {}) {
+        const key = `${url}_${JSON.stringify(options)}`;
+        
+        // Check if we have an existing connection
+        if (this.websockets.has(key)) {
+            const ws = this.websockets.get(key);
+            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                return ws;
+            }
+            // Connection is closed, remove it
+            this.websockets.delete(key);
+        }
+        
+        // Create new WebSocket
+        const ws = new WebSocket(url);
+        
+        // Set up auto-cleanup on close
+        ws.addEventListener('close', () => {
+            this.websockets.delete(key);
+        });
+        
+        ws.addEventListener('error', () => {
+            this.websockets.delete(key);
+        });
+        
+        // Store the connection
+        this.websockets.set(key, ws);
+        
+        return ws;
     }
 
     async init() {
@@ -183,16 +235,23 @@ class APIClient {
 
         // Record request start time
         const startTime = Date.now();
+        const requestKey = `${method}_${path}_${Date.now()}`;
 
         try {
-            // Create abort controller for timeout
+            // Create abort controller for timeout and tracking
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            this.activeRequests.set(requestKey, controller);
+            
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+                this.activeRequests.delete(requestKey);
+            }, timeout);
             
             fetchOptions.signal = controller.signal;
             
             const response = await fetch(url.toString(), fetchOptions);
             clearTimeout(timeoutId);
+            this.activeRequests.delete(requestKey);
             
             const duration = Date.now() - startTime;
 

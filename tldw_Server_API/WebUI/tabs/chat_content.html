@@ -209,8 +209,8 @@
             <div class="chat-input-group">
                 <textarea id="chat-input" placeholder="Type your message..." style="width: 100%; min-height: 60px; margin-bottom: 10px;"></textarea>
                 <div class="btn-group">
-                    <button class="btn btn-primary" onclick="sendChatMessage()">Send</button>
-                    <button class="btn btn-secondary" onclick="clearChat()">Clear Chat</button>
+                    <button class="btn btn-primary" onclick="sendChatMessage()" aria-label="Send message" role="button">Send</button>
+                    <button class="btn btn-secondary" onclick="clearChat()" aria-label="Clear chat history" role="button">Clear Chat</button>
                     <select id="chat-model" class="llm-model-select" style="margin-left: 10px;">
                         <option value="">Loading models...</option>
                     </select>
@@ -384,7 +384,15 @@ async function makeChatCompletionsRequest() {
         if (model) payload.model = model;
         
         const messagesText = document.getElementById('chatCompletions_messages').value;
-        payload.messages = JSON.parse(messagesText);
+        try {
+            const parsedMessages = JSON.parse(messagesText);
+            if (!Array.isArray(parsedMessages)) {
+                throw new Error('Messages must be an array');
+            }
+            payload.messages = parsedMessages;
+        } catch (e) {
+            throw new Error('Invalid messages JSON format: ' + e.message);
+        }
         
         const temperature = parseFloat(document.getElementById('chatCompletions_temperature').value);
         if (!isNaN(temperature)) payload.temperature = temperature;
@@ -441,7 +449,14 @@ async function makeChatCompletionsRequest() {
         const logitBiasText = document.getElementById('chatCompletions_logit_bias').value;
         if (logitBiasText && logitBiasText !== '{}') {
             try {
-                payload.logit_bias = JSON.parse(logitBiasText);
+                try {
+                    const parsed = JSON.parse(logitBiasText);
+                    if (parsed && typeof parsed === 'object') {
+                        payload.logit_bias = parsed;
+                    }
+                } catch (e) {
+                    console.warn('Invalid logit bias JSON:', e);
+                }
             } catch (e) {
                 console.warn('Invalid logit bias JSON:', e);
             }
@@ -451,17 +466,38 @@ async function makeChatCompletionsRequest() {
         const promptTemplate = document.getElementById('chatCompletions_prompt_template').value;
         if (promptTemplate) payload.prompt_template_name = promptTemplate;
         
-        const characterId = parseInt(document.getElementById('chatCompletions_character_id').value);
-        if (!isNaN(characterId)) payload.character_id = characterId;
+        const characterIdStr = document.getElementById('chatCompletions_character_id').value;
+        if (characterIdStr) {
+            const characterId = parseInt(characterIdStr);
+            if (!isNaN(characterId) && characterId > 0) {
+                payload.character_id = characterId;
+            } else {
+                console.warn('Invalid character ID:', characterIdStr);
+            }
+        }
         
         const conversationId = document.getElementById('chatCompletions_conversation_id').value;
-        if (conversationId) payload.conversation_id = conversationId;
+        if (conversationId) {
+            // Basic validation for conversation ID
+            if (/^[a-zA-Z0-9_-]+$/.test(conversationId)) {
+                payload.conversation_id = conversationId;
+            } else {
+                console.warn('Invalid conversation ID format:', conversationId);
+            }
+        }
         
         // Function Calling
         const toolsText = document.getElementById('chatCompletions_tools').value;
         if (toolsText && toolsText !== '[]') {
             try {
-                payload.tools = JSON.parse(toolsText);
+                try {
+                    const parsedTools = JSON.parse(toolsText);
+                    if (parsedTools && Array.isArray(parsedTools)) {
+                        payload.tools = parsedTools;
+                    }
+                } catch (e) {
+                    console.warn('Invalid tools JSON:', e);
+                }
             } catch (e) {
                 console.warn('Invalid tools JSON:', e);
             }
@@ -472,7 +508,14 @@ async function makeChatCompletionsRequest() {
             const toolChoiceJSON = document.getElementById('chatCompletions_tool_choice_json').value;
             if (toolChoiceJSON && toolChoiceJSON !== '{}') {
                 try {
-                    payload.tool_choice = JSON.parse(toolChoiceJSON);
+                    try {
+                        const parsed = JSON.parse(toolChoiceJSON);
+                        if (parsed) {
+                            payload.tool_choice = parsed;
+                        }
+                    } catch (e) {
+                        console.warn('Invalid tool choice JSON:', e);
+                    }
                 } catch (e) {
                     console.warn('Invalid tool choice JSON:', e);
                 }
@@ -509,6 +552,7 @@ async function makeChatCompletionsRequest() {
 }
 
 // Interactive chat interface
+const MAX_CHAT_MESSAGES = 100; // Limit chat history for performance
 let chatMessages = [
     {role: 'system', content: 'You are a helpful assistant.'}
 ];
@@ -526,7 +570,14 @@ async function sendChatMessage() {
     // Add user message to display
     const userDiv = document.createElement('div');
     userDiv.className = 'chat-message user';
-    userDiv.innerHTML = `<strong>User:</strong> <span>${Utils.escapeHtml(userMessage)}</span>`;
+    // Create user message elements safely
+    const userLabel = document.createElement('strong');
+    userLabel.textContent = 'User:';
+    const userContent = document.createElement('span');
+    userContent.textContent = userMessage;
+    userDiv.appendChild(userLabel);
+    userDiv.appendChild(document.createTextNode(' '));
+    userDiv.appendChild(userContent);
     messagesDiv.appendChild(userDiv);
     
     // Add to messages array
@@ -545,7 +596,10 @@ async function sendChatMessage() {
     assistantDiv.appendChild(assistantContent);
     messagesDiv.appendChild(assistantDiv);
     
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    // Use requestAnimationFrame for smooth scrolling
+    requestAnimationFrame(() => {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
     
     try {
         const response = await apiClient.post('/api/v1/chat/completions', {
@@ -588,7 +642,10 @@ async function sendChatMessage() {
         console.error('Chat error:', error);
     }
     
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    // Use requestAnimationFrame for smooth scrolling
+    requestAnimationFrame(() => {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
 }
 
 function clearChat() {
@@ -626,6 +683,25 @@ async function exportCharacter() {
         responseEl.textContent = `Error: ${error.message}`;
     }
 }
+
+// Make functions globally available immediately
+(function() {
+    if (typeof window !== 'undefined') {
+        window.toggleLogprobs = toggleLogprobs;
+        window.toggleToolChoiceJSON = toggleToolChoiceJSON;
+        window.makeChatCompletionsRequest = makeChatCompletionsRequest;
+        window.sendChatMessage = sendChatMessage;
+        window.clearChat = clearChat;
+        window.exportCharacter = exportCharacter;
+        
+        // Also ensure they're available on the global object
+        if (!window.makeChatCompletionsRequest) {
+            console.error('Failed to attach makeChatCompletionsRequest to window');
+        } else {
+            console.log('Chat functions successfully attached to window');
+        }
+    }
+})();
 
 // Handle Enter key in chat input
 document.addEventListener('DOMContentLoaded', () => {
@@ -728,6 +804,26 @@ async function populateModelDropdowns() {
     }
 }
 
+// Make character functions globally available immediately
+(function() {
+    if (typeof window !== 'undefined') {
+        window.createCharacter = createCharacter;
+        window.listCharacters = listCharacters;
+        window.getCharacter = getCharacter;
+        window.updateCharacter = updateCharacter;
+        window.deleteCharacter = deleteCharacter;
+        window.createConversation = createConversation;
+        window.listConversations = listConversations;
+        window.getConversationDetails = getConversationDetails;
+        window.sendConversationMessage = sendConversationMessage;
+        window.updateConversation = updateConversation;
+        window.deleteConversation = deleteConversation;
+        window.exportConversation = exportConversation;
+        
+        console.log('Character/conversation functions attached to window');
+    }
+})();
+
 // Call populateModelDropdowns when the chat content is loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Check if we're on a page with model dropdowns
@@ -743,6 +839,8 @@ document.addEventListener('DOMContentLoaded', () => {
     margin-bottom: 10px;
     padding: 8px;
     border-radius: 4px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .chat-message.user {
@@ -761,6 +859,77 @@ document.addEventListener('DOMContentLoaded', () => {
     font-style: italic;
 }
 
+/* Mobile Responsiveness */
+@media screen and (max-width: 768px) {
+    .chat-message.user,
+    .chat-message.assistant {
+        margin-left: 0;
+        margin-right: 0;
+        max-width: 100%;
+    }
+    
+    .chat-messages {
+        height: 300px !important;
+    }
+    
+    .endpoint-section {
+        padding: 10px;
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    textarea {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    .btn-group {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+    
+    .btn {
+        min-width: 80px;
+        padding: 10px 16px;
+        font-size: 16px;
+    }
+    
+    select.llm-model-select {
+        width: 100%;
+        margin-left: 0 !important;
+        margin-top: 10px;
+    }
+    
+    fieldset {
+        padding: 5px;
+    }
+    
+    /* Make advanced options more accessible on mobile */
+    details.advanced-params summary {
+        padding: 10px;
+        font-size: 16px;
+        background-color: #f0f0f0;
+        border-radius: 5px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .chat-messages {
+        height: 250px !important;
+    }
+    
+    .endpoint-section h2 {
+        font-size: 1.2rem;
+    }
+    
+    .api-button {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+    }
+}
+
 .typing {
     animation: pulse 1.5s infinite;
 }
@@ -775,6 +944,7 @@ document.addEventListener('DOMContentLoaded', () => {
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .btn {
@@ -783,6 +953,8 @@ document.addEventListener('DOMContentLoaded', () => {
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
+    touch-action: manipulation; /* Better touch handling */
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
 }
 
 .btn-primary {

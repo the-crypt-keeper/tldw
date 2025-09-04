@@ -20,22 +20,22 @@ class TestCharacterCardEndpoints:
     def test_create_character_endpoint(self, test_client, auth_headers, sample_character_card):
         """Test creating a character via API."""
         response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json=sample_character_card,
             headers=auth_headers
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
-        assert 'character_id' in data
-        assert data['character_id'] > 0
+        assert 'id' in data
+        assert data['id'] > 0
     
     @pytest.mark.integration
     def test_get_character_endpoint(self, test_client, auth_headers):
         """Test getting a character via API."""
         # Create character
         create_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'API Test Character',
                 'description': 'Test character via API',
@@ -44,7 +44,7 @@ class TestCharacterCardEndpoints:
             },
             headers=auth_headers
         )
-        char_id = create_response.json()['character_id']
+        char_id = create_response.json()['id']
         
         # Get character
         response = test_client.get(
@@ -63,7 +63,7 @@ class TestCharacterCardEndpoints:
         # Create multiple characters
         for i in range(3):
             test_client.post(
-                "/api/v1/characters/create",
+                "/api/v1/characters/",
                 json={
                     'name': f'Character {i}',
                     'description': f'Description {i}',
@@ -75,21 +75,22 @@ class TestCharacterCardEndpoints:
         
         # List characters
         response = test_client.get(
-            "/api/v1/characters/list",
+            "/api/v1/characters/",
             headers=auth_headers
         )
         
         assert response.status_code == 200
         data = response.json()
-        assert 'characters' in data
-        assert len(data['characters']) >= 3
+        # List endpoint returns array directly
+        assert isinstance(data, list)
+        assert len(data) >= 3
     
     @pytest.mark.integration
     def test_update_character_endpoint(self, test_client, auth_headers):
         """Test updating a character via API."""
         # Create character
         create_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Original',
                 'description': 'Original desc',
@@ -98,11 +99,12 @@ class TestCharacterCardEndpoints:
             },
             headers=auth_headers
         )
-        char_id = create_response.json()['character_id']
+        char_id = create_response.json()['id']
+        char_version = create_response.json()['version']
         
-        # Update character
+        # Update character (with expected_version for optimistic locking)
         update_response = test_client.put(
-            f"/api/v1/characters/{char_id}",
+            f"/api/v1/characters/{char_id}?expected_version={char_version}",
             json={
                 'name': 'Updated',
                 'description': 'Updated description'
@@ -112,7 +114,7 @@ class TestCharacterCardEndpoints:
         
         assert update_response.status_code == 200
         data = update_response.json()
-        assert data['success'] is True
+        assert data['id'] == char_id
         
         # Verify update
         get_response = test_client.get(
@@ -126,7 +128,7 @@ class TestCharacterCardEndpoints:
         """Test deleting a character via API."""
         # Create character
         create_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'To Delete',
                 'description': 'Will be deleted',
@@ -135,17 +137,18 @@ class TestCharacterCardEndpoints:
             },
             headers=auth_headers
         )
-        char_id = create_response.json()['character_id']
+        char_id = create_response.json()['id']
+        char_version = create_response.json()['version']
         
-        # Delete character
+        # Delete character (with expected_version for optimistic locking)
         delete_response = test_client.delete(
-            f"/api/v1/characters/{char_id}",
+            f"/api/v1/characters/{char_id}?expected_version={char_version}",
             headers=auth_headers
         )
         
         assert delete_response.status_code == 200
         data = delete_response.json()
-        assert data['success'] is True
+        assert 'message' in data or 'detail' in data
         
         # Verify deletion
         get_response = test_client.get(
@@ -166,7 +169,7 @@ class TestChatSessionEndpoints:
         """Test creating a chat session via API."""
         # Create character first
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Chat Character',
                 'description': 'For chat testing',
@@ -175,7 +178,7 @@ class TestChatSessionEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         # Create chat
         response = test_client.post(
@@ -197,7 +200,7 @@ class TestChatSessionEndpoints:
         """Test getting a chat session via API."""
         # Create character and chat
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Test Character',
                 'description': 'Test',
@@ -206,7 +209,7 @@ class TestChatSessionEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -231,7 +234,7 @@ class TestChatSessionEndpoints:
         """Test listing user's chats via API."""
         # Create character
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'List Test',
                 'description': 'Test',
@@ -240,7 +243,7 @@ class TestChatSessionEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         # Create multiple chats
         for i in range(3):
@@ -269,7 +272,7 @@ class TestChatSessionEndpoints:
         """Test deleting a chat session via API."""
         # Create character and chat
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Delete Test',
                 'description': 'Test',
@@ -278,7 +281,7 @@ class TestChatSessionEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -294,7 +297,8 @@ class TestChatSessionEndpoints:
         )
         
         assert delete_response.status_code == 200
-        assert delete_response.json()['success'] is True
+        data = delete_response.json()
+        assert 'message' in data or 'detail' in data
 
 # ========================================================================
 # Message Endpoint Tests
@@ -308,7 +312,7 @@ class TestMessageEndpoints:
         """Test sending a message via API."""
         # Setup character and chat
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Message Test',
                 'description': 'Test',
@@ -317,7 +321,7 @@ class TestMessageEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -346,7 +350,7 @@ class TestMessageEndpoints:
         """Test getting chat messages via API."""
         # Setup character, chat, and messages
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Get Messages Test',
                 'description': 'Test',
@@ -355,7 +359,7 @@ class TestMessageEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -391,7 +395,7 @@ class TestMessageEndpoints:
         """Test editing a message via API."""
         # Setup
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Edit Test',
                 'description': 'Test',
@@ -400,7 +404,7 @@ class TestMessageEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -431,7 +435,7 @@ class TestMessageEndpoints:
         """Test deleting a message via API."""
         # Setup
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Delete Msg Test',
                 'description': 'Test',
@@ -440,7 +444,7 @@ class TestMessageEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -463,7 +467,8 @@ class TestMessageEndpoints:
         )
         
         assert delete_response.status_code == 200
-        assert delete_response.json()['success'] is True
+        data = delete_response.json()
+        assert 'message' in data or 'detail' in data
 
 # ========================================================================
 # Character Chat Completion Tests
@@ -477,7 +482,7 @@ class TestCharacterChatCompletion:
         """Test getting AI response for character chat."""
         # Setup character with specific personality
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Assistant',
                 'description': 'Helpful AI',
@@ -486,7 +491,7 @@ class TestCharacterChatCompletion:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -515,7 +520,7 @@ class TestCharacterChatCompletion:
         """Test streaming chat completion."""
         # Setup
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Streamer',
                 'description': 'Streaming test',
@@ -524,7 +529,7 @@ class TestCharacterChatCompletion:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -564,7 +569,7 @@ class TestSearchEndpoints:
         """Test searching characters via API."""
         # Create characters with different tags
         test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Fantasy Wizard',
                 'description': 'Magic user',
@@ -576,7 +581,7 @@ class TestSearchEndpoints:
         )
         
         test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Science Bot',
                 'description': 'Science helper',
@@ -606,7 +611,7 @@ class TestSearchEndpoints:
         # Create tagged characters
         for i in range(3):
             test_client.post(
-                "/api/v1/characters/create",
+                "/api/v1/characters/",
                 json={
                     'name': f'Tagged {i}',
                     'description': 'Test',
@@ -619,15 +624,16 @@ class TestSearchEndpoints:
         
         # Filter by common tag
         response = test_client.post(
-            "/api/v1/characters/filter",
+            "/api/v1/characters/search/",
             json={'tags': ['common']},
             headers=auth_headers
         )
         
         assert response.status_code == 200
         data = response.json()
-        assert 'characters' in data
-        assert len(data['characters']) >= 3
+        # List endpoint returns array directly
+        assert isinstance(data, list)
+        assert len(data) >= 3
 
 # ========================================================================
 # Import/Export Endpoint Tests
@@ -641,7 +647,7 @@ class TestImportExportEndpoints:
         """Test exporting a character via API."""
         # Create character
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Export Test',
                 'description': 'To be exported',
@@ -651,7 +657,7 @@ class TestImportExportEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         # Export
         response = test_client.get(
@@ -674,10 +680,10 @@ class TestImportExportEndpoints:
             headers=auth_headers
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.json()
-        assert 'character_id' in data
-        assert data['character_id'] > 0
+        assert 'id' in data
+        assert data['id'] > 0
         
         # Verify import
         char_response = test_client.get(
@@ -691,7 +697,7 @@ class TestImportExportEndpoints:
         """Test exporting chat history via API."""
         # Setup character and chat with messages
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'History Export',
                 'description': 'Test',
@@ -700,7 +706,7 @@ class TestImportExportEndpoints:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -745,7 +751,7 @@ class TestRateLimiting:
         """Test rate limiting per character."""
         # Create character
         char_response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': 'Rate Limited',
                 'description': 'Test',
@@ -754,7 +760,7 @@ class TestRateLimiting:
             },
             headers=auth_headers
         )
-        char_id = char_response.json()['character_id']
+        char_id = char_response.json()['id']
         
         chat_response = test_client.post(
             "/api/v1/chats/create",
@@ -800,7 +806,7 @@ class TestErrorHandling:
     def test_invalid_character_data(self, test_client, auth_headers):
         """Test 422 for invalid character data."""
         response = test_client.post(
-            "/api/v1/characters/create",
+            "/api/v1/characters/",
             json={
                 'name': '',  # Empty name
                 'description': 'Test'
@@ -815,6 +821,6 @@ class TestErrorHandling:
     @pytest.mark.integration
     def test_unauthorized_access(self, test_client):
         """Test 401 for missing authentication."""
-        response = test_client.get("/api/v1/characters/list")
+        response = test_client.get("/api/v1/characters/")
         
         assert response.status_code in [401, 403]
