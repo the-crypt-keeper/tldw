@@ -11,7 +11,7 @@ import json
 import re
 from datetime import datetime
 
-from tldw_Server_API.app.core.Character_Chat.Character_Chat_Lib import CharacterChatManager
+from tldw_Server_API.tests.Character_Chat_NEW.test_utils import CharacterChatManager
 from tldw_Server_API.app.core.Character_Chat.chat_dictionary import ChatDictionaryService
 from tldw_Server_API.app.core.Character_Chat.world_book_manager import WorldBookService
 

@@ -526,7 +526,7 @@ async function sendChatMessage() {
     // Add user message to display
     const userDiv = document.createElement('div');
     userDiv.className = 'chat-message user';
-    userDiv.innerHTML = `<strong>User:</strong> ${Utils.escapeHtml(userMessage)}`;
+    userDiv.innerHTML = `<strong>User:</strong> <span>${Utils.escapeHtml(userMessage)}</span>`;
     messagesDiv.appendChild(userDiv);
     
     // Add to messages array
@@ -535,7 +535,14 @@ async function sendChatMessage() {
     // Create assistant message placeholder
     const assistantDiv = document.createElement('div');
     assistantDiv.className = 'chat-message assistant';
-    assistantDiv.innerHTML = '<strong>Assistant:</strong> <span class="typing">Thinking...</span>';
+    const assistantLabel = document.createElement('strong');
+    assistantLabel.textContent = 'Assistant:';
+    const assistantContent = document.createElement('span');
+    assistantContent.className = 'typing';
+    assistantContent.textContent = 'Thinking...';
+    assistantDiv.appendChild(assistantLabel);
+    assistantDiv.appendChild(document.createTextNode(' '));
+    assistantDiv.appendChild(assistantContent);
     messagesDiv.appendChild(assistantDiv);
     
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -551,12 +558,33 @@ async function sendChatMessage() {
         if (response.choices && response.choices[0] && response.choices[0].message) {
             const assistantMessage = response.choices[0].message.content;
             chatMessages.push({role: 'assistant', content: assistantMessage});
-            assistantDiv.innerHTML = `<strong>Assistant:</strong> ${Utils.escapeHtml(assistantMessage)}`;
+            assistantDiv.innerHTML = '';
+            const label = document.createElement('strong');
+            label.textContent = 'Assistant:';
+            const content = document.createElement('span');
+            content.textContent = assistantMessage;
+            assistantDiv.appendChild(label);
+            assistantDiv.appendChild(document.createTextNode(' '));
+            assistantDiv.appendChild(content);
         } else {
-            assistantDiv.innerHTML = '<strong>Assistant:</strong> <em>No response received</em>';
+            assistantDiv.innerHTML = '';
+            const label2 = document.createElement('strong');
+            label2.textContent = 'Assistant:';
+            const error = document.createElement('em');
+            error.textContent = 'No response received';
+            assistantDiv.appendChild(label2);
+            assistantDiv.appendChild(document.createTextNode(' '));
+            assistantDiv.appendChild(error);
         }
     } catch (error) {
-        assistantDiv.innerHTML = `<strong>Assistant:</strong> <em>Error: ${Utils.escapeHtml(error.message)}</em>`;
+        assistantDiv.innerHTML = '';
+        const errorLabel = document.createElement('strong');
+        errorLabel.textContent = 'Assistant:';
+        const errorMsg = document.createElement('em');
+        errorMsg.textContent = `Error: ${error.message}`;
+        assistantDiv.appendChild(errorLabel);
+        assistantDiv.appendChild(document.createTextNode(' '));
+        assistantDiv.appendChild(errorMsg);
         console.error('Chat error:', error);
     }
     
@@ -568,7 +596,11 @@ function clearChat() {
         {role: 'system', content: 'You are a helpful assistant.'}
     ];
     const messagesDiv = document.getElementById('chat-messages');
-    messagesDiv.innerHTML = '<div class="chat-message system">System: You are a helpful assistant.</div>';
+    messagesDiv.innerHTML = '';
+    const systemDiv = document.createElement('div');
+    systemDiv.className = 'chat-message system';
+    systemDiv.textContent = 'System: You are a helpful assistant.';
+    messagesDiv.appendChild(systemDiv);
 }
 
 // Character export functionality

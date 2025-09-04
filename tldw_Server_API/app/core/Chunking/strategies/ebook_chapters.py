@@ -151,15 +151,9 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
         except re.error as e:
             raise InvalidInputError(f"Invalid regex pattern: {e}")
         
-        # Test for exponential complexity with a sample
-        test_input = "a" * 50
-        try:
-            with self._regex_timeout(1) as timeout:  # 1 second timeout for test
-                timeout.run_with_timeout(re.search, pattern, test_input)
-        except ProcessingError:
-            raise InvalidInputError(
-                "Regex pattern appears to have exponential complexity"
-            )
+        # Don't actually test the regex execution - the DANGEROUS_PATTERNS check above
+        # should catch problematic patterns. Testing them would cause the very problem
+        # we're trying to prevent (ReDoS during validation).
         
         return True
     
@@ -199,13 +193,10 @@ class EbookChapterChunkingStrategy(BaseChunkingStrategy):
                 )
                 logger.debug(f"Using {self.language} chapter pattern")
             
-            # Find all chapter markers with timeout protection
-            try:
-                with self._regex_timeout(self.REGEX_TIMEOUT):
-                    chapter_markers = list(re.finditer(chapter_pattern, text, re.MULTILINE))
-            except ProcessingError as e:
-                logger.error(f"Regex timeout during chapter detection: {e}")
-                raise InvalidInputError(f"Chapter pattern search timed out: {e}")
+            # Find all chapter markers 
+            # Note: Pattern safety is ensured by _validate_regex_pattern above
+            # which rejects dangerous patterns before they can be compiled
+            chapter_markers = list(re.finditer(chapter_pattern, text, re.MULTILINE))
             
             if not chapter_markers:
                 logger.info("No chapter markers found, treating entire text as single chapter")

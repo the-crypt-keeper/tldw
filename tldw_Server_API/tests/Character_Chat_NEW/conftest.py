@@ -164,7 +164,10 @@ def populated_character_db(character_db) -> CharactersRAGDB:
 @pytest.fixture
 def chat_dictionary_service(test_db_path) -> Generator[ChatDictionaryService, None, None]:
     """Create a ChatDictionaryService instance for testing."""
-    service = ChatDictionaryService(db_path=str(test_db_path))
+    from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
+    
+    db = CharactersRAGDB(str(test_db_path), client_id="test_client")
+    service = ChatDictionaryService(db)
     
     yield service
     
@@ -177,7 +180,10 @@ def chat_dictionary_service(test_db_path) -> Generator[ChatDictionaryService, No
 @pytest.fixture
 def world_book_service(test_db_path) -> Generator[WorldBookService, None, None]:
     """Create a WorldBookService instance for testing."""
-    service = WorldBookService(db_path=str(test_db_path))
+    from tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB import CharactersRAGDB
+    
+    db = CharactersRAGDB(str(test_db_path), client_id="test_client")
+    service = WorldBookService(db)
     
     yield service
     
@@ -192,9 +198,13 @@ def mock_character_db():
     """Create a mock CharactersRAGDB for unit tests."""
     db = MagicMock(spec=CharactersRAGDB)
     
+    # Mock initialization
+    db.initialize_db = Mock(return_value=None)
+    
     # Mock character methods
-    db.create_character_card = Mock(return_value=1)
-    db.get_character_card = Mock(return_value={
+    db.add_character_card = Mock(return_value=1)  # This is what Character_Chat_Lib calls
+    db.create_character_card = Mock(return_value=1)  # Keep for direct tests
+    db.get_character_card_by_id = Mock(return_value={
         'id': 1,
         'name': 'Test Character',
         'description': 'Test description',
@@ -202,9 +212,11 @@ def mock_character_db():
         'first_message': 'Hello!',
         'created_at': datetime.utcnow().isoformat()
     })
+    db.get_character_card_by_name = Mock(return_value=None)  # No conflicts by default
     db.list_character_cards = Mock(return_value=[])
-    db.update_character_card = Mock(return_value={'success': True})
-    db.delete_character_card = Mock(return_value={'success': True})
+    db.update_character_card = Mock(return_value=True)
+    db.soft_delete_character_card = Mock(return_value=True)
+    db.delete_character_card = Mock(return_value=True)
     
     # Mock chat methods
     db.create_chat = Mock(return_value=1)
@@ -218,17 +230,19 @@ def mock_character_db():
     db.list_chats = Mock(return_value=[])
     db.add_message = Mock(return_value=1)
     db.get_messages = Mock(return_value=[])
+    db.delete_chat_session = Mock(return_value=True)
     
     return db
 
-# NOTE: CharacterChatManager doesn't exist - this fixture is disabled
-# @pytest.fixture
-# def mock_chat_manager(mock_character_db):
-#     """Create a CharacterChatManager with mocked database for unit tests."""
-#     with patch('tldw_Server_API.app.core.Character_Chat.Character_Chat_Lib.CharactersRAGDB', return_value=mock_character_db):
-#         manager = CharacterChatManager(db_path=":memory:")
-#         manager.db = mock_character_db
-#         yield manager
+@pytest.fixture
+def mock_chat_manager(mock_character_db):
+    """Create a CharacterChatManager with mocked database for unit tests."""
+    from tldw_Server_API.tests.Character_Chat_NEW.test_utils import CharacterChatManager
+    
+    with patch('tldw_Server_API.app.core.DB_Management.ChaChaNotes_DB.CharactersRAGDB', return_value=mock_character_db):
+        manager = CharacterChatManager(db_path=":memory:")
+        manager.db = mock_character_db
+        yield manager
 
 # =====================================================================
 # Character Card Fixtures

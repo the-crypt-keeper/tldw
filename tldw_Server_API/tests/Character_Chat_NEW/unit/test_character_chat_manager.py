@@ -10,7 +10,7 @@ from unittest.mock import Mock, MagicMock, patch, call
 from datetime import datetime
 import json
 
-from tldw_Server_API.app.core.Character_Chat.Character_Chat_Lib import CharacterChatManager
+from tldw_Server_API.tests.Character_Chat_NEW.test_utils import CharacterChatManager
 
 # ========================================================================
 # Character Card Management Tests
