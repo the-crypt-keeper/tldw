@@ -145,11 +145,14 @@ class CharacterChatManager:
         """Get information about a chat session."""
         # Return basic info about the chat
         messages = self.get_chat_messages(chat_id)
-        if messages:
+        # Try to get conversation details
+        conv = self.db.get_conversation_by_id(chat_id)
+        if conv or messages:
             return {
                 'id': chat_id,
-                'message_count': len(messages),
-                'messages': messages
+                'character_id': conv.get('character_id') if conv else None,
+                'message_count': len(messages) if messages else 0,
+                'messages': messages or []
             }
         return None
     
@@ -174,7 +177,12 @@ class CharacterChatManager:
     
     def get_messages(self, chat_id: int) -> List[Dict[str, Any]]:
         """Get messages from a chat (alias for get_chat_messages)."""
-        return self.get_chat_messages(chat_id)
+        messages = self.get_chat_messages(chat_id)
+        # Map 'sender' to 'role' for compatibility
+        for msg in messages:
+            if 'sender' in msg and 'role' not in msg:
+                msg['role'] = msg['sender']
+        return messages
     
     def get_recent_messages(self, chat_id: int, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent messages from a chat."""
@@ -242,7 +250,32 @@ class CharacterChatManager:
     
     def import_character_card(self, card_data: Dict[str, Any]) -> Optional[int]:
         """Import a character card."""
-        return self.create_character_card(**card_data)
+        # Filter out metadata fields that shouldn't be imported
+        import_data = {}
+        allowed_fields = {
+            'name', 'description', 'personality', 'scenario', 'system_prompt',
+            'image', 'post_history_instructions', 'first_message', 'message_example',
+            'creator_notes', 'alternate_greetings', 'tags', 'creator', 'extensions'
+        }
+        
+        for key, value in card_data.items():
+            if key in allowed_fields:
+                import_data[key] = value
+        
+        # Ensure we have required fields
+        if 'creator' not in import_data:
+            import_data['creator'] = 'imported'
+        
+        # Try to create with original name, if it fails due to conflict, add a suffix
+        try:
+            return self.create_character_card(**import_data)
+        except Exception as e:
+            if 'already exists' in str(e) and 'name' in import_data:
+                # Add _imported suffix to avoid conflict
+                import time
+                import_data['name'] = f"{import_data['name']}_imported_{time.time()}"
+                return self.create_character_card(**import_data)
+            raise
     
     def export_chat_history(self, chat_id: int, format: str = "json") -> Dict[str, Any]:
         """Export chat history."""
@@ -274,21 +307,16 @@ class CharacterChatManager:
         words = message.split()
         chunks = []
         current_chunk = []
-        current_size = 0
         
         for word in words:
-            # Add 1 for the space between words
-            word_size = 1 if current_chunk else 0
-            
-            if current_size + word_size <= chunk_size:
-                current_chunk.append(word)
-                current_size += word_size
-            else:
-                # Start a new chunk
+            # Check if adding this word would exceed the chunk size
+            if len(current_chunk) + 1 > chunk_size:
+                # Save current chunk and start a new one
                 if current_chunk:
                     chunks.append(' '.join(current_chunk))
                 current_chunk = [word]
-                current_size = 1
+            else:
+                current_chunk.append(word)
         
         # Add the last chunk
         if current_chunk:

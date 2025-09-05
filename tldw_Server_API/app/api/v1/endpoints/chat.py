@@ -651,7 +651,11 @@ async def create_chat_completion(
                 if msg_parts:
                     hist_entry = {"role": role, "content": msg_parts}
                     if role == "assistant" and character_card_for_context and character_card_for_context.get('name'):
-                        hist_entry["name"] = character_card_for_context.get('name')
+                        # Sanitize character name for OpenAI API compatibility (no spaces or special chars)
+                        name = character_card_for_context.get('name', '')
+                        name = name.replace(' ', '_').replace('<', '').replace('>', '').replace('|', '').replace('\\', '').replace('/', '')
+                        if name:  # Only add if name is not empty after sanitization
+                            hist_entry["name"] = name
                     historical_openai_messages.append(hist_entry)
             logger.info(f"Loaded {len(historical_openai_messages)} historical messages for conv_id '{final_conversation_id}'.")
 
@@ -669,7 +673,11 @@ async def create_chat_completion(
 
             msg_for_llm = msg_dict.copy()
             if msg_model.role == "assistant" and character_card_for_context and character_card_for_context.get('name'):
-                msg_for_llm["name"] = character_card_for_context.get('name')
+                # Sanitize character name for OpenAI API compatibility (no spaces or special chars)
+                name = character_card_for_context.get('name', '')
+                name = name.replace(' ', '_').replace('<', '').replace('>', '').replace('|', '').replace('\\', '').replace('/', '')
+                if name:  # Only add if name is not empty after sanitization
+                    msg_for_llm["name"] = name
             current_turn_messages_for_llm.append(msg_for_llm)
 
         # --- Prompt Templating ---
@@ -850,7 +858,9 @@ async def create_chat_completion(
             async def save_callback(full_reply: str):
                 """Callback to save the assistant's reply after streaming completes."""
                 if full_reply and final_conversation_id:
+                    # Sanitize character name for OpenAI API compatibility (no spaces or special chars)
                     asst_name = character_card_for_context.get("name", "Assistant") if character_card_for_context else "Assistant"
+                    asst_name = asst_name.replace(' ', '_').replace('<', '').replace('>', '').replace('|', '').replace('\\', '').replace('/', '')
                     logger.info(f"Saving assistant reply (len {len(full_reply)}) for conv_id {final_conversation_id}")
                     # Use transaction for atomic save
                     await _save_message_turn_to_db(
@@ -961,7 +971,9 @@ async def create_chat_completion(
                 raise ChatAPIError(provider=provider, message="LLM call returned None response", status_code=500)
 
             if content_to_save:
+                # Sanitize character name for OpenAI API compatibility (no spaces or special chars)
                 asst_name = character_card_for_context.get("name", "Assistant") if character_card_for_context else "Assistant"
+                asst_name = asst_name.replace(' ', '_').replace('<', '').replace('>', '').replace('|', '').replace('\\', '').replace('/', '')
                 await _save_message_turn_to_db(chat_db, final_conversation_id, {"role": "assistant", "name": asst_name, "content": content_to_save}, use_transaction=True)
 
             # Use CPU-bound handler for large JSON encoding
@@ -1076,8 +1088,16 @@ async def create_chat_completion(
                             ChatConfigurationError: 503, ChatProviderError: getattr(e_chat, 'status_code', 502),
                             ChatAPIError: getattr(e_chat, 'status_code', 500) }
         err_status = status_code_map.get(type(e_chat), 500)
-        # Use repr() for the message to avoid issues with JSON containing curly braces
-        logger.error(f"Chat Library Error: {type(e_chat).__name__} - {repr(e_chat.message)} (Provider: {e_chat.provider}, UpstreamStatus: {getattr(e_chat, 'status_code', 'N/A')})", exc_info=True)
+        # Don't use f-string when logging errors that might contain JSON with curly braces
+        # Use lazy formatting to avoid issues with curly braces in error messages
+        logger.error(
+            "Chat Library Error: {} - {} (Provider: {}, UpstreamStatus: {})", 
+            type(e_chat).__name__, 
+            repr(e_chat.message), 
+            e_chat.provider, 
+            getattr(e_chat, 'status_code', 'N/A'),
+            exc_info=True
+        )
         # Standardize error messages - never expose internal details for 5xx errors
         if err_status < 500:
             # Client errors can have more detail

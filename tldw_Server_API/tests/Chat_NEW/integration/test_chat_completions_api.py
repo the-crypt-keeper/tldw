@@ -208,7 +208,13 @@ class TestDatabaseIntegration:
             assert response.status_code == status.HTTP_200_OK
             
             # Check database for saved conversation
-            conversations = populated_chacha_db.get_all_conversations()
+            # Get the Default Character first
+            characters = populated_chacha_db.list_character_cards()
+            default_char = next((c for c in characters if c['name'] == 'Default Character'), None)
+            assert default_char is not None
+            
+            # Get conversations for the character
+            conversations = populated_chacha_db.get_conversations_for_character(default_char['id'])
             assert len(conversations) > 0
             
         finally:
@@ -231,13 +237,15 @@ class TestDatabaseIntegration:
             characters = populated_chacha_db.list_character_cards()
             assert len(characters) > 0
             
-            # Get conversations for the first character
-            first_char = characters[0]
-            conversations = populated_chacha_db.get_conversations_for_character(first_char["id"])
+            # Find the character we created in the fixture (Default Character with client_id test_user)
+            test_char = next((c for c in characters if c['name'] == 'Default Character' and c['client_id'] == 'test_user'), None)
+            assert test_char is not None, "Could not find test character 'Default Character'"
+            
+            conversations = populated_chacha_db.get_conversations_for_character(test_char["id"])
             assert len(conversations) > 0
             
             first_conv = conversations[0]
-            messages = populated_chacha_db.get_messages(first_conv["id"])
+            messages = populated_chacha_db.get_messages_for_conversation(first_conv["id"])
             assert len(messages) > 0
             
         finally:
@@ -333,6 +341,10 @@ class TestStreamingResponses:
                 },
                 headers=auth_headers
             ) as response:
+                # Debug: print error if request failed
+                if response.status_code != status.HTTP_200_OK:
+                    error_text = await response.aread()
+                    print(f"\nStreaming test error response: {error_text.decode() if error_text else 'No response body'}")
                 assert response.status_code == status.HTTP_200_OK
                 
                 chunks = []

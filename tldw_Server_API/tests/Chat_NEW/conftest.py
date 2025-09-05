@@ -93,8 +93,9 @@ def chacha_db(temp_db_path) -> CharactersRAGDB:
 def populated_chacha_db(chacha_db) -> CharactersRAGDB:
     """Create a CharactersRAGDB with test data."""
     # First, add a character card
+    # Create Default Character that the system expects
     character_data = {
-        'name': 'Assistant',
+        'name': 'Default Character',
         'description': 'A helpful assistant',
         'personality': 'Helpful and friendly',
         'system_prompt': 'You are a helpful assistant.',

@@ -309,9 +309,12 @@ async def prepare_llm_messages(
         
         msg_dict = msg_model.model_dump(exclude_none=True)
         
-        # Add character name for assistant messages
+        # Add character name for assistant messages (sanitized for OpenAI compatibility)
         if msg_model.role == "assistant" and character_card and character_card.get('name'):
-            msg_dict["name"] = character_card.get('name')
+            # OpenAI requires name to match pattern ^[^\\s<|\\\/>]+$ (no spaces or special chars)
+            name = character_card.get('name', '').replace(' ', '_').replace('<', '').replace('>', '').replace('|', '').replace('\\', '').replace('/', '')
+            if name:  # Only add if name is not empty after sanitization
+                msg_dict["name"] = name
         
         llm_messages.append(msg_dict)
     
