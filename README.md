@@ -13,6 +13,9 @@ YouTube contains an incredible amount of knowledge, much of which is locked insi
 - `roller-*.py` - rolling summarization
   - [can-ai-code](https://github.com/the-crypt-keeper/can-ai-code) - interview executors to run LLM inference
 
+- `roller-pegasus.py` - rolling summarization from the *video itself* (optional)
+  - [TwelveLabs Pegasus](https://twelvelabs.io) - video-understanding model; summarizes what is on screen, not just the transcript. Reads the source URL from `<prefix>.info.json` and analyzes it in rolling time-windows. Needs `pip install twelvelabs fire jinja2` and `TWELVELABS_API_KEY` (free tier available).
+
 - `compare.py` - prepare LLM outputs for webapp
 - `compare-app.py` - summary viewer webapp
 
